@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 
 import type { ReactNode } from 'react'
@@ -26,9 +26,14 @@ import { mergeSlices } from '@/lib/api/slice'
 import { type LatLng, SELECTED_PLACE_MAP_LEVEL } from '@/lib/geo/coord'
 import { getCurrentPosition, getPositionIfGranted, offersLocate } from '@/lib/geo/current-position'
 import {
+  areaAfterFramedIdle,
   areaAfterIdle,
   areaAfterResearch,
+  focusedPlaceMapArea,
+  type FocusFraming,
+  framingAfterIdle,
   INITIAL_PLACE_MAP_AREA,
+  PLACE_MAP_FOCUS_RADIUS_METERS,
   type PlaceMapArea,
   placesInArea,
 } from '@/lib/map/place-map-area'
@@ -89,6 +94,7 @@ export function PlaceMapView({
   renderListRow,
   sheetMaxTopInset,
   panelTopInset,
+  initialFocus,
 }: {
   filters: PlaceFilters
   /** 미로그인이면 반려견 목록을 조회하지 않는다 — 필터의 크기 축이 빠진다 (#200) */
@@ -163,6 +169,18 @@ export function PlaceMapView({
    * `sheetMaxTopInset` 이 모바일 시트에 대해 하는 일과 같은 축이다.
    */
   panelTopInset?: number | undefined
+  /**
+   * **처음 열 자리** — 담기 화면이 그날 직전 장소를 넘긴다 (#1177, `addPlaceFocus`).
+   *
+   * 주면 지도가 이 점으로 카메라를 옮기고, 첫 목록을 **"이 지역에서 재검색" 을 이미 누른
+   * 상태로** 시작한다(`focusedPlaceMapArea` — 서버 거리순 `/places/nearby`). 주지 않으면
+   * (`/places`, 기준점이 없는 날) 지금까지와 한 글자도 다르지 않다 — 제주 기본 화면에 목록 캐시.
+   *
+   * **마운트 때 값만 쓴다.** 담기는 응답으로 상세를 갈아끼워 호출부의 기준점이 방금 담은
+   * 곳으로 바뀌는데, 그때마다 카메라가 옮겨지면 여러 곳을 연달아 담는 흐름(#370)이 매번
+   * 끊긴다 — 사용자가 맞춰 둔 확대·위치가 날아간다. 이름이 `initial` 인 이유다.
+   */
+  initialFocus?: LatLng | null | undefined
 }) {
   /*
     **`undefined` 만이 아니라 `null`·`false` 도 "머리 없음" 이다** (#1012 검토). 호출부가
@@ -193,7 +211,11 @@ export function PlaceMapView({
     아래 행이 당겨졌다 — Lighthouse 모바일 CLS 0.159, 범인이 시트 행이었다. 권유의 자는
     처음부터 있어야 해서 그 일만 `originBounds` 로 떼어 냈다.
   */
-  const [area, setArea] = useState<PlaceMapArea>(INITIAL_PLACE_MAP_AREA)
+  /* 마운트 때 값으로 얼린다 — `initialFocus` 주석 */
+  const [focus] = useState<LatLng | null>(initialFocus ?? null)
+  const [area, setArea] = useState<PlaceMapArea>(() =>
+    focus === null ? INITIAL_PLACE_MAP_AREA : focusedPlaceMapArea(focus),
+  )
   const searchedBounds = area.searched
   const originBounds = area.origin
   /*
@@ -204,7 +226,15 @@ export function PlaceMapView({
     목록 필터의 자리이고 이것은 데이터 출처의 자리다. 영역 쪽이 다시 첫 `idle` 에 채워지는
     변경이 와도 들어오자마자 프리페치한 캐시를 버리는 일이 없게 한다.
   */
-  const [researched, setResearched] = useState(false)
+  /* 기준점이 있으면 재검색을 누른 상태로 시작한다 (#1177) — 들어오자마자 주변 조회가 나간다 */
+  const [researched, setResearched] = useState(focus !== null)
+  /*
+    **기준점 지도의 카메라가 어디까지 왔나** (#1177, `framingAfterIdle`). `null` 이면 기준점이
+    없는 지도라 `/places` 의 `areaAfterIdle` 그대로다.
+
+    ref 인 이유: 화면에 그리는 값이 아니라 다음 `idle` 을 어떻게 받을지만 정한다.
+  */
+  const framingRef = useRef<FocusFraming | null>(focus === null ? null : 'pending')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sheetStop, setSheetStop] = useState<SheetStop>('mid')
   const [panelOpen, setPanelOpen] = useState(true)
@@ -279,7 +309,14 @@ export function PlaceMapView({
     와 `목록 0곳` 을 먼저 말했다가 행으로 바뀌었다. 그 동안은 로딩 폴백과 같은 행 골격을 둔다
     (`PlaceMapRowsSkeleton`).
   */
-  const listPending = !usingNearby && listQuery.isPending
+  /*
+    **기준점 지도는 주변 조회를 기다린다** (#1177). 목록 캐시(프리페치한 첫 장)는 이미 있어
+    `listQuery.isPending` 이 거짓이라, 그것만 보면 주변 조회가 오기 전에 첫 장을 기준점
+    영역으로 거른 결과 — 대개 0곳 — 가 `이 지역에는 표시할 곳이 없어요` 로 먼저 깜빡인다.
+    조회가 실패하면(`isPending` 거짓) 지금처럼 목록 캐시로 떨어진다.
+  */
+  const listPending =
+    !usingNearby && (listQuery.isPending || (focus !== null && nearbyQuery.isPending))
   const places: PlaceSummary[] = useMemo(
     () => (usingNearby ? (nearbyQuery.data?.places.map((entry) => entry.place) ?? []) : listPlaces),
     [usingNearby, nearbyQuery.data, listPlaces],
@@ -356,6 +393,22 @@ export function PlaceMapView({
   )
 
   const handleBounds = useCallback((next: MapBounds, userMoved: boolean) => {
+    /*
+      **기준점 지도는 따로 받는다** (#1177, `framingAfterIdle`). 첫 `idle` 은 카메라가 옮기기
+      전의 제주 기본 시야라, 아래 갈래로 받으면 권유 기준이 그것으로 덮여 카메라가 옮기자마자
+      재검색 버튼이 뜬다. 카메라를 놓은 뒤 첫 `idle` 을 권유 기준으로 삼는다.
+    */
+    const framing = framingRef.current
+    if (framing !== null) {
+      const step = framingAfterIdle(framing)
+      framingRef.current = step.framing
+      if (!step.seen) return
+
+      setBounds(next)
+      if (step.adoptOrigin) setArea((current) => areaAfterFramedIdle(current, next))
+      return
+    }
+
     setBounds(next)
 
     /*
@@ -372,6 +425,31 @@ export function PlaceMapView({
     */
     setArea((current) => areaAfterIdle(current, next, userMoved))
   }, [])
+
+  /** 카메라를 놓았다 — 다음 `idle` 이 그 결과다 (`framingAfterIdle`) */
+  const handleCameraApplied = useCallback(() => {
+    if (framingRef.current === 'pending') framingRef.current = 'applied'
+  }, [])
+
+  /*
+    **기준점으로 옮기는 카메라** (#1177). `MapCanvas` 는 새 객체를 새 틀로 읽으므로 반드시
+    `useMemo` 이고, `focus` 가 마운트 때 얼린 값이라 렌더마다 다시 옮기지 않는다.
+
+    - `spanMeters` 는 기준점 영역의 한 변(지름)이다 — 첫 목록이 세는 사각형이 짧은 변에
+      통째로 든다. 단계가 정수라 실제 화면은 그보다 넓다(375 폭 레벨 8 ≈ 12km)
+    - `anchorRatio` 는 기본(0.35)에 맡긴다. **0.5 가 아니다** — 모바일 시트 `mid`(45dvh)가
+      지도 아래 절반을 덮고 위에는 머리·검색 카드가 떠서, 기준점이 보이는 띠가 대략 지도 높이의
+      18~47% 다(375×812 에서 머리·검색 바닥 182 · 시트 윗변 383 으로 **계산한 값**이다 — 카카오
+      지도가 뜬 상태로는 재지 못했다). 0.5 면 기준점이 시트 윗변에 걸린다. 데스크톱은 시트가 없어 어느
+      쪽이든 보인다
+    - `refitOnResize` 는 켜지 않는다. 시트·패널은 지도 위에 떠서 컨테이너 크기를 바꾸지 않고,
+      창 크기를 바꾼 사람을 처음 틀로 되돌릴 이유도 없다 — `/emergency` 와 같은 판단이다
+  */
+  const focusCamera = useMemo(
+    () =>
+      focus === null ? null : { anchor: focus, spanMeters: PLACE_MAP_FOCUS_RADIUS_METERS * 2 },
+    [focus],
+  )
 
   /**
    * "이 지역에서 재검색" — 지금 보이는 영역을 조회 자리로 삼는다.
@@ -505,6 +583,8 @@ export function PlaceMapView({
         selectedId={selectedId}
         onSelect={setSelectedId}
         onBoundsChange={handleBounds}
+        onCameraApplied={handleCameraApplied}
+        camera={focusCamera}
         center={center}
         /* 카드를 누르면 그 핀으로 옮기고 동네가 보이는 단계까지 확대한다 */
         selectedLevel={SELECTED_PLACE_MAP_LEVEL}
@@ -731,9 +811,14 @@ export function PlaceMapView({
               <PlaceMapFilterBar filters={filters} authed={authed} />
             </div>
 
-            <p className="text-caption text-fg-muted border-border bg-bg-sunken border-b px-4 py-2 font-medium">
+            {/*
+              **`p` 가 아니라 `div` 다** (#1177). 대기 중에는 골격(`Skeleton` 은 `div`)을 품는데 `p`
+              안의 `div` 는 HTML 이 허락하지 않아 하이드레이션이 깨진다. 담기 지도가 기준점으로
+              열리면 서버 렌더 시점에 주변 조회가 대기 중이라 이 갈래가 처음으로 서버에서 그려졌다.
+            */}
+            <div className="text-caption text-fg-muted border-border bg-bg-sunken border-b px-4 py-2 font-medium">
               {listPending ? <Skeleton className="h-4.5 w-20" /> : countLine}
-            </p>
+            </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto">
               {listPending ? (

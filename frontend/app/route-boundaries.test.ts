@@ -252,7 +252,10 @@ describe('로딩 골격 — 완료 화면과 같은 자리', () => {
   it('장소 지도 — 목록 대기 중에는 빈 상태가 아니라 같은 행 골격이다', () => {
     const view = code('src/features/place/place-map-view.tsx')
 
-    expect(view).toContain('const listPending = !usingNearby && listQuery.isPending')
+    // #1177 이 기준점 지도의 주변 조회 대기를 같은 골격에 더했다 — 목록 대기 갈래는 그대로다
+    expect(view).toContain(
+      '!usingNearby && (listQuery.isPending || (focus !== null && nearbyQuery.isPending))',
+    )
     expect(view.match(/<PlaceMapRowsSkeleton \/>/g)).toHaveLength(2)
   })
 

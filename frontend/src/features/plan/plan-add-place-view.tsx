@@ -23,6 +23,7 @@ import { usePlanDetail } from '@/features/plan/use-plan-detail'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
 import { messages } from '@/lib/messages'
+import { addPlaceFocus } from '@/lib/plan/add-place-focus'
 import { itemInsertIndex, placeIdsOf } from '@/lib/plan/day-items'
 import { groupItemsByDay } from '@/lib/plan/detail'
 import { PLAN_ADD_DEFAULT_VIEW, type ViewMode, viewModeHref } from '@/lib/url/view-mode'
@@ -327,6 +328,18 @@ export function PlanAddPlaceView({
             sheetMaxTopInset={SHEET_MAX_TOP_INSET + headExtra}
             panelTopInset={PANEL_TOP_INSET + headExtra}
             mutedPlaceIds={addedPlaceIds}
+            /*
+              **그날 직전 장소에서 연다** (#1177). 예전에는 그날과 무관하게 제주시 기본 화면에
+              `/places` 첫 장(`placeId` 순 — 한경면부터)이었다. 규칙은 `addPlaceFocus` 가 갖는다.
+
+              `useMemo` 로 감싸지 않는다 — 이 자리는 조건부 return 뒤라 훅을 둘 수 없고,
+              `PlaceMapView` 가 **마운트 때 값만** 쓰므로(`initialFocus`) 렌더마다 새 객체여도
+              카메라가 다시 옮겨지지 않는다. 담기 응답으로 기준점이 바뀌어도 마찬가지다(#370).
+
+              **목록 보기에는 넘기지 않는다** — `/places` 가 좌표·정렬을 받지 않아, 클라이언트에서
+              정렬하면 받아 둔 페이지만 정렬하는 거짓이 된다 (담기지도 세부명세 #1177 · BE 후속).
+            */
+            initialFocus={addPlaceFocus(day, days)}
             renderRowAction={(place) =>
               planAddPlaceAction(place, {
                 addedPlaceIds,

@@ -243,3 +243,25 @@ describe('담기 화면의 검색 자리 (#1012)', () => {
     expect(tag).toMatch(/\bsearchable\b/)
   })
 })
+
+/**
+ * 담기 지도의 기준점 — 이슈 #1177.
+ *
+ * 규칙(직전 장소 → 그날 숙소 → 전날 숙소 → 없음)은 `add-place-focus.test.ts` 가, 지도가 그
+ * 점에서 여는 상태 전이는 `place-map-area.test.ts` 가 잰다. 여기서는 **지도 갈래만** 넘기는지
+ * 본다 — 목록 보기는 `/places` 가 좌표·정렬을 받지 않아 그대로다 (BE 후속).
+ */
+describe('담기 지도의 기준점 (#1177)', () => {
+  const code = readSourceWithoutComments('src/features/plan/plan-add-place-view.tsx')
+
+  it('지도 갈래가 그날 기준점을 넘긴다', () => {
+    const mapStart = code.indexOf("if (view === 'map')")
+    const listStart = code.indexOf('<PlanAddPlaceShell', mapStart)
+
+    expect(code.slice(mapStart, listStart)).toContain('initialFocus={addPlaceFocus(day, days)}')
+  })
+
+  it('목록 갈래는 넘기지 않는다 — 기준점을 쓰는 곳이 지도 한 곳이다', () => {
+    expect(code.split('addPlaceFocus(').length - 1).toBe(1)
+  })
+})
