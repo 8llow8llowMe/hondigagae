@@ -4,8 +4,8 @@ description = """
 Read-only root-cause investigator for difficult bugs, races, transaction issues, security failures, and data inconsistencies.
 """
 
-model = "gpt-5.6-sol"
-model_reasoning_effort = "high"
+# 추론 강도는 파일에 고정하지 않는다. dev-orchestrator가 T0–T3에 맞춰 spawn 시 지정한다.
+model = "gpt-6.1-sol"
 sandbox_mode = "read-only"
 
 developer_instructions = """

@@ -1,5 +1,8 @@
 [agents]
 enabled = true
 max_concurrent_threads_per_session = 4
-default_subagent_model = "gpt-5.6-terra"
+# 역할 파일은 model만 고정한다. model_reasoning_effort를 파일에 두면
+# spawn 시 지정한 강도보다 우선해서 T0–T3 승격이 막힌다.
+# 강도를 생략한 호출은 아래 기본값(medium)을 쓴다.
+default_subagent_model = "gpt-6-luna"
 default_subagent_reasoning_effort = "medium"

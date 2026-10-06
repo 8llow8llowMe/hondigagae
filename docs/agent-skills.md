@@ -44,16 +44,17 @@
 
 ## 개발 오케스트레이션
 
-`dev-orchestrator`는 CRUD, 일반 기능, 버그, 리팩토링, 아키텍처, 대형 기능을 분류해 필요한 역할만 선택하는 공용 진입점이다. 항상 여러 에이전트를 호출하지 않고 독립적인 읽기 전용 작업만 선택적으로 병렬화한다.
+`dev-orchestrator`는 작업을 `SIMPLE`·`FEATURE`·`BUG`·`REFACTOR`·`ARCHITECTURE`·`LARGE_FEATURE`와 복잡도 `T0`–`T3`로 나눈 뒤 필요한 역할만 선택하는 공용 진입점이다. 항상 여러 에이전트를 호출하지 않고 독립적인 읽기 전용 작업만 선택적으로 병렬화한다. `xhigh`에 해당하는 최상위 승격은 `T3`에서만 쓴다.
 
-프로젝트 범위 역할 파일과 모델 배정의 정본은 호스트별로 나뉜다.
+공통 절차는 스킬 본문이고, 호스트별 실행 수단은 스킬 안의 어댑터다.
 
-| 호스트 | 역할 파일 | 정본 문서 |
-|--------|-----------|-----------|
-| Codex | `.codex/agents/*.toml` | [Codex 역할별 에이전트 운영 가이드](codex-agents.md) |
-| Claude Code | `.claude/agents/*.md` | [Claude Code 역할별 에이전트 운영 가이드](claude-agents.md) |
+| 호스트 | 역할 파일 | 실행 수단 | 정본 |
+|--------|-----------|-----------|------|
+| Codex | `.codex/agents/*.toml` | 모델·추론 강도 | [adapters/codex.md](../.agents/skills/dev-orchestrator/adapters/codex.md), [codex-agents.md](codex-agents.md) |
+| Cursor | 없음 | Ask·Plan·Agent 모드 | [adapters/cursor.md](../.agents/skills/dev-orchestrator/adapters/cursor.md) |
+| Claude Code | `.claude/agents/*.md` | 역할 파일의 `model` | [claude-agents.md](claude-agents.md) |
 
-**작업 분류와 라우팅 판단은 두 문서가 같다.** 다른 것은 실행 수단(TOML 설정 vs Markdown frontmatter), 모델 이름, 읽기 전용 강제 방식(`sandbox_mode` vs `tools`)뿐이다. Cursor처럼 전용 역할 파일이 없는 호스트에서는 같은 스킬의 작업 분류를 쓰되 해당 호스트의 역할 위임 기능에 맞춰 실행하고, 기능이 없으면 메인 실행자가 순서대로 수행한다.
+**작업 분류와 복잡도 판정은 세 호스트가 같다.** 다른 것은 실행 수단이다. Codex는 spawn 시 모델과 추론 강도를 지정하고, Cursor는 모드와 검토 분리로 같은 등급을 표현하며, Claude Code는 역할 파일의 모델을 유지한 채 `T3`에서 검토 역할을 더한다. 한 호스트의 모델 ID를 다른 호스트에 복사하지 않는다. 위임 기능이 없으면 메인 실행자가 같은 순서로 수행한다.
 
 ## 인코딩
 

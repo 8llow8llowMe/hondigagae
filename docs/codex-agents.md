@@ -24,28 +24,31 @@ Codex 설정은 저장소의 `.codex/config.toml`과 `.codex/agents/*.toml`에 �
 [agents]
 enabled = true
 max_concurrent_threads_per_session = 4
-default_subagent_model = "gpt-5.6-terra"
+default_subagent_model = "gpt-6-luna"
 default_subagent_reasoning_effort = "medium"
 ```
 
 - 상한 4는 **하위 에이전트 스레드 수**이며 메인 스레드는 제외된다.
 - 상한을 채우는 것이 목표가 아니다. 보통 읽기 전용 역할 1~2개면 충분하다.
-- 역할 파일에 모델과 추론 강도가 있으면 그 값이 기본값보다 우선한다.
+- 역할 파일은 `model`만 고정한다. `model_reasoning_effort`는 파일에 두지 않는다. Codex는 파일에 적힌 값을 spawn 요청보다 우선하므로, 강도를 파일에 고정하면 복잡도 승격이 막힌다.
+- 강도를 생략한 호출은 `default_subagent_reasoning_effort`(`medium`)를 쓴다. `dev-orchestrator` 경유 호출은 복잡도 표를 spawn 인자로 지정한다.
 - 프로젝트 범위 설정은 사용자가 저장소를 신뢰한 경우에만 로드된다.
 
 ## 역할과 모델
 
-| 역할 | 모델 | 추론 | 권한 | 사용 시점 |
-|------|------|------|------|-----------|
-| `explorer` | `gpt-5.6-terra` | medium | read-only | 파일 탐색, 호출 흐름, 의존성 파악 |
-| `crud_implementer` | `gpt-5.6-terra` | medium | workspace-write | 명확한 CRUD·DTO·매핑·검증·작은 테스트 |
-| `implementer` | `gpt-5.6-sol` | medium | workspace-write | 일반 기능과 원인이 확정된 버그 구현 |
-| `bug_investigator` | `gpt-5.6-sol` | high | read-only | 어려운 버그·트랜잭션·동시성·보안 원인 분석 |
-| `reviewer` | `gpt-5.6-sol` | high | read-only | 최종 diff의 정확성·회귀·보안·테스트 검토 |
-| `refactorer` | `gpt-5.6-sol` | high | workspace-write | 동작 보존 리팩토링 구현 |
-| `architect` | `gpt-6-astra` | high | read-only | 교차 모듈·MSA·보안·트랜잭션 설계 |
+| 역할 | 모델 | 권한 | 사용 시점 |
+|------|------|------|-----------|
+| `explorer` | `gpt-6-luna` | read-only | 파일 탐색, 호출 흐름, 의존성 파악 |
+| `crud_implementer` | `gpt-6-luna` | workspace-write | 명확한 CRUD·DTO·매핑·검증·작은 테스트 |
+| `implementer` | `gpt-6.1-sol` | workspace-write | 일반 기능과 원인이 확정된 버그 구현 |
+| `bug_investigator` | `gpt-6.1-sol` | read-only | 어려운 버그·트랜잭션·동시성·보안 원인 분석 |
+| `reviewer` | `gpt-6.1-sol` | read-only | 최종 diff의 정확성·회귀·보안·테스트 검토 |
+| `refactorer` | `gpt-6.1-sol` | workspace-write | 동작 보존 리팩토링 구현 |
+| `architect` | `gpt-6-astra` | read-only | 교차 모듈·MSA·보안·트랜잭션 설계 |
 
-모델 접근 권한은 계정과 배포 상태에 따라 다를 수 있다. `gpt-6-astra`를 사용할 수 없는 계정에서는 아키텍처 작업을 시작하기 전에 `.codex/agents/architect.toml`의 모델을 팀이 합의한 대체 모델로 조정하거나 메인 실행자에게 제한을 보고한다.
+추론 강도(`low` / `medium` / `high` / `xhigh`)는 역할 이름이 아니라 `T0`–`T3`로 고른다. 표는 [Codex 어댑터](../.agents/skills/dev-orchestrator/adapters/codex.md)에 있다. `xhigh`는 `T3` 칸에만 있고, `explorer`는 `T3`에서도 `medium`을 넘기지 않는다.
+
+모델 접근 권한은 계정과 배포 상태에 따라 다를 수 있다. `gpt-6-astra` 또는 `xhigh`를 쓸 수 없으면 같은 역할의 바로 아래 칸으로 내리고, 그 사실을 메인 실행자에게 보고한다. 메인 세션의 기본 모델은 `gpt-6.1-sol` / `medium`이다.
 
 ## 작업별 라우팅
 
@@ -78,7 +81,7 @@ default_subagent_reasoning_effort = "medium"
 
 ## 프로젝트 스킬과의 관계
 
-- `dev-orchestrator`: 전체 작업 분류와 모델·역할 선택
+- `dev-orchestrator`: 작업 유형·복잡도 분류와 모델·추론 강도 선택. Codex 실행 표는 `.agents/skills/dev-orchestrator/adapters/codex.md`
 - `backend-multi-agent`: 백엔드 대형 작업의 DB·Hexagonal·Security 역할 구성
 - `fe-multi-agent`: 프론트엔드 대형 작업의 명세·API·디자인·지도 역할 구성
 - `backend-api-check`, `hexagonal-guard`, `fe-api-check`, `fe-boundary-guard`: 구현 후 특정 계약·경계 검증

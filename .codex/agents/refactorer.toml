@@ -4,8 +4,8 @@ description = """
 High-reasoning implementation agent for behavior-preserving refactors after scope, dependencies, and regression risks are understood.
 """
 
-model = "gpt-5.6-sol"
-model_reasoning_effort = "high"
+# 추론 강도는 파일에 고정하지 않는다. dev-orchestrator가 T0–T3에 맞춰 spawn 시 지정한다.
+model = "gpt-6.1-sol"
 sandbox_mode = "workspace-write"
 
 developer_instructions = """
