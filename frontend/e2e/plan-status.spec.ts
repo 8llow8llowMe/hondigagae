@@ -132,6 +132,19 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     await expect(page.getByRole('button', { name: '여행 완료하기' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '초안으로 되돌리기' })).toHaveCount(0)
 
+    /*
+      **버튼이 사라진 자리가 결과를 말한다** (#1174). 2회차 사용성 점검에서는 여기서 아무
+      피드백 없이 포커스가 `BODY` 로 떨어졌다. 전폭 버튼에서 왔으므로 포커스가 안내로 옮겨
+      온다(역할 없이 — form-guide.md §8). 확정의 이유였던 공유가 그 바로 아래다.
+    */
+    const confirmDone = page.getByText('일정을 확정했어요. 이제 링크로 공유할 수 있어요.')
+    await expect(confirmDone).toBeFocused()
+
+    await page.getByRole('button', { name: '공유 링크', exact: true }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
     // ── 되돌리기 — 메뉴 안에서 ────────────────────────────────────────────
     await openManageMenu()
     await expect(revertItem).toBeVisible()
@@ -159,6 +172,15 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     await revertItem.click()
 
     await expect(confirmAction).toBeVisible()
+
+    /*
+      **되돌리기도 결과를 말한다** (#1174) — 메뉴에서 왔으므로 포커스는 `⋯` 에 그대로 두고
+      `role="status"` 로 읽힌다. 확정 결과 안내와 `공유 링크` 는 걷힌다.
+    */
+    await expect(page.getByRole('status').filter({ hasText: '초안으로 되돌렸어요.' })).toBeVisible()
+    await expect(manageMenu).toBeFocused()
+    await expect(confirmDone).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '공유 링크', exact: true })).toHaveCount(0)
   })
 
   /*

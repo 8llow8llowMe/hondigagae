@@ -9,19 +9,37 @@ import {
   forwardStatusAction,
   PLAN_STATUS_ACTION_LABELS,
   PLAN_STATUS_ACTION_NOTES,
+  PLAN_STATUS_RESULT_MESSAGES,
+  type PlanStatusActionSpec,
+  type PlanStatusResult,
 } from '@/lib/plan/status-action'
 
-function render(statusCode: string, errorMessage: string | null = null) {
+function renderPanel({
+  action,
+  errorMessage = null,
+  result = null,
+}: {
+  action: PlanStatusActionSpec | undefined
+  errorMessage?: string | null
+  result?: PlanStatusResult | null
+}) {
   return renderToStaticMarkup(
     createElement(PlanStatusActionPanel, {
-      action: forwardStatusAction(statusCode),
+      action,
       labels: PLAN_STATUS_ACTION_LABELS,
       notes: PLAN_STATUS_ACTION_NOTES,
       errorMessage,
+      result,
+      resultMessages: PLAN_STATUS_RESULT_MESSAGES,
+      onShare: () => undefined,
       saving: false,
       onAction: () => undefined,
     }),
   )
+}
+
+function render(statusCode: string, errorMessage: string | null = null) {
+  return renderPanel({ action: forwardStatusAction(statusCode), errorMessage })
 }
 
 /*
@@ -109,5 +127,67 @@ describe('PlanStatusActionPanel — 확정 버튼 아래 안내 (#1154)', () => 
 
   it('확정 뒤(완료 버튼)에는 붙이지 않는다', () => {
     expect(render('CONFIRMED')).not.toContain(messages.plan.confirmUnlocksShare)
+  })
+})
+
+/*
+  **전이가 끝나면 그 자리가 결과를 말한다** (#1174). 2회차 사용성 점검에서 `일정 확정하기` 를
+  누르면 버튼이 사라지기만 하고 포커스가 `BODY` 로 떨어졌다 — 출발 전 확정 일정은 버튼 자리가
+  통째로 비기 때문이다(`action === undefined`). 그 갈래에서도 패널이 남아야 한다.
+*/
+describe('PlanStatusActionPanel — 전이 결과 (#1174)', () => {
+  const confirmed: PlanStatusResult = { kind: 'confirm', announce: 'focus' }
+
+  it('출발 전 확정처럼 버튼이 없어도 결과 안내와 공유 링크가 선다', () => {
+    const markup = renderPanel({ action: undefined, result: confirmed })
+
+    expect(markup).toContain(messages.plan.statusConfirmDone)
+    expect(markup).toContain(`>${messages.plan.shareAction}</button>`)
+  })
+
+  it('결과가 다음 행동보다 먼저다 — 포커스가 내려앉은 뒤 읽는 순서', () => {
+    const markup = renderPanel({ action: forwardStatusAction('CONFIRMED'), result: confirmed })
+
+    const done = markup.indexOf(messages.plan.statusConfirmDone)
+    const share = markup.indexOf(`>${messages.plan.shareAction}<`)
+    const complete = markup.indexOf(messages.plan.statusCompleteAction)
+
+    expect(done).toBeGreaterThanOrEqual(0)
+    expect(done).toBeLessThan(share)
+    expect(share).toBeLessThan(complete)
+  })
+
+  it.each(['complete', 'revert-draft', 'reopen'] as const)(
+    '%s 결과에는 공유 링크를 세우지 않는다 — 공유 가능 여부를 새로 열지 않는다',
+    (kind) => {
+      const markup = renderPanel({ action: undefined, result: { kind, announce: 'live' } })
+
+      expect(markup).toContain(PLAN_STATUS_RESULT_MESSAGES[kind])
+      expect(markup).not.toContain(`>${messages.plan.shareAction}<`)
+    },
+  )
+
+  /*
+   **포커스냐 낭독이냐, 하나만** (form-guide.md §8 · #1102). 둘 다 두면 같은 문구를 두 번 읽는다.
+   */
+  it('포커스를 받는 결과는 역할 없이 tabindex=-1 이다', () => {
+    const markup = renderPanel({ action: undefined, result: confirmed })
+
+    expect(markup).toContain('tabindex="-1"')
+    expect(markup).not.toContain('role="status"')
+  })
+
+  it('메뉴에서 온 결과는 포커스를 두고 role=status 로 읽힌다', () => {
+    const markup = renderPanel({
+      action: forwardStatusAction('DRAFT'),
+      result: { kind: 'revert-draft', announce: 'live' },
+    })
+
+    expect(markup).toContain('role="status"')
+    expect(markup).not.toContain('tabindex="-1"')
+  })
+
+  it('결과도 실패도 없으면 완료 일정의 자리는 여전히 비어 있다', () => {
+    expect(renderPanel({ action: undefined })).toBe('')
   })
 })

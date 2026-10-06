@@ -4,9 +4,13 @@ import { planPhaseOf } from '@/lib/plan/date'
 import {
   changesPetConditionSource,
   forwardStatusAction,
+  PLAN_STATUS_RESULT_MESSAGES,
   planStatusActionLayout,
   planStatusActions,
+  planStatusResultAnnounce,
   reverseStatusActions,
+  statusResultMatches,
+  statusResultOpensShare,
 } from '@/lib/plan/status-action'
 
 describe('planStatusActions — 일정 상태 버튼', () => {
@@ -198,5 +202,66 @@ describe('planStatusActionLayout — 시작일 전 완료는 없고, 출발 당�
         expect([...kinds].sort()).toEqual([...expected].sort())
       }
     }
+  })
+})
+
+describe('전이 결과 (#1174)', () => {
+  it('네 전이 모두 결과 문구를 갖는다 — 한 갈래만 말하면 나머지가 무반응으로 읽힌다', () => {
+    for (const kind of ['confirm', 'complete', 'revert-draft', 'reopen'] as const) {
+      expect(PLAN_STATUS_RESULT_MESSAGES[kind]).not.toBe('')
+    }
+  })
+
+  it('공유 링크는 확정 결과에만 선다', () => {
+    expect(statusResultOpensShare('confirm')).toBe(true)
+    expect(statusResultOpensShare('complete')).toBe(false)
+    expect(statusResultOpensShare('revert-draft')).toBe(false)
+    expect(statusResultOpensShare('reopen')).toBe(false)
+  })
+})
+
+/*
+  **응답이 온 순간의 포커스로 가른다** — 방향으로 가르면 출발 당일 메뉴의 `여행 완료하기`
+  (정방향인데 메뉴에서 시작)가 틀린다. DOM 없이 보려고 요소를 흉내 낸다.
+*/
+describe('planStatusResultAnnounce — 포커스냐 낭독이냐', () => {
+  const body = { tagName: 'BODY' } as unknown as Element
+
+  it('포커스가 BODY 로 떨어졌으면 안내로 옮긴다', () => {
+    expect(planStatusResultAnnounce(body, body)).toBe('focus')
+  })
+
+  it('포커스가 없으면 안내로 옮긴다', () => {
+    expect(planStatusResultAnnounce(null, body)).toBe('focus')
+  })
+
+  it('비활성이 된 버튼에 남은 포커스도 잃은 것으로 본다 — 곧 사라지거나 다른 버튼이 된다', () => {
+    const button = { tagName: 'BUTTON', disabled: true } as unknown as Element
+
+    expect(planStatusResultAnnounce(button, body)).toBe('focus')
+  })
+
+  it('메뉴가 돌려준 트리거에 있으면 그대로 두고 낭독한다', () => {
+    const trigger = { tagName: 'BUTTON', disabled: false } as unknown as Element
+
+    expect(planStatusResultAnnounce(trigger, body)).toBe('live')
+  })
+})
+
+describe('statusResultMatches — 결과는 지금 상태와 맞을 때만 (#1174)', () => {
+  it('각 전이의 도착 상태가 planStatusActions 의 nextStatus 와 같다', () => {
+    for (const code of ['DRAFT', 'CONFIRMED', 'COMPLETED']) {
+      for (const action of planStatusActions(code)) {
+        expect(statusResultMatches(action.kind, action.nextStatus)).toBe(true)
+      }
+    }
+  })
+
+  it('다른 곳에서 초안으로 되돌렸으면 확정 결과(와 공유 링크)를 그리지 않는다', () => {
+    expect(statusResultMatches('confirm', 'DRAFT')).toBe(false)
+  })
+
+  it('모르는 상태 코드에서는 그리지 않는다', () => {
+    expect(statusResultMatches('confirm', 'ARCHIVED')).toBe(false)
   })
 })

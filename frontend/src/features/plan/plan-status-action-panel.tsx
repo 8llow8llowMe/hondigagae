@@ -1,8 +1,17 @@
-import { useId } from 'react'
+'use client'
+
+import { useEffect, useId, useRef } from 'react'
 
 import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
-import type { PlanStatusActionKind, PlanStatusActionSpec } from '@/lib/plan/status-action'
+import { FormNotice } from '@/components/form-notice'
+import { messages } from '@/lib/messages'
+import {
+  type PlanStatusActionKind,
+  type PlanStatusActionSpec,
+  type PlanStatusResult,
+  statusResultOpensShare,
+} from '@/lib/plan/status-action'
 
 export type PlanStatusActionPanelProps = {
   /**
@@ -15,6 +24,15 @@ export type PlanStatusActionPanelProps = {
   /** 버튼 아래 한 줄 — 그 액션이 무엇을 여는지 (#1154). 없는 액션은 줄이 없다 */
   notes?: Partial<Record<PlanStatusActionKind, string>>
   errorMessage: string | null
+  /**
+   * 마지막으로 성공한 전이 (#1174). **`usePlanStatus` 가 든 값을 그대로 받는다** — 포커스
+   * effect 가 이 값의 동일성에 걸려 있어, 호출부가 렌더마다 새 객체를 만들면 렌더마다
+   * 포커스를 빼앗는다.
+   */
+  result: PlanStatusResult | null
+  resultMessages: Record<PlanStatusActionKind, string>
+  /** 확정 결과 아래 `공유 링크` 가 여는 것. 없으면 버튼을 그리지 않는다 */
+  onShare?: (() => void) | undefined
   saving: boolean
   onAction: (action: PlanStatusActionSpec) => void
 }
@@ -38,23 +56,55 @@ export type PlanStatusActionPanelProps = {
  * 그래서 이 래퍼는 평평하다. `Surface` 가 `border-y md:rounded-lg md:border` 라 카드의
  * 바깥 경계가 곧 이 자리의 폭이고, 버튼과 카드가 같은 세로선에 선다. `FormAlert` 도 같은
  * 폭을 받는다 — 그쪽은 글자지만 **버튼 바로 아래 붙는 부속**이라 버튼의 경계를 따른다.
+ *
+ * ## 성공도 여기서 말한다 (#1174)
+ *
+ * 전이가 끝나면 **결과 한 줄이 맨 위에 선다** — 확정이면 그 아래 `공유 링크` 까지. 출발 전
+ * 확정 일정과 완료 일정은 버튼 자리가 통째로 비므로, 예전에는 누른 버튼이 사라지기만 하고
+ * 포커스가 `BODY` 로 떨어졌다. 결과가 맨 위인 것은 포커스가 거기 내려앉아 **읽는 순서가
+ * 결과 → 다음 행동**이 되게 하려는 것이다.
+ *
+ * 읽히는 길은 `result.announce` 하나가 정한다 — `focus` 면 안내로 포커스를 옮기고 역할을 뗀다,
+ * `live` 면 포커스는 그대로(`⋯` 트리거) 두고 `role="status"` 로 읽힌다 (form-guide.md §8).
  */
 export function PlanStatusActionPanel({
   action,
   labels,
   notes = {},
   errorMessage,
+  result,
+  resultMessages,
+  onShare,
   saving,
   onAction,
 }: PlanStatusActionPanelProps) {
   const noteId = useId()
+  const resultRef = useRef<HTMLParagraphElement>(null)
 
-  if (action === undefined && errorMessage === null) return null
+  // 같은 판정(`announce`)이 역할과 포커스를 함께 정한다 — 하나만 따로 놀면 무음이거나 두 번 읽힌다
+  useEffect(() => {
+    if (result?.announce === 'focus') resultRef.current?.focus()
+  }, [result])
+
+  if (action === undefined && errorMessage === null && result === null) return null
 
   const note = action === undefined ? undefined : notes[action.kind]
+  const share = result !== null && statusResultOpensShare(result.kind) ? onShare : undefined
 
   return (
     <div className="flex flex-col gap-2">
+      {result !== null && (
+        <FormNotice
+          ref={resultRef}
+          message={resultMessages[result.kind]}
+          announce={result.announce}
+        />
+      )}
+      {share !== undefined && (
+        <Button variant="secondary" onClick={share} className="w-full">
+          {messages.plan.shareAction}
+        </Button>
+      )}
       {action !== undefined && (
         <Button
           variant={action.variant}
