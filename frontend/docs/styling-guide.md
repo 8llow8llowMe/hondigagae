@@ -48,6 +48,13 @@
 | `Skeleton`                                         | `src/components/skeleton.tsx`      | 실제 콘텐츠와 크기 유사                                                                                                                                                                                                                                                   |
 | `PetAvatar`                                        | `src/components/pet-avatar.tsx`    | 반려견 원형. `sm`(24)·`md`(28)·`lg`(32)·`xl`(40)·`hero`(80·96). 사진 없으면 전 크기 기본 그림(#1047). `aria-hidden`                                                                                                                                                       |
 
+**`ThumbnailTile`** (`src/components/thumbnail-tile.tsx`) — 목록 행의 썸네일 타일(80 · 넓으면 96).
+사진 → 일러스트 → 회색 타일, 선택적 흰 원형 순번 칩(#856), 크기 기준 `viewport`/`container`,
+흐림 · 우선 로드. **장소 · 즐겨찾기 · 일정 상세 · 공유 일정 · AI 초안 행이 함께 쓴다** (#1151) —
+손 복제 다섯 벌 중 공유 일정 행이 #842 · #856 을 놓쳐 갈라져 있었다. 무슨 사진 · 일러스트를
+줄지는 행이 정한다(`imageSrc` · `listThumbnailSrc` · `*Illustration`). 표 밖에 적은 것은 경로
+칸 폭 때문이다 — 행을 더하면 표 전체가 재정렬된다.
+
 **`EmptyState` 와 `ErrorState` 를 분리한 이유**: 404(데이터 부재)와 5xx(일시 장애)의 시각 언어를 다르게 강제하기 위해서다. 한 컴포넌트에 `hasRetry` 플래그를 두면 반드시 잘못 쓰인다. (`api-integration-guide.md` §3)
 
 **확장 규칙**: 기존 컴포넌트에 prop을 추가할 때 **기본값을 보수적으로** 둬서 기존 사용처의 동작이 바뀌지 않게 한다.
