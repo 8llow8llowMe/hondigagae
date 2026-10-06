@@ -380,7 +380,7 @@ describe('FacilityHours — 오늘 한 줄과 원문 갈래 (#654 E-4)', () => {
       **배지와 원문이 어긋날 수 있다고 행에서 말한다** (#671 C-5).
 
       이 갈래가 서는 조건 자체가 "원문에서 읽은 개폐가 서버 `openNow` 와 맞지 않거나
-      아예 읽히지 않았다" 라, **서는 행마다 보기에 자기모순**이다 — `[영업 종료]` 배지
+      아예 읽히지 않았다" 라, **서는 행마다 보기에 자기모순**이다 — `[영업 시간 아님]` 배지
       아래 `09:30~20:00`(수요일 정오 = 진료 시간 안). dev 실물 135곳 중 15곳이 여기다.
 
       원문을 걷는 것이 답이 아니다 — 원문을 그대로 보이는 것이 불변식의 몸통이라
@@ -617,7 +617,7 @@ describe('FacilityRowHeader — 머리 한 줄 (#603)', () => {
     **색이 아니라 무게로 가르던 규칙 "위에" 색을 얹은 것이다** (`OpenStatus` 머리주석).
     이름 옆에 회색 배지 둘(`동물약국` · `24시간`)과 나란히 서면 모양으로는 구별되지 않는다.
   */
-  it('진료중은 status-open, 영업 종료는 status-closed 톤이다', () => {
+  it('진료중은 status-open, 영업 시간 아님은 status-closed 톤이다', () => {
     expect(content({ openNow: true })).toContain('bg-status-open-100')
     expect(content({ openNow: false })).toContain('bg-status-closed-100')
   })
@@ -643,7 +643,7 @@ describe('FacilityRowHeader — 머리 한 줄 (#603)', () => {
     배지 태그를 **여는 `<` 까지 되짚어** 잘라낸다. 고정 길이로 되짚으면 앞 배지(`24시간`)의
     태그까지 먹어 엉뚱한 클래스를 보게 된다.
   */
-  it('진료중은 무게를 함께 올린다 — 영업 종료는 기본 무게다', () => {
+  it('진료중은 무게를 함께 올린다 — 영업 시간 아님은 기본 무게다', () => {
     function statusTag(markup: string, tone: string) {
       const at = markup.indexOf(tone)
       const open = markup.lastIndexOf('<', at)

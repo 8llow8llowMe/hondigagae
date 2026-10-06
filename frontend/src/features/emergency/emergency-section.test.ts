@@ -80,7 +80,7 @@ describe('EmergencySection — openNow 3상태 (아트보드 주석)', () => {
     expect(render()).toContain(messages.emergency.statusOpen)
   })
 
-  it('false 면 영업 종료', () => {
+  it('false 면 영업 시간 아님', () => {
     const markup = render({
       result: {
         facilities: [facility({ openNow: false })],
@@ -124,7 +124,7 @@ describe('EmergencySection — openNow 3상태 (아트보드 주석)', () => {
     expect(render()).not.toMatch(/metric-(high|mid|low|critical)/)
   })
 
-  it('진료중은 초록, 영업 종료는 빨강이다 (#598)', () => {
+  it('진료중은 초록, 영업 시간 아님은 빨강이다 (#598)', () => {
     expect(render()).toContain('bg-status-open-100')
 
     const closed = render({

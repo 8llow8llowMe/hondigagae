@@ -140,7 +140,13 @@ export const placeMessages = {
    */
   detailOpen24: '24시간',
   detailOpenNow: '영업 중',
-  detailOpenClosed: '영업 종료',
+  /**
+   * `openNow === false` (#1160). **시점을 말하지 않는다** — 서버 `openNow` 는 참/거짓뿐이라
+   * 개점 전인지 마감 후인지 모른다. 예전 `영업 종료` 는 09:29 에 `10:00~18:00` 인 곳을 "오늘은
+   * 끝났다" 로 읽혀 방문을 포기하게 만들었다(2026-10-06 사용성 점검). 언제 여는지는 바로 아래
+   * 운영시간 원문이 말한다. 긴급 시설 `statusClosed` 와 같은 문구다.
+   */
+  detailOpenClosed: '영업 시간 아님',
   detailRestDate: '휴무일',
   detailParking: '주차',
   detailBabyCarriage: '유모차 대여',
