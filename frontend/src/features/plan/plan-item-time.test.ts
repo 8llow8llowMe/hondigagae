@@ -301,6 +301,15 @@ describe('PlanItemTimeView — 전자시계 모달 (#1028)', () => {
     expect(markup).toContain(messages.plan.itemTimeModalDescription)
   })
 
+  /*
+    **모바일에 없는 조작을 말하지 않는다** (#1184). 예전 설명은 `▲▼나 방향키로…` 였다 — 방향키는
+    `spinbutton` 의 표준 조작이라 키보드 사용자는 역할로 이미 안다.
+  */
+  it('설명이 방향키를 말하지 않는다 — 모바일에는 없다', () => {
+    expect(messages.plan.itemTimeModalDescription).not.toContain('방향키')
+    expect(messages.plan.itemTimeModalDescription).toContain('▲▼')
+  })
+
   it('설명은 aria-describedby 로 열 때 함께 읽힌다', () => {
     const markup = renderView()
     const describedBy = /aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? ''
