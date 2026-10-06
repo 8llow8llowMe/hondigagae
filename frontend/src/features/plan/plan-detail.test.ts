@@ -449,7 +449,7 @@ describe('PlanItemRow', () => {
       },
     })
 
-    expect(markup).toContain('하루 이동이 깁니다')
+    expect(markup).toContain('하루 이동이 길어요')
     expect(markup).toContain('text-metric-low-700')
   })
 

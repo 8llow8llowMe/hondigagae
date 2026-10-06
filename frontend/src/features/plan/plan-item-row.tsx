@@ -573,7 +573,7 @@ function PlanItemTimeChip({
  *
  * 30km 이상이면 **그 행만** 경고 톤이다. 별도 경고 배지를 만들지 않는다 — 행 자체가
  * 말하는 것이 편집 동기를 만든다 (아트보드 01 주석). 색만으로 전달하지 않으려고
- * 문장(`— 하루 이동이 깁니다.`)이 함께 간다.
+ * 문장(`— 하루 이동이 길어요.`)이 함께 간다.
  */
 function PlanItemDistance({ model }: { model: PlanItemRowModel }) {
   if (model.distanceKind === null || model.distanceMeters === null) return null
