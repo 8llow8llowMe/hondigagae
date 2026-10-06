@@ -1,10 +1,9 @@
-import Image from 'next/image'
 import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
-import { ChevronRightIcon, ImageIcon } from '@/components/icons'
+import { ChevronRightIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
-import { imageLoadingProps } from '@/lib/image/loading'
+import { ThumbnailTile } from '@/components/thumbnail-tile'
 import { listThumbnailSrc } from '@/lib/image/thumbnail'
 import { messages } from '@/lib/messages'
 import { placeIllustration } from '@/lib/place/illustration'
@@ -119,40 +118,22 @@ export function PlaceRowContent({
 
   return (
     <>
-      <div className="bg-band relative size-20 shrink-0 overflow-hidden rounded-md @lg:size-24">
-        {/* 미등록 호스트를 next/image 에 넘기면 런타임에 던진다 — 플레이스홀더로 떨어뜨린다 */}
-        {thumbnail !== null ? (
-          <Image
-            src={thumbnail}
-            /*
-              **장소명을 alt 로 주지 않는다** (#1132 에서 다시 따졌다). 이 사진은 행 링크
-              (`PlaceRow`)·선택 버튼(지도 패널) **안**에 있고, 같은 컨트롤 안 `h3` 가 이미
-              장소명을 말한다 — alt 에도 이름을 주면 접근 이름이 `{장소명} {장소명} …` 으로
-              두 번 읽힌다. 담기 화면(`titleHref`)은 제목 링크가 바로 옆이라 같은 결론이다.
-              사진이 덧붙이는 정보가 없으므로 장식이다.
-            */
-            alt=""
-            fill
-            sizes="(min-width: 1024px) 96px, 80px"
-            className="object-cover"
-            {...imageLoadingProps(priority)}
-          />
-        ) : illustration !== null ? (
-          /*
-            사진이 없으면 카테고리 일러스트로 채운다 (`lib/place/illustration.ts`).
-            **`next/image` 가 아니라 `<img>` 다** — 저장소 안의 정적 SVG 라 최적화할
-            것이 없고(`unoptimized: true`), 원격 호스트 허용 목록과도 무관하다.
-            **장식이므로 `alt=""` 다** — 카테고리는 아래 배지가 이미 낱말로 말한다.
-          */
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={illustration} alt="" className="absolute inset-0 size-full object-cover" />
-        ) : (
-          <span className="text-fg-subtle absolute inset-0 flex flex-col items-center justify-center gap-1">
-            <ImageIcon size={20} />
-            <span className="text-caption text-fg-muted font-medium">{messages.place.noImage}</span>
-          </span>
-        )}
-      </div>
+      {/*
+        **공통 `ThumbnailTile` 이다** (#1151). 사진은 장소명을 alt 로 주지 않는다 — 이 사진은 행
+        링크(`PlaceRow`) · 선택 버튼(지도 패널) **안**에 있고 같은 컨트롤 안 `h3` 가 이미 장소명을
+        말해, alt 에도 주면 접근 이름이 두 번 읽힌다 (#1132). 일러스트는 카테고리별이다
+        (`lib/place/illustration.ts`) — 카테고리는 아래 배지가 낱말로 말한다.
+
+        **크기 기준이 컨테이너다**(`@lg`) — 지도 패널처럼 화면은 넓어도 칸이 좁은 자리에 같은
+        행이 들어간다.
+      */}
+      <ThumbnailTile
+        src={thumbnail}
+        illustration={illustration}
+        emptyLabel={messages.place.noImage}
+        sizeBasis="container"
+        priority={priority}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* 한국어 실데이터는 길다. body 의 word-break: keep-all 은 어절 단위로만

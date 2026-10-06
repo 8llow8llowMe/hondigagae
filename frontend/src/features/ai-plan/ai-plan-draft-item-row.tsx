@@ -1,7 +1,5 @@
-import Image from 'next/image'
-
 import { Badge } from '@/components/badge'
-import { ImageIcon } from '@/components/icons'
+import { ThumbnailTile } from '@/components/thumbnail-tile'
 import type { DraftThumbnail } from '@/lib/ai-plan/draft-thumbnail'
 import { itemTypeLabel } from '@/lib/ai-plan/item-type'
 import { formatDistance } from '@/lib/format/distance'
@@ -94,45 +92,17 @@ export function AiPlanDraftItemRow({
       )}
     >
       {/*
-        **썸네일 타일 — 일정 상세 행(`plan-item-row.tsx`)과 같은 모양이다** (#1127). 담기 전과
-        담은 뒤가 같은 항목을 같은 얼굴로 보여 준다. 크기(80/96) · 폴백 순서(사진 → 유형
-        일러스트 #842 → 회색) · 순번 칩(#856)이 그쪽 결정을 그대로 따른다.
+        **썸네일 타일 — 일정 상세 행과 같은 공통 `ThumbnailTile` 이다** (#1127 · #1151). 담기 전과
+        담은 뒤가 같은 항목을 같은 얼굴로 보여 준다. 보강 중(`undefined`)이면 사진도 일러스트도
+        주지 않아 회색 타일로 기다린다.
 
         빼기로 표시한 항목은 행 전체가 `opacity-60` 이라 타일에 따로 주지 않는다.
       */}
-      <div className="bg-band relative size-20 shrink-0 overflow-hidden rounded-md lg:size-24">
-        {typeof thumbnail === 'string' ? (
-          <Image
-            src={thumbnail}
-            alt=""
-            fill
-            sizes="(min-width: 1024px) 96px, 80px"
-            className="object-cover"
-          />
-        ) : illustration !== null ? (
-          /*
-            저장소 안의 정적 SVG/webp 라 `next/image` 가 아니라 `<img>` 다. 장식이므로
-            `alt=""` — 무엇인지는 제목과 유형 배지가 낱말로 말한다 (`plan-item-row.tsx` 와 같다).
-          */
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={illustration} alt="" className="absolute inset-0 size-full object-cover" />
-        ) : (
-          <span className="text-fg-subtle absolute inset-0 flex items-center justify-center">
-            <ImageIcon size={20} />
-          </span>
-        )}
-
-        {/*
-          순번 칩 — 타일 좌상단 흰 원형. 순서 표시라 a11y 트리에서 뺀다. 모양의 근거
-          (테두리 · 그림자 금지 · 크기)는 `plan-item-row.tsx` 의 같은 칩 주석이 정본이다 (#856).
-        */}
-        <span
-          aria-hidden
-          className="bg-bg text-fg border-border-strong text-caption absolute top-1 left-1 inline-flex size-5 items-center justify-center rounded-full border font-bold tabular-nums"
-        >
-          {ordinal}
-        </span>
-      </div>
+      <ThumbnailTile
+        src={typeof thumbnail === 'string' ? thumbnail : null}
+        illustration={illustration}
+        ordinal={ordinal}
+      />
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">

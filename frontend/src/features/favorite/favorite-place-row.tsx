@@ -1,12 +1,12 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
 import { FormAlert } from '@/components/form-alert'
-import { BookmarkIcon, ImageIcon } from '@/components/icons'
+import { BookmarkIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
+import { ThumbnailTile } from '@/components/thumbnail-tile'
 import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
@@ -66,25 +66,8 @@ export function FavoritePlaceRow({
   return (
     <li className={INSET_CLASS[inset]}>
       <div className="flex items-center gap-3 py-3 lg:gap-5 lg:py-4">
-        <div className="bg-band relative size-20 shrink-0 overflow-hidden rounded-md lg:size-24">
-          {/* 미등록 호스트를 next/image 에 넘기면 런타임에 던진다 — 플레이스홀더로 떨어뜨린다 */}
-          {thumbnail !== null ? (
-            <Image
-              src={thumbnail}
-              alt=""
-              fill
-              sizes="(min-width: 1024px) 96px, 80px"
-              className="object-cover"
-            />
-          ) : (
-            <span className="text-fg-subtle absolute inset-0 flex flex-col items-center justify-center gap-1">
-              <ImageIcon size={20} />
-              <span className="text-caption text-fg-muted font-medium">
-                {messages.place.noImage}
-              </span>
-            </span>
-          )}
-        </div>
+        {/* 미등록 호스트는 `imageSrc` 가 `null` 로 걸러 플레이스홀더로 떨어진다 (#1151 공통 타일) */}
+        <ThumbnailTile src={thumbnail} emptyLabel={messages.place.noImage} />
 
         <div className="min-w-0 flex-1">
           {item.title === null ? (

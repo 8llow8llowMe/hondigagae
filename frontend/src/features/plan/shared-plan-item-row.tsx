@@ -1,12 +1,12 @@
-import Image from 'next/image'
 import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
-import { ImageIcon } from '@/components/icons'
+import { ThumbnailTile } from '@/components/thumbnail-tile'
 import { imageSrc } from '@/lib/image/remote-host'
 import { placeMetaLine } from '@/lib/place/meta'
 import { planItemTimeLabel } from '@/lib/plan/date'
 import { isPlaceTargetOf } from '@/lib/plan/detail'
+import { planItemIllustration } from '@/lib/plan/illustration'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import type { SharedPlanItem } from '@/types/plan'
 
@@ -30,6 +30,12 @@ import type { SharedPlanItem } from '@/types/plan'
 export function SharedPlanItemRow({ item }: { item: SharedPlanItem }) {
   const { place } = item
   const thumbnail = imageSrc(place?.firstImage ?? null)
+  /*
+    사진이 없으면 **유형** 일러스트다 — 소유자 행(`plan-item-row.tsx`)과 같은 판정이다 (#842).
+    이 행은 복제된 타일을 들고 있어 #842 · #856 을 받지 못했고, 같은 일정이 공유 링크에서만
+    회색 타일 · 검정 사각 칩이었다 (#1151).
+  */
+  const illustration = thumbnail === null ? planItemIllustration(item.itemType.code) : null
   const meta = placeMetaLine(place?.addr1 ?? null, place?.indoor ?? null)
   const time = planItemTimeLabel(item.startTime)
 
@@ -48,29 +54,8 @@ export function SharedPlanItemRow({ item }: { item: SharedPlanItem }) {
 
   const body = (
     <>
-      <div className="bg-band relative size-20 shrink-0 overflow-hidden rounded-md lg:size-24">
-        {thumbnail !== null ? (
-          <Image
-            src={thumbnail}
-            alt=""
-            fill
-            sizes="(min-width: 1024px) 96px, 80px"
-            className="object-cover"
-          />
-        ) : (
-          <span className="text-fg-subtle absolute inset-0 flex items-center justify-center">
-            <ImageIcon size={20} />
-          </span>
-        )}
-
-        {/* 순번 칩 — 자료가 아니라 순서 표시라 a11y 트리에서 뺀다 (목록 구조가 이미 말한다) */}
-        <span
-          aria-hidden
-          className="bg-fg text-fg-inverse text-caption absolute top-1 left-1 inline-flex size-5 items-center justify-center rounded-sm font-bold tabular-nums"
-        >
-          {item.sequence + 1}
-        </span>
-      </div>
+      {/* 타일 · 순번 칩은 공통 `ThumbnailTile` 이다 — 소유자 행과 같은 얼굴 (#1151) */}
+      <ThumbnailTile src={thumbnail} illustration={illustration} ordinal={item.sequence + 1} />
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
