@@ -1,4 +1,4 @@
-import type { ContentTypeCode, PetAllowanceCode } from '@/types/place'
+import type { ContentTypeCode, PetAllowanceCode, PlaceFilters } from '@/types/place'
 
 /**
  * 필터 UI 전용 라벨.
@@ -42,6 +42,49 @@ export const CONTENT_TYPE_FILTER_ORDER = [
   'SHOPPING',
   'COURSE',
 ] as const satisfies readonly ContentTypeCode[]
+
+/**
+ * **장소 종류** — 유형 축에 **카페**를 더한 화면의 선택지 (#1156).
+ *
+ * 백엔드 `contentType` 에는 카페가 없다 — 음식점(`RESTAURANT`)에 섞여 있다. 그래서 "강아지랑
+ * 갈 카페" 를 찾는 사용자가 좁힐 방법이 없었다 (2026-10-06 사용성 점검). 원천 분류
+ * `sourceCategory=카페` 를 음식점과 **함께** 걸어 한 칩으로 낸다 — 백엔드가 이미 받는 조건이다
+ * (Swagger: *"카페만 볼 때는 sourceCategory=카페 를 함께 씁니다"*).
+ *
+ * **카페 분류만 쓴다 (사용자 결정 2026-10-06).** dev 실측(음식점 815곳): `카페` 24곳은 **전부
+ * 동반 가능**이다. 이름이 카페 같은 곳 93곳 중 72곳은 TourAPI 출처라 원천 분류가 비어 있고
+ * 동반 정보도 "모름" 이라, 이 과제의 답이 아니다. 휴게음식점 · 제과점에 등록된 카페는 놓친다.
+ *
+ * 유형 축은 라디오라(`contentType` 단일 값) 카페도 **같은 줄의 한 선택지**다 — 음식점과 카페가
+ * 함께 켜져 보이지 않게 `withPlaceKind` 가 한쪽을 고르면 다른 쪽을 푼다.
+ */
+export type PlaceKind = ContentTypeCode | 'CAFE'
+
+const CAFE_SOURCE_CATEGORY = '카페'
+
+/** 화면 순서 — 유형 순서 그대로에 카페를 **음식점 바로 뒤**에 끼운다 (먹을 곳 묶음) */
+export const PLACE_KIND_FILTER_ORDER: readonly PlaceKind[] = CONTENT_TYPE_FILTER_ORDER.flatMap(
+  (code): PlaceKind[] => (code === 'RESTAURANT' ? [code, 'CAFE'] : [code]),
+)
+
+export const PLACE_KIND_LABEL: Record<PlaceKind, string> = {
+  ...CONTENT_TYPE_LABEL,
+  CAFE: '카페',
+}
+
+/** 지금 걸린 종류. 없으면 `null`(전체). 주소로 카페 분류만 걸려 와도 카페로 읽는다 */
+export function placeKindOf(filters: PlaceFilters): PlaceKind | null {
+  if (filters.sourceCategory === CAFE_SOURCE_CATEGORY) return 'CAFE'
+  return filters.contentType
+}
+
+/** 종류를 고른다. **유형 · 원천 분류 두 칸만** 바꾸고 다른 축은 그대로 둔다 */
+export function withPlaceKind(filters: PlaceFilters, kind: PlaceKind | null): PlaceFilters {
+  if (kind === 'CAFE') {
+    return { ...filters, contentType: 'RESTAURANT', sourceCategory: CAFE_SOURCE_CATEGORY }
+  }
+  return { ...filters, contentType: kind, sourceCategory: null }
+}
 
 export const PET_ALLOWANCE_LABEL: Record<PetAllowanceCode, string> = {
   ALLOWED: '동반 가능',

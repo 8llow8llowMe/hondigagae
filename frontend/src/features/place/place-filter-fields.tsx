@@ -2,18 +2,20 @@
 
 import { FilterCheck, FilterList, FilterListHeading, FilterRadio } from '@/components/filter-list'
 import {
-  CONTENT_TYPE_FILTER_ORDER,
-  CONTENT_TYPE_LABEL,
   INDOOR_LABEL,
+  PLACE_KIND_FILTER_ORDER,
+  PLACE_KIND_LABEL,
+  placeKindOf,
   SIGUNGU_CODES,
   SIGUNGU_LABEL,
+  withPlaceKind,
 } from '@/features/place/filter-labels'
 import { messages } from '@/lib/messages'
 import { isPetSizeCode } from '@/lib/pet/form'
 import { toPlaceFilterWeight } from '@/lib/pet/weight'
 import { withParenthesizedParticle, withSubjectParticle } from '@/lib/text/korean'
 import type { Pet } from '@/types/pet'
-import type { ContentTypeCode, PlaceFilters } from '@/types/place'
+import type { PlaceFilters } from '@/types/place'
 
 /**
  * 필터 축 하나하나 — 데스크톱 레일과 모바일 시트가 **같은 필드를 공유한다.**
@@ -158,18 +160,19 @@ export function ContentTypeField({ filters, onChange }: FieldProps) {
   return (
     <FilterList label={messages.place.filterContentTypeLabel} exclusive>
       <FilterRadio
-        selected={filters.contentType === null}
-        onSelect={() => onChange({ ...filters, contentType: null })}
+        selected={placeKindOf(filters) === null}
+        onSelect={() => onChange(withPlaceKind(filters, null))}
       >
         {messages.place.filterAll}
       </FilterRadio>
-      {CONTENT_TYPE_FILTER_ORDER.map((code: ContentTypeCode) => (
+      {/* 카페는 음식점 바로 뒤 한 선택지다 — 유형이 아니라 원천 분류다 (#1156) */}
+      {PLACE_KIND_FILTER_ORDER.map((option) => (
         <FilterRadio
-          key={code}
-          selected={filters.contentType === code}
-          onSelect={() => onChange({ ...filters, contentType: code })}
+          key={option}
+          selected={placeKindOf(filters) === option}
+          onSelect={() => onChange(withPlaceKind(filters, option))}
         >
-          {CONTENT_TYPE_LABEL[code]}
+          {PLACE_KIND_LABEL[option]}
         </FilterRadio>
       ))}
     </FilterList>
