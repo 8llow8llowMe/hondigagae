@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 
 import type { ReactNode } from 'react'
 
+import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from '@/components/icons'
 import { MAP_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
@@ -18,6 +19,7 @@ import { PlaceMapPanel } from '@/features/place/place-map-panel'
 import { PlaceMapRowsSkeleton } from '@/features/place/place-map-skeleton'
 import { PlaceSearchField } from '@/features/place/place-search-field'
 import { useNearbyPlaces } from '@/features/place/use-nearby-places'
+import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { usePlaceList } from '@/features/place/use-place-list'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
@@ -40,6 +42,7 @@ import {
 } from '@/lib/map/viewport'
 import { visibleCountLabel } from '@/lib/map/visible-count'
 import { messages } from '@/lib/messages'
+import { mapEmptyCopy } from '@/lib/place/search-empty'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceFilters, PlaceSummary } from '@/types/place'
@@ -294,6 +297,32 @@ export function PlaceMapView({
     영역이 옮겨 갔다는 사실은 캡션(`countLine`)과 재검색 버튼이 말한다.
   */
   const visible = useMemo(() => placesInArea(places, searchedBounds), [places, searchedBounds])
+
+  /*
+    **빈 목록이 무엇 때문인지 가른다** (#1155). 검색어로 받은 결과가 아예 없는데도 `이 지역에는
+    표시할 곳이 없어요 · 지도를 움직이거나…` 라서, 2026-10-06 사용성 점검에서 사용자가 지도를
+    옮기며 헤맸다. 받은 결과(`places`)가 0 이면 검색어 탓, 있는데 영역 밖이면 지역 탓이다.
+    검색어 갈래는 **검색어만** 지운다 — 다른 필터까지 풀면 사용자가 고른 조건이 사라진다.
+  */
+  const { apply: applyFilters } = usePlaceFilterNav()
+  const emptyCopy = mapEmptyCopy({ keyword: filters.keyword, fetchedCount: places.length })
+  const emptyState = (
+    <EmptyState
+      title={emptyCopy.title}
+      description={emptyCopy.description}
+      action={
+        emptyCopy.clearKeyword ? (
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => applyFilters({ ...filters, keyword: null })}
+          >
+            {messages.place.clearKeyword}
+          </Button>
+        ) : undefined
+      }
+    />
+  )
 
   /*
     **내용이 같으면 같은 Set 으로 취급한다.** `mutedPlaceIds` 는 참조 동등성으로만
@@ -710,10 +739,7 @@ export function PlaceMapView({
               {listPending ? (
                 <PlaceMapRowsSkeleton />
               ) : visible.length === 0 ? (
-                <EmptyState
-                  title={messages.map.emptyInView}
-                  description={messages.map.emptyInViewDescription}
-                />
+                emptyState
               ) : (
                 <PlaceMapPanel
                   places={visible}
@@ -777,10 +803,7 @@ export function PlaceMapView({
         {listPending ? (
           <PlaceMapRowsSkeleton />
         ) : visible.length === 0 ? (
-          <EmptyState
-            title={messages.map.emptyInView}
-            description={messages.map.emptyInViewDescription}
-          />
+          emptyState
         ) : (
           <PlaceMapPanel
             places={visible}
