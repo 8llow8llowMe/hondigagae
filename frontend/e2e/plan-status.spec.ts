@@ -78,7 +78,12 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     const confirmAction = page.getByRole('button', { name: '일정 확정하기' })
     const manageMenu = page.getByRole('button', { name: '일정 관리' })
     const revertItem = page.getByRole('menuitem', { name: '초안으로 되돌리기' })
-    const shareItem = page.getByRole('menuitem', { name: '공유 링크' })
+    /*
+      **정확히 일치로 집는다** (#1154). 초안의 잠긴 항목 `공유 링크 · 확정 후` 도 이 낱말을 품어,
+      기본 부분 일치로는 두 항목이 한 로케이터에 걸린다.
+    */
+    const shareItem = page.getByRole('menuitem', { name: '공유 링크', exact: true })
+    const lockedShareItem = page.getByRole('menuitem', { name: '공유 링크 · 확정 후' })
 
     /*
       **정방향은 버튼, 역방향은 메뉴다** (#653 · 진단 PL-2 · 명세 D11-2). 390 실측에서
@@ -98,11 +103,13 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     await expect(revertItem).toHaveCount(0)
 
     /*
-      **초안에는 공유도 없다** (#628). 서버가 초안 공유를 `PLAN_022` 로 막으므로 항목을
-      보여 주고 눌러서 배우게 하지 않는다 — 항목 자체가 없다. 누군가 "일단 띄우고 오류로
-      안내하자" 로 되돌리면 여기서 걸린다.
+      **초안의 공유는 잠긴 채 보인다** (#628 → #1154). 서버가 초안 공유를 `PLAN_022` 로 막으므로
+      **누를 수 있는 항목은 여전히 없다** — 누군가 "일단 띄우고 오류로 안내하자" 로 되돌리면 첫
+      단언에서 걸린다. 다만 감추기만 했더니 사용자가 공유 기능이 없는 줄 알아(2026-10-06 사용성
+      점검) 비활성 `공유 링크 · 확정 후` 가 자리와 조건을 알린다.
     */
     await expect(shareItem).toHaveCount(0)
+    await expect(lockedShareItem).toBeDisabled()
     await page.keyboard.press('Escape')
 
     // ── 확정 ──────────────────────────────────────────────────────────────
