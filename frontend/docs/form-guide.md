@@ -178,6 +178,10 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
   - **`FormAlert` 의 기본값은 `live` 그대로다.** 포커스를 옮기지 않는 나머지 29개 파일(38곳)은 바뀌지 않는다.
     `focus` 는 포커스를 실제로 옮기는 자리(지금은 `FormFailure` 와 공유 모달의 재시도 결과 — #1159,
     판정은 `shareFailureAnnounce`)만 넘긴다. `FormFailure.announce` 는 필수다.
+  - **성공 안내도 같은 계약이다** ([#1174](https://github.com/8llow8llowMe/hondigagae/issues/1174)).
+    `FormNotice` 가 `announce` 를 받는다 — 기본값 `live`(`role="status"`), `focus` 면 역할을 떼고
+    `tabIndex={-1}`. 지금은 일정 상태 전이의 결과만 넘긴다: 전폭 버튼에서 시작해 포커스가 `BODY` 로
+    떨어졌으면 `focus`, 메뉴에서 시작해 포커스가 `⋯` 에 남았으면 `live`(판정은 `planStatusResultAnnounce`).
 - 제출 실패 시 **화면에서 첫 번째로 보이는 오류 필드로 포커스를 옮긴다.**
   - **판정 기준은 DOM 순서다.** zod 스키마의 키 선언 순서가 아니다 — 두 순서는 언제든 어긋날 수
     있고, 어긋나면 포커스가 위의 오류를 지나쳐 아래로 간다 ([#560](https://github.com/8llow8llowMe/hondigagae/issues/560)
