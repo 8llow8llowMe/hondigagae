@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 
 import { AuthCardDog } from '@/features/auth/auth-card-dog'
+import { LoginReasonNotice } from '@/features/auth/login-reason-notice'
 import { SignupScreen } from '@/features/auth/signup-screen'
 import { readSession } from '@/lib/auth/session'
 import { safeReturnTo } from '@/lib/http/redirect'
@@ -33,9 +34,15 @@ export default async function SignupPage({
     없다 (#688).
   */
   return (
-    <>
+    /*
+      **로그인 화면과 같은 래퍼다** (#1157). 예전에는 fragment 라 카드 안 첫 요소가 곧 `회원가입`
+      제목이었는데, 안내가 그 위에 서면서 둘이 붙었다 — 로그인(`login/page.tsx`)의 `gap-4` 와 맞춘다.
+    */
+    <div className="flex flex-col gap-4">
       <AuthCardDog />
+      {/* 로그인 화면에서 넘어와도 같은 맥락을 이어받는다 — `returnTo` 가 그대로 실려 온다 */}
+      <LoginReasonNotice returnTo={target} screen="signup" />
       <SignupScreen returnTo={target} />
-    </>
+    </div>
   )
 }
