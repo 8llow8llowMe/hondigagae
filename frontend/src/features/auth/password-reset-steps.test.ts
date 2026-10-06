@@ -193,9 +193,7 @@ describe('PasswordResetCodeStep', () => {
 describe('PasswordResetDone', () => {
   // 안내 문장은 제목 묶음(`PasswordResetHeading`)으로 옮겼다 — 제목 아래 4 에 붙는다 (#1084 L3)
   it('전 기기 로그아웃 안내는 여기가 아니라 제목 아래 설명 줄이 한다', () => {
-    const done = renderToStaticMarkup(
-      createElement(PasswordResetDone, { email: 'demo@hondigagae.dev' }),
-    )
+    const done = renderToStaticMarkup(createElement(PasswordResetDone))
     const heading = renderToStaticMarkup(
       createElement(PasswordResetHeading, {
         heading: messages.auth.resetDoneTitle,
@@ -207,18 +205,16 @@ describe('PasswordResetDone', () => {
     expect(heading).toContain('모든 기기')
   })
 
-  it('로그인 링크에 이메일을 미리 채운다', () => {
-    const markup = renderToStaticMarkup(
-      createElement(PasswordResetDone, { email: 'demo@hondigagae.dev' }),
-    )
+  /* 이메일은 URL 이 아니라 넘겨주기로 간다 — 재설정 성공 시점에 넘긴다 (#1158) */
+  it('로그인 링크가 이메일을 URL 에 싣지 않는다', () => {
+    const markup = renderToStaticMarkup(createElement(PasswordResetDone))
 
-    expect(markup).toContain('href="/login?email=demo%40hondigagae.dev"')
+    expect(markup).toContain('href="/login"')
+    expect(markup).not.toContain('email=')
   })
 
   it('제목을 다시 렌더하지 않는다 — 뷰의 aria-live 영역이 이미 읽는다', () => {
-    const markup = renderToStaticMarkup(
-      createElement(PasswordResetDone, { email: 'demo@hondigagae.dev' }),
-    )
+    const markup = renderToStaticMarkup(createElement(PasswordResetDone))
 
     expect(markup).not.toContain(messages.auth.resetDoneTitle)
   })

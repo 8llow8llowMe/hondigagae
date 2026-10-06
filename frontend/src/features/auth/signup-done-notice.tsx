@@ -4,9 +4,9 @@ import { messages } from '@/lib/messages'
 /**
  * 표시 전용. `signedUp=1` 일 때만 가입 완료 안내를 보여준다 — 회원가입-세부명세.md D5.
  *
- * 가입 성공 리다이렉트와 409(이메일 중복) "로그인하기" 링크가 완전히 같은
- * `/login?returnTo=…&email=…` 쿼리 셰이프를 쓴다. `email` 유무로 판정하면
- * 중복 계정 케이스에도 이 배너가 잘못 뜬다 — `signedUp` 전용 파라미터로만 판정한다.
+ * 자동 로그인이 실패한 가입(#1158)과 409(이메일 중복) "로그인하기" 링크가 같은
+ * `/login?returnTo=…` 로 오고, 이메일은 둘 다 넘겨주기(`login-email-handoff.ts`)로 온다.
+ * 다른 단서로 판정하면 중복 계정 케이스에도 이 배너가 잘못 뜬다 — `signedUp` 전용 파라미터로만 판정한다.
  *
  * `app/(auth)/login/page.tsx`(async 서버 컴포넌트, `readSession` 을 통해 서버 전용
  * env 를 끌어온다)와 분리한 별도 파일이다. 같은 파일에 두면 이 컴포넌트만 렌더

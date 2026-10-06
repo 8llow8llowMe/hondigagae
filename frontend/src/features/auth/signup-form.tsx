@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { useQueryClient } from '@tanstack/react-query'
+
+import { enterAfterSignup } from '@/features/auth/enter-after-signup'
+import { enterSession } from '@/features/auth/enter-session'
 import {
   codeSchema,
   type CodeValues,
@@ -15,8 +19,9 @@ import {
 import { SignupConsentFields } from '@/features/auth/signup-consent-fields'
 import { SignupHeading } from '@/features/auth/signup-parts'
 import { CodeStep, EmailStep, ProfileStep } from '@/features/auth/signup-steps'
-import { sendEmailCode, signup, verifyEmailCode } from '@/lib/api/auth'
+import { login, sendEmailCode, signup, verifyEmailCode } from '@/lib/api/auth'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
+import { handOffLoginEmail } from '@/lib/auth/login-email-handoff'
 import {
   clearConsentErrors,
   hasConsentErrors,
@@ -73,6 +78,14 @@ export function SignupForm({
   onConsentAllChange,
 }: SignupFormProps) {
   const router = useRouter()
+  const queryClient = useQueryClient()
+  /*
+    **자동 로그인이 성공해 이동을 시작하면 버튼을 도는 채로 둔다** (#1158). `enterSession` 의
+    `location.replace` 는 이동을 시작만 하고 돌아와, `useForm` 이 곧 제출 중 표시를 내린다 — 새
+    문서가 오기 전 틈에 `가입하기` 가 다시 눌리면 409 를 맞는다. `login-form.tsx` 의 같은 이름
+    상태와 같은 이유다. 성공은 되돌릴 일이 없어 한 번 켜면 끄지 않는다.
+  */
+  const [entering, setEntering] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const [step, setStep] = useState<Step>('email')
@@ -289,14 +302,31 @@ export function SignupForm({
 
         throw error
       }
-    },
-    onSuccess: () => {
-      // dataBody 가 null 이라 자동 로그인이 안 된다. 로그인 화면으로 보내고
-      // 이메일을 미리 채운다 — 정본 D0. signedUp=1 은 가입 완료 배너 전용 표식이다.
-      // 409 "로그인하기" 링크와 같은 /login?returnTo=…&email=… 셰이프를 쓰므로
-      // email 유무로는 구분할 수 없다 — 중복 계정 케이스에도 배너가 잘못 뜬다.
-      const params = new URLSearchParams({ returnTo, email, signedUp: '1' })
-      router.replace(`/login?${params.toString()}`)
+
+      /*
+        **가입 직후 같은 자격으로 로그인을 이어 부른다** (#1158, 사용자 결정 2026-10-06 — 정본 D8 #3
+        개정). 가입 응답은 토큰을 주지 않는다(`dataBody: null`). 로그인이 실패하면 예전처럼 로그인
+        화면(`signedUp=1` 가입 완료 안내)으로 가고, 이메일은 URL 이 아니라 넘겨주기로 간다 —
+        판정과 근거는 `enter-after-signup.ts`. **던지지 않는다** — 가입은 이미 됐다.
+
+        **`onSuccess` 가 아니라 여기서 기다린다.** `onSuccess` 는 제출 중 표시가 풀리기 직전에
+        동기로 불려, 로그인이 도는 동안 `가입하기` 가 다시 눌려 409 를 맞을 수 있다. 여기서
+        기다리면 `가입 중` 이 로그인 응답까지 남고, 그 뒤 이동 중의 틈은 `entering` 이 막는다.
+
+        세션 진입은 **문서째 새로 받는다**(`enterSession`) — 로그인 화면과 같은 이유다(#1075).
+      */
+      await enterAfterSignup(
+        {
+          login,
+          enter: (href) => {
+            setEntering(true)
+            enterSession({ queryClient, location: globalThis.location }, href)
+          },
+          toLogin: (href) => router.replace(href),
+          handOff: handOffLoginEmail,
+        },
+        { email, password: values.password, returnTo },
+      )
     },
   })
 
@@ -573,7 +603,7 @@ export function SignupForm({
         values={profileForm.values}
         errors={profileStepErrors}
         errorStatus={profileErrorStatus}
-        submitting={profileForm.isSubmitting}
+        submitting={profileForm.isSubmitting || entering}
         duplicateEmail={duplicateEmail}
         returnTo={returnTo}
         // errors.form 이 있으면(409 포함) 성공 안내를 끈다 — 안 그러면 "이메일 인증이

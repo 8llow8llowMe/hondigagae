@@ -455,6 +455,9 @@ describe('ProfileStep', () => {
     expect(markup).toContain('이미 가입된 이메일 (a@b.c)입니다.')
     expect(markup).toContain(messages.auth.toLogin)
     expect(markup).toContain('/login?')
+    // 이메일은 URL 이 아니라 누를 때 넘겨주기로 간다 — 기록 · 로그 · Referer 에 남지 않게 (#1158)
+    expect(markup).toContain('href="/login?returnTo=%2F"')
+    expect(markup).not.toContain('email=')
   })
 
   it('5xx 면 ErrorState 와 재시도 버튼을 렌더한다', () => {

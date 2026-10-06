@@ -11,6 +11,7 @@ import { PasswordInput } from '@/components/password-input'
 import type { CodeValues, EmailValues, SignupProfileValues } from '@/features/auth/schemas'
 import { SignupEmailSummary } from '@/features/auth/signup-parts'
 import { VerificationCodeInput } from '@/features/auth/verification-code-input'
+import { handOffLoginEmail } from '@/lib/auth/login-email-handoff'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { type FailureAnnounce, submitFailureAnnounce } from '@/lib/form/submit-failure-focus'
 import { messages } from '@/lib/messages'
@@ -247,7 +248,9 @@ export function ProfileStep({
 
       {duplicateEmail !== null && (
         <Link
-          href={`/login?${new URLSearchParams({ returnTo, email: duplicateEmail }).toString()}`}
+          href={`/login?${new URLSearchParams({ returnTo }).toString()}`}
+          // 이메일은 URL 이 아니라 넘겨주기로 간다 — 기록 · 로그 · Referer 에 남지 않게 (#1158)
+          onClick={() => handOffLoginEmail(duplicateEmail)}
           className="text-body-2 text-brand-600 underline"
         >
           {messages.auth.toLogin}

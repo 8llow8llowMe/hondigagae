@@ -16,6 +16,7 @@ import { loginSchema, type LoginValues } from '@/features/auth/schemas'
 import { SocialLoginButtons } from '@/features/auth/social-login-buttons'
 import { login, type LoginResult } from '@/lib/api/auth'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
+import { takeHandedOffLoginEmail } from '@/lib/auth/login-email-handoff'
 import {
   clearSavedLoginEmail,
   readSavedLoginEmail,
@@ -230,6 +231,12 @@ export function LoginForm({ returnTo, initialEmail, onSubmittingChange }: LoginF
     일이 없으므로 한 번 켜면 끄지 않는다 (이 컴포넌트는 이동과 함께 사라진다).
   */
   const [entering, setEntering] = useState(false)
+  /*
+    넘겨받은 이메일을 **한 번만** 꺼내 둔다 (#1158). 꺼내기는 저장소에서 지우는 일이라, dev 의
+    StrictMode 가 마운트 effect 를 두 번 돌리면 두 번째에 `null` 이 나와 기억한 이메일이 넘겨받은
+    값을 덮는다. `undefined` 는 "아직 안 꺼냈다", `null` 은 "꺼냈는데 없었다" 다.
+  */
+  const handedOffRef = useRef<string | null | undefined>(undefined)
 
   // 필드로 좁혀지지 않는 응답(401 / 429 / 5xx)을 구분하기 위한 값.
   // FormErrors 는 메시지만 담고 상태 코드를 담지 않아 별도로 추적한다.
@@ -308,8 +315,8 @@ export function LoginForm({ returnTo, initialEmail, onSubmittingChange }: LoginF
   }, [submitCount])
 
   /*
-    첫 화면 값 — `?email=` 쿼리 > 기억한 이메일 (`resolveInitialLoginEmail`). 쿼리 쪽은 서버
-    렌더에 이미 들어가 있고, 여기서는 저장값으로 **빈 칸만** 채운다.
+    첫 화면 값 — 넘겨받은 이메일(#1158) > `?email=` 쿼리 > 기억한 이메일 (`resolveInitialLoginEmail`).
+    쿼리 쪽은 서버 렌더에 이미 들어가 있고, 여기서는 넘겨받은 값이나 저장값으로 채운다.
 
     **이메일이 채워져 있으면 비밀번호로 포커스를 옮긴다** (L1). 기억한 이메일이나 가입
     직후의 이메일로 들어온 사람에게 남은 일은 비밀번호 하나다. 빈 채로 온 사람은 건드리지
@@ -320,7 +327,14 @@ export function LoginForm({ returnTo, initialEmail, onSubmittingChange }: LoginF
     지운 이메일을 저장값으로 되살린다.
   */
   useEffect(() => {
-    const initial = resolveInitialLoginEmail(initialEmail, readSavedLoginEmail())
+    /*
+      **넘겨받은 이메일이 먼저다** (#1158). 가입 실패 대비 · 중복 가입 · 비밀번호 재설정 완료가
+      예전 `?email=` 쿼리 대신 탭 범위 저장소로 넘긴다 — 읽으면 지워진다. 쿼리(`initialEmail`)는
+      예전 링크 · 북마크를 위해 그대로 읽는다. 둘 다 "지금의 의도" 라 저장값을 이긴다.
+    */
+    if (handedOffRef.current === undefined) handedOffRef.current = takeHandedOffLoginEmail()
+    const handedOff = handedOffRef.current
+    const initial = resolveInitialLoginEmail(handedOff ?? initialEmail, readSavedLoginEmail())
     if (initial.email !== initialEmail) setValue('email', initial.email)
     setRemember(initial.remember)
     if (initial.email.length > 0) {
