@@ -4,6 +4,7 @@ import { Badge } from '@/components/badge'
 import { ChevronRightIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
 import { ThumbnailTile } from '@/components/thumbnail-tile'
+import { placeTypeLabel } from '@/features/place/filter-labels'
 import { listThumbnailSrc } from '@/lib/image/thumbnail'
 import { messages } from '@/lib/messages'
 import { placeIllustration } from '@/lib/place/illustration'
@@ -210,8 +211,9 @@ function PlaceBadges({ place, className }: { place: PlaceSummary; className?: st
           {place.petAllowanceType.name}
         </Badge>
       )}
+      {/* 카페 분류인 음식점은 `카페` 다 — 카페 칩과 같은 판정 (#1181) */}
       <Badge tone="neutral" size="sm">
-        {place.contentType.name}
+        {placeTypeLabel(place)}
       </Badge>
 
       {/* 실내 여부를 모르면 점선으로 "모름" 을 드러낸다 (styling-guide.md §3 unknown).

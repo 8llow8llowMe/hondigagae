@@ -333,3 +333,32 @@ describe('PlaceRow — 첫 화면 사진 우선 로드 (#1132)', () => {
     expect(tag).toMatch(/fetchpriority="high"/i)
   })
 })
+
+/*
+  **카페 칩으로 찾은 결과가 `음식점` 배지였다** (#1181). 칩과 같은 판정(음식점 + 원천 분류 `카페`)
+  이면 배지도 `카페` 다 — 쓰는 글자는 서버가 준 원천 분류 그대로다.
+*/
+describe('PlaceRow — 카페 분류의 유형 배지 (#1181)', () => {
+  const restaurant = {
+    ...placeSummary,
+    contentType: { code: 'RESTAURANT', name: '음식점', description: null },
+  } as PlaceSummary
+
+  it('카페 분류인 음식점은 카페라고 쓴다', () => {
+    const markup = render({ ...restaurant, sourceCategory: '카페' })
+
+    expect(markup).toContain('>카페<')
+    expect(markup).not.toContain('>음식점<')
+  })
+
+  it('원천 분류가 없거나 다른 음식점은 서버 유형 이름 그대로다', () => {
+    expect(render({ ...restaurant, sourceCategory: null })).toContain('>음식점<')
+    expect(render({ ...restaurant, sourceCategory: '한식' })).toContain('>음식점<')
+  })
+
+  it('음식점이 아닌 유형은 원천 분류가 카페여도 바꾸지 않는다 — 칩과 같은 판정이다', () => {
+    const markup = render({ ...placeSummary, sourceCategory: '카페' })
+
+    expect(markup).toContain(`>${placeSummary.contentType.name}<`)
+  })
+})
