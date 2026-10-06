@@ -1,11 +1,11 @@
-import Image from 'next/image'
 import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
 import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
-import { CheckIcon, ClockIcon, ImageIcon } from '@/components/icons'
+import { CheckIcon, ClockIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
+import { ThumbnailTile } from '@/components/thumbnail-tile'
 import { formatStandaloneCelsius } from '@/lib/format/celsius'
 import { formatDistance } from '@/lib/format/distance'
 import { isLongTrip } from '@/lib/geo/distance'
@@ -258,63 +258,17 @@ export function PlanItemRow({
 
   const body = (
     <>
-      <div
-        className={cn(
-          'bg-band relative size-20 shrink-0 overflow-hidden rounded-md lg:size-24',
-          // 다녀온 곳은 남은 곳보다 뒤로 물러난다. **이것만으로 전달하지 않는다** —
-          // 배지(`다녀옴`)와 `aria-pressed` 가 같은 사실을 낱말로도 말한다 (DESIGN.md §7)
-          item.visited && 'opacity-60',
-        )}
-      >
-        {thumbnail !== null ? (
-          <Image
-            src={thumbnail}
-            alt=""
-            fill
-            sizes="(min-width: 1024px) 96px, 80px"
-            className="object-cover"
-          />
-        ) : illustration !== null ? (
-          /*
-            **`next/image` 가 아니라 `<img>` 다** — 저장소 안의 정적 SVG 라 최적화할 것이
-            없고(`unoptimized: true`) 원격 호스트 허용 목록과도 무관하다. **장식이므로
-            `alt=""` 다** — 무엇인지는 제목과 유형 배지가 이미 낱말로 말한다
-            (`place-row.tsx` 가 같은 이유로 같은 모양이다).
-          */
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={illustration} alt="" className="absolute inset-0 size-full object-cover" />
-        ) : (
-          <span className="text-fg-subtle absolute inset-0 flex items-center justify-center">
-            <ImageIcon size={20} />
-          </span>
-        )}
-
-        {/*
-          순번 칩 — 썸네일 좌상단. 자료가 아니라 순서 표시라 a11y 트리에서 뺀다
-          (행 순서는 목록 구조가 이미 말한다).
-
-          **흰 원형이다** (#856). 예전에는 `bg-fg`(#15181d) 검정 사각이라, `aria-hidden` 인
-          **장식이 화면에서 가장 진한 면**을 쓰고 있었다 — #842 의 일러스트 폴백이 들어오며
-          밝은 파스텔 타일 위에서 더 도드라졌다.
-
-          **원형은 동선 지도의 핀 번호와 같은 언어다** — 같은 일정의 같은 순서를 두 화면이
-          같은 모양으로 말한다. 썸네일 안에 그대로 두는 것은 행 폭을 뺏지 않기 위해서다
-          (좌측 거터로 빼면 390 에서 제목이 그만큼 깎인다 — D11-5 가 이미 깎았다).
-
-          **그림자가 아니라 1px 테두리다.** 흰 칩이 밝은 타일 위에 서면 경계가 사라지는데,
-          그림자는 이 저장소에서 **떠 있는 것 전용**이다 (`token-usage.test.ts` 의 `FLOATING`
-          목록 · DESIGN.md §0). 순번 칩은 썸네일에 붙어 있지 떠 있지 않다.
-
-          **크기와 자리는 그대로다** (`size-5` · `top-1 left-1`) — 모양과 색만 바꾼다.
-          스페이싱 스케일 밖 값(22px · 6px)을 새로 들이지 않는다 (DESIGN.md §4).
-        */}
-        <span
-          aria-hidden
-          className="bg-bg text-fg border-border-strong text-caption absolute top-1 left-1 inline-flex size-5 items-center justify-center rounded-full border font-bold tabular-nums"
-        >
-          {model.item.sequence + 1}
-        </span>
-      </div>
+      {/*
+        **타일은 공통 `ThumbnailTile` 이다** (#1151) — 폴백 순서 · 순번 칩(#856) 모양의 근거는
+        그 컴포넌트가 갖는다. 다녀온 곳은 남은 곳보다 뒤로 물러난다. **흐림만으로 전달하지
+        않는다** — 배지(`다녀옴`)와 `aria-pressed` 가 같은 사실을 낱말로도 말한다 (DESIGN.md §7).
+      */}
+      <ThumbnailTile
+        src={thumbnail}
+        illustration={illustration}
+        ordinal={model.item.sequence + 1}
+        dimmed={item.visited}
+      />
 
       <div className="min-w-0 flex-1">
         {/*
