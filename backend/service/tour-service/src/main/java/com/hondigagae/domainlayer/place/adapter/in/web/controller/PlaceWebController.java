@@ -4,6 +4,7 @@ import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.NearbyPlaceResponse;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.PlaceDetailResponse;
+import com.hondigagae.domainlayer.place.adapter.in.web.validation.PlaceKeywordTokenLimit;
 import com.hondigagae.domainlayer.place.application.exception.PlaceValidationMessage;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceKeyword;
@@ -42,7 +43,8 @@ public class PlaceWebController {
     @Operation(summary = "장소 목록 조회",
         description = "지역·타입·반려동물 동반 조건으로 장소를 검색합니다. lastPlaceId 커서 기반 무한 스크롤 응답입니다. "
             + "비 오는 날 대안을 찾을 때는 indoor=true 로, 소형견만 받는 곳을 피할 때는 allowedPetSize 로 거릅니다. "
-            + "이름·주소로 찾을 때는 keyword 를 씁니다 (부분 일치, 대소문자 무시).\n\n"
+            + "이름·주소로 찾을 때는 keyword 를 씁니다. 공백으로 나눈 단어를 최대 5개까지 받고, 모든 단어가 "
+            + "각각 이름 또는 주소에 부분 일치해야 합니다(대소문자 무시).\n\n"
             + "**필수 파라미터는 없습니다.** 전부 생략하면 전체 장소의 첫 페이지(20개)가 옵니다. "
             + "선택 파라미터는 채운 것만 AND 조건으로 걸립니다.\n\n"
             + "**정렬은 `placeId` 오름차순이며 최신순이 아닙니다.** 아이디 대역이 원천별로 갈려 있어 "
@@ -69,8 +71,9 @@ public class PlaceWebController {
         @RequestParam(required = false) Integer petWeightKg,
         @Parameter(description = "[선택] 원천 분류명 그대로 (펜션·카페·박물관·여행지 등). 콘텐츠 타입으로는 갈리지 않는 구분에 씁니다. 생략하면 필터 없음", example = "카페")
         @RequestParam(required = false) String sourceCategory,
-        @Parameter(description = "[선택] 장소명 또는 주소 부분 일치. 공백/빈 값은 필터 없음. 최대 50자", example = "성산")
+        @Parameter(description = "[선택] 장소명 또는 주소 검색. 공백으로 나눈 단어를 AND로 검색하며 각 단어는 이름 또는 주소에 부분 일치. 공백/빈 값은 필터 없음. 최대 50자·5단어", example = "성산 고성리")
         @Size(max = PlaceKeyword.MAX_LENGTH, message = PlaceValidationMessage.KEYWORD_MAX_INVALID)
+        @PlaceKeywordTokenLimit
         @RequestParam(required = false) String keyword,
         @Parameter(description = "[선택] 커서. 첫 페이지는 생략하고, 다음 페이지는 직전 응답 마지막 항목의 placeId 를 넣습니다(그 아이디 **뒤**부터 옵니다). 예시 값은 형식 안내용", example = "126434") @RequestParam(required = false) Long lastPlaceId,
         @Parameter(description = "[선택, 기본 20] 조회 개수 (1~50)", example = "20")
@@ -97,7 +100,8 @@ public class PlaceWebController {
 
     @Operation(summary = "주변 장소 검색",
         description = "좌표 기준 반경 안의 장소를 가까운 순으로 찾습니다. 여행 중 다음 일정을 고를 때 쓰는 조회라 "
-            + "커서가 아니라 상위 N 개를 돌려줍니다. "
+            + "커서가 아니라 상위 N 개를 돌려줍니다. keyword 는 공백으로 나눈 단어를 최대 5개까지 받고, "
+            + "모든 단어가 각각 이름 또는 주소에 부분 일치해야 합니다. "
             + "식사할 곳을 찾을 때는 contentType=RESTAURANT 로, 카페만 볼 때는 sourceCategory=카페 를 함께 씁니다. "
             + "여기 담긴 음식점은 지자체에 반려동물 동반출입 업소로 등록된 곳이라 동반 가능 여부가 확인된 정보입니다.\n\n"
             + "**필수: lat, lng.** 나머지는 생략 가능하고 radius 기본 5000m, size 기본 15 입니다.\n\n"
@@ -135,8 +139,9 @@ public class PlaceWebController {
         @RequestParam(required = false) Integer petWeightKg,
         @Parameter(description = "[선택] 원천 분류명 그대로 (카페·펜션·일반음식점 등). 생략하면 필터 없음", example = "카페")
         @RequestParam(required = false) String sourceCategory,
-        @Parameter(description = "[선택] 장소명 또는 주소 부분 일치. 공백/빈 값은 필터 없음. 최대 50자", example = "성산")
+        @Parameter(description = "[선택] 장소명 또는 주소 검색. 공백으로 나눈 단어를 AND로 검색하며 각 단어는 이름 또는 주소에 부분 일치. 공백/빈 값은 필터 없음. 최대 50자·5단어", example = "성산 고성리")
         @Size(max = PlaceKeyword.MAX_LENGTH, message = PlaceValidationMessage.KEYWORD_MAX_INVALID)
+        @PlaceKeywordTokenLimit
         @RequestParam(required = false) String keyword,
 
         @Parameter(description = "[선택, 기본 15] 조회 개수 (1~50)", example = "15")

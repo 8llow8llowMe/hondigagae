@@ -20,7 +20,7 @@
 
 ## 주요 API (계획)
 
-- `GET /api/v1/places` — 검색 (지역, 유형, 반려견 동반 조건, **keyword** 이름·주소 부분 일치, 커서 기반 `SliceResponse`)
+- `GET /api/v1/places` — 검색 (지역, 유형, 반려견 동반 조건, **keyword** 단어별 이름·주소 AND 검색, 커서 기반 `SliceResponse`)
 - `GET /api/v1/places/{placeId}` — 상세 (출입 조건: 실내/실외, 크기 제한, 목줄/케이지 조건)
 - `GET /api/v1/places/{placeId}/related` — 연관 관광지
 - `GET /api/v1/places/{placeId}/suitability` — 여행 적합도 (`score` + `reasons`, `api-design-guide.md` §9).
@@ -83,7 +83,7 @@
   상세에는 `fitsActivityLevels`(이 코스를 걸을 만한 활동량의 `{code,name,description}` 목록)를 더한다.
   plan-service 의 `PlanItemWalkCourseItem.fitsActivityLevels` 와 같은 모양이라 화면이 렌더를 재사용한다.
   **목록 항목에는 싣지 않는다** — 목록은 이미 활동량으로 걸러 내려가므로 항목마다 반복하면 응답만 부푼다
-- `GET /api/v1/places/nearby?lat=&lng=&radius=&contentType=&petSizeType=&petWeightKg=&keyword=` — 좌표 반경 장소 검색. keyword 는 목록과 같은 이름·주소 부분 일치
+- `GET /api/v1/places/nearby?lat=&lng=&radius=&contentType=&petSizeType=&petWeightKg=&keyword=` — 좌표 반경 장소 검색. keyword 는 목록과 같은 단어별 이름·주소 AND 검색
 - `GET /api/v1/emergencies/facilities?lat=&lng=&radius=&type=&open24Only=&openNowOnly=&size=` — 긴급 시설 반경 검색.
   `size` 상한은 **250** 이다 — 제주 전역 시설이 213곳이라 반경을 최대로 넓혀도 잘리지 않는다.
   화면이 유형·24시간을 클라이언트에서 좁히며 칩마다 개수를 보여주므로 한 번에 전량을 받아야 한다.
@@ -134,8 +134,11 @@
 ## 데이터 흐름
 
 - 장소/코스/연관 관광지/혼잡도 예측: batch-service가 적재한 DB를 조회한다.
-  장소 키워드 검색(`keyword`)은 DB `LIKE`(이름·주소) 가 원천이고, 같은 조건의 반복
-  조회만 Redis 에 5분 TTL 로 둔다. Redis 장애는 캐시 미스로 취급한다. Elasticsearch
+  장소 키워드 검색(`keyword`)은 공백을 한 칸으로 정규화한 뒤 최대 5개 단어로 나눈다. 각 단어는
+  이름 또는 주소 중 한 곳에 부분 일치해야 하고, 모든 단어를 만족한 장소만 찾는다. `%`·`_`·`\`는
+  와일드카드가 아니라 리터럴이다. 공백/빈 값은 필터 없음이며 원문 길이 상한은 50자다. 검색 원천은
+  DB `LIKE`이고, 같은 조건의 반복 조회만 Redis 에 5분 TTL 로 둔다. 검색 의미 변경 전 캐시와 섞이지
+  않도록 목록·주변 키 네임스페이스는 각각 `list:v2`, `nearby:v2`를 쓴다. Redis 장애는 캐시 미스로 취급한다. Elasticsearch
   는 인프라 미구성이라 이 경로를 쓰지 않는다 (#421).
 - 날씨: 기상청 실시간 호출(`WeatherObservationPort`) + Redis **격자별** 캐시.
   TTL 은 고정값이 아니라 다음 발표 시각에 맞춘다 — 캐시는 성능 최적화가 아니라
@@ -171,6 +174,12 @@
   응답에 `delisted` 플래그). 새 참조는 내부 검증 API 가 막는다 — `data-refresh-guide.md` 2절.
 - 동적 검색은 `repository/custom`(QueryDSL) 이 담당한다. 병합·delisted 제외는
   `PlaceCustomRepositoryImpl.visible()` 한곳에 있다 — 새 검색을 추가하면 반드시 이것을 거친다.
+
+## 장소 키워드 토큰 검색 결정 (#1161)
+
+- **명세**: 목록과 주변 검색 모두 공백 기준 최대 5개 단어를 받고, 단어마다 `(이름 OR 주소)`를 적용한 뒤 단어 조건을 AND로 결합한다.
+- **계획/작업**: 정규화·상한 판단은 `PlaceKeyword`에 모으고, 공개 API는 Bean Validation으로 `PLACE_108`과 `keyword` 필드 오류를 응답한다. Processor는 같은 규칙으로 캐시 전에 정규화·방어 검증한다.
+- **결정**: 기존 필터·노출·커서·대소문자 무시·LIKE 리터럴 이스케이프는 유지한다. 캐시는 기존 전체 구문 검색 결과를 재사용하지 않도록 v2 네임스페이스로 분리한다.
 
 ## 필수 파라미터 누락 응답 (필수)
 

@@ -9,6 +9,7 @@ public final class PlaceValidationMessage {
     public static final String RADIUS_RANGE_INVALID = "PLACE_105:검색 반경은 1m 이상 50000m 이하만 가능합니다.";
     public static final String PET_WEIGHT_RANGE_INVALID = "PLACE_106:반려견 체중은 1kg 이상 100kg 이하만 가능합니다.";
     public static final String KEYWORD_MAX_INVALID = "PLACE_107:keyword는 50자 이하만 가능합니다.";
+    public static final String KEYWORD_TOKEN_MAX_INVALID = "PLACE_108:keyword는 최대 5개 단어만 가능합니다.";
 
     private PlaceValidationMessage() {
     }

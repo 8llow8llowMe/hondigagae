@@ -128,8 +128,8 @@ public class PlaceCustomRepositoryImpl implements PlaceCustomRepository {
         if (sourceCategory != null) {
             where.and(place.sourceCategory.eq(sourceCategory));
         }
-        PlaceKeyword.normalize(keyword).ifPresent(normalized -> {
-            String escaped = PlaceKeyword.escapeLike(normalized);
+        PlaceKeyword.tokens(keyword).forEach(token -> {
+            String escaped = PlaceKeyword.escapeLike(token);
             where.and(new BooleanBuilder()
                 .or(place.title.likeIgnoreCase("%" + escaped + "%", '\\'))
                 .or(place.addr1.likeIgnoreCase("%" + escaped + "%", '\\')));
