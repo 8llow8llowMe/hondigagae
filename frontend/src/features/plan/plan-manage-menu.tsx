@@ -21,7 +21,7 @@ import { dayToLocalNoon } from '@/lib/date/day'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 import { canCopyPlan } from '@/lib/plan/copy'
-import { isShareablePlan } from '@/lib/plan/share-link'
+import { shareMenuState } from '@/lib/plan/share-link'
 import { PLAN_STATUS_ACTION_LABELS, type PlanStatusActionSpec } from '@/lib/plan/status-action'
 import type { Pet } from '@/types/pet'
 import type { PlanDetail } from '@/types/plan'
@@ -104,6 +104,8 @@ export function PlanManageMenu({
   */
   const todayDate = dayToLocalNoon(today)
   const canCopy = todayDate !== null && canCopyPlan(plan, todayDate)
+  // 공유 항목: 열림 · 잠김(초안) · 숨김 (#1154 — 아래 메뉴 배열 주석)
+  const shareState = shareMenuState(plan.status.code)
 
   function leave() {
     void queryClient.invalidateQueries({ queryKey: planKeys.list() })
@@ -212,8 +214,13 @@ export function PlanManageMenu({
 
               **역방향 상태 변경보다 위다.** 공유는 되돌릴 수 있는 평범한 액션이고,
               아래 둘(되돌리기 · 삭제)로 갈수록 무게가 는다.
+
+              **초안에는 잠긴 항목이 선다** (#1154). 감추기만 하면 사용자는 공유 기능이 없는
+              줄 알았다(2026-10-06 사용성 점검). 눌리지 않으므로 위 결정(누르면 400)과 부딪히지
+              않고, 이름이 "확정 후" 라고 열리는 조건을 말한다. 같은 말을 확정 버튼 아래 한 줄도
+              한다 — 비활성 항목은 키보드 포커스를 받지 않아 그쪽이 보조 기술의 자리다.
             */
-            ...(isShareablePlan(plan.status.code)
+            ...(shareState === 'enabled'
               ? [
                   {
                     label: messages.plan.shareAction,
@@ -223,7 +230,15 @@ export function PlanManageMenu({
                     },
                   },
                 ]
-              : []),
+              : shareState === 'locked'
+                ? [
+                    {
+                      label: messages.plan.shareActionLocked,
+                      disabled: true,
+                      onSelect: () => undefined,
+                    },
+                  ]
+                : []),
             ...statusActions.map((action) => ({
               label: PLAN_STATUS_ACTION_LABELS[action.kind],
               disabled: status.saving,

@@ -6,6 +6,7 @@ import {
   isShareablePlan,
   shareExpiryLabel,
   shareLoadErrorMessage,
+  shareMenuState,
   shareUrlOf,
   shouldRetryShareLinkQuery,
 } from '@/lib/plan/share-link'
@@ -155,5 +156,25 @@ describe('발급 모달 조회 재시도 (shouldRetryShareLinkQuery)', () => {
 
   it('무응답은 첫 실패에 재시도한다', () => {
     expect(shouldRetryShareLinkQuery(0, new TypeError('Failed to fetch'))).toBe(true)
+  })
+})
+
+/*
+  **초안에서 공유를 감추기만 하면 사용자는 공유가 없는 줄 안다** (#1154, 2026-10-06 사용성 점검).
+  누르면 400 이 나는 항목을 두지 않는 #628 의 결정은 지키고, 초안에는 **잠긴 항목**을 보여
+  어디에 있고 무엇을 해야 열리는지 알린다.
+*/
+describe('공유 메뉴 항목 상태 (shareMenuState, #1154)', () => {
+  it('확정 · 완료는 연다', () => {
+    expect(shareMenuState('CONFIRMED')).toBe('enabled')
+    expect(shareMenuState('COMPLETED')).toBe('enabled')
+  })
+
+  it('초안은 잠긴 채 보인다 — 숨기면 공유가 없는 줄 안다', () => {
+    expect(shareMenuState('DRAFT')).toBe('locked')
+  })
+
+  it('모르는 상태는 감춘다 — 확정하면 열린다고 약속할 근거가 없다', () => {
+    expect(shareMenuState('ARCHIVED')).toBe('hidden')
   })
 })

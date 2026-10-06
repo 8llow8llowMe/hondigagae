@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
 import type { PlanStatusActionKind, PlanStatusActionSpec } from '@/lib/plan/status-action'
@@ -10,6 +12,8 @@ export type PlanStatusActionPanelProps = {
    */
   action: PlanStatusActionSpec | undefined
   labels: Record<PlanStatusActionKind, string>
+  /** 버튼 아래 한 줄 — 그 액션이 무엇을 여는지 (#1154). 없는 액션은 줄이 없다 */
+  notes?: Partial<Record<PlanStatusActionKind, string>>
   errorMessage: string | null
   saving: boolean
   onAction: (action: PlanStatusActionSpec) => void
@@ -38,11 +42,16 @@ export type PlanStatusActionPanelProps = {
 export function PlanStatusActionPanel({
   action,
   labels,
+  notes = {},
   errorMessage,
   saving,
   onAction,
 }: PlanStatusActionPanelProps) {
+  const noteId = useId()
+
   if (action === undefined && errorMessage === null) return null
+
+  const note = action === undefined ? undefined : notes[action.kind]
 
   return (
     <div className="flex flex-col gap-2">
@@ -52,9 +61,16 @@ export function PlanStatusActionPanel({
           onClick={() => onAction(action)}
           loading={saving}
           className="w-full"
+          // 안내를 버튼의 설명으로 잇는다 — 스크린 리더가 버튼 이름과 함께 읽는다
+          aria-describedby={note === undefined ? undefined : noteId}
         >
           {labels[action.kind]}
         </Button>
+      )}
+      {note !== undefined && (
+        <p id={noteId} className="text-caption text-fg-muted text-center">
+          {note}
+        </p>
       )}
       <FormAlert message={errorMessage} />
     </div>
