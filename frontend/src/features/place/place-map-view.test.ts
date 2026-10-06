@@ -71,3 +71,23 @@ describe('PlaceMapView — 개수 캡션의 요소 (#1177)', () => {
     expect(source.slice(opener, opener + 4)).toBe('<div')
   })
 })
+
+/*
+  **기준점 지도의 두 실패 갈래** (#1177 지도 검토). 하나는 SDK 폴백이 기준점을 버리던 것, 하나는
+  첫 주변 조회의 일시 장애를 "이 지역에는 표시할 곳이 없어요" 로 말하던 것이다.
+*/
+describe('PlaceMapView — 기준점 지도의 실패 갈래 (#1177)', () => {
+  it('SDK 폴백 목록이 첫 장이 아니라 지금 목록(기준점이면 주변 조회)을 그린다', () => {
+    const fallback = source.slice(source.indexOf('<PlaceListSection'))
+
+    expect(fallback).toMatch(/places=\{places\}/)
+    expect(fallback.slice(0, fallback.indexOf('/>'))).not.toContain('places={listPlaces}')
+  })
+
+  it('주변 조회의 일시 장애는 빈 상태가 아니라 재시도다 — 패널 · 시트 두 곳 모두', () => {
+    const branches = source.match(/\) : nearbyFailed \? \(\s*nearbyErrorState/g) ?? []
+
+    expect(branches).toHaveLength(2)
+    expect(source).toMatch(/nearbyQuery\.isError && isRetriable\(nearbyQuery\.error\)/)
+  })
+})
