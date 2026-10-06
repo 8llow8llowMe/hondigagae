@@ -1,4 +1,4 @@
-import { toLatLng } from '@/lib/geo/coord'
+import { type LatLng, toLatLng } from '@/lib/geo/coord'
 import { isWithinBounds, type MapBounds } from '@/lib/map/viewport'
 
 /**
@@ -56,6 +56,86 @@ export function areaAfterIdle(
  */
 export function areaAfterResearch(bounds: MapBounds): PlaceMapArea {
   return { origin: bounds, searched: bounds }
+}
+
+/**
+ * 기준점이 있는 지도(담기, #1177)가 **처음 찾는 범위** — 기준점에서 네 변까지의 거리(m).
+ *
+ * **5km 다.** 차로 10분 안팎 — 하루 동선에서 "다음에 들를 곳" 을 고르는 거리이고, 중문에서
+ * 서귀포 시내(약 14km)는 들지 않지만 중문·대포·색달은 든다. 주변 조회는 모서리까지를 반경으로
+ * 보내므로(`boundsRadiusMeters`) 실제 반경은 약 7.1km 다. 더 넓히면 제주 지도 절반이 들어와
+ * 기준점을 둔 의미가 흐려지고, 좁히면 한적한 동네에서 결과가 비어 첫 화면이 빈 상태로 열린다.
+ * 그 너머는 사용자가 지도를 옮겨 "이 지역에서 재검색" 으로 넓힌다 — `/places` 와 같은 길이다.
+ */
+export const PLACE_MAP_FOCUS_RADIUS_METERS = 5_000
+
+/** 위도 1도의 남북 거리(m). `viewport.ts` 와 같은 값 — 제주만 다루므로 상수로 충분하다 */
+const METERS_PER_LAT_DEGREE = 111_320
+
+/**
+ * 기준점에서 시작하는 영역 — **"이 지역에서 재검색" 을 이미 누른 모양**이다 (#1177).
+ *
+ * 그래서 첫 목록이 프리페치한 `/places` 첫 장(`placeId` 순 — 한경면부터다)이 아니라 이 자리의
+ * 주변 조회(`/places/nearby`, 서버 거리순)다. 권유 기준도 같은 자리에서 시작하지만, 카메라가
+ * 놓은 실제 시야로 곧 옮겨 간다 (`areaAfterFramedIdle`).
+ *
+ * 영역은 정사각형이다 — `/places` 의 재검색이 화면 사각형을 그대로 쓰는 것과 같은 모양이다.
+ */
+export function focusedPlaceMapArea(focus: LatLng): PlaceMapArea {
+  const dLat = PLACE_MAP_FOCUS_RADIUS_METERS / METERS_PER_LAT_DEGREE
+  const dLng =
+    PLACE_MAP_FOCUS_RADIUS_METERS / (METERS_PER_LAT_DEGREE * Math.cos((focus.lat * Math.PI) / 180))
+
+  return areaAfterResearch({
+    sw: { lat: focus.lat - dLat, lng: focus.lng - dLng },
+    ne: { lat: focus.lat + dLat, lng: focus.lng + dLng },
+  })
+}
+
+/**
+ * 기준점 지도의 카메라가 어디까지 왔나 (#1177).
+ *
+ * - `pending` — 지도는 떴지만 카메라를 아직 놓지 않았다. 이때의 `idle` 은 **제주 기본 시야**다
+ * - `applied` — 카메라를 놓았다(`MapCanvas` 의 `onCameraApplied`). 다음 `idle` 이 그 결과다
+ * - `settled` — 그 `idle` 을 받았다. 이제부터는 `/places` 와 같다
+ */
+export type FocusFraming = 'pending' | 'applied' | 'settled'
+
+/**
+ * 기준점 지도의 `idle` 을 어떻게 받을지.
+ *
+ * **함정이 있다.** 지도는 먼저 제주 기본 위치로 만들어지고(`MapCanvas` 는 첫 중심을 생성 전에
+ * 정한다), 카메라가 그 뒤에 한 번 옮긴다. 첫 `idle`(`userMoved=false`)을 `areaAfterIdle` 로
+ * 받으면 권유 기준이 제주 기본 시야로 덮이고, 카메라가 기준점으로 옮기는 순간 "충분히
+ * 벗어났다" 로 읽혀 **조작 0회에서 재검색 버튼이 뜬다.** 카메라의 `idle` 은 `settledRef` 가 이미
+ * 켜진 뒤라 `userMoved=true` 로 와서 `userMoved` 로는 가를 수 없다.
+ *
+ * 그래서 카메라를 놓기 전의 `idle` 은 **보지도 않고**(`seen: false` — 보이는 영역 `bounds` 도
+ * 옮기지 않는다. 옮기면 그 사이 버튼이 한 번 깜빡인다), 놓은 뒤 첫 `idle` 을 권유 기준으로 삼는다
+ * (`adoptOrigin`). 기준을 기준점 사각형으로 두지 않는 이유: 카메라는 단계가 정수라 사각형보다
+ * 넓게 보이고 기준점을 화면 위쪽에 둬 중심도 다르다 — 그 차이가 그대로 확대·이동으로 읽힌다.
+ */
+export function framingAfterIdle(framing: FocusFraming): {
+  framing: FocusFraming
+  /** 이 `idle` 의 영역을 지금 보이는 영역(`bounds`)으로 받는가 */
+  seen: boolean
+  /** 이 `idle` 의 영역을 재검색 권유 기준으로 삼는가 (`areaAfterFramedIdle`) */
+  adoptOrigin: boolean
+} {
+  if (framing === 'pending') return { framing, seen: false, adoptOrigin: false }
+  if (framing === 'applied') return { framing: 'settled', seen: true, adoptOrigin: true }
+  return { framing, seen: true, adoptOrigin: false }
+}
+
+/**
+ * 카메라가 놓은 시야를 **권유 기준으로만** 삼는다 (#1177).
+ *
+ * 목록 영역(`searched`)은 기준점 사각형 그대로다 — 옮기면 주변 조회 키(중심·반경)가 바뀌어
+ * 같은 자리를 한 번 더 조회한다. 대가는 캡션이 "목록 N곳" 인 것뿐이다(`isSameViewport` 가 두
+ * 영역을 다르다고 본다). 목록의 장소는 모두 기준점 사각형 안이라 거짓말은 아니다.
+ */
+export function areaAfterFramedIdle(area: PlaceMapArea, next: MapBounds): PlaceMapArea {
+  return { ...area, origin: next }
 }
 
 /**

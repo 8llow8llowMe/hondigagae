@@ -31,3 +31,43 @@ describe('PlaceMapView — 시트 최대 단계의 윗변 (#901 D2)', () => {
     expect(code).toContain('sheetMaxTopInset?: number | undefined')
   })
 })
+
+/*
+  #1177 — 담기 지도가 그날 직전 장소에서 연다. **기준점이 없으면 `/places` 그대로다.**
+
+  기준점은 마운트 때 값만 쓴다 — 담기 응답이 기준점을 바꿀 때마다 카메라가 옮겨지면
+  연달아 담는 흐름(#370)이 끊긴다. 상태 전이(첫 `idle` 함정)는 `place-map-area.test.ts` 가 잰다.
+*/
+describe('PlaceMapView — 기준점에서 열기 (#1177)', () => {
+  it('기준점은 마운트 때 한 번 얼린다', () => {
+    expect(code).toContain('const [focus] = useState<LatLng | null>(initialFocus ?? null)')
+  })
+
+  it('기준점이 없으면 제주 기본 영역 · 목록 캐시 · 카메라 없음이다', () => {
+    expect(code).toContain('focus === null ? INITIAL_PLACE_MAP_AREA : focusedPlaceMapArea(focus)')
+    expect(code).toContain('const [researched, setResearched] = useState(focus !== null)')
+    expect(code).toContain('focus === null ? null : { anchor: focus,')
+    expect(code).toContain("useRef<FocusFraming | null>(focus === null ? null : 'pending')")
+  })
+
+  it('기준점 지도는 주변 조회가 오기 전까지 행 골격을 둔다 — 빈 상태가 먼저 깜빡이지 않는다', () => {
+    expect(code).toContain('(focus !== null && nearbyQuery.isPending)')
+  })
+})
+
+/*
+  **대기 골격을 품는 캡션은 `p` 가 아니다** (#1177). `Skeleton` 은 `div` 라 `p` 안에 두면 HTML 이
+  허락하지 않아 하이드레이션이 깨진다 — 기준점 지도가 서버 렌더 시점에 주변 조회를 기다리며
+  처음 이 갈래를 서버에서 그렸을 때 실측으로 걸렸다.
+*/
+describe('PlaceMapView — 개수 캡션의 요소 (#1177)', () => {
+  it('골격을 품을 수 있는 캡션이 p 로 열리지 않는다', () => {
+    const caption = source.indexOf(
+      '{listPending ? <Skeleton className="h-4.5 w-20" /> : countLine}',
+    )
+    const opener = source.lastIndexOf('<', source.lastIndexOf('className=', caption))
+
+    expect(caption).toBeGreaterThan(0)
+    expect(source.slice(opener, opener + 4)).toBe('<div')
+  })
+})
