@@ -215,15 +215,16 @@ export function PasswordResetCodeStep({
  *
  * **자동으로 로그인 화면에 보내지 않는다.** 전 기기 로그아웃은 사용자가 예상하지 못한
  * 부수효과라(`jwtTokenStorePort.deleteAllSessions`) 읽을 시간을 줘야 한다 — 정본 D5.
- * 이메일을 미리 채워 넘기므로 이어지는 로그인은 비밀번호 한 번이다.
+ * 이메일은 재설정 성공 때 넘겨 두므로(`login-email-handoff.ts`, #1158) 이어지는 로그인은 비밀번호 한 번이다.
  *
  * **제목(`resetDoneTitle`)은 여기서 렌더하지 않는다.** `PasswordResetView` 의 단계 제목이
  * 이미 그 문구를 aria-live 영역으로 내보낸다 — 여기서 또 쓰면 같은 문장이 두 번 읽힌다.
  */
-export function PasswordResetDone({ email }: { email: string }) {
+export function PasswordResetDone() {
   return (
     <div className="flex flex-col items-start">
-      <ButtonLink href={`/login?${new URLSearchParams({ email }).toString()}`} size="lg">
+      {/* 이메일은 URL 이 아니라 넘겨주기로 간다 — 재설정 성공 시점에 넘겼다 (#1158) */}
+      <ButtonLink href="/login" size="lg">
         {messages.auth.toLoginScreen}
       </ButtonLink>
     </div>

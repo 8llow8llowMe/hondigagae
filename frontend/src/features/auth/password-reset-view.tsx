@@ -17,6 +17,7 @@ import {
 } from '@/features/auth/schemas'
 import { resetPassword, sendPasswordResetCode } from '@/lib/api/auth'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
+import { handOffLoginEmail } from '@/lib/auth/login-email-handoff'
 import { codeStepAfterResend, type ResendOutcome } from '@/lib/form/code-step-after-resend'
 import { remainingSeconds } from '@/lib/form/cooldown'
 import { apiErrorToFormErrors, type FormErrors } from '@/lib/form/field-errors'
@@ -181,6 +182,12 @@ export function PasswordResetView() {
       }
     },
     onSuccess: () => {
+      /*
+        완료 화면의 `로그인 화면으로` 가 이메일을 채워 데려간다 — 예전 `?email=` 쿼리 대신 넘겨주기
+        (#1158). 버튼(`ButtonLink`)이 클릭 처리기를 받지 않아 성공 시점에 넘긴다. 탭 범위라
+        로그인 화면이 읽기 전까지만 남고, 읽으면 지워진다.
+      */
+      handOffLoginEmail(email)
       setStep('done')
     },
   })
@@ -365,7 +372,7 @@ export function PasswordResetView() {
         />
       )}
 
-      {step === 'done' && <PasswordResetDone email={email} />}
+      {step === 'done' && <PasswordResetDone />}
 
       {step !== 'done' && <PasswordResetLoginLink />}
     </div>
