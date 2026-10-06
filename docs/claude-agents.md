@@ -24,12 +24,12 @@
 | `name` / `description` | YAML frontmatter `name` / `description` |
 | `developer_instructions` | frontmatter 아래 본문 (Markdown) |
 | `model` | frontmatter `model` |
-| `model_reasoning_effort` | **대응 필드 없음** — 모델 선택과 본문 지시로 흡수한다 |
+| `model_reasoning_effort` | **대응 필드 없음.** 역할 파일의 `model`을 유지하고, `T3`에서는 검토 역할을 추가한다 |
 | `sandbox_mode = "read-only"` | frontmatter `tools: Read, Grep, Glob, Bash` (Write/Edit 미부여) |
 | `sandbox_mode = "workspace-write"` | `tools` 생략 (전체 도구 상속) |
 | `[agents] max_concurrent_threads_per_session = 4` | **설정 키 없음** — 아래 병렬화 규칙으로 규율한다 |
 
-- 이름은 각 호스트 관례를 따른다. Codex 는 snake_case(`crud_implementer`), Claude Code 는 kebab-case(`crud-implementer`)다. 역할과 모델 등급은 동일하다.
+- 이름은 각 호스트 관례를 따른다. Codex 는 snake_case(`crud_implementer`), Claude Code 는 kebab-case(`crud-implementer`)다. 역할은 동일하다. Codex 추론 강도는 복잡도마다 바꾸고, Claude Code 모델 등급은 역할마다 고정한다.
 - 읽기 전용 강제는 Claude Code 에서 **도구 목록**으로 표현한다. `tools` 에 `Write`/`Edit` 를 넣지 않으면 그 역할은 파일을 고칠 수 없다. `Bash` 는 검사·테스트 실행용으로 부여하며, 본문에서 편집 금지를 명시한다.
 
 ## 역할과 모델
@@ -81,6 +81,10 @@
 - 하위 에이전트(구현·검토·탐색·테스트 보강)는 **역할 파일의 `model`(Opus / Sonnet)로 돈다.** `architect` 만 Fable 이다. 메인 세션의 Fable 을 하위 에이전트에 상속시키지 않는다 — 모든 역할 파일에 `model` 이 있는 이유다.
 - `Agent` 호출에서 `model` 을 덮어쓰는 것은 예외 처리다(예: 계정에 그 모델이 없을 때). 덮어썼으면 보고에 적는다.
 - 메인 세션이 Opus 이하여도 규칙은 같다 — 역할 파일의 모델이 우선한다. 세션 모델을 하위 에이전트에 물려주고 싶으면 역할 파일에 `model: inherit` 를 적는다(현재 그런 역할은 없다).
+
+### 복잡도와 추론 강도
+
+`T0`–`T3` 판정은 `dev-orchestrator` 스킬이 정본이다. Claude Code에는 `model_reasoning_effort`가 없으므로 `T3`라고 역할 파일 위에 모델 등급을 더 만들지 않는다. `T3`에서는 역할 파일의 모델을 유지하고, 인증·개인정보·결제·분산 상태·스키마 변경이 범위에 있으면 해당 검토 역할을 추가한다. Codex의 `xhigh` 표를 이 호스트의 모델 ID로 옮기지 않는다.
 
 ### 모델 가용성
 

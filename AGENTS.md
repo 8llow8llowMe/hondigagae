@@ -107,9 +107,10 @@
 ### 역할별 개발 흐름
 
 - 비단순 개발 작업에는 `dev-orchestrator`를 적용해 작업 유형에 맞는 역할과 모델을 선택한다.
-- 역할 분류와 라우팅 판단은 호스트가 같고 **실행 수단과 모델 이름만 다르다.**
-  - Codex — `.codex/agents/*.toml`. 정본 [docs/codex-agents.md](docs/codex-agents.md). 단순 CRUD·탐색은 Terra, 일반 구현은 Sol Medium, 버그 분석·리뷰·리팩토링은 Sol High, 아키텍처는 Astra High
-  - Claude Code — `.claude/agents/*.md`. 정본 [docs/claude-agents.md](docs/claude-agents.md). 탐색·단순 구현은 Sonnet, 일반 구현·버그 분석·리뷰·리팩토링은 Opus, 아키텍처는 Fable
+- 역할 분류와 복잡도(`T0`–`T3`) 판정은 호스트가 같고, **실행 수단만 다르다.** 절차는 `dev-orchestrator` 스킬이고, 최상위 승격은 `T3`에서만 쓴다.
+  - Codex — `.codex/agents/*.toml`은 모델만 고정한다. 탐색·단순 구현은 Luna, 일반 구현·원인 분석·검토·리팩토링은 Sol, 아키텍처는 Astra. 추론 강도는 [Codex 어댑터](.agents/skills/dev-orchestrator/adapters/codex.md)에서 spawn 시 지정한다. 운영 정본은 [docs/codex-agents.md](docs/codex-agents.md)
+  - Cursor — 전용 역할 파일이 없다. 같은 스킬을 `/dev-orchestrator`로 부르고, 복잡도는 [Cursor 어댑터](.agents/skills/dev-orchestrator/adapters/cursor.md)의 Ask·Plan·Agent 모드로 적용한다. Codex 모델 ID를 세션에 없는 모델로 지정하지 않는다
+  - Claude Code — `.claude/agents/*.md`. 정본 [docs/claude-agents.md](docs/claude-agents.md). 탐색·단순 구현은 Sonnet, 일반 구현·버그 분석·리뷰·리팩토링은 Opus, 아키텍처는 Fable. `T3`에서도 역할 파일의 모델을 유지하고 검토 역할을 추가한다
 - 공용 역할 7종(`explorer`, `crud_implementer`/`crud-implementer`, `implementer`, `bug_investigator`/`bug-investigator`, `reviewer`, `refactorer`, `architect`)은 양쪽에 대응 파일이 있다.
 - 워크스페이스 전용 역할은 Claude Code에만 파일이 있다. BE 4종(`be-executor`, `be-hexagonal-reviewer`, `be-db-reviewer`, `be-security-reviewer`), FE 7종(`fe-spec-writer`, `fe-implementer`, `fe-reviewer`, `fe-api-contract`, `fe-design-reviewer`, `fe-test-author`, `fe-map-reviewer`). 다른 호스트에서는 해당 역할 프롬프트를 순차로 적용한다. 세부는 `backend/docs/team-playbook.md`, `frontend/docs/team-playbook.md`.
 - 모든 작업을 무조건 병렬화하지 않는다. 서로 독립적인 읽기 전용 조사만 병렬화하고, 겹치는 파일의 쓰기는 한 실행자가 순차 수행한다.

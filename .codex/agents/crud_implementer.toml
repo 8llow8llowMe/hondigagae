@@ -4,8 +4,8 @@ description = """
 Cost-efficient implementer for clearly scoped CRUD, DTO, mapping, validation, configuration, and small test changes.
 """
 
-model = "gpt-5.6-terra"
-model_reasoning_effort = "medium"
+# 추론 강도는 파일에 고정하지 않는다. dev-orchestrator가 T0–T3에 맞춰 spawn 시 지정한다.
+model = "gpt-6-luna"
 sandbox_mode = "workspace-write"
 
 developer_instructions = """
