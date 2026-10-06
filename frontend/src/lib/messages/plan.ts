@@ -1092,6 +1092,15 @@ export const planMessages = {
   shareCopiedLabel: '복사됨',
   /** 비 HTTPS · 구형 브라우저에서 `navigator.clipboard` 가 없다. 조용히 실패하지 않는다 */
   shareCopyError: '복사하지 못했어요. 주소를 직접 복사해 주세요.',
+  /**
+   * 기기의 공유 시트를 연다 (#1183). `navigator.share` 가 있을 때만 선다 — 모바일 사용자는 복사 뒤
+   * 메신저로 옮기는 대신 카카오톡 등으로 바로 보내기를 기대했다(2026-10-06 사용성 점검 2회차).
+   */
+  shareNativeAction: '공유하기',
+  /** 공유 시트에 실리는 제목 — 받는 쪽 미리보기에 뜬다 */
+  shareNativeTitle: '혼디가개 여행 일정',
+  /** 취소(`AbortError`)가 아닌 실패. 복사라는 다른 길이 바로 옆에 있다 */
+  shareNativeError: '공유하지 못했어요. 복사해서 보내 주세요.',
   shareRevokeAction: '링크 폐기',
   shareRevokeConfirmTitle: '공유 링크를 폐기할까요?',
   /**

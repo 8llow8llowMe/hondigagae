@@ -171,3 +171,31 @@ const SHARE_LINK_QUERY_MAX_RETRY = 1
 export function shouldRetryShareLinkQuery(failureCount: number, error: unknown): boolean {
   return isRetriable(error) && failureCount < SHARE_LINK_QUERY_MAX_RETRY
 }
+
+/**
+ * 기기 공유 시트(`navigator.share`)를 쓸 수 있는가 (#1183).
+ *
+ * **기능으로 판정한다** — 기기 · UA 로 가르지 않는다. 데스크톱 사파리 · 엣지에도 있고, 있으면 그
+ * 기기의 공유 시트가 뜬다. `canShare` 가 있으면 이 URL 을 실을 수 있는지까지 묻는다.
+ * 없으면 지금처럼 `복사` 만 선다.
+ */
+export function canUseShareSheet(
+  nav: Partial<Pick<Navigator, 'share' | 'canShare'>>,
+  url: string,
+): boolean {
+  if (typeof nav.share !== 'function') return false
+  return typeof nav.canShare === 'function' ? nav.canShare({ url }) : true
+}
+
+/**
+ * 공유 시트가 끝난 결과 (#1183).
+ *
+ * **사용자가 시트를 닫은 것(`AbortError`)은 실패가 아니다** — 보내지 않기로 한 것이다. 오류로
+ * 그리면 아무 잘못도 없는데 경고가 뜬다. 그 밖의 거절(`NotAllowedError` — 사용자 제스처 밖 등)은
+ * 실패로 말하고 옆의 `복사` 로 보낸다.
+ */
+export function shareSheetOutcome(error: unknown): 'canceled' | 'failed' {
+  // `DOMException` 이 `Error` 를 잇지 않는 환경이 있어 `instanceof` 대신 이름만 본다
+  const name = typeof error === 'object' && error !== null && 'name' in error ? error.name : null
+  return name === 'AbortError' ? 'canceled' : 'failed'
+}

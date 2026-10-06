@@ -3,12 +3,14 @@ import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
 import {
+  canUseShareSheet,
   isShareablePlan,
   shareContentState,
   shareExpiryLabel,
   shareFailureAnnounce,
   shareLoadFailure,
   shareMenuState,
+  shareSheetOutcome,
   shareUrlOf,
   shouldRetryShareLinkQuery,
 } from '@/lib/plan/share-link'
@@ -237,5 +239,35 @@ describe('발급 모달 실패 낭독 (shareFailureAnnounce)', () => {
     for (const phase of ['running', 'settled', 'focused'] as const) {
       expect(shareFailureAnnounce(phase)).toBe('focus')
     }
+  })
+})
+
+describe('canUseShareSheet — 기기 공유 시트 (#1183)', () => {
+  const url = 'https://hondigagae.com/shared-plans/abc'
+
+  it('share 가 없으면 쓰지 않는다 — 복사만 선다', () => {
+    expect(canUseShareSheet({}, url)).toBe(false)
+  })
+
+  it('share 가 있고 canShare 가 없으면 쓴다', () => {
+    expect(canUseShareSheet({ share: () => Promise.resolve() }, url)).toBe(true)
+  })
+
+  it('canShare 가 이 URL 을 거절하면 쓰지 않는다', () => {
+    expect(canUseShareSheet({ share: () => Promise.resolve(), canShare: () => false }, url)).toBe(
+      false,
+    )
+  })
+})
+
+describe('shareSheetOutcome — 취소는 실패가 아니다 (#1183)', () => {
+  it('사용자가 시트를 닫은 AbortError 는 취소다', () => {
+    expect(shareSheetOutcome(new DOMException('Share canceled', 'AbortError'))).toBe('canceled')
+  })
+
+  it('그 밖의 거절은 실패다', () => {
+    expect(shareSheetOutcome(new DOMException('no gesture', 'NotAllowedError'))).toBe('failed')
+    expect(shareSheetOutcome(new Error('boom'))).toBe('failed')
+    expect(shareSheetOutcome(null)).toBe('failed')
   })
 })
