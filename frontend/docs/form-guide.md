@@ -176,8 +176,8 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
     다. 포커스 effect 와 같은 함수를 봐야 "역할을 뗐는데 포커스도 안 간" 무음 실패가 없다. 위의 두
     예외 갈래는 호출부가 `live` 로 덮는다.
   - **`FormAlert` 의 기본값은 `live` 그대로다.** 포커스를 옮기지 않는 나머지 29개 파일(38곳)은 바뀌지 않는다.
-    `focus` 는 포커스를 실제로 옮기는 자리(지금은 `FormFailure`)만 넘긴다. `FormFailure.announce` 는
-    필수다.
+    `focus` 는 포커스를 실제로 옮기는 자리(지금은 `FormFailure` 와 공유 모달의 재시도 결과 — #1159,
+    판정은 `shareFailureAnnounce`)만 넘긴다. `FormFailure.announce` 는 필수다.
 - 제출 실패 시 **화면에서 첫 번째로 보이는 오류 필드로 포커스를 옮긴다.**
   - **판정 기준은 DOM 순서다.** zod 스키마의 키 선언 순서가 아니다 — 두 순서는 언제든 어긋날 수
     있고, 어긋나면 포커스가 위의 오류를 지나쳐 아래로 간다 ([#560](https://github.com/8llow8llowMe/hondigagae/issues/560)
