@@ -786,7 +786,12 @@ export const planMessages = {
   itemTimeEditLabel: '{title} 시작 시각 {time}, 고치기',
   /** 모달 제목. `{title}` 치환 — 어느 항목의 시각인지 밝힌다 */
   itemTimeModalTitle: '{title} 시작 시각',
-  itemTimeModalDescription: '▲▼나 방향키로 바꾸거나 숫자를 바로 입력해요.',
+  /**
+   * 모달 설명. **기기를 가리지 않는 말이다** (#1184) — 예전 `▲▼나 방향키로 바꾸거나…` 는 모바일에
+   * 없는 방향키를 말했다. 방향키는 `spinbutton` 역할의 표준 조작이라 키보드 · 스크린리더 사용자는
+   * 역할로 이미 안다(`plan-item-time-view.tsx`).
+   */
+  itemTimeModalDescription: '▲▼를 누르거나 숫자를 바로 입력해요.',
   /** 두 칸의 이름 — `spinbutton` 의 `aria-label` */
   itemTimeHourLabel: '시',
   itemTimeMinuteLabel: '분',
