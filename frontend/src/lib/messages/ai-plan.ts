@@ -46,7 +46,6 @@ export const aiPlanMessages = {
   fieldBudget: '예산 (선택)',
   fieldBudgetUnit: '만원',
   fieldBudgetHint: '어림값이면 충분해요. 비워 두면 예산을 따지지 않아요.',
-  budgetPresetLabel: '예산 고르기',
   budgetAny: '상관없음',
 
   /**

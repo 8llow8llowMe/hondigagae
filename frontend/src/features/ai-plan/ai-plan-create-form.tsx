@@ -390,9 +390,9 @@ export function AiPlanCreateForm({
         */}
         <fieldset className="flex flex-col gap-1">
           {/*
-            **라벨이 눈에 보여야 한다.** 예산 칩은 바로 아래 `Field`(예산 (선택))가 라벨을
-            들고 있어 `ChipGroup` 의 `aria-label` 만으로 충분했지만, 이 축은 칩이 컨트롤의
-            전부다 — 라벨이 없으면 접기를 펼쳤을 때 무엇을 고르는 칩인지 알 수 없다.
+            **라벨이 눈에 보여야 한다.** 예산 칩은 `Field`(예산 (선택)) 라벨 아래에 선다(#1178).
+            이 축은 칩이 컨트롤의 전부라 `Field` 대신 `fieldset` · `legend` 다 — 라벨이 없으면
+            접기를 펼쳤을 때 무엇을 고르는 칩인지 알 수 없다.
             `CheckboxGroup` 의 `legend` 와 같은 값이다.
           */}
           <legend className="text-body-2 text-fg mb-1 font-medium">
@@ -425,56 +425,64 @@ export function AiPlanCreateForm({
         {/*
           예산은 **칩 + 직접 입력**이다 (아트보드 01 주석: 대부분 어림값을 고른다).
           "상관없음" 은 빈 값이고 `0` 이 아니다 — 계약이 `@Positive` 다 (명세 S1).
+
+          **칩이 `Field` 안, 라벨 아래다** (#1178). 예전에는 칩이 `Field` 바깥 **위**에 서서 보이는
+          제목 없이 `예산 (선택)` 라벨보다 먼저 나왔고, 바로 위 `지역` 묶음의 일부처럼 읽혔다
+          (2026-10-06 사용성 점검 2회차). 이제 라벨 → 칩 → 입력 → 안내가 한 묶음이다. 칩은
+          `Field` 의 설명 맥락(`aria-describedby`)을 읽지 않으므로 안내는 여전히 입력칸에만 걸린다.
+
+          **칩 묶음의 이름이 보이는 라벨과 같다** — 예전 `예산 고르기` 는 화면 어디에도 없는 말이었다
+          (WCAG 2.5.3).
         */}
-        <div className="flex flex-col gap-2">
-          {/*
-            **레이아웃 클래스를 여기서 준다.** `ChipGroup` 은 role/aria 배선만 하고
-            배치를 사용처에 맡긴다 (`place-filter-chips.tsx` 와 같은 규약).
+        <Field
+          id="budgetManwon"
+          label={messages.aiPlan.fieldBudget}
+          hint={messages.aiPlan.fieldBudgetHint}
+          error={errors.fields.budgetManwon}
+        >
+          <div className="flex flex-col gap-2">
+            {/*
+                **레이아웃 클래스를 여기서 준다.** `ChipGroup` 은 role/aria 배선만 하고
+                배치를 사용처에 맡긴다 (`place-filter-chips.tsx` 와 같은 규약).
 
-            **간격은 `gap-2`(8px)다.** 필터 칩(`place-filter-chips` · `emergency-section`)은
-            `gap-1.5`(6px)를 쓰는데, 그쪽은 여러 줄로 빽빽하게 깔리는 필터 줄이고 이쪽은
-            폼 컨트롤이라 **여전히 갈라져 있다** — 규약이 같다고 값까지 맞추지 않는다
-            (#96 이 필터 쪽 3곳을 6px 로 통일한 것과 이 값은 별개다).
+                **간격은 `gap-2`(8px)다.** 필터 칩(`place-filter-chips` · `emergency-section`)은
+                `gap-1.5`(6px)를 쓰는데, 그쪽은 여러 줄로 빽빽하게 깔리는 필터 줄이고 이쪽은
+                폼 컨트롤이라 **여전히 갈라져 있다** — 규약이 같다고 값까지 맞추지 않는다
+                (#96 이 필터 쪽 3곳을 6px 로 통일한 것과 이 값은 별개다).
 
-            **아트보드는 이 자리에 10px 을 줬고, 그것을 §4 스케일의 8 로 내렸다** (#335).
-            아트보드가 `DESIGN.md` §4 의 출처지만 **정본은 §4 다** — "아트보드가 그랬다" 가
-            이기면 스케일은 어디에서도 권위를 갖지 못하고, `token-usage.test.ts` 가 그
-            권위를 지키려고 존재한다. 2px 은 이 자리에서 보이지 않지만, **한 폼의 칩 줄만
-            제품의 다른 모든 칩 줄과 다른 간격을 쓰는 것**은 화면을 옮겨 다닐 때 보인다.
-            6 으로 내리는 쪽은 #339 에서 시도했다가 되돌렸다(필터 칩과 같아진다) —
-            8 은 "폼 컨트롤이 필터 칩보다 조금 넉넉하다" 는 뜻을 지키면서 스케일 안에 있는
-            유일한 값이다.
-          */}
-          <ChipGroup
-            label={messages.aiPlan.budgetPresetLabel}
-            exclusive
-            className="flex flex-wrap gap-2"
-          >
-            {BUDGET_PRESETS_MANWON.map((preset) => (
-              <Chip
-                key={preset}
-                exclusive
-                selected={budgetSelected === String(preset)}
-                onSelect={() => onValueChange('budgetManwon', String(preset))}
-              >
-                {`${preset}${messages.aiPlan.fieldBudgetUnit}`}
-              </Chip>
-            ))}
-            <Chip
+                **아트보드는 이 자리에 10px 을 줬고, 그것을 §4 스케일의 8 로 내렸다** (#335).
+                아트보드가 `DESIGN.md` §4 의 출처지만 **정본은 §4 다** — "아트보드가 그랬다" 가
+                이기면 스케일은 어디에서도 권위를 갖지 못하고, `token-usage.test.ts` 가 그
+                권위를 지키려고 존재한다. 2px 은 이 자리에서 보이지 않지만, **한 폼의 칩 줄만
+                제품의 다른 모든 칩 줄과 다른 간격을 쓰는 것**은 화면을 옮겨 다닐 때 보인다.
+                6 으로 내리는 쪽은 #339 에서 시도했다가 되돌렸다(필터 칩과 같아진다) —
+                8 은 "폼 컨트롤이 필터 칩보다 조금 넉넉하다" 는 뜻을 지키면서 스케일 안에 있는
+                유일한 값이다.
+              */}
+            <ChipGroup
+              label={messages.aiPlan.fieldBudget}
               exclusive
-              selected={budgetSelected === ''}
-              onSelect={() => onValueChange('budgetManwon', '')}
+              className="flex flex-wrap gap-2"
             >
-              {messages.aiPlan.budgetAny}
-            </Chip>
-          </ChipGroup>
+              {BUDGET_PRESETS_MANWON.map((preset) => (
+                <Chip
+                  key={preset}
+                  exclusive
+                  selected={budgetSelected === String(preset)}
+                  onSelect={() => onValueChange('budgetManwon', String(preset))}
+                >
+                  {`${preset}${messages.aiPlan.fieldBudgetUnit}`}
+                </Chip>
+              ))}
+              <Chip
+                exclusive
+                selected={budgetSelected === ''}
+                onSelect={() => onValueChange('budgetManwon', '')}
+              >
+                {messages.aiPlan.budgetAny}
+              </Chip>
+            </ChipGroup>
 
-          <Field
-            id="budgetManwon"
-            label={messages.aiPlan.fieldBudget}
-            hint={messages.aiPlan.fieldBudgetHint}
-            error={errors.fields.budgetManwon}
-          >
             <div className="flex items-center gap-2">
               {/*
                 일정 예산과 같은 입력칸이다 (#986). 만원 단위라 쉼표가 붙는 일은 드물지만,
@@ -491,8 +499,8 @@ export function AiPlanCreateForm({
                 {messages.aiPlan.fieldBudgetUnit}
               </span>
             </div>
-          </Field>
-        </div>
+          </div>
+        </Field>
 
         {/*
           **생성 옵션은 접기의 맨 아래다** (아트보드 05 "입력 화면에 붙는 세 항목").

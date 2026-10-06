@@ -194,6 +194,28 @@ describe('AiPlanCreateForm — 예산은 칩 + 직접 입력', () => {
   })
 
   // 이슈 #986 — 만원 단위라 쉼표가 붙는 일은 드물지만 일정 예산과 같은 입력칸을 쓴다
+  /*
+    **라벨 → 칩 → 입력이 한 묶음이다** (#1178). 칩이 라벨보다 위에 서서 바로 위 `지역` 묶음의 일부처럼
+    읽혔다(2026-10-06 사용성 점검 2회차).
+  */
+  it('예산 라벨이 칩보다 먼저이고 칩이 입력칸보다 먼저다', () => {
+    const html = render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_REGION } })
+    const label = html.search(/<label[^>]*for="budgetManwon"/)
+    const chips = html.indexOf('20만원')
+    const input = html.indexOf('id="budgetManwon"')
+
+    expect(label).toBeGreaterThan(0)
+    expect(label).toBeLessThan(chips)
+    expect(chips).toBeLessThan(input)
+  })
+
+  it('칩 묶음의 이름이 보이는 라벨과 같다 — 화면에 없는 이름을 쓰지 않는다', () => {
+    const html = render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_REGION } })
+
+    expect(html).toContain(`aria-label="${messages.aiPlan.fieldBudget}"`)
+    expect(html).not.toContain('예산 고르기')
+  })
+
   it('예산 칸도 천 단위 쉼표로 보인다', () => {
     expect(
       render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_REGION, budgetManwon: '1500' } }),
