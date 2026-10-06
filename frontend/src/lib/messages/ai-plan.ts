@@ -222,6 +222,11 @@ export const aiPlanMessages = {
    */
   jobStepElapsed: '이 단계 {stepElapsed}째',
   /**
+   * 단계 이름 옆의 단계 경과 (#1176). `{stepElapsed}` 는 `45초` · `1분 12초`. `일정 구성 · 1분 12초째` 로
+   * 읽힌다 — 이름 바로 옆이라 `이 단계` 를 붙이지 않는다. 위 둘째 줄 문구는 상한 초과 화면이 그대로 쓴다.
+   */
+  jobStepElapsedInline: '{stepElapsed}째',
+  /**
    * 조건 블록 라벨 — 기다리는 중 (#710).
    *
    * **진행 화면에도 조건을 그린다.** 서버가 생성 조건을 함께 내려주므로(#488) 값은 이미
