@@ -517,6 +517,18 @@ export const planMessages = {
    */
   statusReopenAction: '확정으로 되돌리기',
   statusReopenError: '되돌리지 못했어요. 잠시 후 다시 시도해 주세요.',
+  /**
+   * 상태 전이가 끝난 뒤 그 자리에 남는 한 줄 (#1174). **무엇이 됐는지와 그래서 열린 · 닫힌 것**을
+   * 말한다 — 버튼이 사라지기만 해서는 성공인지 알 수 없었다(2026-10-06 사용성 점검 2회차).
+   *
+   * **되돌리기는 공유를 따로 말하지 않는다.** 초안이 되면 확정 버튼 아래 `confirmUnlocksShare` 가
+   * 다시 서서 공유 조건을 말한다 — 결과에도 쓰면 같은 말이 두 줄로 붙고, 링크를 만든 적 없는
+   * 일정에도 "열리지 않아요" 가 있는 링크가 잠긴 것처럼 읽힌다.
+   */
+  statusConfirmDone: '일정을 확정했어요. 이제 링크로 공유할 수 있어요.',
+  statusRevertDone: '초안으로 되돌렸어요.',
+  statusCompleteDone: '여행을 완료했어요.',
+  statusReopenDone: '확정으로 되돌렸어요.',
 
   manageLabel: '일정 관리',
   /**

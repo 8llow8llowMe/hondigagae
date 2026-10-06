@@ -417,9 +417,12 @@ export function PlanDetailSection({
           */
           action={
             <PlanStatusAction
+              planId={plan.planId}
+              statusCode={plan.status.code}
               action={statusLayout.button}
               saving={status.saving}
               errorMessage={status.errorMessage}
+              result={status.result}
               onAction={status.run}
             />
           }

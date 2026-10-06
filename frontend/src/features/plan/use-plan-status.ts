@@ -13,6 +13,8 @@ import {
   changesPetConditionSource,
   type PlanStatusActionKind,
   type PlanStatusActionSpec,
+  type PlanStatusResult,
+  planStatusResultAnnounce,
 } from '@/lib/plan/status-action'
 
 const ACTION_ERRORS: Record<PlanStatusActionKind, string> = {
@@ -37,11 +39,16 @@ const ACTION_ERRORS: Record<PlanStatusActionKind, string> = {
  * 들고 있던 낡은 값으로 덮어쓸 위험이 생긴다 (`PlanCommandProcessor.updatePlan`).
  * 응답이 `PlanDetailResponse` 전체라 `setQueryData` 로 갈아끼우고 목록 · 브리핑을 무효화한다
  * (완료 ↔ 진행 전환은 판정 · 산책 위험도까지 — 아래).
+ *
+ * **성공도 화면이 말한다** (#1174). `result` 는 마지막으로 성공한 전이다 — 개요 아래 액션 자리가
+ * 결과 한 줄(확정이면 `공유 링크` 까지)을 그린다. 다음 전이를 시작하면 걷는다: 진행 중에 직전
+ * 결과가 남아 있으면 "확정했어요" 아래에서 되돌리기가 돌고, 실패하면 성공과 실패가 나란히 선다.
  */
 export function usePlanStatus(planId: string) {
   const queryClient = useQueryClient()
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [result, setResult] = useState<PlanStatusResult | null>(null)
   // disabled 반영 전 빠른 연속 클릭을 막는다 (form-guide.md §6)
   const savingRef = useRef(false)
 
@@ -50,10 +57,19 @@ export function usePlanStatus(planId: string) {
     savingRef.current = true
     setSaving(true)
     setErrorMessage(null)
+    setResult(null)
 
     void updatePlan(planId, { status: action.nextStatus })
       .then((next) => {
         queryClient.setQueryData(planKeys.detail(planId), next)
+        /*
+          **응답이 온 지금의 포커스로 읽힐 길을 정한다** — 전폭 버튼에서 왔으면 이미 `BODY` 라
+          안내로 옮기고, 메뉴에서 왔으면 `⋯` 에 둔 채 낭독한다 (`planStatusResultAnnounce`).
+        */
+        setResult({
+          kind: action.kind,
+          announce: planStatusResultAnnounce(document.activeElement, document.body),
+        })
         void queryClient.invalidateQueries({ queryKey: planKeys.list() })
         /*
           **브리핑은 버린다** (#1055). 서버가 반려견 특성을 상태에 따라 읽는다 — 완료 일정은
@@ -81,5 +97,5 @@ export function usePlanStatus(planId: string) {
       })
   }
 
-  return { run, saving, errorMessage }
+  return { run, saving, errorMessage, result }
 }
