@@ -15,12 +15,14 @@ import { fetchPlanShareLink, issuePlanShareLink, revokePlanShareLink } from '@/l
 import type { FailureAnnounce } from '@/lib/form/submit-failure-focus'
 import { messages } from '@/lib/messages'
 import {
+  canUseShareSheet,
   type PlanShareState,
   shareContentState,
   shareExpiryLabel,
   shareFailureAnnounce,
   shareLoadFailure,
   type ShareRetryPhase,
+  shareSheetOutcome,
   shareUrlOf,
   shouldRetryShareLinkQuery,
 } from '@/lib/plan/share-link'
@@ -69,6 +71,9 @@ export function PlanShareModal({
   const contentRef = useRef<HTMLDivElement>(null)
 
   const [copied, setCopied] = useState(false)
+  /** 기기 공유 시트를 쓸 수 있는가 (#1183) — `navigator` 는 브라우저에만 있어 마운트 뒤에 읽는다 */
+  const [sheetAvailable, setSheetAvailable] = useState(false)
+  const [shareFailed, setShareFailed] = useState(false)
   const [copyFailed, setCopyFailed] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -172,6 +177,25 @@ export function PlanShareModal({
   const expiry =
     link === null || link === undefined ? null : shareExpiryLabel(link.expiresAt, new Date())
 
+  useEffect(() => {
+    setSheetAvailable(url !== null && canUseShareSheet(navigator, url))
+  }, [url])
+
+  /*
+    **기기 공유 시트로 보낸다** (#1183). 사용자가 시트를 닫은 것(`AbortError`)은 실패가 아니라
+    보내지 않기로 한 것이라 아무것도 그리지 않는다 — `shareSheetOutcome`.
+  */
+  async function handleShare() {
+    if (url === null) return
+
+    try {
+      await navigator.share({ title: messages.plan.shareNativeTitle, url })
+      setShareFailed(false)
+    } catch (error) {
+      setShareFailed(shareSheetOutcome(error) === 'failed')
+    }
+  }
+
   async function handleCopy() {
     if (url === null) return
 
@@ -235,6 +259,8 @@ export function PlanShareModal({
             onRetry={handleRetry}
             onIssue={() => issue.mutate()}
             onCopy={() => void handleCopy()}
+            onShare={sheetAvailable ? () => void handleShare() : null}
+            shareFailed={shareFailed}
             onRevoke={() => setConfirming(true)}
           />
         </div>
@@ -275,6 +301,10 @@ export type PlanShareContentProps = {
   onRetry: () => void
   onIssue: () => void
   onCopy: () => void
+  /** 기기 공유 시트를 연다 (#1183). `null` 이면 그 기기에 시트가 없다 — 버튼을 그리지 않는다 */
+  onShare?: (() => void) | null
+  /** 공유 시트가 취소가 아닌 이유로 실패했다 */
+  shareFailed?: boolean
   onRevoke: () => void
 }
 
@@ -298,6 +328,8 @@ export function PlanShareContent({
   onRetry,
   onIssue,
   onCopy,
+  onShare = null,
+  shareFailed = false,
   onRevoke,
 }: PlanShareContentProps) {
   if (state === 'loading') return <Skeleton className="h-24 w-full" />
@@ -351,6 +383,15 @@ export function PlanShareContent({
       />
 
       <div className="flex flex-wrap items-center gap-2">
+        {/*
+          **공유 시트가 있으면 맨 앞이다** (#1183) — 모바일에서 링크를 보내는 가장 짧은 길이다.
+          복사는 그대로 옆에 남는다: 시트에 원하는 앱이 없거나 주소를 붙여 넣을 곳이 따로 있다.
+        */}
+        {onShare !== null && (
+          <Button onClick={onShare} disabled={url === null}>
+            {messages.plan.shareNativeAction}
+          </Button>
+        )}
         <Button variant="secondary" onClick={onCopy} disabled={url === null}>
           {copied ? messages.plan.shareCopiedLabel : messages.plan.shareCopyAction}
         </Button>
@@ -367,6 +408,7 @@ export function PlanShareContent({
       {expiry !== null && <p className="text-caption text-fg-subtle font-medium">{expiry}</p>}
 
       {copyFailed && <FormAlert message={messages.plan.shareCopyError} />}
+      {shareFailed && <FormAlert message={messages.plan.shareNativeError} />}
     </div>
   )
 }

@@ -150,3 +150,31 @@ describe('공유 모달 — 불러오기 실패', () => {
     expect(html).not.toContain(messages.common.retry)
   })
 })
+
+/*
+ **모바일 공유 시트** (#1183). 복사만 있으면 메신저로 옮기는 단계를 사용자가 직접 해야 했다.
+ */
+describe('공유 모달 — 기기 공유 시트 (#1183)', () => {
+  const shared = { state: 'shared' as const, url: 'https://hondigagae.com/shared-plans/abc' }
+
+  it('시트가 있으면 공유하기가 복사보다 앞에 선다', () => {
+    const html = render({ ...shared, onShare: () => undefined })
+
+    expect(html).toContain(messages.plan.shareNativeAction)
+    expect(html.indexOf(messages.plan.shareNativeAction)).toBeLessThan(
+      html.indexOf(messages.plan.shareCopyAction),
+    )
+  })
+
+  it('시트가 없으면 지금처럼 복사만 선다', () => {
+    const html = render({ ...shared, onShare: null })
+
+    expect(html).not.toContain(messages.plan.shareNativeAction)
+    expect(html).toContain(messages.plan.shareCopyAction)
+  })
+
+  it('취소가 아닌 실패만 말한다 — 복사로 보낸다', () => {
+    expect(render({ ...shared, shareFailed: true })).toContain(messages.plan.shareNativeError)
+    expect(render({ ...shared, shareFailed: false })).not.toContain(messages.plan.shareNativeError)
+  })
+})
