@@ -7,6 +7,7 @@ import type { ReactNode } from 'react'
 
 import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
+import { ErrorState } from '@/components/error-state'
 import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from '@/components/icons'
 import { MAP_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
 import { Skeleton } from '@/components/skeleton'
@@ -21,7 +22,7 @@ import { PlaceSearchField } from '@/features/place/place-search-field'
 import { useNearbyPlaces } from '@/features/place/use-nearby-places'
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { usePlaceList } from '@/features/place/use-place-list'
-import { ApiError, toErrorStatus } from '@/lib/api/error'
+import { ApiError, isRetriable, toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
 import { type LatLng, SELECTED_PLACE_MAP_LEVEL } from '@/lib/geo/coord'
 import { getCurrentPosition, getPositionIfGranted, offersLocate } from '@/lib/geo/current-position'
@@ -341,6 +342,23 @@ export function PlaceMapView({
     옮기며 헤맸다. 받은 결과(`places`)가 0 이면 검색어 탓, 있는데 영역 밖이면 지역 탓이다.
     검색어 갈래는 **검색어만** 지운다 — 다른 필터까지 풀면 사용자가 고른 조건이 사라진다.
   */
+  /*
+    **기준점 지도의 첫 주변 조회가 일시 장애로 실패했다** (#1177 검토). 목록 캐시로 떨어지면
+    프리페치한 첫 장(placeId 순)을 기준점 영역으로 거른 결과 — 대개 0곳 — 가 `이 지역에는 표시할
+    곳이 없어요` 로 서서 **장애를 데이터 부재로 말한다.** 사용자가 아무것도 하지 않은 첫 화면이다.
+    5xx · 무응답만 재시도를 준다(404 에는 재시도를 달지 않는다 — 이 저장소 규칙). `/places` 의
+    재검색 실패는 이 갈래가 아니다(`focus` 가 없다) — 예전 그대로다.
+  */
+  const nearbyFailed =
+    focus !== null && !usingNearby && nearbyQuery.isError && isRetriable(nearbyQuery.error)
+  const nearbyErrorState = (
+    <ErrorState
+      title={messages.place.errorTitle}
+      description={messages.common.temporaryErrorDescription}
+      onRetry={() => void nearbyQuery.refetch()}
+    />
+  )
+
   const { apply: applyFilters } = usePlaceFilterNav()
   const emptyCopy = mapEmptyCopy({ keyword: filters.keyword, fetchedCount: places.length })
   const emptyState = (
@@ -513,7 +531,12 @@ export function PlaceMapView({
             어긋난다. 카드가 없으니 `headingLevel` 도 기본값 `2` 그대로 둔다 (#456①).
           */
           inset="main"
-          places={listPlaces}
+          /*
+            **기준점 지도면 주변 조회 결과(거리순)다** (#1177 검토). 카카오 키 도메인이 등록되지 않은
+            환경은 늘 이 폴백이라, 첫 장만 그리면 기준점이 통째로 무시됐다. `/places` 는 폴백에서
+            재검색을 할 수 없어 `places` 가 곧 `listPlaces` 다 — 동작이 같다.
+          */
+          places={places}
           loading={listQuery.isPending}
           errorStatus={toErrorStatus(listQuery.error)}
           errorMessage={
@@ -823,6 +846,8 @@ export function PlaceMapView({
             <div className="min-h-0 flex-1 overflow-y-auto">
               {listPending ? (
                 <PlaceMapRowsSkeleton />
+              ) : nearbyFailed ? (
+                nearbyErrorState
               ) : visible.length === 0 ? (
                 emptyState
               ) : (
@@ -887,6 +912,8 @@ export function PlaceMapView({
       >
         {listPending ? (
           <PlaceMapRowsSkeleton />
+        ) : nearbyFailed ? (
+          nearbyErrorState
         ) : visible.length === 0 ? (
           emptyState
         ) : (
