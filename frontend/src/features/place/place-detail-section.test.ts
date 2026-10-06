@@ -723,7 +723,7 @@ describe('PlaceDetailSection — 영업 상태 (#294)', () => {
     expect(markup).not.toContain(messages.place.detailOpenClosed)
   })
 
-  it('openNow 가 false 면 영업 종료를 쓴다', () => {
+  it('openNow 가 false 면 영업 시간 아님을 쓴다', () => {
     const markup = withIntro({ open24: false, openNow: false })
 
     expect(markup).toContain(messages.place.detailOpenClosed)
@@ -731,7 +731,18 @@ describe('PlaceDetailSection — 영업 상태 (#294)', () => {
   })
 
   /*
-    24시간인 곳에 "지금 영업 중" 은 동어반복이고 "영업 종료" 는 모순이다. 그 모순이 실제로
+    #1160 — `openNow` 는 참/거짓뿐이라 개점 전과 마감 후를 가르지 못한다. "영업 종료" 는 09:29 에
+    `10:00~18:00` 인 곳을 "오늘은 끝났다" 로 읽혔다. 끝·마감을 말하는 낱말이 돌아오면 걸린다.
+  */
+  it('openNow false 문구는 시점을 말하지 않는다 — 개점 전에도 맞아야 한다', () => {
+    for (const word of ['종료', '마감', '끝']) {
+      expect(messages.place.detailOpenClosed).not.toContain(word)
+      expect(messages.emergency.statusClosed).not.toContain(word)
+    }
+  })
+
+  /*
+    24시간인 곳에 "지금 영업 중" 은 동어반복이고 "영업 시간 아님" 은 모순이다. 그 모순이 실제로
     오므로(긴급 시설 dev 응답의 청사약국 — `10:00~24:00` 인데 `open24: true`/`openNow: false`)
     화면은 `24시간` 하나만 말한다.
   */

@@ -820,7 +820,7 @@ function PlaceOpenStatus({
     <>
       {/*
         **`open24` 면 `openNow` 를 말하지 않는다.** 24시간인 곳에 "지금 영업 중" 은
-        동어반복이고 "영업 종료" 는 모순이다 — 그 모순이 실제로 온다 (긴급 시설 dev 응답의
+        동어반복이고 "영업 시간 아님" 은 모순이다 — 그 모순이 실제로 온다 (긴급 시설 dev 응답의
         청사약국이 `10:00~24:00` 인데 `open24: true`/`openNow: false` 다). 모순을 나란히
         두면 사용자가 판단할 수 없고, 원문이 바로 아래 있으니 확인할 수 있다.
       */}
@@ -828,7 +828,7 @@ function PlaceOpenStatus({
         <Badge tone="neutral">{messages.place.detailOpen24}</Badge>
       ) : (
         openNow !== null && (
-          // 영업 중은 무게를 주고, 영업 종료는 그대로 둔다
+          // 영업 중은 무게를 주고, 영업 시간 아님은 그대로 둔다
           <Badge tone="neutral" className={openNow ? 'text-fg font-semibold' : ''}>
             {openNow ? messages.place.detailOpenNow : messages.place.detailOpenClosed}
           </Badge>

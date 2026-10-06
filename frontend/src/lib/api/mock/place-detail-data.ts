@@ -70,7 +70,7 @@ const FULL_INTRO: PlaceIntro = {
   chkCreditCard: '가능',
 }
 
-/** 일부 값만 있는 intro — 없는 줄이 숨겨져야 한다. 영업 상태는 **영업 종료** 갈래다 */
+/** 일부 값만 있는 intro — 없는 줄이 숨겨져야 한다. 영업 상태는 **영업 시간 아님** 갈래다 */
 const PARTIAL_INTRO: PlaceIntro = {
   infoCenter: null,
   useTime: '10:00~18:00',
