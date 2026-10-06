@@ -415,3 +415,45 @@ describe('PlanDayVerdict — 등급 tint 밴드', () => {
     expect(lists[1]?.classes).toContain('gap-1')
   })
 })
+
+/*
+  **좋은 판정의 감점은 "살펴볼 점" 이다** (#1179). 초록 `여행 적합` 아래 가장 큰 문장이 감점 하나라
+  판정과 반대 방향의 말이 이유처럼 읽혔다. 순서 · 문장은 서버 그대로이고 이름만 붙인다.
+*/
+describe('PlanDayVerdict — 좋은 판정의 감점 근거 (#1179)', () => {
+  const crowded = {
+    code: 'CROWDED',
+    name: '혼잡',
+    description: '관광객 집중률 74% 로 붐빌 것으로 예상됩니다.',
+    scoreDelta: -8,
+  }
+  const petAllowed = planVerdict.reasons[0]
+  if (petAllowed === undefined) throw new Error('fixture 에 근거가 있어야 한다')
+
+  it('여행 적합인데 감점이 있으면 근거 위에 살펴볼 점이 선다', () => {
+    const html = render({ reasons: [crowded, petAllowed] })
+
+    expect(html).toContain(messages.plan.verdictCaveatsLabel)
+    expect(html.indexOf(messages.plan.verdictCaveatsLabel)).toBeLessThan(
+      html.indexOf(crowded.description),
+    )
+  })
+
+  it('감점이 없으면 서지 않는다', () => {
+    expect(render({ reasons: [petAllowed] })).not.toContain(messages.plan.verdictCaveatsLabel)
+  })
+
+  it('낮은 판정의 날에는 서지 않는다 — 감점이 곧 이유다', () => {
+    const html = render({
+      reasons: [crowded],
+      suitabilityLevel: {
+        code: 'LOW',
+        name: '여행 주의',
+        description: null,
+        scoreDescription: null,
+      },
+    })
+
+    expect(html).not.toContain(messages.plan.verdictCaveatsLabel)
+  })
+})

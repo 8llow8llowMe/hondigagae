@@ -6,6 +6,7 @@ import {
   METRIC_FILL_TONE,
   METRIC_TINT_EDGE_TONE,
   METRIC_TINT_TONE,
+  type MetricTone,
   MetricValue,
   MetricWord,
 } from '@/components/metric'
@@ -223,6 +224,17 @@ export function PlanDayVerdict({
         (`reason-list.tsx` 머리주석). 브리핑도 이 컴포넌트를 쓰므로 같은 모양이 된다 — 같은
         `PlanDayWeatherItem` 을 두 화면이 다르게 그리지 않는다는 위 원칙 그대로다.
       */}
+      {/*
+        **좋은 판정의 감점은 "살펴볼 점" 이다** (#1179). 서버 근거는 감점과 정보성뿐이고 정보성은 위
+        `grouped` 로 아래 작은 글씨가 되므로, `여행 적합` 인 날 가장 크게 남는 문장이 감점 하나였다 —
+        판정과 반대 방향의 말이 이유처럼 읽혔다. 순서 · 문장은 그대로 두고(서버 순서 규칙) **이름만**
+        붙인다. 낮은 판정의 날은 감점이 곧 이유라 붙이지 않는다. 감점이 없으면 캡션도 없다.
+      */}
+      {showsCaveatsLabel(tone, verdict.reasons) && (
+        <p className="text-caption text-fg-muted -mb-1 font-medium">
+          {messages.plan.verdictCaveatsLabel}
+        </p>
+      )}
       <ReasonList
         informationalLayout="grouped"
         reasons={verdict.reasons.map((reason) => ({
@@ -234,6 +246,17 @@ export function PlanDayVerdict({
       <PlanVerdictNotes petConditionApplied={petConditionApplied} basisPetName={basisPetName} />
     </div>
   )
+}
+
+/**
+ * 근거 위에 `살펴볼 점` 을 붙이는가 (#1179) — **좋은 판정(`high`)인데 감점 근거가 있을 때**만이다.
+ * 감점만 큰 글씨로 남아 판정과 반대 방향의 말이 이유처럼 읽히는 갈래가 그것뿐이다.
+ */
+export function showsCaveatsLabel(
+  tone: MetricTone,
+  reasons: readonly { scoreDelta: number }[],
+): boolean {
+  return tone === 'high' && reasons.some((reason) => reason.scoreDelta < 0)
 }
 
 /**
