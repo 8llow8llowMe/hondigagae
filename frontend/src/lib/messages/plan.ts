@@ -852,6 +852,11 @@ export const planMessages = {
   addPlaceTitle: '{day}일차에 담을 장소',
   /** 어느 일정인지 밝힌다 — 목록만 보면 어디에 담는지 알 수 없다 */
   addPlaceSubtitle: '고른 장소가 {day}일차 맨 뒤에 담겨요.',
+  /**
+   * 그날 끝에 숙박이 있으면 그 앞에 담긴다 (#1175, `itemInsertIndex`). **"맨 뒤" 라고 쓰면 거짓이다** —
+   * 담은 뒤 일정에서 숙소 앞에 선 것을 보고 잘못 담긴 줄 안다.
+   */
+  addPlaceSubtitleBeforeLodging: '고른 장소가 {day}일차 숙소 앞에 담겨요.',
   addPlaceBack: '일정으로 돌아가기',
 
   /**

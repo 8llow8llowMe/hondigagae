@@ -23,7 +23,7 @@ import { usePlanDetail } from '@/features/plan/use-plan-detail'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
 import { messages } from '@/lib/messages'
-import { placeIdsOf } from '@/lib/plan/day-items'
+import { itemInsertIndex, placeIdsOf } from '@/lib/plan/day-items'
 import { groupItemsByDay } from '@/lib/plan/detail'
 import { PLAN_ADD_DEFAULT_VIEW, type ViewMode, viewModeHref } from '@/lib/url/view-mode'
 import type { PlaceFilters, PlaceSummary } from '@/types/place'
@@ -368,6 +368,7 @@ export function PlanAddPlaceView({
       backHref={backHref}
       planTitle={detail.data.title}
       notice={visitResetNotice}
+      beforeLodging={itemInsertIndex(group.items) < group.items.length}
       listHref={listHref}
       mapHref={mapHref}
       view={view}
@@ -466,6 +467,7 @@ export function PlanAddPlaceShell({
   view,
   tools,
   notice = null,
+  beforeLodging = false,
   children,
 }: {
   day: number
@@ -474,6 +476,8 @@ export function PlanAddPlaceShell({
   planTitle?: string | undefined
   /** 부제 아래 한 줄 — '다녀옴' 초기화 경고 (#1066). 없으면 줄 자체가 없다 */
   notice?: string | null
+  /** 그날 끝에 숙박이 있어 담는 곳이 맨 뒤가 아니다 (#1175) — 부제가 "숙소 앞" 이라고 말한다 */
+  beforeLodging?: boolean
   listHref: string
   mapHref: string
   view: ViewMode
@@ -482,7 +486,9 @@ export function PlanAddPlaceShell({
   children: ReactNode
 }) {
   const title = messages.plan.addPlaceTitle.replace('{day}', String(day))
-  const subtitle = messages.plan.addPlaceSubtitle.replace('{day}', String(day))
+  const subtitle = (
+    beforeLodging ? messages.plan.addPlaceSubtitleBeforeLodging : messages.plan.addPlaceSubtitle
+  ).replace('{day}', String(day))
 
   return (
     /*

@@ -155,13 +155,14 @@ describe('이동·휴식 추가 — 모달 안에 선다 (#1066)', () => {
   })
 })
 
-function renderAddShell(notice: string | null) {
+function renderAddShell(notice: string | null, beforeLodging = false) {
   return renderToStaticMarkup(
     createElement(PlanAddPlaceShell, {
       day: 1,
       backHref: '/plans/1#day1',
       planTitle: '몽실이와 제주 2박 3일',
       notice,
+      beforeLodging,
       listHref: '/plans/1/days/1/add?view=list',
       mapHref: '/plans/1/days/1/add',
       view: 'list',
@@ -188,5 +189,22 @@ describe('장소 추가 — 화면 머리에 선다 (#1066)', () => {
 
     expect(markup).not.toContain(messages.plan.visitResetOnAddNotice)
     expect(markup).not.toContain(OLD_NOTICE)
+  })
+})
+
+/*
+  **부제가 담기는 자리를 거짓말하지 않는다** (#1175). 끝에 숙박이 있는 날 "맨 뒤에 담겨요" 라고
+  쓰면, 담은 뒤 숙소 앞에 선 것을 보고 잘못 담긴 줄 안다.
+*/
+describe('장소 추가 — 부제가 담길 자리를 말한다 (#1175)', () => {
+  it('끝에 숙박이 있는 날은 숙소 앞이라고 말한다', () => {
+    const markup = renderAddShell(null, true)
+
+    expect(markup).toContain(messages.plan.addPlaceSubtitleBeforeLodging.replace('{day}', '1'))
+    expect(markup).not.toContain(messages.plan.addPlaceSubtitle.replace('{day}', '1'))
+  })
+
+  it('아니면 맨 뒤다', () => {
+    expect(renderAddShell(null)).toContain(messages.plan.addPlaceSubtitle.replace('{day}', '1'))
   })
 })

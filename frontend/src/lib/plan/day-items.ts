@@ -159,7 +159,43 @@ export function placeIdsOf(items: PlanItemDetail[]): Set<string> {
 }
 
 /**
- * 그 일자의 **맨 끝에** 장소 하나를 붙인 일괄 교체 본문.
+ * 담기가 새 항목을 넣을 자리 — 그날 **끝에 붙은 숙박 앞** (#1175).
+ *
+ * **맨 끝이 아니다.** 2026-10-06 사용성 점검 2회차에서 `장소 추가` 로 담은 카페가 그날 숙박 뒤에
+ * 붙어, 숙소에서 38.7km 를 되돌아가는 순서가 됐다 — 사용자가 순서 편집으로 직접 옮겨야 했다(옮기니
+ * 5km). 숙박은 그날의 끝이다. 낮에 갈 곳을 고른 사람이 숙소 다음에 가려는 경우는 드물고, 그렇다면
+ * 순서 편집으로 옮긴다 — 반대 방향의 실수보다 싸다.
+ *
+ * **끝에 연달아 붙은 숙박 묶음만 본다.** 중간의 숙박(아침 체크아웃 · 낮 짐 맡기기)은 그날의 끝이
+ * 아니라 건드리지 않는다 — 그 뒤에 이미 낮 일정이 이어진다. 숙박만 있는 날은 맨 앞(0)이다.
+ *
+ * **이동·휴식 추가(`appendMoveItemPayload`)는 쓰지 않는다** — 숙소 앞 이동인지 숙소에서의 휴식인지
+ * 화면이 알 수 없어 예전처럼 맨 끝이다(H7-3).
+ */
+export function itemInsertIndex(items: PlanItemDetail[]): number {
+  let index = items.length
+  while (index > 0 && items[index - 1]?.itemType.code === 'LODGING') index -= 1
+  return index
+}
+
+/** 기존 항목을 되싣고 `itemInsertIndex` 자리에 하나를 끼운 본문. `sequence` 는 0부터 다시 매긴다 */
+function insertItemPayload(
+  items: PlanItemDetail[],
+  day: number,
+  added: Omit<PlanItemPayload, 'day' | 'sequence'>,
+): PlanDayItemsReplacePayload {
+  const at = itemInsertIndex(items)
+  const existing = items.map((item, index) =>
+    toPayloadItem(item, day, index < at ? index : index + 1),
+  )
+
+  return {
+    items: [...existing.slice(0, at), { day, sequence: at, ...added }, ...existing.slice(at)],
+  }
+}
+
+/**
+ * 그 일자에 장소 하나를 담은 일괄 교체 본문 — **끝에 붙은 숙박 앞, 없으면 맨 끝** (#1175).
  *
  * **새 API 가 없다.** 담기도 일자 편집과 같은 `PUT …/days/{day}/items` 라, 기존 항목을
  * 전부 되싣고 하나를 더한 목록을 보낸다 — 되싣지 않으면 그 일자가 새 항목 하나만
@@ -171,29 +207,20 @@ export function placeIdsOf(items: PlanItemDetail[]): Set<string> {
  * (아래)가 자매 함수로 따로 있다 — 중복 판정(`placeIdsOf` vs `walkCourseIdsOf`)과 `title`
  * 조립 규칙이 갈려 인자로 합치지 않았다 (`올레담기-세부명세.md` D3-1).
  *
- * 순서는 **맨 끝**이다. 위치를 고르는 UI 는 두지 않는다 — 순서는 편집모드가 소유한다
- * (F5-3).
+ * 위치를 고르는 UI 는 두지 않는다 — 순서는 편집모드가 소유한다(F5-3). 자리는 `itemInsertIndex`
+ * 하나가 정한다 — 예전에는 늘 맨 끝이라 숙박 뒤에 붙었다.
  */
 export function appendPlaceItemPayload(
   items: PlanItemDetail[],
   day: number,
   place: { placeId: string; title: string },
 ): PlanDayItemsReplacePayload {
-  const existing = items.map((item, index) => toPayloadItem(item, day, index))
-
-  return {
-    items: [
-      ...existing,
-      {
-        day,
-        sequence: existing.length,
-        itemType: 'PLACE',
-        // 문자열 그대로다 — Snowflake 라 Number() 를 거치면 정밀도를 잃는다 (E1 규칙 1)
-        targetId: place.placeId,
-        title: place.title.slice(0, ITEM_TITLE_MAX),
-      },
-    ],
-  }
+  return insertItemPayload(items, day, {
+    itemType: 'PLACE',
+    // 문자열 그대로다 — Snowflake 라 Number() 를 거치면 정밀도를 잃는다 (E1 규칙 1)
+    targetId: place.placeId,
+    title: place.title.slice(0, ITEM_TITLE_MAX),
+  })
 }
 
 // ─── 산책 코스 담기 (#620) ────────────────────────────────────────────────────
@@ -221,8 +248,8 @@ export function walkCourseIdsOf(items: PlanItemDetail[]): Set<string> {
 }
 
 /**
- * 그 일자의 **맨 끝에** 산책 코스 하나를 붙인 일괄 교체 본문. `appendPlaceItemPayload` 의
- * 자매다 (`올레담기-세부명세.md` D3).
+ * 그 일자에 산책 코스 하나를 담은 일괄 교체 본문 — 자리는 장소 담기와 같다(**끝에 붙은 숙박 앞**,
+ * `itemInsertIndex`, #1175). `appendPlaceItemPayload` 의 자매다 (`올레담기-세부명세.md` D3).
  *
  * **`itemType` 이 `WALK` 고정이고 `targetId` 는 `walk_course.id` 다** — `place.id` 와
  * 다른 네임스페이스다. **서버가 저장 시 이 id 를 검증하지 않는다**
@@ -239,21 +266,12 @@ export function appendWalkCourseItemPayload(
   day: number,
   course: { walkCourseId: string; title: string },
 ): PlanDayItemsReplacePayload {
-  const existing = items.map((item, index) => toPayloadItem(item, day, index))
-
-  return {
-    items: [
-      ...existing,
-      {
-        day,
-        sequence: existing.length,
-        itemType: 'WALK',
-        // 문자열 그대로다 — Snowflake 라 Number() 를 거치면 정밀도를 잃는다 (E1 규칙 1)
-        targetId: course.walkCourseId,
-        title: course.title.slice(0, ITEM_TITLE_MAX),
-      },
-    ],
-  }
+  return insertItemPayload(items, day, {
+    itemType: 'WALK',
+    // 문자열 그대로다 — Snowflake 라 Number() 를 거치면 정밀도를 잃는다 (E1 규칙 1)
+    targetId: course.walkCourseId,
+    title: course.title.slice(0, ITEM_TITLE_MAX),
+  })
 }
 
 // ─── 이동·휴식 직접 추가 (#1014) ──────────────────────────────────────────────
