@@ -168,3 +168,14 @@ export const PLAN_STATUS_ACTION_LABELS: Record<PlanStatusActionKind, string> = {
   'revert-draft': messages.plan.statusRevertAction,
   reopen: messages.plan.statusReopenAction,
 }
+
+/**
+ * 버튼 아래 한 줄 — **그 액션이 무엇을 여는지** (#1154).
+ *
+ * `확정하기` 만 갖는다. AI 로 담은 일정은 늘 초안이고 초안은 공유할 수 없는데(`PLAN_022`),
+ * 그 사실을 화면 어디서도 말하지 않아 2026-10-06 사용성 점검의 "친구에게 공유" 과제가
+ * 멈췄다. 사용자가 다음에 할 일을 보는 자리가 이 버튼이라 여기서 말한다.
+ */
+export const PLAN_STATUS_ACTION_NOTES: Partial<Record<PlanStatusActionKind, string>> = {
+  confirm: messages.plan.confirmUnlocksShare,
+}

@@ -1,5 +1,9 @@
 import { PlanStatusActionPanel } from '@/features/plan/plan-status-action-panel'
-import { PLAN_STATUS_ACTION_LABELS, type PlanStatusActionSpec } from '@/lib/plan/status-action'
+import {
+  PLAN_STATUS_ACTION_LABELS,
+  PLAN_STATUS_ACTION_NOTES,
+  type PlanStatusActionSpec,
+} from '@/lib/plan/status-action'
 
 /**
  * 일정 확정 · 완료 — 아트보드 01 + #613.
@@ -53,6 +57,7 @@ export function PlanStatusAction({
     <PlanStatusActionPanel
       action={action}
       labels={PLAN_STATUS_ACTION_LABELS}
+      notes={PLAN_STATUS_ACTION_NOTES}
       errorMessage={errorMessage}
       saving={saving}
       onAction={onAction}

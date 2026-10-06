@@ -45,6 +45,22 @@ export function isShareablePlan(statusCode: string): boolean {
 }
 
 /**
+ * ⋯ 메뉴의 공유 항목 상태 (#1154).
+ *
+ * - `enabled` — 공유할 수 있다
+ * - `locked` — **초안**이다. 잠긴 채 보인다
+ * - `hidden` — 모르는 상태다. 확정하면 열린다고 약속할 근거가 없어 감춘다
+ *
+ * **초안을 감추기만 하면 사용자는 공유 기능이 없는 줄 안다** — 사용성 점검에서 실제로 그랬다.
+ * 누르면 `PLAN_022` 400 이 나는 항목을 두지 않는다는 #628 의 결정은 그대로다: `locked` 는
+ * 눌리지 않는다(비활성). 어디 있는지와 무엇을 하면 열리는지만 말한다.
+ */
+export function shareMenuState(statusCode: string): 'enabled' | 'locked' | 'hidden' {
+  if (isShareablePlan(statusCode)) return 'enabled'
+  return statusCode === 'DRAFT' ? 'locked' : 'hidden'
+}
+
+/**
  * 만료 안내 한 줄. 날짜를 못 읽으면 `null` — 틀린 날짜는 없는 날짜보다 나쁘다.
  *
  * **D-N 을 쓰지 않는다.** 30일짜리라 `D-29` 는 크기 감각을 주지 못하고, 이 줄을 읽는

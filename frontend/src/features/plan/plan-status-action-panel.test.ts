@@ -5,13 +5,18 @@ import { describe, expect, it } from 'vitest'
 
 import { PlanStatusActionPanel } from '@/features/plan/plan-status-action-panel'
 import { messages } from '@/lib/messages'
-import { forwardStatusAction, PLAN_STATUS_ACTION_LABELS } from '@/lib/plan/status-action'
+import {
+  forwardStatusAction,
+  PLAN_STATUS_ACTION_LABELS,
+  PLAN_STATUS_ACTION_NOTES,
+} from '@/lib/plan/status-action'
 
 function render(statusCode: string, errorMessage: string | null = null) {
   return renderToStaticMarkup(
     createElement(PlanStatusActionPanel, {
       action: forwardStatusAction(statusCode),
       labels: PLAN_STATUS_ACTION_LABELS,
+      notes: PLAN_STATUS_ACTION_NOTES,
       errorMessage,
       saving: false,
       onAction: () => undefined,
@@ -82,5 +87,27 @@ describe('PlanStatusActionPanel — 카드 폭 (#845)', () => {
 
   it('버튼은 그대로 전폭이다 — 인셋을 뗀 것이지 폭을 줄인 것이 아니다', () => {
     expect(render('DRAFT')).toContain('w-full')
+  })
+})
+
+/*
+  **확정이 무엇을 여는지 말한다** (#1154). AI 로 담은 일정은 늘 초안이고 초안은 공유할 수
+  없는데, 그 사실을 아무 데서도 말하지 않아 "친구에게 공유" 과제가 멈췄다.
+*/
+describe('PlanStatusActionPanel — 확정 버튼 아래 안내 (#1154)', () => {
+  it('초안의 확정 버튼 아래에 공유가 열린다고 말한다', () => {
+    expect(render('DRAFT')).toContain(messages.plan.confirmUnlocksShare)
+  })
+
+  it('안내를 버튼의 설명으로 잇는다 — 스크린 리더가 버튼과 함께 읽는다', () => {
+    const markup = render('DRAFT')
+    const describedBy = /<button[^>]*aria-describedby="([^"]+)"/.exec(markup)?.[1]
+
+    expect(describedBy).toBeDefined()
+    expect(markup).toContain(`id="${describedBy ?? ''}"`)
+  })
+
+  it('확정 뒤(완료 버튼)에는 붙이지 않는다', () => {
+    expect(render('CONFIRMED')).not.toContain(messages.plan.confirmUnlocksShare)
   })
 })

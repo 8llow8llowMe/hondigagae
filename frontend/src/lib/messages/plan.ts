@@ -494,6 +494,8 @@ export const planMessages = {
   walkSafetyRetryAction: '산책 위험도 다시 불러오기',
 
   statusConfirmAction: '일정 확정하기',
+  /** 확정 버튼 아래 한 줄 — 초안은 공유할 수 없다는 것을 확정이 여는 것으로 말한다 (#1154) */
+  confirmUnlocksShare: '확정하면 링크로 일정을 공유할 수 있어요.',
   statusConfirmError: '확정하지 못했어요. 잠시 후 다시 시도해 주세요.',
   /**
    * 확정을 되돌린다 (#565). **확인 대화상자를 붙이지 않는 근거가 이 문구 자체다** —
@@ -1041,6 +1043,8 @@ export const planMessages = {
   // 발급·폐기는 `/plans/[planId]` 관리 메뉴 안 모달, 열람은 `/shared-plans/[token]`.
 
   shareAction: '공유 링크',
+  /** 초안의 ⋯ 메뉴에 잠긴 채 서는 공유 항목 (#1154) — 어디 있고 무엇을 하면 열리는지 */
+  shareActionLocked: '공유 링크 · 확정 후',
   shareTitle: '공유 링크',
   /**
    * **보이지 않는 것을 먼저 말한다.** 링크를 주는 쪽이 가장 먼저 묻는 것이
