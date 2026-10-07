@@ -75,3 +75,13 @@ describe('map-canvas.tsx — 묶음의 판단이 이 파일에 남아 있지 않
     expect(occurrences("setAttribute('aria-label'")).toBe(1)
   })
 })
+
+describe('map-canvas.tsx — 기준점 마커 (#1223)', () => {
+  it('같은 통로(markerElement)로 만들고 누를 수 없다', () => {
+    expect(SOURCE).toContain('markerElement(focusMarkerContent(focusMarker.name), null)')
+  })
+
+  it('장소 핀과 다른 배열이다 — 핀 effect 가 통째로 비울 때 함께 지워지면 깜빡인다', () => {
+    expect(SOURCE).toContain('focusOverlayRef')
+  })
+})

@@ -96,6 +96,7 @@ export function PlaceMapView({
   sheetMaxTopInset,
   panelTopInset,
   initialFocus,
+  initialFocusName,
 }: {
   filters: PlaceFilters
   /** 미로그인이면 반려견 목록을 조회하지 않는다 — 필터의 크기 축이 빠진다 (#200) */
@@ -182,6 +183,13 @@ export function PlaceMapView({
    * 끊긴다 — 사용자가 맞춰 둔 확대·위치가 날아간다. 이름이 `initial` 인 이유다.
    */
   initialFocus?: LatLng | null | undefined
+  /**
+   * 기준점의 이름 (#1223). 주면 그 자리에 누를 수 없는 `기준 · {이름}` 이름표가 선다 — 기준이 올레
+   * 시작점이거나 필터에 걸린 장소면 그 자리에 핀이 없어, 왜 여기서 열렸는지 알 수 없었다.
+   * `initialFocus` 와 함께 **마운트 때 값만 쓴다** — 담을 때마다 이름표가 옮겨 가면 카메라는 그대로인데
+   * 기준만 바뀐 것처럼 읽힌다.
+   */
+  initialFocusName?: string | null | undefined
 }) {
   /*
     **`undefined` 만이 아니라 `null`·`false` 도 "머리 없음" 이다** (#1012 검토). 호출부가
@@ -214,6 +222,12 @@ export function PlaceMapView({
   */
   /* 마운트 때 값으로 얼린다 — `initialFocus` 주석 */
   const [focus] = useState<LatLng | null>(initialFocus ?? null)
+  const [focusName] = useState<string | null>(initialFocusName ?? null)
+  /* 얼린 두 값에서만 나오므로 참조가 바뀌지 않는다 — `MapCanvas` 가 이 참조로 다시 그린다 */
+  const focusMarker = useMemo(
+    () => (focus === null || focusName === null ? null : { ...focus, name: focusName }),
+    [focus, focusName],
+  )
   const [area, setArea] = useState<PlaceMapArea>(() =>
     focus === null ? INITIAL_PLACE_MAP_AREA : focusedPlaceMapArea(focus),
   )
@@ -611,6 +625,7 @@ export function PlaceMapView({
         center={center}
         /* 카드를 누르면 그 핀으로 옮기고 동네가 보이는 단계까지 확대한다 */
         selectedLevel={SELECTED_PLACE_MAP_LEVEL}
+        focusMarker={focusMarker}
         onFailure={setFailure}
         className="h-full w-full"
       />
