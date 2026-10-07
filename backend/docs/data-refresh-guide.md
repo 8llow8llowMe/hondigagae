@@ -652,3 +652,65 @@ SELECT COUNT(*) unreflected
  WHERE p.source = 'TOUR_API' AND p.merged_into_id IS NULL AND p.delisted_at IS NULL
    AND ppi.allowance_scope <> 'UNKNOWN' AND p.pet_allowance_type = 'UNKNOWN';
 ```
+
+## 11. 개요에 유형 표기가 실려 있을 때 — `overview` (#1216)
+
+문화정보원 CSV 의 `기본 정보_장소설명` 은 설명문이 아니라 "유형 표기[, 이용 메모…]" 다
+(`place-data-integration.md` §2 컬럼 매핑). 그대로 싣던 동안 장소 상세에 `관광지` · `공원` 한 낱말이 떴고,
+병합이 관광 API 장소의 빈 개요까지 그 낱말로 채웠다. **코드는 표기를 버리고 메모만 싣도록 고쳤다**
+(`CultureDescriptionParser`). 원본 기준 제주 여행 장소 230행 중 메모가 남는 것은 21행(`악천후 시 휴장`,
+`13세 이상 입장 가능` …)이고 209행은 `NULL` 이 된다.
+
+이미 적재된 값은 코드 배포만으로 바뀌지 않는다. 이유는 두 가지다.
+
+- 파일이 그대로라 다음 실행이 `atchFileId` 비교로 **건너뛴다**(§1). `forceImport=true` 가 필요하다.
+- 관광 API 행에 옮겨 간 값은 §8 · §9 와 같은 이유로 **`placeMergeJob` 재실행으로 고쳐지지 않는다.**
+
+### 절차
+
+```sql
+-- 1) 영향 범위를 먼저 센다 (읽기 전용). 배포 전에 세어 두면 4) 와 비교된다
+SELECT COUNT(*) FROM place
+ WHERE overview IN ('관광지', '공원', '애견 동반 펜션', '펜션', '애견카페', '박물관', '미술관', '문예회관');
+SELECT COUNT(*) FROM place WHERE source = 'TOUR_API' AND overview IS NOT NULL;
+```
+
+2) 코드를 배포한 뒤 문화정보원 잡을 **한 번** 강제로 다시 돌린다. 문화정보원 행의 `overview` 가 메모 또는 `NULL` 로 바뀐다.
+
+```
+--spring.batch.job.name=cultureFacilityImportJob sido=제주특별자치도 forceImport=true runAt=<ISO 시각>
+```
+
+```sql
+-- 3) 이미 병합된 쌍 — 관광 API 행의 개요를 비우고 흡수 행의 고친 값으로 다시 옮긴다
+--    ★ 2) 뒤에 돌린다. 앞에 돌리면 흡수 행의 옛 낱말을 다시 옮겨 온다
+UPDATE place SET overview = NULL, updated_at = NOW()
+ WHERE source = 'TOUR_API' AND overview IS NOT NULL;
+
+UPDATE place survivor
+  JOIN place absorbed ON absorbed.merged_into_id = survivor.id
+   SET survivor.overview = COALESCE(survivor.overview, absorbed.overview),
+       survivor.updated_at = NOW()
+ WHERE survivor.source = 'TOUR_API';
+```
+
+- **관광 API 행의 `overview` 를 통째로 비워도 되는 근거** — 관광 API 적재(`JdbcPlaceBulkAdapter.UPSERT_SQL`)는
+  이 컬럼을 쓰지 않는다(개요를 수집하지 않는다, `place-data-integration.md` §4). 그래서 관광 API 행의 값은
+  전부 병합이 옮긴 것이다. 관광 API 개요를 수집하게 되거나 사람이 개요를 고치는 경로가 생기면 이 절차는
+  그대로 쓸 수 없다.
+- `source_category`(`여행지` 등)는 되돌리지 않는다. 흡수 행의 실제 분류이고, `sourceCategory=카페` 검색
+  (AI 일정의 카페 후보, #1170)이 이 값으로 관광 API 카페를 찾는다.
+- prod 는 §8 과 같이 **런북으로 사람이 적용**한다. dev 에서 1)~4) 를 돌려 건수를 확인한 뒤 옮긴다.
+
+### 확인
+
+```sql
+-- 4-1) 유형 표기만 남은 개요 — 0 이어야 한다
+SELECT COUNT(*) FROM place
+ WHERE overview IN ('관광지', '공원', '애견 동반 펜션', '펜션', '애견카페', '박물관', '미술관', '문예회관');
+
+-- 4-2) 메모는 남아 있다 — 0 보다 커야 한다 (원본 기준 제주 문화정보원 21행, 중복 제거로 조금 적을 수 있다)
+SELECT COUNT(*) FROM place WHERE source = 'CULTURE_PORTAL' AND overview IS NOT NULL;
+```
+
+> 장소 상세 API 로 보면 캐시 때문에 잠시 옛 값이 올 수 있다 — §8 과 같이 **확인은 SQL 로 한다.**
