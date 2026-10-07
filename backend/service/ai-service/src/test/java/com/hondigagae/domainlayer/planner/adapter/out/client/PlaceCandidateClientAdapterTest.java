@@ -70,4 +70,25 @@ class PlaceCandidateClientAdapterTest {
             assertThat(place.title()).isEqualTo("포시즌펜션");
         });
     }
+
+    @Test
+    @DisplayName("음식점 조회는 콘텐츠 타입 RESTAURANT 를 검색에 넘긴다 — 카페도 이 타입이다 (#1245)")
+    void passesRestaurantContentType() {
+        PlaceCandidateClientAdapter adapter = new PlaceCandidateClientAdapter(
+            placeCandidateClient,
+            pinnedPlaceCandidateClient,
+            new InternalResponseSupport(CircuitBreakerRegistry.ofDefaults()));
+        when(placeCandidateClient.searchPlaces("39", null, "ALLOWED", 50, null, null, "RESTAURANT"))
+            .thenReturn(Response.success(new PlaceSliceClientResponse(List.of(
+                new PlaceItemClientResponse(
+                    "31", null, "애월더선셋", "제주시 애월읍", 33.47, 126.33, null, null, null, true, "카페")),
+                false)));
+
+        List<PlaceCandidateQueryResult> results = adapter.findRestaurantCandidates("39", null, 50);
+
+        assertThat(results).singleElement().satisfies(place -> {
+            assertThat(place.placeId()).isEqualTo(31L);
+            assertThat(place.sourceCategory()).isEqualTo("카페");
+        });
+    }
 }
