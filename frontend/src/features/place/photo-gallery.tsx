@@ -470,8 +470,9 @@ function MobileCarousel({
 
   return (
     <div
-      // `group` — 이전/다음 버튼이 마우스를 올렸을 때 · 포커스가 안에 있을 때만 보인다
-      className={cn('group relative', !always && 'md:hidden')}
+      // `group/gallery` — 이전/다음 버튼이 **이 사진 영역**에 마우스를 올렸을 때만 보인다. 이름을 붙여
+      // 패널 · 목록 행의 다른 `group` 에 반응하지 않게 한다
+      className={cn('group/gallery relative', !always && 'md:hidden')}
     >
       <ul
         ref={trackRef}
@@ -521,8 +522,10 @@ function MobileCarousel({
       </ul>
 
       {/*
-        **이전/다음 버튼 (#1233 D3)** — 끌기 · 가로 휠을 모르는 마우스 사용자의 길이다. 손을 올렸을 때 ·
-        포커스가 있을 때만 보인다(사진을 가리지 않는다). 첫 칸의 이전, 끝 칸의 다음은 **그리지 않는다** —
+        **이전/다음 버튼 (#1233 D3)** — 끌기 · 가로 휠을 모르는 마우스 사용자의 길이다. **사진 위에 마우스를
+        올렸을 때만 서서히(200ms) 나타난다**(사용자 결정 2026-10-07) — 사진을 가리지 않는다. 예외는
+        **키보드 포커스**(`:focus-visible`)뿐이다: 안 보이는 버튼에 포커스가 가면 어디 있는지 모른다.
+        `focus-within` 을 쓰지 않는다 — 타일을 마우스로 누르면 포커스가 남아 손을 떼도 버튼이 떠 있었다. 첫 칸의 이전, 끝 칸의 다음은 **그리지 않는다** —
         눌러도 안 움직이는 버튼은 고장으로 읽힌다. 터치 기기에서는 `hover` 가 없어 안 보인다.
       */}
       {index > 0 && <CarouselStepButton direction="prev" onClick={() => goTo(index - 1)} />}
@@ -554,7 +557,7 @@ function MobileCarousel({
   )
 }
 
-/** 사진 위 좌우 세로 중앙의 원형 44 버튼 — `MobileCarousel` 의 `group` 안에서만 보인다 */
+/** 사진 위 좌우 세로 중앙의 원형 44 버튼 — `MobileCarousel` 의 `group/gallery` 안에서만 보인다 */
 function CarouselStepButton({
   direction,
   onClick,
@@ -572,7 +575,7 @@ function CarouselStepButton({
         direction === 'prev' ? messages.place.galleryPrevAction : messages.place.galleryNextAction
       }
       className={cn(
-        'bg-bg/90 text-fg focus-visible:ring-brand-500 absolute top-1/2 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-full opacity-0 shadow-md transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:ring-2 focus-visible:outline-none',
+        'bg-bg/90 text-fg focus-visible:ring-brand-500 absolute top-1/2 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-full opacity-0 shadow-md transition-opacity duration-200 ease-out group-hover/gallery:opacity-100 group-has-[:focus-visible]/gallery:opacity-100 focus-visible:ring-2 focus-visible:outline-none',
         direction === 'prev' ? 'left-6' : 'right-6',
       )}
     >
