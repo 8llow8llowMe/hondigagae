@@ -9,7 +9,7 @@ import { SharedPlanSection } from '@/features/plan/shared-plan-section'
 import { ApiError } from '@/lib/api/error'
 import { paths } from '@/lib/api/paths'
 import { serverFetch } from '@/lib/api/server'
-import { sharedPlanPageTitle } from '@/lib/plan/shared-plan-title'
+import { sharedPlanOpenGraph, sharedPlanPageTitle } from '@/lib/plan/shared-plan-title'
 import type { SharedPlan } from '@/types/plan'
 
 /**
@@ -49,18 +49,15 @@ const loadSharedPlan = cache((token: string) =>
 )
 
 /**
- * **탭 제목은 링크의 상태만 말하고 일정 내용은 싣지 않는다** (#980).
+ * **탭 제목 · 공유 미리보기는 링크가 유효하면 일정 이름, 아니면 링크의 상태다** (#980 → #1186).
  *
- * 예전에는 정적 `metadata`(`공유된 여행 일정`)라 무효한 링크(404)·만료(410)에서도 그 말을
- * 해서, 본문(`유효하지 않은 링크예요` · `만료된 링크예요`)과 탭이 갈렸다. 지금은 조회 결과로
- * **유효 여부만** 가른다 — `sharedPlanPageTitle` 은 오류만 받고 일정을 받지 않는다.
- * 조회는 **결과를 변수에 받지 않는다** — 받은 값이 없으니 제목에 흘러들 수도 없다.
- * 일정 이름은 사용자가 지은 사적 문자열이라 브라우저 히스토리·탭 제목·화면 공유로 남에게
- * 샌다 (명세 보안 메모).
+ * #980 은 무효(404) · 만료(410)에서도 `공유된 여행 일정` 이라 본문과 탭이 갈리던 것을 조회 결과로 갈랐다.
+ * #1186 은 유효한 링크에 **일정 이름 하나**를 싣는다 — 메신저 미리보기가 서비스 공통 카드라 받는 사람이
+ * 무엇을 받았는지 몰랐다(사용자 결정 2026-10-07). **넘기는 것은 이름뿐이다** — 기간 · 예산 · 메모는
+ * 메타데이터로 흘러갈 자리가 없다(`sharedPlanPageTitle` · `sharedPlanOpenGraph` 가 문자열 하나만 받는다).
  *
  * **백엔드를 한 번 더 부르지 않는다.** `loadSharedPlan` 이 `cache()` 라 페이지 렌더와 한
- * 호출을 나눠 쓴다 — 정적 metadata 시절의 "제목 하나를 위해 한 번 더 부를 이유가 없다" 는
- * 그대로 지켜진다.
+ * 호출을 나눠 쓴다.
  *
  * **`noindex` 가 이 화면의 유일한 색인 방어다.** 토큰 자체가 열람 권한이라 색인되면
  * 링크가 공개된다 — 저장소에 `robots.ts` · `sitemap.ts` 가 없어 여기 말고는 막을 곳이
@@ -71,15 +68,19 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const { token } = await params
 
   let error: unknown = null
+  let planTitle: string | null = null
   try {
-    await loadSharedPlan(token)
+    planTitle = (await loadSharedPlan(token)).title
   } catch (caught) {
     // 조회 실패를 메타데이터 단계에서 화면 실패로 만들지 않는다. 판정은 페이지가 한다
     error = caught
   }
 
+  const openGraph = sharedPlanOpenGraph(planTitle)
+
   return {
-    title: `${sharedPlanPageTitle(error)} · 혼디가개`,
+    title: `${sharedPlanPageTitle(error, planTitle)} · 혼디가개`,
+    ...(openGraph === undefined ? {} : { openGraph }),
     robots: { index: false, follow: false },
   }
 }
