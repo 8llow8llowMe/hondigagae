@@ -22,6 +22,8 @@ public class PlaceSuitabilityPresenter {
             // 점수를 못 낸 경우 null 을 그대로 내린다. 0 으로 바꾸면 "최악"으로 읽힌다.
             .score(score.score())
             .suitabilityLevel(score.level().toScoreMetadata())
+            // 문구 규칙은 도메인(SuitabilityHeadline)에 있다. 여기서 등급으로 다시 짓지 않는다.
+            .headline(info.headline())
             .reasons(insightPresenter.toReasonItems(score.reasons()))
             .weatherWarning(insightPresenter.toWarningItem(info.weatherWarning()))
             .weather(insightPresenter.toWeatherItem(info.weather()))

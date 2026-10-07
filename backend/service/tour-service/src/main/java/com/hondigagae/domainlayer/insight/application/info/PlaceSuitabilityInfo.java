@@ -21,6 +21,8 @@ public record PlaceSuitabilityInfo(
     String placeTitle,
     LocalDate targetDate,
     SuitabilityScore score,
+    // 서술형 결론 한 문장(SuitabilityHeadline). 결정적 사실(출입 · 발효 중인 특보) 없이 판단 근거가 부족하면 null 이다.
+    String headline,
     // 근거로 쓴 그 날의 날씨. 판정 불가일 때는 null 이다.
     DailyWeather weather,
     CongestionSnapshot congestion,

@@ -39,6 +39,16 @@ public record PlaceSuitabilityResponse(
     @Schema(description = "적합도 등급 metadata")
     ScoreMetricMetadata suitabilityLevel,
 
+    @Schema(
+        description = "서술형 결론 한 문장. 결론을 정하는 사실이 있으면 그것을 먼저 말하고"
+            + "(동반 불가 > 기상특보 > 크기 제한(반려견 크기를 넘겨 입장 조건과 맞지 않을 때) > 동반 미확인), "
+            + "없으면 등급 문구다(적합 '오늘 가기 좋아요' · 보통 '가도 괜찮지만 챙길 게 있어요' · 낮음 '오늘은 다른 곳이 더 나아요'). "
+            + "'오늘' 은 판정 기준 일자가 오늘일 때만 쓴다. 반려견 이름은 넣지 않는다. "
+            + "판단 근거가 부족하면(INSUFFICIENT) null 이며, 화면은 이때 등급 name 을 쓴다. 단 위의 결정적 사실은 날씨와 무관하게 알므로 그때도 말한다",
+        example = "오늘 가기 좋아요",
+        nullable = true)
+    String headline,
+
     @Schema(description = "판정 근거. 점수 영향이 큰 순서다")
     List<SuitabilityReasonItem> reasons,
 
