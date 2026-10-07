@@ -21,6 +21,11 @@
 ## 주요 API (계획)
 
 - `GET /api/v1/places` — 검색 (지역, 유형, 반려견 동반 조건, **keyword** 단어별 이름·주소 AND 검색, 커서 기반 `SliceResponse`)
+- `GET /api/v1/places/sitemap` — 사이트맵용 장소 전량 (#1135). `placeId` · `petAllowanceType` · `modifiedAt` 만,
+  페이지 없이 `placeId` 오름차순. 노출 규칙은 목록·주변과 같은 `visible()` 이라 병합·delisted 는 빠지고, 동반 구분으로는 거르지 않는다.
+  `modifiedAt` 은 **원천 수정일(`sourceModifiedAt`)** 이다 — 배치 upsert 가 매번 `updated_at = NOW()` 로 모든 행을 다시 써서
+  적재 시각은 lastmod 로 뜻이 없다. 원천에 수정일이 없으면 null 이다. 제주 2,300여 곳이라 한 번에 주고,
+  사이트맵 파일 하나의 상한(5만 URL)에 다가가면 페이지를 다시 설계한다
 - `GET /api/v1/places/{placeId}` — 상세 (출입 조건: 실내/실외, 크기 제한, 목줄/케이지 조건)
 - `GET /api/v1/places/{placeId}/related` — 연관 관광지
 - `GET /api/v1/places/{placeId}/suitability` — 여행 적합도 (`score` + `reasons`, `api-design-guide.md` §9).
