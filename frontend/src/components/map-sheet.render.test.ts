@@ -205,6 +205,40 @@ describe('shouldStartSheetDrag — 무엇이 드래그를 시작하는가 (#901 
   it('대상이 없으면 시작하지 않는다', () => {
     expect(shouldStartSheetDrag(null)).toBe(false)
   })
+
+  it('필터 줄(toolbar)은 칩 사이 틈까지 드래그를 시작하지 않는다 — 칩을 누르려다 시트가 끌렸다', () => {
+    // 실제 선택자를 받아 그 안에 표식이 있을 때만 "맞았다" 고 답하는 가짜 대상
+    const insideToolbar = {
+      closest: (selector: string) => (selector.includes('[data-sheet-no-drag]') ? 'div' : null),
+    }
+
+    expect(shouldStartSheetDrag(insideToolbar)).toBe(false)
+  })
+})
+
+describe('MapSheet — 손잡이와 필터 줄 (사용자 지적 2026-10-07)', () => {
+  function renderWithToolbar() {
+    return renderToStaticMarkup(
+      createElement(MapSheet, {
+        label: '목록',
+        stop: 'mid',
+        onStopChange: () => undefined,
+        toolbar: createElement('p', null, '필터 자리'),
+        header: createElement('p', null, '지도에 보이는 곳 8'),
+        children: createElement('p', null, '목록 자리'),
+      }),
+    )
+  }
+
+  it('필터 줄에 드래그 제외 표식이 있다', () => {
+    expect(renderWithToolbar()).toMatch(/<div data-sheet-no-drag="true"[^>]*><p>필터 자리/)
+  })
+
+  it('손잡이 줄은 위아래 12px 여유를 둔다 — 막대와 칩이 붙어 잡기 어려웠다', () => {
+    const grabber = /<div class="([^"]*touch-none[^"]*)"/.exec(renderWithToolbar())?.[1] ?? ''
+
+    expect(grabber.split(/\s+/)).toEqual(expect.arrayContaining(['pt-3', 'pb-3']))
+  })
 })
 
 /**
