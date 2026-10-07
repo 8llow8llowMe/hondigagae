@@ -1,32 +1,77 @@
-import { type Ref, useId } from 'react'
+'use client'
 
+import { type ReactNode, type Ref, useId, useState } from 'react'
+import Link from 'next/link'
+
+import { Badge } from '@/components/badge'
 import { ButtonLink } from '@/components/button'
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from '@/components/icons'
-import { MetricBadge } from '@/components/metric'
+import { FormAlert } from '@/components/form-alert'
+import {
+  BookmarkIcon,
+  CautionIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  CloseIcon,
+  CrowdIcon,
+  DirectionsIcon,
+  ParkingIcon,
+  PawIcon,
+  PhoneIcon,
+  PinIcon,
+  ShareIcon,
+} from '@/components/icons'
+import { METRIC_WORD_TONE, MetricBadge } from '@/components/metric'
 import { Skeleton } from '@/components/skeleton'
+import { WeatherGlyph } from '@/components/weather-glyph'
+import { placeTypeLabel } from '@/features/place/filter-labels'
 import { PhotoGallery } from '@/features/place/photo-gallery'
 import {
-  PlaceDetailActionBar,
-  type PlaceDetailActions,
-} from '@/features/place/place-detail-action-bar'
-import { verdictSummaryLines } from '@/features/place/place-verdict-summary-lines'
-import { PlaceVisitKeyLine } from '@/features/place/place-visit-key-line'
+  type PreviewVerdictFact,
+  previewVerdictFacts,
+} from '@/features/place/preview-verdict-facts'
+import { formatDistance } from '@/lib/format/distance'
+import { directionsUrl } from '@/lib/geo/map-link'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
+import { shortAddress } from '@/lib/place/address'
 import { galleryImages, galleryImagesLeadingFirst } from '@/lib/place/gallery'
 import { hoursHeadline } from '@/lib/place/hours'
-import { placeMetaLine } from '@/lib/place/meta'
+import { indoorLabel } from '@/lib/place/indoor'
 import { toPlainText } from '@/lib/place/text'
+import { withCompanionParticle } from '@/lib/text/korean'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceSuitabilityResponse, WalkSafetyResponse } from '@/types/insight'
 import type { PlaceDetail, PlaceSummary } from '@/types/place'
 
-/** 혼잡도는 미리보기에 싣지 않는다 — `verdictSummaryLines` 가 이 값이면 그 줄을 만들지 않는다 */
-const NO_CONGESTION = { data: null, loading: false, failed: false } as const
-
 export type PlaceMapPreviewVariant = 'panel' | 'sheet'
 
 type Source<T> = { data: T | null; loading: boolean; failed: boolean }
+
+/**
+ * 미리보기의 행동 (#1233). 상세 하단 바(`PlaceDetailActions`)와 갈라졌다 — 저장은 행동 줄로 올라가고
+ * 하단 바는 담기 하나다. 로그인 안내는 컨테이너가 각 행동 안에서 연다(`onToggleSave` · `onAddToPlan`).
+ */
+export type PlaceMapPreviewActions = {
+  authed: boolean
+  saved: boolean
+  savePending: boolean
+  /** 저장 실패 문구. 행동 줄 바로 아래 남긴다 — 토스트로 흘리면 놓친다 */
+  saveError: string | null
+  /** 미로그인이면 컨테이너가 로그인 안내 시트를 연다 */
+  onToggleSave: () => void
+  /** 이 화면에서 한 번이라도 담았다 */
+  added: boolean
+  /** 미로그인이면 컨테이너가 로그인 안내 시트를 연다 */
+  onAddToPlan: () => void
+  /** 원천에서 사라진 장소 (#146) — 담기 · 새 저장을 잠근다. 저장 해제는 열어 둔다 */
+  delisted: boolean
+  /** 상세 정규 주소를 공유한다 (`lib/place/share.ts`) */
+  onShare: () => void
+  /** 주소를 클립보드에 복사한다 — 결과는 컨테이너가 토스트로 말한다 */
+  onCopyAddress: (address: string) => void
+}
 
 export type PlaceMapPreviewBodyProps = {
   placeId: string
@@ -38,27 +83,35 @@ export type PlaceMapPreviewBodyProps = {
   detail: Source<PlaceDetail>
   suitability: Source<PlaceSuitabilityResponse>
   walkSafety: Source<WalkSafetyResponse>
-  /** 선택된 반려견 이름. 없으면 적합도 근거 줄을 그리지 않는다 */
+  /** 선택된 반려견 이름. 없으면 판정 카드 머리가 `오늘 이 장소` 이고 등록 안내 줄이 선다 */
   petName: string | null
-  /** 상세 하단 바 그대로 (`PlaceDetailActionBar`) */
-  actions: PlaceDetailActions
+  actions: PlaceMapPreviewActions
   /** 열릴 때 포커스를 받는 이름 — 컨테이너가 쥔다 (`place-map-preview.tsx`) */
   headingRef?: Ref<HTMLHeadingElement> | undefined
 }
 
 /**
  * 미리보기의 표시 부분 — **props 만 받는다** (#1227). node 환경에서 렌더 갈래를 테스트하려고
- * 조회 · 상태를 쥔 컨테이너(`PlaceMapPreview`)와 나눴다 — `PlaceDetailView` / `PlaceDetailSection`
- * 과 같은 분리다 (testing-guide.md §1).
+ * 조회 · 상태를 쥔 컨테이너(`PlaceMapPreview`)와 나눴다 (testing-guide.md §1).
  *
- * 순서: 사진(캐러셀) → 이름 · 적합도 · 메타 → 방문 핵심 줄 → 판정 줄 → 이용 안내 → `상세 정보 전체
- * 보기` → 하단 바(저장 · 담기). **"요약을 다 읽고 더 보고 싶은 순간" 의 자리에 상세로 가는 길이 있다**
- * (#1230 — 예전에는 닫기 바로 옆이라 닫으려다 상세로 갔다).
+ * **위계로 설계한다 — 나열하지 않는다** (#1233, `지도미리보기-재설계-세부명세.md`). 지난 판은 상세
+ * 화면의 함수를 재사용하는 데 맞춰 라벨-값 표가 세 번 반복됐다. 이번 판의 원칙: 한 화면에 **결론
+ * 하나 · 행동 하나 줄 · 참고는 접어서**, 같은 사실은 한 번만, 라벨 칸(`dt`)으로 위계를 대신하지 않는다.
  *
- * **두 겹으로 그린다.** 목록 행(`summary`)으로 이름 · 대표 사진 · 메타를 즉시 그리고, 상세 · 판정이
- * 오는 대로 나머지를 채운다. 목록에 없는 id 면 상세 응답이 그 자리를 채운다.
+ * ```text
+ * 사진(캐러셀)
+ * ① 이름  분류            ← 이름 옆 적합도 배지 없음 — 적합도는 ⑤ 하나가 말한다
+ * ② ● 영업 중 · 짧은 주소 · 거리
+ * ③ (🐾 동반 · 크기) (실내/야외)
+ * ④ [길찾기][전화][저장][공유]
+ * ⑤ 오늘 {반려견}과 — 결론 한 문장 / 근거 사실(좋은 쪽 → 주의 쪽)
+ * ⑥ 이용 정보 — 아이콘 행(운영 · 주차 · 주소+복사), 더보기
+ * ⑦ 상세 정보 전체 보기
+ * ⑧ 하단 바 — 일정에 담기
+ * ```
  *
- * **줄마다 따로 실패한다.** 판정 하나가 죽어도 그 줄만 빠진다. 재시도는 상세 화면이 갖는다.
+ * **두 겹으로 그린다.** 목록 행(`summary`)으로 이름 · 대표 사진 · 주소를 즉시 그리고, 상세 · 판정이
+ * 오는 대로 나머지를 채운다. **줄마다 따로 실패한다** — 판정 하나가 죽어도 그 줄만 빠진다.
  */
 export function PlaceMapPreviewBody({
   placeId,
@@ -75,20 +128,10 @@ export function PlaceMapPreviewBody({
   const place = detail.data
   const title = summary?.title ?? place?.title ?? null
   const contentTypeCode = summary?.contentType.code ?? place?.contentType.code ?? null
-  /* 메타는 목록 행과 같은 줄이다 — 거리는 거리순 목록에서만 온다 (`placeMetaLine`) */
-  const meta =
-    summary !== null
-      ? placeMetaLine(summary.addr1, summary.indoor, summary.distanceMeters)
-      : place !== null
-        ? placeMetaLine(place.addr1, place.indoor)
-        : null
-  const level = suitability.data?.suitabilityLevel ?? null
   const inset = variant === 'sheet' ? 'px-4' : 'px-5'
   /*
-    **사진은 상세의 이미지 목록이다** (#1230). dev 50곳 중 36곳이 2장 이상(최대 29장)인데 대표 한 장만
-    보였다. 상세 응답 전에는 목록 행의 대표 사진 한 장으로 먼저 서고, 응답이 오면 **대표를 첫 장으로
-    둔 채** 목록을 잇는다(`galleryImagesLeadingFirst`) — 응답의 목록에는 대표가 없어서, 그냥 바꾸면
-    방금 본 사진이 다른 사진으로 바뀌었다(리뷰 실측).
+    **사진은 상세의 이미지 목록이다** (#1230). 상세 응답 전에는 목록 행의 대표 사진 한 장으로 먼저
+    서고, 응답이 오면 **대표를 첫 장으로 둔 채** 목록을 잇는다(`galleryImagesLeadingFirst`).
   */
   const images =
     place !== null
@@ -97,8 +140,7 @@ export function PlaceMapPreviewBody({
 
   /*
     목록에도 없고 상세도 못 받았다 — 말할 이름이 없다. 문구 · `상세 정보 전체 보기` · 닫기만 남긴다.
-    404(사라진 id)와 5xx 를 가르지 않고 재시도를 달지 않는다: 여기는 상세로 가는 입구이고,
-    상세가 404 는 빈 화면으로, 5xx 는 재시도로 제대로 가른다.
+    404 와 5xx 를 가르지 않고 재시도를 달지 않는다: 여기는 상세로 가는 입구다.
   */
   const failed = title === null && detail.failed
 
@@ -106,12 +148,8 @@ export function PlaceMapPreviewBody({
     <section
       aria-label={messages.map.previewLabel}
       /*
-        면(배경 · 테두리 · 곡률 · 그림자)은 **담는 쪽이 갖는다** (`place-map-view.tsx`) — 지도 위에
-        뜨는 표면의 소유자가 그 파일이다 (`token-usage.test.ts` FLOATING). 여기는 세로 배치만 한다.
-
-        **`min-h-0` 이 없으면 하단 바가 잘린다** (리뷰 실측). 모바일 시트는 높이가 아니라 상한만
-        있어 `h-full` 이 풀리지 않고, flex 항목의 `min-height: auto` 가 내용 높이 아래로 줄지 않게
-        막는다 — 667 높이 폰에서 반려견 줄까지 오면 저장 · 담기가 시트 밖으로 나갔다.
+        면(배경 · 테두리 · 곡률 · 그림자)은 **담는 쪽이 갖는다** (`place-map-view.tsx`).
+        **`min-h-0` 이 없으면 하단 바가 잘린다** — 모바일 시트는 높이가 아니라 상한만 있다.
       */
       className="flex h-full max-h-full min-h-0 flex-col"
     >
@@ -126,7 +164,8 @@ export function PlaceMapPreviewBody({
         ) : title === null ? (
           <PreviewSkeleton />
         ) : (
-          <div className="flex flex-col gap-4 pb-5">
+          // 절 사이 24 · 절 안 12 (명세 D4)
+          <div className="flex flex-col gap-6 pb-6">
             <PhotoGallery
               images={images}
               title={title}
@@ -134,65 +173,38 @@ export function PlaceMapPreviewBody({
               layout="carousel"
             />
 
-            <div className={cn('flex min-w-0 flex-col gap-1', inset)}>
-              <div className="flex items-start justify-between gap-2">
-                {/*
-                  공백 없는 긴 이름이 넘치지 않게 — 상세 `h1` 과 같은 이유 (`min-w-0`).
-                  `tabIndex={-1}` — 열릴 때 포커스를 받는다(컨테이너). 탭 순서에는 들지 않는다.
-                */}
-                <h2
-                  ref={headingRef}
-                  tabIndex={-1}
-                  className="text-title-2 text-fg min-w-0 flex-1 font-bold break-words focus:outline-none"
-                >
-                  {title}
-                </h2>
-                {/*
-                  등급은 **왔을 때만** 배지다. 묻는 중이면 **배지 모양 골격**이 자리를 잡는다 (#1230) —
-                  비어 있다가 갑자기 생기면 "등급이 없는 곳" 으로 읽혔다가 바뀐다.
-                */}
-                {level !== null ? (
-                  <MetricBadge
-                    tone={suitabilityTone(level.code)}
-                    axis="suitability"
-                    className="shrink-0"
-                  >
-                    {level.name}
-                  </MetricBadge>
-                ) : (
-                  suitability.loading && <Skeleton className="h-6 w-24 shrink-0 rounded-md" />
-                )}
-              </div>
-              {meta !== null && (
-                <p className="text-body-2 text-fg-muted line-clamp-1 tabular-nums">{meta}</p>
-              )}
-            </div>
-
-            {place !== null && (
-              <div className={inset}>
-                <PlaceVisitKeyLine
-                  name={place.title}
-                  open24={place.intro?.open24 ?? null}
-                  openNow={place.intro?.openNow ?? null}
-                  useTime={place.intro?.useTime ?? null}
-                  tel={place.tel}
-                  lat={place.lat}
-                  lng={place.lng}
-                />
-              </div>
-            )}
+            <PreviewIdentity
+              title={title}
+              summary={summary}
+              place={place}
+              headingRef={headingRef}
+              className={inset}
+            />
 
             <div className={inset}>
-              <PreviewVerdicts
-                place={place}
-                placePending={detail.loading}
-                suitability={suitability}
-                walkSafety={walkSafety}
-                petName={petName}
+              <PreviewActionRow
+                title={title}
+                lat={place?.lat ?? summary?.lat ?? null}
+                lng={place?.lng ?? summary?.lng ?? null}
+                tel={place?.tel ?? summary?.tel ?? null}
+                actions={actions}
               />
             </div>
 
-            {place !== null && <PreviewUseGuide place={place} className={inset} />}
+            <PreviewVerdictCard
+              suitability={suitability}
+              walkSafety={walkSafety}
+              petName={petName}
+              className={inset}
+            />
+
+            {place !== null && (
+              <PreviewUseInfo
+                place={place}
+                onCopyAddress={actions.onCopyAddress}
+                className={inset}
+              />
+            )}
 
             <div className={inset}>
               <DetailLink placeId={placeId} title={title} />
@@ -201,28 +213,14 @@ export function PlaceMapPreviewBody({
         )}
       </div>
 
-      {/*
-        하단 바는 **상세의 것을 그대로 쓴다** — 저장 · 담기 · 미로그인 `로그인` · 사라진 장소 잠금이
-        한 컴포넌트에 있다. 미리보기만의 바를 만들면 그 규칙이 두 벌이 된다.
-        `shrink-0` — 본문이 길어도 바는 줄지 않고 본문이 스크롤된다.
-      */}
-      {!failed && title !== null && (
-        <PlaceDetailActionBar
-          {...actions}
-          inset={variant === 'panel' ? 'card' : 'panel'}
-          className="shrink-0"
-        />
-      )}
+      {!failed && title !== null && <PreviewBottomBar actions={actions} variant={variant} />}
     </section>
   )
 }
 
 /**
  * 머리 줄 — (1024~1279) `‹ 목록` · 닫기. **상세로 가는 길은 여기 없다** (#1230).
- *
- * **`‹ 목록` 은 `xl` 에서 사라진다.** 1280 부터는 목록이 옆에 그대로 있어 돌아갈 곳이 없다.
- * 시트(모바일)에도 없다 — 닫으면 목록 시트가 돌아온다. 시트에 그래버를 두지 않는다 — 끌 수 없는데
- * 끌 수 있어 보인다.
+ * `‹ 목록` 은 `xl` 에서 사라진다 — 1280 부터는 목록이 옆에 그대로 있다. 시트(모바일)에도 없다.
  */
 function PreviewTopBar({
   variant,
@@ -257,10 +255,565 @@ function PreviewTopBar({
 }
 
 /**
- * `상세 정보 전체 보기 ›` — **정보 맨 아래 전폭 보조 버튼** (#1230, 사용자 결정).
+ * ① 이름 + 분류 · ② 상태 줄 · ③ 속성 칩 (#1233 D2).
  *
- * 닫기 옆이면 닫으려다 상세로 가고, 하단 바 셋째 칸이면 390 에서 담기가 좁아진다. 요약을 다 읽고
- * "더 보고 싶다" 는 순간에 손이 가는 자리가 여기다. 주요 행동(담기)과 겨루지 않게 보조(secondary)다.
+ * **이름 옆 적합도 배지를 걷었다** — 배지와 판정 줄이 같은 말(`여행 적합`)을 두 번 했다. 적합도는
+ * ⑤ 카드 하나가 말한다. 분류는 목록 행과 같은 판정(`placeTypeLabel` — 카페 분류 음식점은 `카페`)이다.
+ */
+function PreviewIdentity({
+  title,
+  summary,
+  place,
+  headingRef,
+  className,
+}: {
+  title: string
+  summary: PlaceSummary | null
+  place: PlaceDetail | null
+  headingRef?: Ref<HTMLHeadingElement> | undefined
+  className: string
+}) {
+  const source = place ?? summary
+  const kind = source === null ? null : placeTypeLabel(source)
+
+  return (
+    <div className={cn('flex min-w-0 flex-col gap-3', className)}>
+      <div className="flex min-w-0 flex-col gap-1">
+        {/*
+          이름 바로 옆(같은 줄 기준선)에 작은 회색 분류 — 네이버 플레이스의 위계. 분류는 `h2` 밖이다:
+          이름이 포커스를 받을 때(`tabIndex={-1}`) 장소명만 읽혀야 한다.
+          공백 없는 긴 이름이 넘치지 않게 `min-w-0 break-words`.
+        */}
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+          <h2
+            ref={headingRef}
+            tabIndex={-1}
+            className="text-title-2 text-fg min-w-0 font-bold break-words focus:outline-none"
+          >
+            {title}
+          </h2>
+          {kind !== null && <span className="text-body-2 text-fg-muted shrink-0">{kind}</span>}
+        </div>
+        <PreviewStatusLine summary={summary} place={place} />
+      </div>
+      <PreviewChips summary={summary} place={place} />
+    </div>
+  )
+}
+
+/**
+ * ② 상태 줄 — `[운영 상태] · [짧은 주소] · [거리]` 한 줄, 넘치면 말줄임.
+ *
+ * 운영 상태는 **원문이 있을 때만** 선다(세부명세 D5-5 — 근거 없이 판정만 서면 아래 이용 정보와 다른
+ * 말을 한다): `24시간` · `● 영업 중`(초록 · 굵게) · `영업 시간 아님` · 판정이 없으면 원문 첫 줄.
+ *
+ * **색은 `--status-open-*` 이다** — 명세 초안은 `--metric-high-700` 이었으나, 등급 색이면 `영업 중` 이
+ * `여행 적합` 과 한 뜻이 된다(DESIGN.md §2-9 가 그래서 토큰을 갈랐다). 색만으로 가르지 않게 점과
+ * 굵기를 함께 준다. 방문 핵심 줄(`PlaceVisitKeyLine`)은 미리보기에서 쓰지 않는다 — 운영은 이 줄이,
+ * 전화 · 길찾기는 ④ 가 맡는다.
+ */
+function PreviewStatusLine({
+  summary,
+  place,
+}: {
+  summary: PlaceSummary | null
+  place: PlaceDetail | null
+}) {
+  const intro = place?.intro ?? null
+  const hours = hoursHeadline(intro?.useTime ?? null)
+  const open = hours !== null && (intro?.open24 === true || intro?.openNow === true)
+  const status =
+    hours === null
+      ? null
+      : intro?.open24 === true
+        ? messages.place.detailOpen24
+        : intro?.openNow === true
+          ? messages.place.detailOpenNow
+          : intro?.openNow === false
+            ? messages.place.detailOpenClosed
+            : hours
+  const address = shortAddress(summary?.addr1 ?? place?.addr1 ?? null)
+  const meters = summary?.distanceMeters ?? null
+  const distance = meters === null ? null : formatDistance(meters)
+  const rest = [address, distance].filter((part): part is string => part !== null && part !== '')
+
+  if (status === null && rest.length === 0) return null
+
+  return (
+    <p className="text-body-2 text-fg-muted line-clamp-1 tabular-nums">
+      {status !== null && (
+        <span className={cn(open && 'text-status-open-700 font-semibold')}>
+          {open && <span aria-hidden>● </span>}
+          {status}
+        </span>
+      )}
+      {status !== null && rest.length > 0 && ' · '}
+      {rest.join(' · ')}
+    </p>
+  )
+}
+
+/**
+ * ③ 속성 칩 — **사실만**. 판정(적합 · 안전)은 칩으로 만들지 않는다 — 판정 축은 ⑤ 다.
+ * 모르는 값은 점선(`MetricBadge unknown`)으로 "모름" 을 드러낸다 (styling-guide.md §3).
+ */
+function PreviewChips({
+  summary,
+  place,
+}: {
+  summary: PlaceSummary | null
+  place: PlaceDetail | null
+}) {
+  const allowance = place?.petAllowanceType ?? summary?.petAllowanceType ?? null
+  const size = place?.petInfo?.allowedPetSize.name ?? summary?.allowedPetSize?.name ?? null
+  const indoor = place !== null ? place.indoor : (summary?.indoor ?? null)
+  const indoorWord = indoorLabel(indoor)
+
+  if (allowance === null) return null
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {allowance.code === 'UNKNOWN' ? (
+        <MetricBadge tone="unknown" size="sm">
+          {messages.place.petAllowanceUnknown}
+        </MetricBadge>
+      ) : (
+        <Badge tone="neutral" size="sm" className="gap-1">
+          <PawIcon size={14} />
+          {size === null ? allowance.name : `${allowance.name} · ${size}`}
+        </Badge>
+      )}
+      {indoorWord === null ? (
+        <MetricBadge tone="unknown" size="sm">
+          {messages.place.rowIndoorUnknown}
+        </MetricBadge>
+      ) : (
+        <Badge tone="neutral" size="sm">
+          {indoorWord}
+        </Badge>
+      )}
+    </div>
+  )
+}
+
+/**
+ * ④ 행동 줄 — **아이콘 + 짧은 글자 4칸, 같은 폭** (#1233 D2, 카카오맵 · 네이버의 장소 카드).
+ *
+ * **칸 수는 바뀌지 않는다.** 좌표가 없으면 길찾기, 번호가 없으면 전화가 **흐린 칸으로 선다** — 칸이
+ * 빠지면 같은 자리를 누르던 손이 다른 행동을 누른다. 비활성 이유는 스크린리더에만 말한다(보이는 것은
+ * 흐린 칸뿐). `disabled` 가 아니라 `aria-disabled` — 포커스가 닿아야 이유를 들을 수 있다.
+ *
+ * 전화번호는 버튼에 쓰지 않는다 — 이름(`전화 064-…`)에만 있다. 저장은 `aria-pressed` 로 상태를 말한다.
+ */
+function PreviewActionRow({
+  title,
+  lat,
+  lng,
+  tel,
+  actions,
+}: {
+  title: string
+  lat: number | null
+  lng: number | null
+  tel: string | null
+  actions: PlaceMapPreviewActions
+}) {
+  const directions = directionsUrl({ name: title, lat, lng })
+  // 해제는 살려 둔다 — 잠기는 것은 **새로 저장하는 방향**뿐이다 (#146)
+  const saveBlocked = actions.delisted && !actions.saved
+  const saved = actions.authed && actions.saved
+
+  return (
+    <div className="flex flex-col gap-3">
+      <nav aria-label={messages.map.previewActionsLabel}>
+        <ul className="grid grid-cols-4 gap-2">
+          <li>
+            {directions === null ? (
+              <ActionCell
+                icon={<DirectionsIcon size={20} />}
+                label={messages.map.directions}
+                unavailable={messages.map.previewDirectionsUnavailable}
+              />
+            ) : (
+              <a href={directions} target="_blank" rel="noopener noreferrer" className={CELL}>
+                <DirectionsIcon size={20} />
+                {messages.map.directions}
+                <span className="sr-only"> {messages.map.directionsHint}</span>
+              </a>
+            )}
+          </li>
+          <li>
+            {tel === null ? (
+              <ActionCell
+                icon={<PhoneIcon size={20} />}
+                label={messages.map.previewCall}
+                unavailable={messages.map.previewCallUnavailable}
+              />
+            ) : (
+              <a href={`tel:${tel.replace(/[^\d+]/g, '')}`} className={CELL}>
+                <PhoneIcon size={20} />
+                {messages.map.previewCall}
+                <span className="sr-only"> {tel}</span>
+              </a>
+            )}
+          </li>
+          <li>
+            {saveBlocked ? (
+              <ActionCell
+                icon={<BookmarkIcon size={20} />}
+                label={messages.map.previewSave}
+                unavailable={messages.map.previewSaveBlocked}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={actions.onToggleSave}
+                disabled={actions.savePending}
+                // 미로그인은 저장 여부를 모른다 — 눌린 상태를 말하지 않고 누르면 로그인 안내가 뜬다
+                aria-pressed={actions.authed ? actions.saved : undefined}
+                className={cn(CELL, 'disabled:opacity-60')}
+              >
+                <BookmarkIcon size={20} fill={saved ? 'currentColor' : 'none'} />
+                {saved ? messages.map.previewSaved : messages.map.previewSave}
+              </button>
+            )}
+          </li>
+          <li>
+            <button type="button" onClick={actions.onShare} className={CELL}>
+              <ShareIcon size={20} />
+              {messages.map.previewShare}
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      <FormAlert message={actions.saveError} />
+    </div>
+  )
+}
+
+/** 행동 칸 — 높이 56(누르는 자리 44 하한 위), 아이콘 20 위 · 글자 아래, 면 `--band` */
+const CELL =
+  'bg-band text-fg text-caption focus-visible:ring-brand-500 flex h-14 w-full flex-col items-center justify-center gap-1 rounded-md font-medium focus-visible:ring-2 focus-visible:outline-none'
+
+/** 쓸 수 없는 칸 — 자리는 지키고 흐리게 선다. 이유는 스크린리더에만 */
+function ActionCell({
+  icon,
+  label,
+  unavailable,
+}: {
+  icon: ReactNode
+  label: string
+  unavailable: string
+}) {
+  return (
+    <button
+      type="button"
+      aria-disabled="true"
+      className={cn(CELL, 'text-fg-subtle cursor-not-allowed')}
+    >
+      {icon}
+      {label}
+      <span className="sr-only"> {unavailable}</span>
+    </button>
+  )
+}
+
+/**
+ * ⑤ 오늘 판정 카드 — **이 서비스의 차별점** (#1233 D2 ⑤).
+ *
+ * - **결론 — 서술형 한 문장**(사용자 결정): 서버 `headline`(BE #1234)을 `title-2` 굵게(명세의 `title-3` 은
+ *   스케일에 없다 — 새 크기를 만들지 않는다, 명세 D4). 아직 안 오면 등급
+ *   `name`(`여행 적합`)이 그 자리에 서고 배지는 생략한다 — 같은 말 두 번을 피한다. FE 가 등급 code 별
+ *   문장을 만들지 않는다(enum 규칙).
+ * - **근거 사실 — 좋은 쪽 먼저, 주의 쪽 아래** (`previewVerdictFacts`). 주의는 아이콘 + 색 + sr `주의`.
+ * - 면은 `--band` 채움(L2 아이템 채움, DESIGN.md §0) — 그 위 골격은 `surface="band"` 로 대비를 되찾는다.
+ */
+function PreviewVerdictCard({
+  suitability,
+  walkSafety,
+  petName,
+  className,
+}: {
+  suitability: Source<PlaceSuitabilityResponse>
+  walkSafety: Source<WalkSafetyResponse>
+  petName: string | null
+  className: string
+}) {
+  const headingId = useId()
+  const data = suitability.data
+  const facts = previewVerdictFacts(data, walkSafety.data)
+  const loading = suitability.loading || walkSafety.loading
+
+  // 둘 다 실패(또는 둘 다 말할 것이 없음) — 카드를 세우지 않는다. 재시도는 상세의 몫이다
+  if (!loading && data === null && facts.length === 0) return null
+
+  const headline = data?.headline ?? null
+  const level = data?.suitabilityLevel ?? null
+
+  return (
+    <div className={className}>
+      <section
+        aria-labelledby={headingId}
+        aria-busy={loading}
+        className="bg-band flex flex-col gap-3 rounded-lg p-4"
+      >
+        <h3 id={headingId} className="text-caption text-fg-muted font-semibold">
+          {petName === null
+            ? messages.map.previewVerdictHeadNoPet
+            : messages.map.previewVerdictHead.replace('{pet}', withCompanionParticle(petName))}
+        </h3>
+
+        {suitability.loading ? (
+          <>
+            <Skeleton surface="band" className="h-6 w-40" />
+            <span className="sr-only">{messages.map.previewLoading}</span>
+          </>
+        ) : (
+          level !== null && (
+            <div className="flex flex-col items-start gap-1">
+              <p className="text-title-2 text-fg font-bold break-keep">{headline ?? level.name}</p>
+              {headline !== null && (
+                <MetricBadge tone={suitabilityTone(level.code)} size="sm">
+                  {level.name}
+                </MetricBadge>
+              )}
+            </div>
+          )
+        )}
+
+        {petName === null && (
+          <Link
+            href="/pets/new"
+            className="text-link hover:text-link-hover focus-visible:ring-brand-500 text-body-2 inline-flex min-h-11 items-center gap-1 self-start rounded-sm font-semibold break-keep focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {messages.map.previewPetPrompt}
+            <ChevronRightIcon size={16} aria-hidden />
+          </Link>
+        )}
+
+        {(facts.length > 0 || loading) && (
+          <ul className="flex flex-col gap-2">
+            {facts.map((fact) => (
+              <VerdictFactRow key={fact.key} fact={fact} />
+            ))}
+            {loading && facts.length === 0 && (
+              <>
+                <li>
+                  <Skeleton surface="band" className="h-4 w-3/4" />
+                </li>
+                <li>
+                  <Skeleton surface="band" className="h-4 w-2/3" />
+                </li>
+                <li>
+                  <Skeleton surface="band" className="h-4 w-1/2" />
+                </li>
+              </>
+            )}
+          </ul>
+        )}
+      </section>
+    </div>
+  )
+}
+
+/** 근거 사실 한 줄 — 아이콘 20 + 짧은 사실. 주의 쪽은 주의 아이콘 · 등급 글자색 · sr `주의` */
+function VerdictFactRow({ fact }: { fact: PreviewVerdictFact }) {
+  const caution = fact.tone !== null
+  const icon = caution ? (
+    <CautionIcon size={20} />
+  ) : fact.glyph !== null ? (
+    <WeatherGlyph glyph={fact.glyph} size={20} />
+  ) : fact.key === 'walk' ? (
+    <PawIcon size={20} className="text-fg-muted" />
+  ) : fact.key === 'congestion' ? (
+    <CrowdIcon size={20} className="text-fg-muted" />
+  ) : null
+
+  return (
+    <li
+      className={cn(
+        'text-body-2 flex items-start gap-2 break-keep',
+        caution ? METRIC_WORD_TONE[fact.tone ?? 'mid'] : 'text-fg',
+      )}
+    >
+      <span className="inline-flex size-5 shrink-0 items-center justify-center">{icon}</span>
+      <span className="min-w-0">
+        {caution && <span className="sr-only">{messages.map.previewFactCaution} </span>}
+        {fact.text}
+      </span>
+    </li>
+  )
+}
+
+/**
+ * ⑥ 이용 정보 — **라벨 칸 없이 아이콘 + 값** (#1233 D2, 네이버 정보 탭).
+ *
+ * - 🕐 운영: 원문 첫 줄 + 휴무 — 원문이 여러 줄이면 행을 눌러 펼친다.
+ * - 🅿 주차 · 📍 주소(+ 복사).
+ * - 접힘 `더보기`: 유모차 대여 · 신용카드 · 문의처(전화와 다를 때). 이 셋은 값이 `가능` · `없음` 처럼
+ *   낱말 하나라 라벨 없이는 뜻이 없다 — 접힌 안에서만 라벨을 붙인다.
+ *
+ * **값이 없는 행은 빠지고, 전부 없으면 절이 없다.** 원문은 TourAPI 문자열이라 태그를 걷는다(`toPlainText`).
+ */
+function PreviewUseInfo({
+  place,
+  onCopyAddress,
+  className,
+}: {
+  place: PlaceDetail
+  onCopyAddress: (address: string) => void
+  className: string
+}) {
+  /*
+    `useId` 다 — 패널(데스크톱)과 시트(모바일)가 **동시에 마운트**되므로(CSS 로만 갈린다) 장소 id 로
+    만들면 같은 id 가 문서에 두 번 선다.
+  */
+  const headingId = useId()
+  const hoursId = useId()
+  const moreId = useId()
+  const [hoursOpen, setHoursOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+
+  const intro = place.intro
+  const hoursFull = toPlainText(intro?.useTime ?? null)
+  const hoursFirst = hoursHeadline(intro?.useTime ?? null)
+  const hoursMore = hoursFull !== null && hoursFull !== hoursFirst
+  const rest = toPlainText(intro?.restDate ?? null)
+  const parking = toPlainText(intro?.parking ?? null)
+  const address =
+    place.addr1 === null
+      ? null
+      : place.addr2 === null
+        ? place.addr1
+        : `${place.addr1} ${place.addr2}`
+  const infoCenter = toPlainText(intro?.infoCenter ?? null)
+  const more: { label: string; value: string | null }[] = [
+    {
+      label: messages.place.detailBabyCarriage,
+      value: toPlainText(intro?.chkBabyCarriage ?? null),
+    },
+    { label: messages.place.detailCreditCard, value: toPlainText(intro?.chkCreditCard ?? null) },
+    {
+      label: messages.place.detailInfoCenter,
+      // 전화와 같은 번호면 ④ 가 이미 말했다
+      value: infoCenter !== null && infoCenter !== place.tel ? infoCenter : null,
+    },
+  ]
+  const moreRows = more.filter((row): row is { label: string; value: string } => row.value !== null)
+
+  const hasHours = hoursFirst !== null || rest !== null
+  if (!hasHours && parking === null && address === null && moreRows.length === 0) return null
+
+  const restLine = rest === null ? null : messages.map.previewRestDate.replace('{value}', rest)
+
+  return (
+    <section aria-labelledby={headingId} className={cn('flex flex-col gap-1', className)}>
+      <h3 id={headingId} className="text-body-1 text-fg mb-1 font-semibold">
+        {messages.map.previewUseInfo}
+      </h3>
+
+      <ul className="flex flex-col">
+        {hasHours && (
+          <InfoRow icon={<ClockIcon size={20} />}>
+            {hoursMore ? (
+              <button
+                type="button"
+                onClick={() => setHoursOpen((open) => !open)}
+                aria-expanded={hoursOpen}
+                aria-controls={hoursId}
+                className="focus-visible:ring-brand-500 flex w-full items-start gap-1 rounded-sm text-left focus-visible:ring-2 focus-visible:outline-none"
+              >
+                <span className="min-w-0 flex-1">
+                  {hoursFirst}
+                  {restLine !== null && <span className="text-fg-muted"> · {restLine}</span>}
+                </span>
+                {/* 글줄 높이(20)에 맞춘 칸 — 첫 줄 가운데에 선다 */}
+                <span className="text-fg-muted flex h-5 shrink-0 items-center">
+                  <ChevronDownIcon size={16} className={cn(hoursOpen && 'rotate-180')} />
+                </span>
+              </button>
+            ) : (
+              <span>
+                {hoursFirst ?? restLine}
+                {hoursFirst !== null && restLine !== null && (
+                  <span className="text-fg-muted"> · {restLine}</span>
+                )}
+              </span>
+            )}
+            {hoursMore && (
+              <span
+                id={hoursId}
+                hidden={!hoursOpen}
+                className="text-fg-muted mt-1 block whitespace-pre-line"
+              >
+                {hoursFull}
+              </span>
+            )}
+          </InfoRow>
+        )}
+
+        {parking !== null && (
+          <InfoRow icon={<ParkingIcon size={20} />}>
+            <span className="whitespace-pre-line">{parking}</span>
+          </InfoRow>
+        )}
+
+        {address !== null && (
+          <InfoRow icon={<PinIcon size={20} />}>
+            <span className="flex items-start gap-2">
+              <span className="min-w-0 flex-1">{address}</span>
+              <button
+                type="button"
+                onClick={() => onCopyAddress(address)}
+                aria-label={messages.map.previewAddressCopyLabel}
+                className="text-link hover:text-link-hover focus-visible:ring-brand-500 text-caption -my-3 inline-flex min-h-11 shrink-0 items-center rounded-sm px-1 font-semibold focus-visible:ring-2 focus-visible:outline-none"
+              >
+                {messages.map.previewAddressCopy}
+              </button>
+            </span>
+          </InfoRow>
+        )}
+      </ul>
+
+      {moreRows.length > 0 && (
+        <div className="flex flex-col">
+          <button
+            type="button"
+            onClick={() => setMoreOpen((open) => !open)}
+            aria-expanded={moreOpen}
+            aria-controls={moreId}
+            className="text-body-2 text-fg-muted hover:text-fg focus-visible:ring-brand-500 inline-flex min-h-11 items-center gap-1 self-start rounded-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {moreOpen ? messages.map.previewLess : messages.map.previewMore}
+            <ChevronDownIcon size={16} className={cn(moreOpen && 'rotate-180')} />
+          </button>
+          <ul id={moreId} hidden={!moreOpen} className="flex flex-col gap-2 pb-2">
+            {moreRows.map((row) => (
+              <li key={row.label} className="text-body-2 text-fg break-keep">
+                <span className="text-fg-muted">{row.label}</span> {row.value}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  )
+}
+
+/** 이용 정보 한 행 — 아이콘 20 + 값, 최소 44 (복사 · 펼치기가 행 안 버튼이다) */
+function InfoRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  return (
+    <li className="text-body-2 text-fg flex min-h-11 items-start gap-3 py-3 break-keep">
+      <span className="text-fg-muted shrink-0">{icon}</span>
+      <div className="min-w-0 flex-1">{children}</div>
+    </li>
+  )
+}
+
+/**
+ * `상세 정보 전체 보기 ›` — **정보 맨 아래 전폭 보조 버튼** (#1230, 사용자 결정).
+ * 요약을 다 읽고 "더 보고 싶다" 는 순간에 손이 가는 자리다. 주요 행동(담기)과 겨루지 않게 보조다.
  */
 function DetailLink({ placeId, title }: { placeId: string; title: string | null }) {
   return (
@@ -271,10 +824,7 @@ function DetailLink({ placeId, title }: { placeId: string; title: string | null 
       trailing={<ChevronRightIcon size={16} aria-hidden />}
       className="w-full"
     >
-      {/*
-        링크 목록(로터)에서 무엇의 상세인지 들리게 장소명을 앞에 붙인다 — 보이는 문구가 이름에 그대로
-        들어가므로 2.5.3(보이는 라벨 포함)도 지킨다. `ButtonLink` 는 글자 버튼에 `aria-label` 을 받지 않는다.
-      */}
+      {/* 로터에서 무엇의 상세인지 들리게 장소명을 앞에 붙인다 — 보이는 문구도 이름에 그대로 든다 */}
       {title !== null && <span className="sr-only">{title} </span>}
       {messages.map.previewDetail}
     </ButtonLink>
@@ -282,161 +832,53 @@ function DetailLink({ placeId, title }: { placeId: string; title: string | null 
 }
 
 /**
- * 판정 줄 — 적합도 근거 · 동반 · 지금 산책.
- *
- * 동반 · 산책은 **상세 판정 요약과 같은 함수**(`verdictSummaryLines`)로 만든다 — 같은 장소에
- * 같은 문장이 선다. 혼잡도 줄은 넘기지 않는다. 요약 컴포넌트를 그대로 쓰지 않는 이유는 둘이다:
- * 그것은 `lg:hidden` 이고(상세는 데스크톱에서 레일이 판정을 말한다) 줄마다 같은 문서 안
- * 앵커로 뛴다 — 미리보기에는 그 앵커가 없다.
- *
- * **적합도 근거는 반려견이 있을 때만 선다.** 상세도 게스트에게 점수 · 근거를 보이지 않는다
- * (`place-detail-view.tsx` — 기준이 되는 반려견이 없다). 등급은 이름 옆 배지가 말한다.
- *
- * **묻는 중에는 라벨을 두고 값 자리에 골격을 둔다** (#1230). 무엇을 기다리는지가 먼저 보여야 한다.
- * 묶음은 **위아래 1px 구분선**이다(L2 구분선, DESIGN.md §0 — 아이템에 테두리를 두르지 않는다). 예전에는
- * `--band` 채움이라 같은 `--band` 인 골격이 묻혀 **빈칸으로 보였다**(사용자 지적). `aria-busy` 로 보조기기에도 묻는 중임을 알린다.
+ * ⑧ 하단 바 — **`일정에 담기` 전폭 하나** (#1233). 상세 하단 바(`PlaceDetailActionBar`)를 쓰지 않는다 —
+ * 저장은 ④ 로 올라갔다. **사라진 장소 잠금(#146)은 그대로 들인다**: 담기 비활성 + 이유 문구를 버튼 위에.
+ * 담은 뒤에는 라벨이 바뀐다(`다른 일정에도 담기`) — 같은 자리에서 두 번 눌러 중복으로 담지 않게.
  */
-function PreviewVerdicts({
-  place,
-  placePending,
-  suitability,
-  walkSafety,
-  petName,
+function PreviewBottomBar({
+  actions,
+  variant,
 }: {
-  place: PlaceDetail | null
-  placePending: boolean
-  suitability: Source<PlaceSuitabilityResponse>
-  walkSafety: Source<WalkSafetyResponse>
-  petName: string | null
+  actions: PlaceMapPreviewActions
+  variant: PlaceMapPreviewVariant
 }) {
-  const lines: { label: string; value: string | null; note: string | null }[] = []
-
-  if (petName !== null && !suitability.failed) {
-    lines.push({
-      label: petName,
-      value: suitability.data?.suitabilityLevel.name ?? null,
-      note: suitability.data?.reasons[0]?.description ?? null,
-    })
-  }
-
-  if (place !== null) {
-    for (const line of verdictSummaryLines(place, walkSafety, NO_CONGESTION)) {
-      lines.push({ label: line.label, value: line.value, note: null })
-    }
-  } else if (placePending) {
-    /*
-      상세가 오기 전에도 **무엇을 기다리는지** 말한다 — 동반 줄은 상세 응답에서 나오고, 산책 줄은
-      그 곁에 선다. 라벨만 먼저 두고 값은 골격이다.
-    */
-    lines.push({ label: messages.place.detailSummaryPetLabel, value: null, note: null })
-    if (!walkSafety.failed) {
-      lines.push({ label: messages.place.detailSummaryWalkLabel, value: null, note: null })
-    }
-  }
-
-  if (lines.length === 0) return null
-
-  const busy = lines.some((line) => line.value === null)
+  const inset = variant === 'sheet' ? 'px-4' : 'px-5'
 
   return (
-    <dl aria-busy={busy} className="border-border border-y">
-      {lines.map((line) => (
-        <div key={line.label} className="border-border flex gap-3 border-b py-3 last:border-b-0">
-          {/* 라벨 열 72 — 줄마다 같은 폭이라 값의 세로선이 맞는다 */}
-          <dt className="text-caption text-fg-muted w-18 shrink-0 truncate pt-1 font-medium">
-            {line.label}
-          </dt>
-          <dd className="text-body-2 text-fg min-w-0 flex-1">
-            {line.value === null ? (
-              <>
-                <Skeleton className="mt-1 h-4 w-28" />
-                <span className="sr-only">{messages.map.previewLoading}</span>
-              </>
-            ) : (
-              <span className="font-semibold">{line.value}</span>
-            )}
-            {line.note !== null && (
-              <span className="text-caption text-fg-muted mt-1 block break-keep">{line.note}</span>
-            )}
-          </dd>
-        </div>
-      ))}
-    </dl>
+    <div className="border-border shrink-0 border-t">
+      {actions.delisted && (
+        <p className={cn('text-body-2 text-fg-muted pt-3', inset)}>
+          {messages.place.detailDelistedActionsBlocked}
+        </p>
+      )}
+      <div className={cn('py-3', inset)}>
+        <button
+          type="button"
+          onClick={actions.onAddToPlan}
+          disabled={actions.delisted}
+          className={cn(
+            'text-body-1 focus-visible:ring-brand-500 h-12 w-full rounded-md font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60',
+            actions.added
+              ? 'border-border-strong text-fg bg-bg border'
+              : 'bg-brand-600 hover:bg-brand-700 text-fg-inverse',
+          )}
+        >
+          {actions.added ? messages.plan.addToPlanAgainAction : messages.plan.addToPlanAction}
+        </button>
+      </div>
+    </div>
   )
 }
 
-/**
- * 이용 안내 — 운영시간(핵심 줄보다 길 때만 전문) · 휴무일 · 주차 · 유모차 대여 · 신용카드 · 주소 (#1230, 사용자 결정).
- *
- * "가려면 무엇을 알아야 하나" 의 나머지다. 방문 핵심 줄은 운영시간 **첫 줄**만 말하므로 전문은
- * 여기서 말한다. 상세 방문 정보 카드와 같은 라벨(`messages.place.detail*`)을 쓴다.
- * 전화는 핵심 줄이 이미 말해 여기 두지 않는다. **값이 없는 줄은 빠지고, 전부 없으면 절이 없다.**
- * 원문은 TourAPI 문자열이라 태그를 걷고(`toPlainText`) 줄바꿈을 살린다.
- */
-function PreviewUseGuide({ place, className }: { place: PlaceDetail; className: string }) {
-  /*
-    `useId` 다 — 패널(데스크톱)과 시트(모바일)가 **동시에 마운트**되므로(CSS 로만 갈린다) 장소 id 로
-    만들면 같은 id 가 문서에 두 번 선다(aria-labelledby 충돌, 리뷰 지적).
-  */
-  const headingId = useId()
-  const intro = place.intro
-  const address =
-    place.addr1 === null
-      ? null
-      : place.addr2 === null
-        ? place.addr1
-        : `${place.addr1} ${place.addr2}`
-  const candidates: { label: string; value: string | null }[] = [
-    { label: messages.place.detailUseTime, value: hoursBeyondHeadline(intro?.useTime ?? null) },
-    { label: messages.place.detailRestDate, value: toPlainText(intro?.restDate ?? null) },
-    { label: messages.place.detailParking, value: toPlainText(intro?.parking ?? null) },
-    {
-      label: messages.place.detailBabyCarriage,
-      value: toPlainText(intro?.chkBabyCarriage ?? null),
-    },
-    { label: messages.place.detailCreditCard, value: toPlainText(intro?.chkCreditCard ?? null) },
-    { label: messages.place.detailAddress, value: address },
-  ]
-  const rows = candidates.filter(
-    (row): row is { label: string; value: string } => row.value !== null,
-  )
-
-  if (rows.length === 0) return null
-
-  return (
-    <section aria-labelledby={headingId} className={className}>
-      <h3 id={headingId} className="text-body-1 text-fg mb-2 font-semibold">
-        {messages.place.detailSectionIntro}
-      </h3>
-      <dl className="flex flex-col gap-2">
-        {rows.map((row) => (
-          <div key={row.label} className="flex gap-3">
-            <dt className="text-body-2 text-fg-muted w-18 shrink-0">{row.label}</dt>
-            <dd className="text-body-2 text-fg min-w-0 flex-1 break-keep whitespace-pre-line">
-              {row.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  )
-}
-
-/**
- * 운영시간 원문 — **핵심 줄이 첫 줄로 이미 다 말했으면 `null`** 이다. 원문이 한 줄이면 바로 위
- * 핵심 줄과 같은 문장이 두 번 선다(dev 한라산 실측). 둘째 줄부터 더 있을 때만 전문을 다시 싣는다.
- */
-function hoursBeyondHeadline(useTime: string | null): string | null {
-  const text = toPlainText(useTime)
-  return text === null || text === hoursHeadline(useTime) ? null : text
-}
-
+/** 목록에도 없고 상세를 기다리는 동안 — 사진 · 이름 · 행동 줄 · 판정 카드 자리 */
 function PreviewSkeleton() {
   return (
-    <div className="flex flex-col gap-3 px-5 py-4">
+    <div className="flex flex-col gap-4 px-5 py-4">
       <Skeleton className="h-6 w-1/2" />
       <Skeleton className="h-4 w-2/3" />
-      <Skeleton className="h-16 w-full" />
+      <Skeleton className="h-14 w-full rounded-md" />
+      <Skeleton className="h-28 w-full rounded-lg" />
     </div>
   )
 }

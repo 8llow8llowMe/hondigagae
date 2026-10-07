@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { useToast } from '@/components/toast'
 import { usePlaceFavorite } from '@/features/favorite/use-place-favorite'
 import { useSelectedPet } from '@/features/nav/use-selected-pet'
 import { PlaceLoginPromptSheet } from '@/features/place/place-login-prompt-sheet'
@@ -14,6 +15,8 @@ import { usePlaceSuitability } from '@/features/place/use-place-suitability'
 import { usePlaceWalkSafety } from '@/features/place/use-place-walk-safety'
 import { PlaceAddToPlanSheet } from '@/features/plan/place-add-to-plan-sheet'
 import { toPetCondition } from '@/lib/api/insight'
+import { messages } from '@/lib/messages'
+import { copyText, placeShareUrl, sharePlace } from '@/lib/place/share'
 import type { PlaceSummary } from '@/types/place'
 
 /**
@@ -53,6 +56,29 @@ export function PlaceMapPreview({
   const [added, setAdded] = useState(false)
 
   const title = summary?.title ?? detail.data?.title ?? null
+  const { showToast } = useToast()
+
+  /*
+    **공유 (#1233)** — 상세 정규 주소를 기기 공유 시트로, 없으면 링크 복사. 사용자가 시트를 닫은 것은
+    아무것도 띄우지 않는다. 복사 결과는 토스트로 말한다 — 끝난 일을 알리는 것이 토스트의 몫이고
+    (`toast.tsx`), 실패도 다시 누르면 되는 일이라 섹션 안에 남길 오류가 아니다(명세 D2 ④).
+  */
+  async function share() {
+    if (title === null) return
+    const outcome = await sharePlace(navigator, {
+      title,
+      url: placeShareUrl(window.location.origin, placeId),
+    })
+    if (outcome === 'copied') showToast({ message: messages.map.previewShareCopied })
+    if (outcome === 'failed') showToast({ message: messages.map.previewShareFailed })
+  }
+
+  async function copyAddress(address: string) {
+    const copied = await copyText(navigator, address)
+    showToast({
+      message: copied ? messages.map.previewAddressCopied : messages.map.previewAddressCopyFailed,
+    })
+  }
 
   /*
     **포커스를 잃었으면 이름으로 데려온다.** 1024~1279 는 미리보기가 목록 자리를 쓰고(목록은
@@ -106,8 +132,9 @@ export function PlaceMapPreview({
           onToggleSave: () => (authed ? favorite.toggle() : setLoginIntent('save')),
           added,
           onAddToPlan: () => (authed ? setAddOpen(true) : setLoginIntent('add')),
-          onLogin: () => setLoginIntent('add'),
           delisted: detail.data?.delisted ?? false,
+          onShare: () => void share(),
+          onCopyAddress: (address) => void copyAddress(address),
         }}
         headingRef={headingRef}
       />

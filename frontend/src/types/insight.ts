@@ -185,6 +185,12 @@ export type PlaceSuitabilityResponse = {
   /** **null 은 0점이 아니라 "점수를 내지 않았다" 는 뜻이다.** 등급이 `INSUFFICIENT` 로 온다 */
   score: number | null
   suitabilityLevel: ScoreMetricMetadata
+  /**
+   * 오늘의 결론 한 문장(`오늘 가기 좋아요` 등) — **BE #1234 요청, 아직 계약에 없다.** 지도 미리보기
+   * 판정 카드(#1233)가 크게 쓴다. 없거나 null 이면 등급 `name` 이 그 자리에 선다 — FE 가 등급 code 별
+   * 문장을 만들지 않는다(enum 규칙). 계약 스냅샷에 들어오면 선택(`?`)을 걷는다.
+   */
+  headline?: string | null
   /** 점수 영향이 큰 순서다. **재정렬하지 않는다** */
   reasons: SuitabilityReasonItem[]
   /** 예보 범위 밖이면 null → 섹션을 숨긴다 */
