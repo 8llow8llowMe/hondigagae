@@ -242,3 +242,52 @@ describe('PhotoGallery — 미등록 호스트', () => {
     expect(markup).toBe('')
   })
 })
+
+/*
+  #1230 — 지도 미리보기는 데스크톱에서도 400 폭 패널이라 **뷰포트로 가르지 않고** 캐러셀만 쓴다.
+  `always` 전달이 빠지면 캐러셀이 `md:hidden` 으로 돌아가 데스크톱 패널에서 사진이 통째로 사라진다.
+*/
+describe('PhotoGallery — 캐러셀 갈래 (#1230)', () => {
+  function renderCarousel(count: number, contentTypeCode: string | null = null) {
+    const images = Array.from({ length: count }, (_, index) => image(index + 1))
+
+    return renderToStaticMarkup(
+      createElement(PhotoGallery, {
+        images,
+        title: '수월봉',
+        contentTypeCode,
+        layout: 'carousel',
+      }),
+    )
+  }
+
+  it('캐러셀이 어느 폭에서도 선다 — md:hidden 이 없다', () => {
+    const markup = renderCarousel(3)
+
+    expect(markup).toContain('snap-x')
+    expect(markup).not.toContain('md:hidden')
+    expect(markup).toContain('1/3')
+  })
+
+  it('데스크톱 모자이크를 그리지 않는다', () => {
+    const markup = renderCarousel(3)
+
+    expect(markup).not.toContain('hidden md:block')
+    expect(markup).not.toContain('--gallery-h-desktop')
+  })
+
+  it('사진이 없으면 일러스트도 폭과 상관없이 한 갈래만 보인다', () => {
+    const markup = renderCarousel(0, 'CULTURE')
+
+    expect(markup).toContain('/illustrations/place-culture.webp')
+    expect(markup).not.toContain('md:hidden')
+    expect(markup).not.toContain('hidden md:block')
+  })
+
+  it('기본(responsive)은 예전 그대로 — 상세 화면은 바뀌지 않는다', () => {
+    const markup = render(3)
+
+    expect(markup).toContain('relative md:hidden')
+    expect(markup).toContain('hidden md:block')
+  })
+})

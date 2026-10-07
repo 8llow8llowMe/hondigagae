@@ -35,3 +35,31 @@ export function galleryImages(
   */
   return [{ originImgUrl: firstImage, smallImageUrl: null, imgName: null, cpyrhtDivCd }]
 }
+
+/**
+ * **대표 사진을 맨 앞에 둔** 사진 목록 — 지도 미리보기용 (#1230).
+ *
+ * 백엔드는 `images` 가 비었을 때만 대표(`firstImage`)로 폴백하고, 있으면 TourAPI 상세 이미지 목록을
+ * 그대로 준다 — **그 목록에 대표 사진이 없다**(dev 30곳 중 2장↑ 29곳 전부 `images[0] ≠ firstImage`,
+ * 12곳 중 11곳은 목록 어디에도 없음, 리뷰 실측). 미리보기는 상세 응답 전에 목록 행의 대표 사진으로
+ * 먼저 서므로, 응답이 오면 **방금 본 사진이 다른 사진으로 바뀌고 다시 볼 수 없었다.** 그래서 대표를
+ * 첫 장으로 고정하고 같은 URL 은 한 번만 둔다.
+ *
+ * 상세 갤러리(`galleryImages`)는 바꾸지 않았다 — 상세는 목록 행을 거치지 않아 바뀌는 순간이 없다.
+ */
+export function galleryImagesLeadingFirst(
+  images: readonly PlaceImage[],
+  firstImage: string | null,
+  cpyrhtDivCd: string | null,
+): PlaceImage[] {
+  const fallback = galleryImages(images, firstImage, cpyrhtDivCd)
+  if (images.length === 0 || firstImage === null || firstImage.trim().length === 0) return fallback
+
+  const lead: PlaceImage = {
+    originImgUrl: firstImage,
+    smallImageUrl: null,
+    imgName: null,
+    cpyrhtDivCd,
+  }
+  return [lead, ...images.filter((image) => image.originImgUrl !== firstImage)]
+}

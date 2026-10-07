@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { galleryImages } from '@/lib/place/gallery'
+import { galleryImages, galleryImagesLeadingFirst } from '@/lib/place/gallery'
 import type { PlaceImage } from '@/types/place'
 
 function image(overrides: Partial<PlaceImage> = {}): PlaceImage {
@@ -53,5 +53,36 @@ describe('galleryImages — images 가 비면 대표 이미지를 쓴다', () =>
    */
   it('미등록 호스트도 그대로 넘긴다 — 판정은 갤러리가 한다', () => {
     expect(galleryImages([], 'https://cdn.example.com/1.jpg', null)).toHaveLength(1)
+  })
+})
+
+describe('galleryImagesLeadingFirst — 미리보기는 대표 사진이 첫 장 (#1230)', () => {
+  const image = (url: string) => ({
+    originImgUrl: url,
+    smallImageUrl: null,
+    imgName: null,
+    cpyrhtDivCd: 'Type1',
+  })
+
+  it('목록에 대표가 없으면 맨 앞에 붙인다 — 목록 행에서 본 사진이 바뀌지 않는다', () => {
+    const result = galleryImagesLeadingFirst([image('b'), image('c')], 'a', 'Type1')
+
+    expect(result.map((i) => i.originImgUrl)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('목록에 대표가 있으면 한 번만 둔다', () => {
+    const result = galleryImagesLeadingFirst([image('b'), image('a')], 'a', 'Type1')
+
+    expect(result.map((i) => i.originImgUrl)).toEqual(['a', 'b'])
+  })
+
+  it('목록이 비면 상세와 같은 폴백 — 대표 한 장', () => {
+    expect(galleryImagesLeadingFirst([], 'a', null).map((i) => i.originImgUrl)).toEqual(['a'])
+  })
+
+  it('대표가 없으면 목록 그대로', () => {
+    expect(galleryImagesLeadingFirst([image('b')], null, null).map((i) => i.originImgUrl)).toEqual([
+      'b',
+    ])
   })
 })

@@ -2,6 +2,7 @@
 
 import { type ReactNode, useRef } from 'react'
 
+import { toBody } from '@/lib/ui/body-portal'
 import { useOverlay } from '@/lib/ui/overlay'
 import { cn } from '@/lib/utils/cn'
 
@@ -39,7 +40,7 @@ export function BottomSheet({
 
   if (!open) return null
 
-  return (
+  return toBody(
     <div className="fixed inset-0 z-50 flex items-end md:items-center md:justify-center">
       {/* 배경 rgba(21,24,29,.5) — 가이드 §5-2.
           Esc 와 바깥 클릭이 닫기를 맡으므로 a11y 트리에서 뺀다 — 전면을 덮는 버튼이
@@ -107,6 +108,6 @@ export function BottomSheet({
           <div className="border-border bg-bg border-t px-4 py-3">{footer}</div>
         )}
       </div>
-    </div>
+    </div>,
   )
 }
