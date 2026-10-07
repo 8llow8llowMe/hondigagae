@@ -212,10 +212,23 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
   - **구간은 로그로 센다** — `AI plan route legs maxLegKm= longLegs= lodgingRelocated=` (긴 구간 기준 25km,
     0건이어도 한 줄). 옮긴 숙소는 `AI plan stay relocated day= before= beforeKm= after= afterKm=`. 이슈의
     "같은 조건으로 재생성해 구간 거리 비교" 를 dev 에서 이 두 줄로 한다.
-  - **후속 — 후보 풀의 숙박.** dev 의 제주 전체 후보 50곳에 숙박이 3곳(서귀포 2 · 구좌 1)뿐이라, 서쪽에 묵을 숙소가
-    애초에 없다. 재배치는 있는 숙소 중 가까운 곳을 고를 뿐이다. 후보 풀에 숙박을 권역별로 할당하는 일은 후보
-    조회(`PlaceCandidateQueryPort` · `AiPlanWorker#loadCandidates`)를 바꾸는 #1170 뒤로 미뤘다. `longLegs` 가
-    계속 남으면 그쪽을 볼 신호다.
+  - **dev 재측정 (2026-10-07, 3일).** 최장 구간 62 → 39.4km, 25km 넘는 구간 6 → 3. 2일차 밤 숙소를 구좌 →
+    서귀포로 옮겼다(거리 합 79.7 → 19.2km). 남은 긴 구간은 후보 풀에 서쪽 숙소가 없어서다 — 아래 숙박 할당.
+- **후보 풀에 숙박을 권역마다 싣는다 (필수, #1236).** 후보 풀은 지역 검색 상위 N(`placeId` 순)이라 숙박이
+  우연히만 든다 — dev 의 제주 전체 50곳에는 숙박이 3곳(서귀포 2 · 구좌 1)이었는데, 동반 가능 숙박은 56곳이고
+  6권역에 다 있다(남서부 10 · 북서부 10 · 남부 10 · 북동부 17 · 남동부 6 · 북부 3). 서쪽 일정에 묵을 곳이 풀에
+  없으면 모델도 재배치 가드도 고를 수 없다.
+  - **숙박을 따로 한 번 더 찾는다** — `GET /api/v1/places?contentType=LODGING`(같은 지역 · 시군구, 동반 가능,
+    한 페이지 50곳, `PlaceCandidateQueryPort#findLodgingCandidates`). 요청 조건 후보(#1170) 다음, 필수 포함 ·
+    즐겨찾기를 합치기 전이다.
+  - **권역마다 2곳까지** (`LodgingZonePolicy.PER_ZONE`). 이미 풀에 있는 숙박도 그 권역 몫으로 센다. 권역은 프롬프트와
+    같은 `JejuZone` 이다 — 그래서 `JejuZone` 을 프롬프트 어댑터에서 application 모델로 옮겼다. 좌표가 없거나 제주
+    밖이면 어느 몫인지 몰라 싣지 않는다.
+  - **상한은 그대로다** — 넘치는 만큼 풀의 뒤에서부터 숙박이 아닌 장소(일반 검색의 꼬리)를 뺀다. 6권역이면 많아야
+    12곳이라 프롬프트 길이는 늘지 않는다. 숙박은 풀의 뒤에 붙는다.
+  - **못 가져와도 생성은 계속한다.** 숙박은 동선을 낫게 할 뿐 없다고 일정이 틀리지는 않는다. 장소가 하나도 없으면
+    숙박만으로 일정을 짤 수 없어 싣지 않는다. 로그 `AI plan lodging candidates spread by zone fetched= before= after=`
+    로 몇 곳을 실었는지 본다.
 - XAI reasons는 LLM 자유 생성이 아니라, 실제 데이터 근거(기온·혼잡도·이동거리·동반 조건)를 코드에서 조립하고 문장화만 LLM에 맡기는 방향을 우선한다.
 - 토큰 사용량 카운터를 두어 운영 비용을 추적한다 (어댑터가 호출당·누적 사용량을 로그로 남긴다).
 - 거절(`stop_reason=refusal`)은 HTTP 200 으로 온다. content 를 그냥 읽으면 빈 응답을 파싱 실패로
