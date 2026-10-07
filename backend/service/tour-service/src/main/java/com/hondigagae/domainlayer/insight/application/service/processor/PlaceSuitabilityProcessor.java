@@ -16,6 +16,7 @@ import com.hondigagae.domainlayer.insight.domain.model.CongestionSnapshot;
 import com.hondigagae.domainlayer.insight.domain.model.DailyWeather;
 import com.hondigagae.domainlayer.insight.domain.model.PlaceCondition;
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityEvaluator;
+import com.hondigagae.domainlayer.insight.domain.model.SuitabilityHeadline;
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityInput;
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityScore;
 import com.hondigagae.global.properties.InsightProperties;
@@ -57,11 +58,14 @@ public class PlaceSuitabilityProcessor {
         }
 
         LocalDate targetDate = query.resolvedDate();
+        // "오늘인가" 는 한 번만 판정한다. 특보를 붙일지와 결론 문구에 "오늘" 을 쓸지가 같은 값을 봐야
+        // 자정 경계에서 "특보는 붙었는데 문구는 오늘이 아니다" 처럼 둘이 어긋나지 않는다.
+        boolean today = targetDate.equals(LocalDate.now());
         WeatherLookup weather = lookupWeather(place, targetDate);
         CongestionSnapshot congestion = congestionForecastPort.findByPlaceAndDate(query.placeId(), targetDate);
         // 특보는 지금 발효 중인 것이라 오늘에만 붙인다. 미래 날짜에 붙이면 그 날도 태풍이라고
         // 말하는 셈이 된다. 판정과 응답이 같은 값을 쓰도록 한 번만 구한다.
-        WeatherWarning warning = targetDate.equals(LocalDate.now())
+        WeatherWarning warning = today
             ? weatherWarningProcessor.heaviestWarning().orElse(null)
             : null;
 
@@ -80,6 +84,7 @@ public class PlaceSuitabilityProcessor {
             .placeTitle(place.title())
             .targetDate(targetDate)
             .score(score)
+            .headline(SuitabilityHeadline.of(score, warning != null, today))
             .weather(weather.daily())
             .congestion(congestion)
             .weatherWarning(warning)
