@@ -1,24 +1,22 @@
-import Image from 'next/image'
-import Link from 'next/link'
-
 import type { Ref } from 'react'
 
+import { ButtonLink } from '@/components/button'
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
 import { Skeleton } from '@/components/skeleton'
-import { ThumbnailTile } from '@/components/thumbnail-tile'
+import { PhotoGallery } from '@/features/place/photo-gallery'
 import {
   PlaceDetailActionBar,
   type PlaceDetailActions,
 } from '@/features/place/place-detail-action-bar'
 import { verdictSummaryLines } from '@/features/place/place-verdict-summary-lines'
 import { PlaceVisitKeyLine } from '@/features/place/place-visit-key-line'
-import { imageSrc } from '@/lib/image/remote-host'
-import { listThumbnailSrc } from '@/lib/image/thumbnail'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
-import { placeIllustration } from '@/lib/place/illustration'
+import { galleryImages } from '@/lib/place/gallery'
+import { hoursHeadline } from '@/lib/place/hours'
 import { placeMetaLine } from '@/lib/place/meta'
+import { toPlainText } from '@/lib/place/text'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceSuitabilityResponse, WalkSafetyResponse } from '@/types/insight'
 import type { PlaceDetail, PlaceSummary } from '@/types/place'
@@ -53,8 +51,12 @@ export type PlaceMapPreviewBodyProps = {
  * 조회 · 상태를 쥔 컨테이너(`PlaceMapPreview`)와 나눴다 — `PlaceDetailView` / `PlaceDetailSection`
  * 과 같은 분리다 (testing-guide.md §1).
  *
- * **두 겹으로 그린다.** 목록 행(`summary`)으로 이름 · 사진 · 메타를 즉시 그리고, 상세 · 판정이 오는
- * 대로 나머지 줄을 채운다. 목록에 없는 id 면 상세 응답이 그 자리를 채운다.
+ * 순서: 사진(캐러셀) → 이름 · 적합도 · 메타 → 방문 핵심 줄 → 판정 줄 → 이용 안내 → `상세 정보 전체
+ * 보기` → 하단 바(저장 · 담기). **"요약을 다 읽고 더 보고 싶은 순간" 의 자리에 상세로 가는 길이 있다**
+ * (#1230 — 예전에는 닫기 바로 옆이라 닫으려다 상세로 갔다).
+ *
+ * **두 겹으로 그린다.** 목록 행(`summary`)으로 이름 · 대표 사진 · 메타를 즉시 그리고, 상세 · 판정이
+ * 오는 대로 나머지를 채운다. 목록에 없는 id 면 상세 응답이 그 자리를 채운다.
  *
  * **줄마다 따로 실패한다.** 판정 하나가 죽어도 그 줄만 빠진다. 재시도는 상세 화면이 갖는다.
  */
@@ -82,9 +84,18 @@ export function PlaceMapPreviewBody({
         : null
   const level = suitability.data?.suitabilityLevel ?? null
   const inset = variant === 'sheet' ? 'px-4' : 'px-5'
+  /*
+    **사진은 상세와 같은 목록이다** (#1230, `galleryImages`). dev 50곳 중 36곳이 2장 이상(최대 29장)
+    인데 대표 한 장만 보였다. 상세 응답 전에는 목록 행의 대표 사진 한 장으로 먼저 선다 — 같은 URL 이
+    첫 장이라 응답이 와도 첫 장이 바뀌지 않는다.
+  */
+  const images =
+    place !== null
+      ? galleryImages(place.images, place.firstImage, place.cpyrhtDivCd)
+      : galleryImages([], summary?.firstImage ?? null, null)
 
   /*
-    목록에도 없고 상세도 못 받았다 — 말할 이름이 없다. 문구 · `상세 보기` · 닫기만 남긴다.
+    목록에도 없고 상세도 못 받았다 — 말할 이름이 없다. 문구 · `상세 정보 전체 보기` · 닫기만 남긴다.
     404(사라진 id)와 5xx 를 가르지 않고 재시도를 달지 않는다: 여기는 상세로 가는 입구이고,
     상세가 404 는 빈 화면으로, 5xx 는 재시도로 제대로 가른다.
   */
@@ -103,65 +114,57 @@ export function PlaceMapPreviewBody({
       */
       className="flex h-full max-h-full min-h-0 flex-col"
     >
-      <PreviewTopBar placeId={placeId} title={title} variant={variant} onClose={onClose} />
+      <PreviewTopBar variant={variant} onClose={onClose} />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {failed ? (
-          <p className={cn('text-body-2 text-fg-muted py-6', inset)}>
-            {messages.map.previewLoadFailed}
-          </p>
+          <div className={cn('flex flex-col gap-4 py-6', inset)}>
+            <p className="text-body-2 text-fg-muted">{messages.map.previewLoadFailed}</p>
+            <DetailLink placeId={placeId} />
+          </div>
         ) : title === null ? (
           <PreviewSkeleton />
         ) : (
-          <div className="flex flex-col gap-4 pb-4">
-            {variant === 'panel' && (
-              <PreviewPhoto
-                src={
-                  imageSrc(summary?.firstImage ?? place?.firstImage ?? null) ??
-                  listThumbnailSrc(summary?.firstImage2 ?? null, null)
-                }
-                illustration={placeIllustration(contentTypeCode)}
-              />
-            )}
+          <div className="flex flex-col gap-4 pb-5">
+            <PhotoGallery
+              images={images}
+              title={title}
+              contentTypeCode={contentTypeCode}
+              layout="carousel"
+            />
 
-            <div className={cn('flex gap-3', inset)}>
-              {variant === 'sheet' && (
-                <ThumbnailTile
-                  src={listThumbnailSrc(
-                    summary?.firstImage2 ?? null,
-                    summary?.firstImage ?? place?.firstImage ?? null,
-                  )}
-                  illustration={placeIllustration(contentTypeCode)}
-                />
-              )}
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <div className="flex items-start justify-between gap-2">
-                  {/*
-                    공백 없는 긴 이름이 넘치지 않게 — 상세 `h1` 과 같은 이유 (`min-w-0`).
-                    `tabIndex={-1}` — 열릴 때 포커스를 받는다(컨테이너). 탭 순서에는 들지 않는다.
-                  */}
-                  <h2
-                    ref={headingRef}
-                    tabIndex={-1}
-                    className="text-title-2 text-fg min-w-0 flex-1 font-bold break-words focus:outline-none"
+            <div className={cn('flex min-w-0 flex-col gap-1', inset)}>
+              <div className="flex items-start justify-between gap-2">
+                {/*
+                  공백 없는 긴 이름이 넘치지 않게 — 상세 `h1` 과 같은 이유 (`min-w-0`).
+                  `tabIndex={-1}` — 열릴 때 포커스를 받는다(컨테이너). 탭 순서에는 들지 않는다.
+                */}
+                <h2
+                  ref={headingRef}
+                  tabIndex={-1}
+                  className="text-title-2 text-fg min-w-0 flex-1 font-bold break-words focus:outline-none"
+                >
+                  {title}
+                </h2>
+                {/*
+                  등급은 **왔을 때만** 배지다. 묻는 중이면 **배지 모양 골격**이 자리를 잡는다 (#1230) —
+                  비어 있다가 갑자기 생기면 "등급이 없는 곳" 으로 읽혔다가 바뀐다.
+                */}
+                {level !== null ? (
+                  <MetricBadge
+                    tone={suitabilityTone(level.code)}
+                    axis="suitability"
+                    className="shrink-0"
                   >
-                    {title}
-                  </h2>
-                  {/* 등급은 **왔을 때만** — 자리를 잡아 두면 빈 배지가 등급처럼 보인다 */}
-                  {level !== null && (
-                    <MetricBadge
-                      tone={suitabilityTone(level.code)}
-                      axis="suitability"
-                      className="shrink-0"
-                    >
-                      {level.name}
-                    </MetricBadge>
-                  )}
-                </div>
-                {meta !== null && (
-                  <p className="text-body-2 text-fg-muted line-clamp-1 tabular-nums">{meta}</p>
+                    {level.name}
+                  </MetricBadge>
+                ) : (
+                  suitability.loading && <Skeleton className="h-6 w-24 shrink-0 rounded-md" />
                 )}
               </div>
+              {meta !== null && (
+                <p className="text-body-2 text-fg-muted line-clamp-1 tabular-nums">{meta}</p>
+              )}
             </div>
 
             {place !== null && (
@@ -187,6 +190,12 @@ export function PlaceMapPreviewBody({
                 petName={petName}
               />
             </div>
+
+            {place !== null && <PreviewUseGuide place={place} className={inset} />}
+
+            <div className={inset}>
+              <DetailLink placeId={placeId} />
+            </div>
           </div>
         )}
       </div>
@@ -194,7 +203,6 @@ export function PlaceMapPreviewBody({
       {/*
         하단 바는 **상세의 것을 그대로 쓴다** — 저장 · 담기 · 미로그인 `로그인` · 사라진 장소 잠금이
         한 컴포넌트에 있다. 미리보기만의 바를 만들면 그 규칙이 두 벌이 된다.
-        `상세 보기` 는 여기 넣지 않고 머리 줄에 둔다 — 390 에서 세 칸이면 담기가 좁아진다.
         `shrink-0` — 본문이 길어도 바는 줄지 않고 본문이 스크롤된다.
       */}
       {!failed && title !== null && (
@@ -209,20 +217,16 @@ export function PlaceMapPreviewBody({
 }
 
 /**
- * 머리 줄 — (1024~1279) `‹ 목록` · `상세 보기 ›` · 닫기.
+ * 머리 줄 — (1024~1279) `‹ 목록` · 닫기. **상세로 가는 길은 여기 없다** (#1230).
  *
  * **`‹ 목록` 은 `xl` 에서 사라진다.** 1280 부터는 목록이 옆에 그대로 있어 돌아갈 곳이 없다.
  * 시트(모바일)에도 없다 — 닫으면 목록 시트가 돌아온다. 시트에 그래버를 두지 않는다 — 끌 수 없는데
  * 끌 수 있어 보인다.
  */
 function PreviewTopBar({
-  placeId,
-  title,
   variant,
   onClose,
 }: {
-  placeId: string
-  title: string | null
   variant: PlaceMapPreviewVariant
   onClose: () => void
 }) {
@@ -239,49 +243,35 @@ function PreviewTopBar({
         </button>
       )}
 
-      <div className="ml-auto flex items-center gap-1">
-        <Link
-          href={`/places/${placeId}`}
-          aria-label={
-            title === null
-              ? messages.map.previewDetail
-              : messages.map.rowDetailLabel.replace('{title}', title)
-          }
-          className="text-link hover:text-link-hover focus-visible:ring-brand-500 text-body-2 inline-flex min-h-11 items-center gap-1 rounded-sm px-2 font-semibold focus-visible:ring-2 focus-visible:outline-none"
-        >
-          {messages.map.previewDetail}
-          <ChevronRightIcon size={16} aria-hidden />
-        </Link>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={messages.map.previewClose}
-          className="text-fg-muted hover:text-fg hover:bg-band focus-visible:ring-brand-500 inline-flex size-11 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
-        >
-          <CloseIcon size={20} />
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={messages.map.previewClose}
+        className="text-fg-muted hover:text-fg hover:bg-band focus-visible:ring-brand-500 ml-auto inline-flex size-11 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
+      >
+        <CloseIcon size={20} />
+      </button>
     </div>
   )
 }
 
 /**
- * 데스크톱 사진 한 장. **모자이크를 두지 않는다** — 고를 때마다 원본 여러 장을 받게 된다.
- * `next/image` 가 패널 폭(400)에 맞춰 줄여 받는다.
+ * `상세 정보 전체 보기 ›` — **정보 맨 아래 전폭 보조 버튼** (#1230, 사용자 결정).
+ *
+ * 닫기 옆이면 닫으려다 상세로 가고, 하단 바 셋째 칸이면 390 에서 담기가 좁아진다. 요약을 다 읽고
+ * "더 보고 싶다" 는 순간에 손이 가는 자리가 여기다. 주요 행동(담기)과 겨루지 않게 보조(secondary)다.
  */
-function PreviewPhoto({ src, illustration }: { src: string | null; illustration: string | null }) {
-  if (src === null && illustration === null) return null
-
+function DetailLink({ placeId }: { placeId: string }) {
   return (
-    <div className="bg-band relative mx-5 h-40 shrink-0 overflow-hidden rounded-md">
-      {src !== null ? (
-        <Image src={src} alt="" fill sizes="400px" className="object-cover" />
-      ) : (
-        // 카테고리 일러스트 — `ThumbnailTile` 과 같은 처리다 (정적 자산이라 `img`)
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={illustration ?? ''} alt="" className="absolute inset-0 size-full object-cover" />
-      )}
-    </div>
+    <ButtonLink
+      href={`/places/${placeId}`}
+      variant="secondary"
+      size="md"
+      trailing={<ChevronRightIcon size={16} aria-hidden />}
+      className="w-full"
+    >
+      {messages.map.previewDetail}
+    </ButtonLink>
   )
 }
 
@@ -295,6 +285,10 @@ function PreviewPhoto({ src, illustration }: { src: string | null; illustration:
  *
  * **적합도 근거는 반려견이 있을 때만 선다.** 상세도 게스트에게 점수 · 근거를 보이지 않는다
  * (`place-detail-view.tsx` — 기준이 되는 반려견이 없다). 등급은 이름 옆 배지가 말한다.
+ *
+ * **묻는 중에는 라벨을 두고 값 자리에 골격을 둔다** (#1230). 무엇을 기다리는지가 먼저 보여야 한다.
+ * 상자는 흰 바탕 + 테두리다 — 예전에는 `--band` 채움이라 같은 `--band` 인 골격이 묻혀 **빈칸으로
+ * 보였다**(사용자 지적). `aria-busy` 로 보조기기에도 묻는 중임을 알린다.
  */
 function PreviewVerdicts({
   place,
@@ -323,41 +317,110 @@ function PreviewVerdicts({
     for (const line of verdictSummaryLines(place, walkSafety, NO_CONGESTION)) {
       lines.push({ label: line.label, value: line.value, note: null })
     }
+  } else if (placePending) {
+    /*
+      상세가 오기 전에도 **무엇을 기다리는지** 말한다 — 동반 줄은 상세 응답에서 나오고, 산책 줄은
+      그 곁에 선다. 라벨만 먼저 두고 값은 골격이다.
+    */
+    lines.push({ label: messages.place.detailSummaryPetLabel, value: null, note: null })
+    if (!walkSafety.failed) {
+      lines.push({ label: messages.place.detailSummaryWalkLabel, value: null, note: null })
+    }
   }
 
-  if (lines.length === 0 && !placePending) return null
+  if (lines.length === 0) return null
 
-  // 아이템 채움(L2) — `--band` 다. `--bg-sunken` 은 바닥 전용이다 (DESIGN.md §0)
+  const busy = lines.some((line) => line.value === null)
+
   return (
-    <dl className="bg-band rounded-md px-4 py-1">
-      {lines.length === 0 ? (
-        <div className="py-3">
-          <Skeleton className="h-4 w-3/4" />
+    <dl aria-busy={busy} className="border-border rounded-md border px-4 py-1">
+      {lines.map((line) => (
+        <div key={line.label} className="border-border flex gap-3 border-b py-3 last:border-b-0">
+          {/* 라벨 열 72 — 줄마다 같은 폭이라 값의 세로선이 맞는다 */}
+          <dt className="text-caption text-fg-muted w-18 shrink-0 truncate pt-1 font-medium">
+            {line.label}
+          </dt>
+          <dd className="text-body-2 text-fg min-w-0 flex-1">
+            {line.value === null ? (
+              <>
+                <Skeleton className="mt-1 h-4 w-28" />
+                <span className="sr-only">{messages.map.previewLoading}</span>
+              </>
+            ) : (
+              <span className="font-semibold">{line.value}</span>
+            )}
+            {line.note !== null && (
+              <span className="text-caption text-fg-muted mt-1 block break-keep">{line.note}</span>
+            )}
+          </dd>
         </div>
-      ) : (
-        lines.map((line) => (
-          <div key={line.label} className="border-border flex gap-3 border-b py-3 last:border-b-0">
-            {/* 라벨 열 72 — 줄마다 같은 폭이라 값의 세로선이 맞는다 */}
-            <dt className="text-caption text-fg-muted w-18 shrink-0 truncate pt-1 font-medium">
-              {line.label}
-            </dt>
-            <dd className="text-body-2 text-fg min-w-0 flex-1">
-              {line.value === null ? (
-                <Skeleton className="h-4 w-24" />
-              ) : (
-                <span className="font-semibold">{line.value}</span>
-              )}
-              {line.note !== null && (
-                <span className="text-caption text-fg-muted mt-1 block break-keep">
-                  {line.note}
-                </span>
-              )}
-            </dd>
-          </div>
-        ))
-      )}
+      ))}
     </dl>
   )
+}
+
+/**
+ * 이용 안내 — 운영시간(핵심 줄보다 길 때만 전문) · 휴무일 · 주차 · 유모차 대여 · 신용카드 · 주소 (#1230, 사용자 결정).
+ *
+ * "가려면 무엇을 알아야 하나" 의 나머지다. 방문 핵심 줄은 운영시간 **첫 줄**만 말하므로 전문은
+ * 여기서 말한다. 상세 방문 정보 카드와 같은 라벨(`messages.place.detail*`)을 쓴다.
+ * 전화는 핵심 줄이 이미 말해 여기 두지 않는다. **값이 없는 줄은 빠지고, 전부 없으면 절이 없다.**
+ * 원문은 TourAPI 문자열이라 태그를 걷고(`toPlainText`) 줄바꿈을 살린다.
+ */
+function PreviewUseGuide({ place, className }: { place: PlaceDetail; className: string }) {
+  const intro = place.intro
+  const address =
+    place.addr1 === null
+      ? null
+      : place.addr2 === null
+        ? place.addr1
+        : `${place.addr1} ${place.addr2}`
+  const candidates: { label: string; value: string | null }[] = [
+    { label: messages.place.detailUseTime, value: hoursBeyondHeadline(intro?.useTime ?? null) },
+    { label: messages.place.detailRestDate, value: toPlainText(intro?.restDate ?? null) },
+    { label: messages.place.detailParking, value: toPlainText(intro?.parking ?? null) },
+    {
+      label: messages.place.detailBabyCarriage,
+      value: toPlainText(intro?.chkBabyCarriage ?? null),
+    },
+    { label: messages.place.detailCreditCard, value: toPlainText(intro?.chkCreditCard ?? null) },
+    { label: messages.place.detailAddress, value: address },
+  ]
+  const rows = candidates.filter(
+    (row): row is { label: string; value: string } => row.value !== null,
+  )
+
+  if (rows.length === 0) return null
+
+  return (
+    <section aria-labelledby={`preview-use-guide-${place.placeId}`} className={className}>
+      <h3
+        id={`preview-use-guide-${place.placeId}`}
+        className="text-body-1 text-fg mb-2 font-semibold"
+      >
+        {messages.place.detailSectionIntro}
+      </h3>
+      <dl className="flex flex-col gap-2">
+        {rows.map((row) => (
+          <div key={row.label} className="flex gap-3">
+            <dt className="text-body-2 text-fg-muted w-18 shrink-0">{row.label}</dt>
+            <dd className="text-body-2 text-fg min-w-0 flex-1 break-keep whitespace-pre-line">
+              {row.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+}
+
+/**
+ * 운영시간 원문 — **핵심 줄이 첫 줄로 이미 다 말했으면 `null`** 이다. 원문이 한 줄이면 바로 위
+ * 핵심 줄과 같은 문장이 두 번 선다(dev 한라산 실측). 둘째 줄부터 더 있을 때만 전문을 다시 싣는다.
+ */
+function hoursBeyondHeadline(useTime: string | null): string | null {
+  const text = toPlainText(useTime)
+  return text === null || text === hoursHeadline(useTime) ? null : text
 }
 
 function PreviewSkeleton() {
