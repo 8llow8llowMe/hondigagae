@@ -2,6 +2,8 @@ package com.hondigagae.domainlayer.planner.application.service.worker;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
+import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanJobMode;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanStepOutcome;
@@ -240,6 +242,40 @@ class AiPlanWorkerStepTest {
         assertThat(candidates.requestedLookups).isZero();
     }
 
+    // 숙박 권역 할당 (#1236) ─────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("동반 가능 숙박을 권역마다 찾아 후보 뒤에 싣는다 — 지역 검색 상위 N 에는 숙박이 우연히만 든다")
+    void spreadsLodgingByZone() {
+        AiPlanJob job = pendingJob("4");
+        RecordingCandidates candidates = new RecordingCandidates();
+        candidates.stays = List.of(
+            stay(501L, "포시즌펜션", 33.2480, 126.5650),
+            stay(502L, "중문 펜션", 33.2500, 126.4100));
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        assertThat(candidates.lodgingSigunguCode).isEqualTo("4");
+        assertThat(llm.lastQuery.safeCandidates()).extracting(PlaceCandidate::placeId)
+            .containsExactly(100L, 501L, 502L);
+    }
+
+    @Test
+    @DisplayName("숙박 조회가 실패해도 생성은 계속한다 — 숙박은 동선을 낫게 할 뿐이다")
+    void continuesWhenLodgingLookupFails() {
+        AiPlanJob job = pendingJob(null);
+        FakeJobStore store = new FakeJobStore(job);
+        RecordingCandidates candidates = new RecordingCandidates();
+        candidates.lodgingFailure = new AiPlanException(AiPlanErrorCode.INTERNAL_SERVICE_UNAVAILABLE);
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(store, new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        assertThat(store.current().status()).isEqualTo(AiPlanJobStatus.COMPLETED);
+        assertThat(llm.lastQuery.safeCandidates()).extracting(PlaceCandidate::placeId).containsExactly(100L);
+    }
+
     // 단계별 소요 지표 (#985) ────────────────────────────────────────────────
 
     @Test
@@ -379,6 +415,12 @@ class AiPlanWorkerStepTest {
             .build();
     }
 
+    private static PlaceCandidateQueryResult stay(long placeId, String title, double lat, double lng) {
+        return PlaceCandidateQueryResult.builder()
+            .placeId(placeId).title(title).contentTypeName("숙박").indoor(true).lat(lat).lng(lng)
+            .build();
+    }
+
     /** 저장된 잡을 들고 있으면서 밟은 단계를 순서대로 기록한다. */
     private static final class FakeJobStore implements AiPlanJobStorePort {
 
@@ -502,6 +544,19 @@ class AiPlanWorkerStepTest {
         private int requestedLookups;
         private Boolean requestedIndoor;
         private String requestedCategory;
+        /** 숙박 검색이 돌려줄 숙소 (#1236). 비우면 숙박을 더 싣지 않는다. */
+        private List<PlaceCandidateQueryResult> stays = List.of();
+        private AiPlanException lodgingFailure;
+        private String lodgingSigunguCode;
+
+        @Override
+        public List<PlaceCandidateQueryResult> findLodgingCandidates(String areaCode, String sigunguCode, int size) {
+            lodgingSigunguCode = sigunguCode;
+            if (lodgingFailure != null) {
+                throw lodgingFailure;
+            }
+            return stays;
+        }
 
         @Override
         public List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, String sigunguCode, int size) {

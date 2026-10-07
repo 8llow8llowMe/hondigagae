@@ -37,6 +37,16 @@ public interface PlaceCandidateQueryPort {
     }
 
     /**
+     * 동반 가능 숙박 (#1236). 후보 풀에 숙박을 권역마다 싣는 데 쓴다 — 지역 검색 상위 N 에는 숙박이 우연히만 든다.
+     *
+     * <p>기본 구현은 빈 목록이다 — 테스트 대역이 구현하지 않으면 숙박을 더 싣지 않을 뿐 생성은 그대로다.
+     * {@link #findRequestedCandidates} 처럼 일반 검색으로 대신하면 숙박이 아닌 장소가 숙박 몫으로 들어간다.
+     */
+    default List<PlaceCandidateQueryResult> findLodgingCandidates(String areaCode, String sigunguCode, int size) {
+        return List.of();
+    }
+
+    /**
      * 아이디로 후보를 직접 가져온다 — 사용자가 필수 포함으로 지정한 장소는 검색 상위 N 에
      * 없어도 후보에 넣어야 하기 때문이다. 노출 불가 장소는 결과에서 빠진다.
      */

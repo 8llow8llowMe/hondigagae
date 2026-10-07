@@ -10,6 +10,7 @@ import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.application.model.RequestNoteConstraints;
+import com.hondigagae.domainlayer.planner.application.service.LodgingZonePolicy;
 import com.hondigagae.domainlayer.planner.application.service.RequestNoteCandidatePolicy;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobEventPort;
@@ -51,6 +52,12 @@ public class AiPlanWorker {
      * 프롬프트는 늘지 않고, 일반 검색의 꼬리만 빠진다 (#1170).
      */
     private static final int REQUEST_SLOT = 8;
+
+    /**
+     * 숙박을 권역마다 싣기 위해 한 번에 가져올 숙박 수 (#1236). tour-service 목록 API 의 한 페이지 상한이다 —
+     * dev 의 제주 동반 가능 숙박은 56곳이라 한 페이지로 6권역이 다 잡힌다.
+     */
+    private static final int LODGING_FETCH_SIZE = 50;
 
     private final AiPlanJobStorePort aiPlanJobStorePort;
     private final AiPlanJobEventPort aiPlanJobEventPort;
@@ -429,6 +436,7 @@ public class AiPlanWorker {
             .map(this::toCandidate)
             .toList();
         searched = reserveRequested(areaCode, sigunguCode, searched, requestNote);
+        searched = spreadLodging(areaCode, sigunguCode, searched);
         if (sigunguCode != null && searched.isEmpty()) {
             // 지역 전체로 넓히지 않는다. 사용자가 "제주시만" 이라고 한 요청에 서귀포 장소를
             // 섞으면 조건을 무시한 일정이 되고, 그 사실이 응답에 드러나지도 않는다.
@@ -480,6 +488,35 @@ public class AiPlanWorker {
                 constraints.cafe(), constraints.indoor(), areaCode, sigunguCode);
         }
         return RequestNoteCandidatePolicy.reserve(matches, searched, aiLlmProperties.placeCandidateSize());
+    }
+
+    /**
+     * 숙박을 권역마다 싣는다 (#1236). 지역 검색 상위 N 에는 숙박이 우연히만 들어, 서쪽 일정에 묵을 곳이 풀에 없을 수
+     * 있었다. 상한은 그대로라 일반 검색의 꼬리가 빠진다({@link LodgingZonePolicy}).
+     *
+     * <p><b>못 가져와도 생성은 계속한다</b> — 숙박은 동선을 낫게 할 뿐, 없다고 일정이 틀리지는 않는다. 장소가 하나도
+     * 없으면 숙박만으로 일정을 짤 수 없으니 싣지 않는다(후보 없음 실패는 어댑터가 낸다).
+     */
+    private List<PlaceCandidate> spreadLodging(String areaCode, String sigunguCode, List<PlaceCandidate> searched) {
+        if (searched.isEmpty()) {
+            return searched;
+        }
+        List<PlaceCandidate> stays;
+        try {
+            stays = placeCandidateQueryPort.findLodgingCandidates(areaCode, sigunguCode, LODGING_FETCH_SIZE).stream()
+                .map(this::toCandidate)
+                .toList();
+        } catch (AiPlanException exception) {
+            log.warn("Lodging candidates lookup failed, continuing without them. errorCode={}",
+                exception.getErrorCode().getCode());
+            return searched;
+        }
+        List<PlaceCandidate> spread = LodgingZonePolicy.spread(stays, searched, aiLlmProperties.placeCandidateSize());
+        long before = searched.stream().filter(LodgingZonePolicy::isLodging).count();
+        long after = spread.stream().filter(LodgingZonePolicy::isLodging).count();
+        log.info("AI plan lodging candidates spread by zone fetched={} before={} after={} areaCode={} sigunguCode={}",
+            stays.size(), before, after, areaCode, sigunguCode);
+        return spread;
     }
 
     /**

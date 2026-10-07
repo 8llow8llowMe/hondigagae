@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.planner.adapter.out.llm;
 
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
 import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
+import com.hondigagae.domainlayer.planner.application.model.JejuZone;
 import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;

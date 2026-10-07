@@ -23,29 +23,37 @@ public class PlaceCandidateClientAdapter implements PlaceCandidateQueryPort {
     /** 동반 가능이 확인된 곳만 후보로 준다. UNKNOWN 을 섞으면 LLM 이 그것을 가능으로 읽는다. */
     private static final String PET_ALLOWED = PetAllowanceType.ALLOWED.name();
 
+    /** tour-service {@code ContentType.LODGING} 의 이름. 공용 enum 이 없어 값을 적는다 (#1236). */
+    private static final String CONTENT_TYPE_LODGING = "LODGING";
+
     private final PlaceCandidateClient placeCandidateClient;
     private final PinnedPlaceCandidateClient pinnedPlaceCandidateClient;
     private final InternalResponseSupport internalResponseSupport;
 
     @Override
     public List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, String sigunguCode, int size) {
-        return search(areaCode, sigunguCode, size, null, null);
+        return search(areaCode, sigunguCode, size, null, null, null);
     }
 
     @Override
     public List<PlaceCandidateQueryResult> findRequestedCandidates(
         String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory
     ) {
-        return search(areaCode, sigunguCode, size, indoor, sourceCategory);
+        return search(areaCode, sigunguCode, size, indoor, sourceCategory, null);
+    }
+
+    @Override
+    public List<PlaceCandidateQueryResult> findLodgingCandidates(String areaCode, String sigunguCode, int size) {
+        return search(areaCode, sigunguCode, size, null, null, CONTENT_TYPE_LODGING);
     }
 
     private List<PlaceCandidateQueryResult> search(
-        String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory
+        String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory, String contentType
     ) {
         PlaceSliceClientResponse body = internalResponseSupport.requestAndUnwrapOrNull(
             InternalResponseSupport.TOUR_SERVICE,
             () -> placeCandidateClient.searchPlaces(
-                areaCode, sigunguCode, PET_ALLOWED, size, indoor, sourceCategory));
+                areaCode, sigunguCode, PET_ALLOWED, size, indoor, sourceCategory, contentType));
 
         if (body == null || body.contents() == null) {
             log.warn("Place candidates empty areaCode={} sigunguCode={} size={}", areaCode, sigunguCode, size);
