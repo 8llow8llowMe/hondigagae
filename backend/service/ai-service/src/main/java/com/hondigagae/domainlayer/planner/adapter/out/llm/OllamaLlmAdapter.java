@@ -102,6 +102,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
     /*
       Ollama 가 응답에 싣는 나노초 지표. Spring AI 의 OllamaChatModel 이 같은 이름으로
       ChatResponseMetadata 에 옮겨 담는다 (상수가 private 이라 여기에 다시 적는다).
+      **값은 나노초 숫자가 아니라 java.time.Duration 이다** (Spring AI 1.1.x, #1235) — durationMillis 참고.
 
       **이 넷을 나눠 봐야 무엇을 줄일지 정할 수 있다** (#489) — 프리필이 지배적이면
       place-candidate-size 를 줄이는 것이 듣고, 디코드가 지배적이면 프롬프트를 줄여도
@@ -452,7 +453,14 @@ public class OllamaLlmAdapter implements AiLlmPort {
             return null;
         }
         Object raw = response.getMetadata().get(key);
-        // Ollama 는 나노초로 준다. 다른 provider 는 이 키가 아예 없다.
+        /*
+          Spring AI 1.1.x 의 OllamaChatModel 은 Ollama 가 준 나노초를 Duration 으로 바꿔 싣는다 (#1235). 전에는
+          나노초 숫자만 읽어 dev 에서 단계별 시간이 전부 null 이었다 — 테스트가 숫자를 넣어 통과했다.
+          숫자 나노초는 다른 버전 호환으로 남긴다. 다른 provider 는 이 키가 아예 없다.
+        */
+        if (raw instanceof Duration duration) {
+            return duration.toMillis();
+        }
         return raw instanceof Number number ? Duration.ofNanos(number.longValue()).toMillis() : null;
     }
 
