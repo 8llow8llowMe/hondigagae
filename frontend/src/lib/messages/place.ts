@@ -154,7 +154,9 @@ export const placeMessages = {
 
   detailPetScope: '동반 가능 구역',
   detailPetSize: '동반 가능 크기',
-  detailLeashRequired: '목줄 필요',
+  /** 반려견 동반 체크리스트의 목줄 줄 (#1226) — `leashRequired` 가 `true` 일 때만 선다 */
+  detailPetLeash: '목줄',
+  detailPetLeashRequired: '필요해요',
   detailPetType: '동반 유형',
   detailPetAnimal: '동반 가능 동물',
   detailPetNeed: '동반 시 필요사항',
@@ -313,8 +315,6 @@ export const placeMessages = {
    */
   detailPetInfoDetailsMissingText:
     '세부 동반 조건은 등록되지 않았어요. 방문 전 전화로 확인해 주세요.',
-  /** `{tel}` 치환 */
-  detailPetInfoEmptyTel: '{tel} 전화',
 
   /**
    * 동반 조건은 관광 API 값이라 최신이 아닐 수 있다.

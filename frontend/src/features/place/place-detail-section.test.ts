@@ -377,65 +377,117 @@ describe('PlaceDetailSection — 동반 정보 없음 (#530)', () => {
     const markup = render({ place: unknown })
 
     expect(markup).toContain(messages.place.detailSectionPet)
-    expect(markup).toContain(placeDetail.petInfo?.allowedPetSize.name ?? '')
-  })
-
-  /* 문구가 아니라 `code` 로 거른다 — `name` 은 서버 문구라 언제든 바뀐다 */
-  it('같은 문구라도 code 가 다르면 그린다', () => {
-    const sameWording: PlaceDetail = {
-      ...placeDetail,
-      petAllowanceType: { code: 'NOT_ALLOWED', name: '동반 정보 없음', description: null },
-    }
-
-    expect(render({ place: sameWording })).toContain('동반 정보 없음')
+    expect(markup).toContain(placeDetail.petInfo?.allowedPetSize.description ?? '')
   })
 })
 
 /*
-  #1066 — `lg` 미만에는 동반이 **세 번** 섰다: 이름 아래 칩 줄 · 판정 요약 `동반` 줄 ·
-  `반려견 동반` 체크리스트. 요약이 `lg:hidden` 이라 칩 묶음은 반대로 `lg` 부터만 세운다.
-  DOM 은 폭마다 나누지 않는다 — 클래스로만 가른다 (`.rail-layout-detail` 주석의 규칙).
+  #1226 — #1066 이 `lg` 미만에서 걷은 동반 칩을 `lg` 부터도 걷는다. 데스크톱은 칩 바로 아래
+  `반려견 동반 정보` 절이 같은 사실을 문장으로 말했다. 머리에는 실내 `모름` 배지만 남는다.
 */
-describe('PlaceDetailSection — 동반 칩은 요약이 없는 폭에서만 (#1066)', () => {
+describe('PlaceDetailSection — 머리는 동반을 말하지 않는다 (#1226)', () => {
   /** 머리(`<header>`)만 떼어 본다 — 동반 문구는 아래 체크리스트에도 있다 */
   function header(markup: string): string {
     return markup.slice(markup.indexOf('<header'), markup.indexOf('</header>'))
   }
 
-  it('동반 칩 묶음을 lg 부터만 세운다', () => {
+  it('동반 등급 · 허용 크기 칩을 어느 폭에서도 그리지 않는다', () => {
     const head = header(render())
-    const wrapper = /<span class="hidden lg:contents">(.*?)<\/span><\/div>/.exec(head)
 
-    expect(wrapper?.[1]).toContain(placeDetail.petAllowanceType.name)
-    expect(wrapper?.[1]).toContain(placeDetail.petInfo?.allowedPetSize.name ?? '')
+    expect(head).not.toContain(placeDetail.petAllowanceType.name)
+    expect(head).not.toContain(placeDetail.petInfo?.allowedPetSize.name ?? '')
+    expect(head).not.toContain('lg:contents')
   })
 
-  it('실내 여부를 알면 lg 미만에서 태그 줄 자체를 세우지 않는다 — 빈 줄이 gap 을 먹는다', () => {
-    const head = header(render({ place: { ...placeDetail, indoor: true } }))
-
-    expect(head).toContain('flex-wrap items-center gap-1.5 hidden lg:flex')
-  })
-
-  it('실내 여부를 모르면 태그 줄이 모든 폭에 선다 — 모름 배지는 요약에 없다', () => {
+  it('실내 여부를 모르면 모름 배지만 선다', () => {
     const head = header(render({ place: { ...placeDetail, indoor: null } }))
 
     expect(head).toContain(messages.place.rowIndoorUnknown)
-    expect(head).not.toContain('hidden lg:flex')
   })
 
-  it('칩이 하나도 없으면 어느 폭에서도 태그 줄을 만들지 않는다', () => {
+  it('실내 여부를 알면 태그 줄을 만들지 않는다 — 빈 줄이 gap 을 먹는다', () => {
+    const head = header(render({ place: { ...placeDetail, indoor: true } }))
+
+    expect(head).not.toContain(messages.place.rowIndoorUnknown)
+    expect(head).not.toContain('gap-1.5')
+  })
+
+  it('목줄은 체크리스트 줄로 옮겨 간다 — 칩을 걷어도 사라지지 않는다', () => {
+    const petInfo = placeDetail.petInfo
+    if (petInfo === null) throw new Error('fixture 에 petInfo 가 있어야 한다')
+
+    const required = render({
+      place: { ...placeDetail, petInfo: { ...petInfo, leashRequired: true } },
+    })
+    const notRequired = render({
+      place: { ...placeDetail, petInfo: { ...petInfo, leashRequired: false } },
+    })
+
+    expect(required).toContain(messages.place.detailPetLeashRequired)
+    expect(notRequired).not.toContain(messages.place.detailPetLeashRequired)
+  })
+})
+
+describe('PlaceDetailSection — 방문 핵심 줄 (#1226)', () => {
+  function header(markup: string): string {
+    return markup.slice(markup.indexOf('<header'), markup.indexOf('</header>'))
+  }
+
+  it('제목 머리 안에 전화 · 길찾기를 세운다', () => {
+    const head = header(render({ place: { ...placeDetail, tel: '064-710-6043' } }))
+
+    expect(head).toContain('tel:0647106043')
+    expect(head).toContain(messages.map.directions)
+  })
+
+  /*
+    동반 정보가 비면 절이 `방문 전 전화로 확인해 주세요` 라고 말한다. 예전에는 그 아래 `{tel} 전화`
+    링크가 따로 서서 핵심 줄과 같은 카드에 번호가 두 번 섰다. 이제 전화는 핵심 줄 · 방문 정보 카드
+    두 곳뿐이다.
+  */
+  it('동반 정보가 비어도 전화 링크는 핵심 줄 · 방문 정보 두 곳뿐이다', () => {
+    const markup = render({ place: { ...placeDetail, petInfo: null, tel: '064-710-6043' } })
+
+    expect(markup.match(/href="tel:0647106043"/g)).toHaveLength(2)
+  })
+
+  it('판정이 없으면 운영시간 원문 첫 줄을 쓴다', () => {
+    const intro = placeDetail.intro
+    if (intro === null) throw new Error('fixture 에 intro 가 있어야 한다')
+
     const head = header(
       render({
         place: {
           ...placeDetail,
-          indoor: true,
-          petInfo: null,
-          petAllowanceType: { code: 'UNKNOWN', name: '동반 정보 없음', description: null },
+          intro: { ...intro, openNow: null, open24: false, useTime: '상시 개방' },
         },
       }),
     )
 
-    expect(head).not.toContain('gap-1.5')
+    expect(head).toContain('상시 개방')
+  })
+})
+
+describe('PlaceDetailSection — 분류 낱말뿐인 소개는 그리지 않는다 (#1226 · #1216)', () => {
+  /* 소개가 없는 장소와 **같은 마크업**이어야 한다 — 낱말 하나짜리 절이 남지 않는다 */
+  it('개요가 분류명과 같으면 소개가 없는 장소와 같다', () => {
+    const word = render({ place: { ...placeDetail, overview: placeDetail.contentType.name } })
+
+    expect(word).toBe(render({ place: { ...placeDetail, overview: null } }))
+  })
+
+  it('원천 분류와 같아도 같다', () => {
+    const place = { ...placeDetail, sourceCategory: '박물관' }
+
+    expect(render({ place: { ...place, overview: '박물관' } })).toBe(
+      render({ place: { ...place, overview: null } }),
+    )
+  })
+
+  it('분류 낱말이 섞인 문장은 그대로 그린다', () => {
+    expect(render({ place: { ...placeDetail, overview: '바다를 낀 관광지' } })).toContain(
+      '바다를 낀 관광지',
+    )
   })
 })
 
@@ -461,17 +513,6 @@ describe('PlaceDetailSection — 외부 원문 처리', () => {
 
     expect(markup).not.toContain('javascript:alert(1)')
     expect(markup).not.toContain(messages.place.detailHomepage)
-  })
-
-  it('목줄이 필요 없으면 목줄 배지를 렌더하지 않는다', () => {
-    const petInfo = placeDetail.petInfo
-    if (petInfo === null) throw new Error('fixture 에 petInfo 가 있어야 한다')
-
-    const markup = render({
-      place: { ...placeDetail, petInfo: { ...petInfo, leashRequired: false } },
-    })
-
-    expect(markup).not.toContain(messages.place.detailLeashRequired)
   })
 
   it('사진이 없으면 카테고리 일러스트로 자리를 채운다 (DESIGN.md §7-3)', () => {
@@ -617,8 +658,9 @@ describe('PlaceDetailSection — 모바일 섹션 순서 (#909 · 제안 A)', ()
     const markup = render()
 
     expect(markup).toContain(messages.map.directions)
+    // 제목 머리의 방문 핵심 줄(#1226)에도 길찾기가 있다 — 방문 정보 쪽은 마지막 것이다
     expect(markup.indexOf(messages.place.detailSectionVisit)).toBeLessThan(
-      markup.indexOf(messages.map.directions),
+      markup.lastIndexOf(messages.map.directions),
     )
   })
 

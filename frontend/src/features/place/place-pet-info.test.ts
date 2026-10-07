@@ -45,11 +45,27 @@ describe('petInfoLines — 값이 없는 줄은 만들지 않는다', () => {
         relaPosesFclty: null,
         relaPurcPrdlst: null,
         relaRntlPrdlst: null,
+        leashRequired: false,
       },
       null,
     )
 
     expect(lines).toHaveLength(2)
+  })
+
+  it('목줄이 필요하면 크기 다음에 줄이 선다 (#1226)', () => {
+    const lines = petInfoLines({ ...petInfo, leashRequired: true }, null)
+
+    expect(lines[2]).toEqual({
+      label: messages.place.detailPetLeash,
+      value: messages.place.detailPetLeashRequired,
+    })
+  })
+
+  it('목줄이 필요 없다고 오면 줄을 만들지 않는다 — `false` 를 "필요 없음" 으로 단정하지 않는다', () => {
+    const lines = petInfoLines({ ...petInfo, leashRequired: false }, null)
+
+    expect(lines.map((line) => line.label)).not.toContain(messages.place.detailPetLeash)
   })
 
   it('원문 표기(chkPet)는 참고 값이라 맨 뒤에 붙는다', () => {
@@ -104,7 +120,6 @@ function renderWithPet(petName: string | null) {
       petInfo,
       allowance: placeDetail.petAllowanceType,
       sourceText: null,
-      tel: null,
       petName,
       petSizeCode: petName === null ? null : 'SMALL',
       petSizeName: petName === null ? null : '소형견',
@@ -151,7 +166,6 @@ function renderEmpty(allowance: { code: string; name: string; description: strin
       petInfo: null,
       allowance,
       sourceText: null,
-      tel: '064-799-4820',
       petName: null,
       petSizeCode: null,
       petSizeName: null,
@@ -202,11 +216,8 @@ describe('petInfo 가 없을 때 — 동반 여부가 등록됐는지와 세부 
     expect(renderEmpty(null)).toContain(messages.place.detailPetInfoEmptyText)
   })
 
-  /** 어느 갈래든 다음 행동(전화)은 남는다 — 숨기는 대신 행동을 준다 (명세 D5) */
-  it('두 갈래 모두 전화 링크를 남긴다', () => {
-    expect(renderEmpty(null)).toContain('tel:0647994820')
-    expect(
-      renderEmpty({ code: 'NOT_ALLOWED', name: '동반 불가', description: '불가합니다.' }),
-    ).toContain('tel:0647994820')
+  /** 다음 행동(전화)은 제목 머리의 방문 핵심 줄이 준다 (#1226) — 여기서 같은 번호를 다시 세우지 않는다 */
+  it('전화 링크를 따로 세우지 않는다', () => {
+    expect(renderEmpty(null)).not.toContain('tel:')
   })
 })
