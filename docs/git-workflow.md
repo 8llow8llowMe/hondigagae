@@ -227,13 +227,24 @@ gh pr edit <번호> --add-assignee @me --add-label frontend-web
 | `label` | 모든 PR | **아무것도 검증하지 않는다.** 배포 대상 라벨이 붙었다는 뜻뿐이다 |
 | `frontend-ci / verify` | `frontend/**` 변경 | format · lint · typecheck · 단위 테스트 · 빌드. **문서만 바뀌면 format 만** (#1004) |
 | `frontend-ci / e2e (1~3)` | `frontend/**` 코드 변경 | 레이아웃·보호 라우트 (Playwright, 목 API). 3 샤드. **문서만 바뀌면 건너뛴다** |
-| `backend-ci / check` | `backend/**` 변경 | **전 모듈** `./gradlew check` — 컴파일 + 테스트 |
+| `backend-ci / check` | `backend/**` 변경 | 컴파일 + 테스트. **PR 은 바뀐 서비스 · cloud 모듈만, core · 빌드 설정이 바뀌면 전 모듈, 문서만이면 건너뛴다** (#1211). develop push 는 늘 전 모듈 |
 
 > **`backend/**` 만 바꾼 PR 에서 오래도록 도는 체크가 `label` 하나였다** ([#764](https://github.com/8llow8llowMe/hondigagae/issues/764)).
 > 그 초록불은 "테스트가 통과했다" 가 아니라 "라벨이 붙었다" 였는데 그렇게 읽히지 않았다.
 
-- **`backend-ci` 는 13개 모듈 전부를 돈다.** 변경 경로로 좁히지 않는다 — `core/**` 는
-  여러 서비스가 함께 쓰므로 부분 빌드가 위험하다 (`Jenkinsfile.backend-common.groovy` 머리말).
+- **`backend-ci` 는 PR 에서 바뀐 모듈만 돈다** ([#1211](https://github.com/8llow8llowMe/hondigagae/issues/1211)).
+  범위는 `scripts/classify-backend-changes.sh` 가 바뀐 경로로 정한다.
+  - `backend/service/<x>/**` · `backend/cloud/<x>/**` 만 바뀌면 → `:service:<x>:check` · `:cloud:<x>:check`
+    (서비스 모듈끼리는 컴파일 의존이 없다)
+  - `backend/core/**` · 빌드 설정(`*.gradle` · `gradle/**` 등) · `backend-ci.yml` · 이 스크립트 · 모르는 경로가
+    있으면 → **전 모듈** `check`. core 는 여러 서비스가 함께 쓰므로 부분 빌드가 위험하다
+    (`Jenkinsfile.backend-common.groovy` 머리말)
+  - `backend/docs/**` · `backend/*.md` 만 바뀌면 → **Gradle 을 건너뛴다**(체크는 초록으로 남는다)
+  - **판정이 실패하면 전 모듈이다.** develop push 는 판정 없이 늘 전 모듈이다 — 머지된 develop 을 검사하는
+    유일한 장치라 좁히지 않는다(아래 #830)
+  - **PR 라벨을 읽지 않는다.** 결과는 자동 라벨과 같은 모듈이지만 `label` 잡과 동시에 시작해 라벨이 아직
+    없을 수 있고, core PR 의 라벨은 사람이 배포용으로 더한 것이라 바뀐 모듈과 다르다
+  - job summary 머리에 **이번에 돈 범위**(`./gradlew …`)를 적는다. 건수를 볼 때 범위도 같이 본다
 - **실행된 테스트 건수를 job summary 에 남긴다.** Gradle 이 캐시로 테스트를 건너뛰면
   한 건도 안 돈 채 `BUILD SUCCESSFUL` 이 나오므로(`backend/docs/done-checklist.md` §1),
   0건이면 통과했어도 빨간불로 떨어뜨린다. **초록불을 봤으면 건수도 같이 본다.**
@@ -422,8 +433,8 @@ PR 올리기 전:
 
 - [ ] CI 통과 — **`verify` · `backend-ci` 와 Jenkins 전부.** 빨간불로 머지하면 develop 이
       오염되고 뒤따르는 모든 PR 이 그 실패를 물려받는다 (§8-2)
-- [ ] **백엔드 PR 이면 `backend-ci` job summary 의 실행 건수를 봤다** — 0건이면 초록불이
-      거짓이다 (§6)
+- [ ] **백엔드 PR 이면 `backend-ci` job summary 의 범위와 실행 건수를 봤다** — 0건이면 초록불이
+      거짓이다. 문서만 바뀐 PR 은 "건너뛰었다" 가 맞다 (§6)
 - [ ] `Issue Number` 가 채워져 있다
 - [ ] **Rebase and merge** 로 머지하고 브랜치를 삭제했다
 
