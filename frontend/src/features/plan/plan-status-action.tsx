@@ -9,6 +9,7 @@ import {
   PLAN_STATUS_ACTION_NOTES,
   PLAN_STATUS_RESULT_MESSAGES,
   type PlanStatusActionSpec,
+  type PlanStatusFailure,
   type PlanStatusResult,
   statusResultMatches,
 } from '@/lib/plan/status-action'
@@ -57,7 +58,7 @@ export function PlanStatusAction({
   statusCode,
   action,
   saving,
-  errorMessage,
+  failure,
   result,
   onAction,
 }: {
@@ -70,7 +71,8 @@ export function PlanStatusAction({
    */
   action: PlanStatusActionSpec | undefined
   saving: boolean
-  errorMessage: string | null
+  /** `usePlanStatus().failure` 그대로 — 패널의 포커스 effect 가 이 값의 동일성에 걸려 있다 (#1203) */
+  failure: PlanStatusFailure | null
   /** `usePlanStatus().result` 그대로 — 패널의 포커스 effect 가 이 값의 동일성에 걸려 있다 */
   result: PlanStatusResult | null
   onAction: (action: PlanStatusActionSpec) => void
@@ -86,7 +88,7 @@ export function PlanStatusAction({
         action={action}
         labels={PLAN_STATUS_ACTION_LABELS}
         notes={PLAN_STATUS_ACTION_NOTES}
-        errorMessage={errorMessage}
+        failure={failure}
         result={shownResult}
         resultMessages={PLAN_STATUS_RESULT_MESSAGES}
         onShare={() => setShareOpen(true)}

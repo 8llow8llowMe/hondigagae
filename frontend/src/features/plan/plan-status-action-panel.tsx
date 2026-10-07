@@ -9,6 +9,7 @@ import { messages } from '@/lib/messages'
 import {
   type PlanStatusActionKind,
   type PlanStatusActionSpec,
+  type PlanStatusFailure,
   type PlanStatusResult,
   statusResultOpensShare,
 } from '@/lib/plan/status-action'
@@ -23,7 +24,11 @@ export type PlanStatusActionPanelProps = {
   labels: Record<PlanStatusActionKind, string>
   /** 버튼 아래 한 줄 — 그 액션이 무엇을 여는지 (#1154). 없는 액션은 줄이 없다 */
   notes?: Partial<Record<PlanStatusActionKind, string>>
-  errorMessage: string | null
+  /**
+   * 마지막 전이의 실패 (#1203). `result` 와 같이 **`usePlanStatus` 가 든 값을 그대로 받는다** —
+   * 포커스 effect 가 이 값의 동일성에 걸려 있다.
+   */
+  failure: PlanStatusFailure | null
   /**
    * 마지막으로 성공한 전이 (#1174). **`usePlanStatus` 가 든 값을 그대로 받는다** — 포커스
    * effect 가 이 값의 동일성에 걸려 있어, 호출부가 렌더마다 새 객체를 만들면 렌더마다
@@ -42,7 +47,7 @@ export type PlanStatusActionPanelProps = {
  * React Query 컴포넌트는 renderToStaticMarkup 으로 못 본다.
  *
  * **버튼이 없어도 사라지지 않는다.** 역방향 액션은 메뉴 안에 있고 그 실패를 말할 자리가
- * 여기뿐이라(메뉴는 선택과 동시에 닫힌다), `action` 이 없어도 `errorMessage` 가 있으면
+ * 여기뿐이라(메뉴는 선택과 동시에 닫힌다), `action` 이 없어도 `failure` 가 있으면
  * 이 자리가 남아야 한다.
  *
  * ## `INSET_CLASS.card` 를 쓰지 않는다 (#845)
@@ -66,12 +71,19 @@ export type PlanStatusActionPanelProps = {
  *
  * 읽히는 길은 `result.announce` 하나가 정한다 — `focus` 면 안내로 포커스를 옮기고 역할을 뗀다,
  * `live` 면 포커스는 그대로(`⋯` 트리거) 두고 `role="status"` 로 읽힌다 (form-guide.md §8).
+ *
+ * ## 실패도 같은 길이다 (#1203)
+ *
+ * 전폭 버튼에서 시작한 실패는 포커스가 `BODY` 에 떨어진 채 `role="alert"` 로 읽히기만 했다 —
+ * 키보드 사용자는 문서 맨 위에서 다시 시작했다(#1078 이 폼에서 막은 낙하). `failure.announce` 가
+ * `focus` 면 알림으로 포커스를 옮기고 역할을 뗀다. 알림은 버튼 **아래**라 Shift+Tab 한 번이 다시
+ * 시도할 버튼이다. 메뉴에서 시작한 실패(`live`)는 포커스를 `⋯` 에 둔 채 `role="alert"` 다.
  */
 export function PlanStatusActionPanel({
   action,
   labels,
   notes = {},
-  errorMessage,
+  failure,
   result,
   resultMessages,
   onShare,
@@ -80,13 +92,22 @@ export function PlanStatusActionPanel({
 }: PlanStatusActionPanelProps) {
   const noteId = useId()
   const resultRef = useRef<HTMLParagraphElement>(null)
+  const failureRef = useRef<HTMLParagraphElement>(null)
 
   // 같은 판정(`announce`)이 역할과 포커스를 함께 정한다 — 하나만 따로 놀면 무음이거나 두 번 읽힌다
   useEffect(() => {
     if (result?.announce === 'focus') resultRef.current?.focus()
   }, [result])
 
-  if (action === undefined && errorMessage === null && result === null) return null
+  /*
+    **실패는 따로 건다.** 한 전이는 결과와 실패 중 하나만 남기므로(`usePlanStatus.run` 이 둘 다 걷고
+    시작한다) 두 effect 가 한 렌더에서 다투지 않는다.
+  */
+  useEffect(() => {
+    if (failure?.announce === 'focus') failureRef.current?.focus()
+  }, [failure])
+
+  if (action === undefined && failure === null && result === null) return null
 
   const note = action === undefined ? undefined : notes[action.kind]
   const share = result !== null && statusResultOpensShare(result.kind) ? onShare : undefined
@@ -122,7 +143,7 @@ export function PlanStatusActionPanel({
           {note}
         </p>
       )}
-      <FormAlert message={errorMessage} />
+      <FormAlert ref={failureRef} message={failure?.message ?? null} announce={failure?.announce} />
     </div>
   )
 }

@@ -11,16 +11,17 @@ import {
   PLAN_STATUS_ACTION_NOTES,
   PLAN_STATUS_RESULT_MESSAGES,
   type PlanStatusActionSpec,
+  type PlanStatusFailure,
   type PlanStatusResult,
 } from '@/lib/plan/status-action'
 
 function renderPanel({
   action,
-  errorMessage = null,
+  failure = null,
   result = null,
 }: {
   action: PlanStatusActionSpec | undefined
-  errorMessage?: string | null
+  failure?: PlanStatusFailure | null
   result?: PlanStatusResult | null
 }) {
   return renderToStaticMarkup(
@@ -28,7 +29,7 @@ function renderPanel({
       action,
       labels: PLAN_STATUS_ACTION_LABELS,
       notes: PLAN_STATUS_ACTION_NOTES,
-      errorMessage,
+      failure,
       result,
       resultMessages: PLAN_STATUS_RESULT_MESSAGES,
       onShare: () => undefined,
@@ -39,7 +40,9 @@ function renderPanel({
 }
 
 function render(statusCode: string, errorMessage: string | null = null) {
-  return renderPanel({ action: forwardStatusAction(statusCode), errorMessage })
+  const failure: PlanStatusFailure | null =
+    errorMessage === null ? null : { message: errorMessage, announce: 'live' }
+  return renderPanel({ action: forwardStatusAction(statusCode), failure })
 }
 
 /*
@@ -189,5 +192,44 @@ describe('PlanStatusActionPanel — 전이 결과 (#1174)', () => {
 
   it('결과도 실패도 없으면 완료 일정의 자리는 여전히 비어 있다', () => {
     expect(renderPanel({ action: undefined })).toBe('')
+  })
+})
+
+describe('PlanStatusActionPanel — 전이 실패의 낭독 경로 (#1203)', () => {
+  /*
+    **전폭 버튼에서 온 실패는 포커스로 읽힌다.** 요청 중 버튼이 `disabled` 라 포커스가 `BODY` 로
+    떨어졌다 — 역할을 떼고 알림이 포커스를 받는다(form-guide.md §8 · #1102). 둘 다 두면 두 번 읽힌다.
+  */
+  it('포커스를 받는 실패는 역할 없이 tabindex=-1 이다', () => {
+    const markup = renderPanel({
+      action: forwardStatusAction('DRAFT'),
+      failure: { message: messages.plan.statusConfirmError, announce: 'focus' },
+    })
+
+    expect(markup).toContain(messages.plan.statusConfirmError)
+    expect(markup).not.toContain('role="alert"')
+    expect(markup).toContain('data-form-alert=""')
+    expect(markup).toContain('tabindex="-1"')
+  })
+
+  it('메뉴에서 온 실패는 포커스를 ⋯ 에 두고 role=alert 로 읽힌다', () => {
+    const markup = renderPanel({
+      action: undefined,
+      failure: { message: messages.plan.statusReopenError, announce: 'live' },
+    })
+
+    expect(markup).toContain('role="alert"')
+    expect(markup).toContain(messages.plan.statusReopenError)
+  })
+
+  it('실패가 버튼 아래다 — 포커스가 내려앉은 뒤 Shift+Tab 이 다시 시도할 버튼이다', () => {
+    const markup = renderPanel({
+      action: forwardStatusAction('DRAFT'),
+      failure: { message: messages.plan.statusConfirmError, announce: 'focus' },
+    })
+
+    expect(markup.indexOf(messages.plan.statusConfirmAction)).toBeLessThan(
+      markup.indexOf(messages.plan.statusConfirmError),
+    )
   })
 })

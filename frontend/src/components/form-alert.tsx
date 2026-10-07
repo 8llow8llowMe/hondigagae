@@ -1,3 +1,5 @@
+import type { Ref } from 'react'
+
 import type { FailureAnnounce } from '@/lib/form/submit-failure-focus'
 import { cn } from '@/lib/utils/cn'
 
@@ -11,9 +13,15 @@ export type FormAlertProps = {
    * 하나로 읽힌다. 둘 다 두면 알림 낭독과 포커스 낭독이 같은 문구를 두 번 읽는다. 포커스를 실제로
    * 옮기지 않는 자리에 `focus` 를 주면 **아무것도 읽히지 않는다** — 그래서 값은 손으로 고르지 않고
    * 포커스 effect 와 같은 판정(`submitFailureAnnounce`)에서 받는다. 지금은 `FormFailure` 와 공유 모달
-   * (`plan-share-modal.tsx`, 재시도 결과 — 판정은 `shareFailureAnnounce`, #1159)이 넘긴다.
+   * (`plan-share-modal.tsx`, 재시도 결과 — 판정은 `shareFailureAnnounce`, #1159), 일정 상태 전이의
+   * 실패(`plan-status-action-panel.tsx`, #1203 — 판정은 `planStatusResultAnnounce`)가 넘긴다.
    */
   announce?: FailureAnnounce | undefined
+  /**
+   * 포커스를 옮길 손잡이 — `FormNotice.ref` 와 같다 (#1203). 폼 밖이라 선택자(`FORM_ALERT_SELECTOR`)로
+   * 찾을 컨테이너가 없는 자리가 쓴다.
+   */
+  ref?: Ref<HTMLParagraphElement>
   className?: string
 }
 
@@ -27,11 +35,12 @@ export type FormAlertProps = {
  *
  * **포커스를 받는 자리면 `announce="focus"`** — 그때는 포커스가 낭독 경로다 (#1102, 위 prop).
  */
-export function FormAlert({ message, announce = 'live', className }: FormAlertProps) {
+export function FormAlert({ message, announce = 'live', ref, className }: FormAlertProps) {
   if (message === null) return null
 
   return (
     <p
+      ref={ref}
       role={announce === 'live' ? 'alert' : undefined}
       /*
         **제출 실패 뒤 포커스 대상이다** (#1078). 제출 중 버튼이 `disabled` 가 되면 포커스가

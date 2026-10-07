@@ -421,7 +421,7 @@ export function PlanDetailSection({
               statusCode={plan.status.code}
               action={statusLayout.button}
               saving={status.saving}
-              errorMessage={status.errorMessage}
+              failure={status.failure}
               result={status.result}
               onAction={status.run}
             />
