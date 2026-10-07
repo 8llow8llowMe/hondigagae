@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.favorite.adapter.in.web.dto.item;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.LocalDateTime;
 import lombok.Builder;
 
 /**
@@ -30,7 +31,10 @@ public record FavoritePlaceItem(
     Boolean indoor,
 
     @Schema(description = "대표 이미지 URL. 없거나 요약 조회 실패 시 null", example = "http://tong.visitkorea.or.kr/cms/resource/1.jpg", nullable = true)
-    String firstImage
+    String firstImage,
+
+    @Schema(description = "즐겨찾기한 시각. 장소 정보의 수정일이 아니다. 목록은 이 순서(최근 저장순)로 내려간다", example = "2026-08-30T14:30:05")
+    LocalDateTime savedAt
 ) {
 
 }

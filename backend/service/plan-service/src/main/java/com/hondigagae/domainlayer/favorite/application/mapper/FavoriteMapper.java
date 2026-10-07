@@ -4,11 +4,13 @@ import com.hondigagae.domainlayer.favorite.adapter.out.persistence.entity.Favori
 import com.hondigagae.domainlayer.favorite.domain.model.Favorite;
 import java.util.List;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface FavoriteMapper {
 
-    // 엔티티 -> 도메인
+    // 엔티티 -> 도메인 (저장 시각 createdAt -> savedAt)
+    @Mapping(source = "createdAt", target = "savedAt")
     Favorite toDomainFromEntity(FavoriteEntity entity);
 
     // 도메인 -> 엔티티

@@ -64,7 +64,10 @@ public class FavoriteQueryProcessor {
 
     private FavoritePlaceInfo toInfo(Favorite favorite, FavoritePlaceQueryResult summary) {
         if (summary == null) {
-            return FavoritePlaceInfo.builder().placeId(favorite.placeId()).build();
+            return FavoritePlaceInfo.builder()
+                .placeId(favorite.placeId())
+                .savedAt(favorite.savedAt())
+                .build();
         }
         return FavoritePlaceInfo.builder()
             .placeId(summary.placeId())
@@ -74,6 +77,7 @@ public class FavoriteQueryProcessor {
             .petAllowanceName(summary.petAllowanceName())
             .indoor(summary.indoor())
             .firstImage(summary.firstImage())
+            .savedAt(favorite.savedAt())
             .build();
     }
 }

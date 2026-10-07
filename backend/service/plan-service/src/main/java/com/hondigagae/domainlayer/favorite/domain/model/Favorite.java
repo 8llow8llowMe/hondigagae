@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.favorite.domain.model;
 
+import java.time.LocalDateTime;
 import lombok.Builder;
 
 /**
@@ -13,7 +14,8 @@ import lombok.Builder;
 public record Favorite(
     long id,
     long memberId,
-    long placeId
+    long placeId,
+    LocalDateTime savedAt
 ) {
 
     public boolean isOwnedBy(long memberId) {

@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.favorite.application.info;
 
+import java.time.LocalDateTime;
 import lombok.Builder;
 
 /**
@@ -14,7 +15,8 @@ public record FavoritePlaceInfo(
     String addr,
     String petAllowanceName,
     Boolean indoor,
-    String firstImage
+    String firstImage,
+    LocalDateTime savedAt
 ) {
 
 }
