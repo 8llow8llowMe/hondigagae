@@ -282,9 +282,53 @@ class AiPlanPromptFactoryTest {
     void candidateLinesUseNumbersInsteadOfIds() {
         String prompt = factory.userPrompt(query(List.of()));
 
-        assertThat(prompt).contains("\n- 1. 장소 | 관광지 | 실내 | 동반: 동반 가능 | 입장크기: 소형견 | 체중제한: 10kg | 분류: 여행지 | 제주\n");
+        assertThat(prompt).contains("\n- 1. 장소 | 관광지 | 실내 | 동반: 동반 가능 | 입장크기: 소형견 | 체중제한: 10kg | 분류: 여행지 | 권역: 북부 | 제주\n");
         assertThat(prompt).doesNotContain("placeId");
         assertThat(prompt).endsWith("2일 일정을 만들어 주세요.");
+    }
+
+    @Test
+    @DisplayName("후보 줄에 좌표의 권역을 주소 앞에 싣고, 제주 밖 좌표면 권역을 지어 붙이지 않는다 (#1171)")
+    void candidateLinesCarryJejuZone() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-15")
+            .placeCandidates(List.of(
+                zoned(1L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631),
+                zoned(2L, "제주올레하우스", "제주특별자치도 제주시 구좌읍", 33.5260, 126.8630),
+                zoned(3L, "해운대", "부산광역시 해운대구", 35.1587, 129.1604)))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        assertThat(prompt).contains("- 1. 수월봉 | 관광지 | 실외 | 동반: 동반 가능 | 권역: 남서부 | 제주특별자치도 제주시 한경면\n");
+        assertThat(prompt).contains("- 2. 제주올레하우스 | 관광지 | 실외 | 동반: 동반 가능 | 권역: 북동부 | 제주특별자치도 제주시 구좌읍\n");
+        assertThat(prompt).contains("- 3. 해운대 | 관광지 | 실외 | 동반: 동반 가능 | 부산광역시 해운대구\n");
+    }
+
+    @Test
+    @DisplayName("시스템 프롬프트가 하루와 그날 숙소를 한 권역 · 맞닿은 권역 안에서 고르게 한다 (#1171)")
+    void systemPromptKeepsDayAndStayWithinNeighboringZones() {
+        String system = factory.systemPrompt();
+
+        assertThat(system).contains("하루는 한 권역, 많아야 맞닿은");
+        assertThat(system).contains("그날 밤 숙소(lodging)도 그날 마지막 장소와 다음 날 첫 장소의");
+        // 맞닿음 정의는 JejuZone#adjacentTo 와 같은 문장이어야 한다 — 북부-남부(한라산 너머)는 없다
+        assertThat(system).contains("북서부-남서부, 북동부-남동부");
+        assertThat(system).doesNotContain("북부-남부");
+    }
+
+    private static PlaceCandidate zoned(long id, String title, String addr, double lat, double lng) {
+        return PlaceCandidate.builder()
+            .placeId(id)
+            .title(title)
+            .contentTypeName("관광지")
+            .addr(addr)
+            .petAllowanceName("동반 가능")
+            .indoor(false)
+            .lat(lat)
+            .lng(lng)
+            .build();
     }
 
     @Test

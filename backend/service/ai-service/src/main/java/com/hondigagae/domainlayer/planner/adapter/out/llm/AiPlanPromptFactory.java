@@ -47,7 +47,10 @@ public class AiPlanPromptFactory {
         1. 장소는 사용자가 준 후보 목록 안에서만 고르고, 후보 줄 앞의 번호로 적습니다. 목록에 없는
            장소는 이름이 떠오르더라도 절대 쓰지 않습니다.
         2. 사람이 아니라 반려견 기준으로 짭니다. 하루 이동을 과하게 넣지 말고, 활동 사이에
-           카페처럼 쉬어 갈 후보를 둡니다.
+           카페처럼 쉬어 갈 후보를 둡니다. 후보 줄의 권역을 보고 하루는 한 권역, 많아야 맞닿은
+           두 권역 안에서 고릅니다. 그날 밤 숙소(lodging)도 그날 마지막 장소와 다음 날 첫 장소의
+           권역이나 맞닿은 권역에서 고릅니다. 맞닿은 권역은 북서부·북부·북동부끼리와
+           남서부·남부·남동부끼리의 옆자리, 그리고 북서부-남서부, 북동부-남동부입니다.
         3. 식사는 음식점 후보가 있을 때만 그 후보로 넣습니다. 없으면 넣지 않습니다.
            없는 것을 있다고 하지 않는 편이 낫습니다.
         4. 근거(reasons)는 최대 3개, 후보 데이터에 적힌 사실로만 씁니다. "좋은 곳입니다" 같은
@@ -203,6 +206,11 @@ public class AiPlanPromptFactory {
             }
             if (candidate.sourceCategory() != null && !candidate.sourceCategory().isBlank()) {
                 prompt.append(" | 분류: ").append(candidate.sourceCategory());
+            }
+            // 주소의 읍면 이름으로 동서를 가늠하라고 맡기지 않는다 — 규칙 2가 이 이름을 그대로 비교한다 (#1171).
+            JejuZone zone = JejuZone.of(candidate.lat(), candidate.lng());
+            if (zone != null) {
+                prompt.append(" | 권역: ").append(zone.getDisplayName());
             }
             if (candidate.addr() != null && !candidate.addr().isBlank()) {
                 prompt.append(" | ").append(candidate.addr());

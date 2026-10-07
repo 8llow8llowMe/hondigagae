@@ -144,7 +144,9 @@ public class OllamaLlmAdapter implements AiLlmPort {
         // 번호 → 후보(아이디 · 이름 · 종류) 다음이 사실 대조다. 종류가 정해진 뒤라야 숙박을 가를 수 있다 (#975).
         AiPlanDraft guarded = new AiPlanDraftFactGuard(indexById(candidates), aiPlanPromptFactory.resolveDayCount(query),
             maxTemperatureByDay(query)).apply(domain);
-        return limitReasons(guarded);
+        // 동선 대조는 사실 대조 뒤다 — 마지막 날 숙박이 빠진 뒤라야 그날을 숙소를 옮길 밤으로 보지 않는다 (#1171).
+        AiPlanDraft routed = AiPlanRouteGuard.of(query).apply(guarded);
+        return limitReasons(routed);
     }
 
     /**
