@@ -92,6 +92,16 @@ describe('sizeMatchesWeightInput — 모순 판정', () => {
   **판단을 순수 함수로 내려 두고 그것을 검사한다** (`form-guide.md` §2).
 */
 describe('sizeChangeForWeight — 자동 선택 (#369)', () => {
+  // 등록 폼은 크기를 고르지 않은 채 시작한다(#1185) — 체중을 적으면 그 크기로 채운다
+  it('고르지 않은 크기는 체중이 정한 크기로 채운다', () => {
+    expect(sizeChangeForWeight('3.5', '')).toBe('SMALL')
+    expect(sizeChangeForWeight('30', '')).toBe('LARGE')
+  })
+
+  it('체중을 읽을 수 없으면 고르지 않은 채 둔다', () => {
+    expect(sizeChangeForWeight('', '')).toBeNull()
+  })
+
   it('어긋난 크기를 체중에 맞게 옮긴다', () => {
     expect(sizeChangeForWeight('30', 'SMALL')).toBe('LARGE')
     expect(sizeChangeForWeight('3.5', 'LARGE')).toBe('SMALL')

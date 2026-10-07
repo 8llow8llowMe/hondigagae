@@ -77,6 +77,8 @@ for (const screen of SCREENS) {
 
       const name = page.locator('#name')
       await name.fill('콩이')
+      // 등록 폼은 크기를 고르지 않은 채 시작한다(#1185) — 저장 실패 갈래까지 가려면 골라야 한다
+      if (screen.method === 'POST') await page.locator('#sizeType-SMALL').check()
       await page.getByRole('button', { name: screen.submit, exact: true }).click()
 
       const temporary = page.locator('main [data-form-temporary-error]')

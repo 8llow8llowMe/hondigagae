@@ -24,12 +24,17 @@ import {
  * boolean 4개를 `false` 로 두는 이유: 서버가 primitive `boolean` 이라 필드를 빼면
  * 조용히 `false` 가 된다 (S3-4). 폼 기본값을 서버 기본값과 같게 맞춰
  * "폼에 보이는 것"과 "저장되는 것"이 어긋나지 않게 한다.
+ *
+ * **크기만 고르지 않은 채 시작한다** (#1185 · 사용자 결정 2026-10-07). 예전에는 `SMALL` 이라 이름만
+ * 쓰고 등록됐다(2회차 사용성 점검 실측). 크기는 장소 동반 판정 · AI 추천의 입력이라 틀리면 해가 크다 —
+ * 대형견이 소형견으로 저장되면 갈 수 없는 곳을 추천받는다. 활동량 · 사회성은 중앙값(`MEDIUM`)이라
+ * 그대로 둔다. 체중을 적으면 크기가 따라오는 동작(`sizeChangeForWeight`)은 그대로다.
  */
 export const EMPTY_PET_FORM_VALUES: PetFormValues = {
   name: '',
   breed: '',
   birthYm: '',
-  sizeType: 'SMALL',
+  sizeType: '',
   // 빈 값이 곧 "모름" 이다. 0 으로 채우면 서버가 400(PET_108) 을 낸다
   weightKg: '',
   heatSensitive: false,
@@ -71,6 +76,10 @@ function blankToNull(value: string): string | null {
  * (S2) 빠진 필드는 값을 지우는 것과 같다.
  */
 export function toPetSavePayload(values: PetFormValues): PetSavePayload {
+  // 스키마가 빈 크기를 막는다(PET_105) — 여기 닿았다면 검증을 건너뛴 호출이다
+  if (values.sizeType === '')
+    throw new Error('toPetSavePayload: 크기를 고르지 않은 값은 검증 뒤에 올 수 없다')
+
   return {
     name: values.name.trim(),
     breed: blankToNull(values.breed),

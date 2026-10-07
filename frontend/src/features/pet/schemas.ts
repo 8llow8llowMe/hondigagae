@@ -37,7 +37,10 @@ export const petFormSchema = z
     breed: z.string().trim().max(50, messages.pet.breedLength),
     // PET_104 — 규칙만 같다. 문구는 서버 것을 따르지 않는다 (#999, messages.pet.birthYmFormat)
     birthYm: optionalBirthYm,
-    // PET_105 — RadioGroup 이 값을 고정하므로 실질적으로는 2차 방어다
+    /*
+      PET_105. **이제 화면에서 닿는다** (#1185) — 등록 폼이 크기를 고르지 않은 채(`''`) 시작한다.
+      예전에는 `RadioGroup` 이 늘 값 하나를 들고 있어 2차 방어였다.
+    */
     sizeType: z.enum(PET_SIZE_CODES, { message: messages.pet.sizeTypeRequired }),
     /*
     PET_108(범위) · PET_109(소수 자릿수).
@@ -68,7 +71,18 @@ export const petFormSchema = z
 
     체중이 비었거나 읽을 수 없으면 어긋남을 판정하지 않는다(백엔드도 그렇다).
   */
-  .refine((values) => sizeMatchesWeightInput(values.sizeType, values.weightKg), {
-    message: messages.pet.weightSizeMismatch,
-    path: ['sizeType'],
-  })
+  /*
+    크기를 아직 고르지 않았으면(`''`, #1185) 어긋남을 판정하지 않는다 — 그 오류는 위 필수 문구가 말한다.
+    출력 타입으로는 `''` 이 올 수 없지만, 필드가 실패해도 객체 수준 검사가 도는 경우가 있어(zod 의
+    "dirty" 값) 런타임으로 한 번 더 거른다. 거르지 않으면 체중을 적은 채 크기를 비웠을 때 필수 문구 대신
+    "체중과 크기가 맞지 않아요" 가 설 수 있다.
+  */
+  .refine(
+    (values) =>
+      (values.sizeType as string) === '' ||
+      sizeMatchesWeightInput(values.sizeType, values.weightKg),
+    {
+      message: messages.pet.weightSizeMismatch,
+      path: ['sizeType'],
+    },
+  )
