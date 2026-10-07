@@ -25,6 +25,8 @@ export type KakaoMaps = {
 
   LatLng: new (lat: number, lng: number) => KakaoLatLng
   LatLngBounds: new () => KakaoLatLngBounds
+  /** 컨테이너 픽셀 좌표 — `getProjection()` 과 주고받는다 (#1227) */
+  Point: new (x: number, y: number) => KakaoPoint
   Map: new (container: HTMLElement, options: KakaoMapOptions) => KakaoMap
   Marker: new (options: KakaoMarkerOptions) => KakaoMarker
   CustomOverlay: new (options: KakaoCustomOverlayOptions) => KakaoCustomOverlay
@@ -41,6 +43,21 @@ export type KakaoMaps = {
 export type KakaoLatLng = {
   getLat: () => number
   getLng: () => number
+}
+
+/** 화면 픽셀 좌표 */
+export type KakaoPoint = {
+  x: number
+  y: number
+}
+
+/**
+ * 지도 투영 — **컨테이너 기준** 픽셀과 좌표를 오간다 (#1227). 오버레이의 `getProjection()`
+ * (패널 기준)과 다르다 — 그쪽은 `KakaoAbstractOverlay` 에 따로 적었다.
+ */
+export type KakaoMapProjection = {
+  containerPointFromCoords: (latlng: KakaoLatLng) => KakaoPoint
+  coordsFromContainerPoint: (point: KakaoPoint) => KakaoLatLng
 }
 
 export type KakaoLatLngBounds = {
@@ -72,6 +89,8 @@ export type KakaoMap = {
   /** 숨겨진 컨테이너에서 만들면 크기가 0 이라 노출 시 호출한다 */
   relayout: () => void
   panTo: (latlng: KakaoLatLng) => void
+  /** 지금 확대 단계 기준이다 — 확대가 끝난 뒤에 읽어야 맞는 값이 나온다 */
+  getProjection: () => KakaoMapProjection
   /**
    * 사용자의 이동(드래그·터치 팬)을 받을지. **기본값은 `true`** 이고, 끄는 것은
    * 고를 것이 없는 단일 핀 지도뿐이다 (#789 — `map-canvas.tsx` 머리주석의 갈래).

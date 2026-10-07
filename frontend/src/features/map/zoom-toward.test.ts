@@ -60,9 +60,22 @@ describe('zoomToward — 확대와 이동의 순서 (#873)', () => {
 
   /* 동시에 걸면 같은 변환을 두 애니메이션이 함께 밀어 중간에서 튄다 */
   it('중심 맞추기는 확대가 끝난 뒤(ZOOM_MS)에 예약한다', () => {
-    expect(helper).toMatch(/setTimeout\([\s\S]{0,160}panTo\(target\)[\s\S]{0,40}\}, ZOOM_MS\)/)
+    expect(helper).toMatch(/setTimeout\([\s\S]{0,160}panTo\(center\)[\s\S]{0,40}\}, ZOOM_MS\)/)
     // 언마운트·SDK 실패를 대비해 예약 시점에 생존을 다시 본다
-    expect(helper).toContain('mapRef.current?.panTo(target)')
+    expect(helper).toContain('mapRef.current?.panTo(center)')
+  })
+
+  /*
+    오프셋 중심(#1227)은 **확대 전에, 지금 단계로** 재고 단계 차이로 줄인다. 예약 안에서 투영을
+    읽으면 마지막 프레임 전이거나 숨겨진 탭에서 배율이 틀어진다 (`lib/map/offset-center.ts`).
+  */
+  it('오프셋 중심은 확대를 걸기 전에 잰다 — 예약 안에서 투영을 읽지 않는다', () => {
+    const measured = helper.indexOf('offsetCenter({')
+    expect(measured).toBeGreaterThan(-1)
+    expect(measured).toBeLessThan(helper.indexOf('map.setLevel(level, {'))
+    expect(helper).toContain('scale: 2 ** ((zoomIn ? level : current) - current)')
+    const scheduled = helper.slice(helper.indexOf('setTimeout('))
+    expect(scheduled).not.toContain('getProjection')
   })
 
   /*
@@ -71,7 +84,8 @@ describe('zoomToward — 확대와 이동의 순서 (#873)', () => {
   */
   it('어지럼을 줄여야 하는 사용자에게는 애니메이션 없이 옮긴다', () => {
     const branch = helper.slice(helper.indexOf('if (prefersReducedMotion())'))
-    expect(branch).toContain('map.setCenter(target)')
+    // 오프셋이 없으면 `center` 는 `target` 이다
+    expect(branch).toContain('map.setCenter(center)')
     expect(branch).toMatch(/if \(zoomIn\) map\.setLevel\(level\)/)
   })
 

@@ -1867,6 +1867,42 @@ body {
 }
 
 /*
+  지도 장소 미리보기 — 이슈 #1227.
+
+  **1280 부터 목록 옆**이다: 목록 패널(`left-4` 16 + 400) + **밖으로 튀어나온 접기 탭 24** 뒤 간격 12.
+  탭을 빼고 400 바로 옆에 붙였더니 미리보기가 탭을 덮어 목록을 접을 수 없었다(실측 — 클릭이 미리보기에 먹혔다). 그 아래 폭은 이 클래스가
+  아무것도 하지 않아 `left-4` 그대로 목록 자리에 선다(목록은 `lg:max-xl:invisible`). 값이
+  `calc()` 라 이름 있는 클래스다 — `.map-panel-collapsed` 와 같은 이유.
+
+  목록을 접었으면 **펼치기 버튼(16 · 44) 오른쪽**에 선다 — 그 자리에 서면 버튼을 덮는다.
+  1024~1279 는 목록 래퍼 전체(버튼 포함)가 `invisible` 이라 비킬 것이 없다.
+*/
+@media (width >= 80rem) {
+  .map-preview-beside {
+    left: calc(1rem + 400px + 24px + 0.75rem);
+  }
+
+  .map-preview-after-handle {
+    left: calc(1rem + 44px + 0.75rem);
+  }
+
+  /* 재검색 알약 — 미리보기가 목록 옆에 서면 남은 지도의 가운데로 (지도 가운데가 미리보기 뒤다) */
+  .map-research-beside-preview {
+    left: calc(1rem + 400px + 24px + 0.75rem + 400px);
+  }
+}
+
+/*
+  모바일 미리보기 시트의 상한 — **목록 시트 `max` 단계와 같은 식**이다 (`map-sheet.tsx`):
+  `max(45dvh, 100dvh − MAP_TOP_CONTROLS_INSET)`. 136 은 뷰포트 위에서 잰 값(헤더 + 검색 · 보기 전환)이라
+  `--header-h` 를 또 빼지 않는다. 시트 바닥이 탭바 위라 그만큼(`--map-sheet-tabbar`)만 더 뺀다.
+  45dvh 하한은 가로 모드에서 윗변이 뒤집히지 않게 하는 #901 의 하한과 같다.
+*/
+.map-preview-sheet {
+  max-height: max(45dvh, calc(100dvh - 136px - var(--map-sheet-tabbar)));
+}
+
+/*
   데스크톱 필터 레일 = L1 카드 — DESIGN.md §0 · §7-1 · 이슈 #535 (#389 를 대체).
 
   **레일만 바닥 위에 맨몸으로 서 있었다.** 오른쪽 목록은 흰 카드라 경계가 분명한데 왼쪽은

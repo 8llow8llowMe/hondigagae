@@ -10,14 +10,16 @@ import { PlaceListView } from '@/features/place/place-list-view'
 import { PlaceMapView } from '@/features/place/place-map-view'
 import { PlaceSearchField } from '@/features/place/place-search-field'
 import { placeKeys } from '@/features/place/queries'
-import { placeListPath, type PlaceSlice } from '@/lib/api/place'
+import { placeDetailPath, placeListPath, type PlaceSlice } from '@/lib/api/place'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import { pageMetadata } from '@/lib/seo/page-metadata'
 import { parsePlaceFilters, toPlaceFilterQuery } from '@/lib/url/place-filters'
+import { PLACE_PREVIEW_KEY, readPlacePreviewParam } from '@/lib/url/place-preview'
 import { parseViewMode, PLACES_DEFAULT_VIEW, viewModeHref } from '@/lib/url/view-mode'
+import type { PlaceDetail } from '@/types/place'
 
 /**
  * **정규 주소는 필터 없는 `/places` 다** (#1130). 필터·보기 쿼리 조합마다 같은 목록이 다른
@@ -60,14 +62,34 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
   // 느리거나 죽었을 때 **서버 렌더가 재시도 백오프만큼 통째로 블로킹된다**
   // (실측: 게이트웨이 다운 시 GET /places 가 3.1초). 서버는 한 번만 시도하고
   // 실패하면 즉시 넘긴다 — 재시도는 클라이언트가 사용자 조작으로 수행한다.
-  await queryClient
-    .prefetchInfiniteQuery({
-      queryKey: placeKeys.list(filters),
-      queryFn: () => serverFetch<PlaceSlice>(placeListPath(filters, null)),
-      initialPageParam: null as string | null,
-      retry: false,
-    })
-    .catch(() => undefined)
+  /*
+    **고른 장소(`?place=`)도 서버가 받는다** (#1227 · architecture-guide.md §9 "첫 화면은 별도 조회
+    금지"). 공유 링크로 들어오면 미리보기가 첫 화면에 서는데, 받지 않으면 이름 자리가 골격으로
+    비었다가 채워진다. 키는 상세 화면과 같다 — `상세 보기` 로 넘어가도 그대로 쓰인다.
+    **판정 둘(적합도 · 산책)은 받지 않는다** — 반려견 조건이 클라이언트 스토어에 있어 서버가 같은 키를
+    만들 수 없다. 실패는 삼킨다 — 미리보기가 클라이언트에서 다시 묻고, 목록은 그대로 서야 한다.
+  */
+  const previewId = view === 'map' ? readPlacePreviewParam(resolved[PLACE_PREVIEW_KEY]) : null
+
+  await Promise.all([
+    queryClient
+      .prefetchInfiniteQuery({
+        queryKey: placeKeys.list(filters),
+        queryFn: () => serverFetch<PlaceSlice>(placeListPath(filters, null)),
+        initialPageParam: null as string | null,
+        retry: false,
+      })
+      .catch(() => undefined),
+    previewId === null
+      ? undefined
+      : queryClient
+          .prefetchQuery({
+            queryKey: placeKeys.detail(previewId),
+            queryFn: () => serverFetch<PlaceDetail>(placeDetailPath(previewId)),
+            retry: false,
+          })
+          .catch(() => undefined),
+  ])
 
   /*
     아트보드 `혼디가개 장소 찾기.dc.html` 03 절 — 데스크톱은 **좌 280 필터 레일(sticky) /
@@ -95,6 +117,8 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
             searchable
             listHref={listHref}
             mapHref={mapHref}
+            /* 고른 장소를 미리보기로 보이고 `?place=` 에 남긴다 (#1227) — 담기 지도는 켜지 않는다 */
+            preview
           />
         </HydrationBoundary>
       </main>

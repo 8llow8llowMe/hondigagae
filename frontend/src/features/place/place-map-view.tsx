@@ -17,15 +17,18 @@ import { MapLocateButton } from '@/features/map/map-locate-button'
 import { PlaceListSection, type PlaceListSectionProps } from '@/features/place/place-list-section'
 import { PlaceMapFilterBar } from '@/features/place/place-map-filter-bar'
 import { PlaceMapPanel } from '@/features/place/place-map-panel'
+import { PlaceMapPreview } from '@/features/place/place-map-preview'
 import { PlaceMapRowsSkeleton } from '@/features/place/place-map-skeleton'
 import { PlaceSearchField } from '@/features/place/place-search-field'
 import { useNearbyPlaces } from '@/features/place/use-nearby-places'
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { usePlaceList } from '@/features/place/use-place-list'
+import { usePlacePreview } from '@/features/place/use-place-preview'
 import { ApiError, isRetriable, toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
 import { type LatLng, SELECTED_PLACE_MAP_LEVEL } from '@/lib/geo/coord'
 import { getCurrentPosition, getPositionIfGranted, offersLocate } from '@/lib/geo/current-position'
+import type { MapOffset } from '@/lib/map/offset-center'
 import {
   areaAfterFramedIdle,
   areaAfterIdle,
@@ -97,6 +100,7 @@ export function PlaceMapView({
   panelTopInset,
   initialFocus,
   initialFocusName,
+  preview = false,
 }: {
   filters: PlaceFilters
   /** 미로그인이면 반려견 목록을 조회하지 않는다 — 필터의 크기 축이 빠진다 (#200) */
@@ -190,6 +194,14 @@ export function PlaceMapView({
    * 기준만 바뀐 것처럼 읽힌다.
    */
   initialFocusName?: string | null | undefined
+  /**
+   * 고른 장소를 **미리보기 패널**로 보이고 `?place=` 에 남긴다 (#1227). `/places` 만 켠다.
+   *
+   * 담기 지도는 켜지 않는다 — 행마다 담기 버튼이 이미 있고(`renderRowAction`), 그 화면의 일은
+   * "이 일정에 넣을 곳 고르기" 라 미리보기가 그 버튼과 같은 일을 두 번 하게 된다. 그 주소에
+   * `place` 가 붙을 이유도 없다. 끄면 선택은 예전처럼 화면 안 상태다 (`usePlacePreview`).
+   */
+  preview?: boolean | undefined
 }) {
   /*
     **`undefined` 만이 아니라 `null`·`false` 도 "머리 없음" 이다** (#1012 검토). 호출부가
@@ -250,7 +262,7 @@ export function PlaceMapView({
     ref 인 이유: 화면에 그리는 값이 아니라 다음 `idle` 을 어떻게 받을지만 정한다.
   */
   const framingRef = useRef<FocusFraming | null>(focus === null ? null : 'pending')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const { selectedId, select: setSelectedId } = usePlacePreview(preview)
   const [sheetStop, setSheetStop] = useState<SheetStop>('mid')
   const [panelOpen, setPanelOpen] = useState(true)
   const [failure, setFailure] = useState<MapSdkFailure | null>(null)
@@ -261,6 +273,57 @@ export function PlaceMapView({
    * 제주 밖에서 버튼이 한 번 보였다가 사라지는 것보다 늦게 나타나는 편이 낫다.
    */
   const [locatable, setLocatable] = useState(false)
+
+  /*
+    **고른 핀을 미리보기에 덮이지 않는 자리로 옮긴다** (`MapCanvas` 의 `selectedOffset`).
+    1440 에서 목록 + 미리보기가 왼쪽 850px 남짓을 덮어 정중앙(720)이 미리보기 뒤였다. 모바일은
+    미리보기 시트가 아래를 덮는다. **고르는 순간 실제 크기를 잰다** — 폭마다 배치가 갈리고
+    (`map-preview-beside`) 시트 높이는 내용만큼이다. 미리보기가 없으면(담기 지도 · 닫힘) 정중앙
+    그대로다 — 목록 패널만 있을 때의 동작은 이 이슈가 바꾸지 않는다.
+  */
+  const rootRef = useRef<HTMLDivElement>(null)
+  const previewPanelRef = useRef<HTMLDivElement>(null)
+  const previewSheetRef = useRef<HTMLDivElement>(null)
+  const selectedOffset = useCallback((): MapOffset | null => {
+    const root = rootRef.current?.getBoundingClientRect()
+    if (root === undefined) return null
+
+    // `display: none` 인 갈래는 크기가 0 이다 — 지금 폭에서 서 있는 쪽만 잰다
+    const panel = previewPanelRef.current?.getBoundingClientRect()
+    if (panel !== undefined && panel.width > 0) return { x: (panel.right - root.left) / 2, y: 0 }
+
+    /*
+      모바일은 위아래가 다 덮인다 — 아래는 시트, 위는 검색 · 보기 전환(`MAP_TOP_CONTROLS_INSET`).
+      둘 사이 띠의 가운데로 보낸다. 띠가 없으면(아주 짧은 화면) 옮기지 않는다.
+    */
+    const sheet = previewSheetRef.current?.getBoundingClientRect()
+    if (sheet !== undefined && sheet.height > 0) {
+      // `MAP_TOP_CONTROLS_INSET` 은 뷰포트 위에서 잰 값이다(헤더 포함) — `root.top` 에 더하지 않는다
+      const top = Math.max(root.top, MAP_TOP_CONTROLS_INSET)
+      if (sheet.top <= top) return null
+      return { x: 0, y: (top + sheet.top) / 2 - (root.top + root.bottom) / 2 }
+    }
+
+    return null
+  }, [])
+
+  /*
+    **닫으면 포커스를 고른 행으로 돌려준다** (WCAG 2.4.3). ✕ 가 언마운트되면 포커스가 `body` 로
+    떨어지고, 1024~1279 · 모바일은 행이 다시 보이게 된 참이다. 포커스가 다른 곳에 살아 있으면
+    (사용자가 이미 옮겼으면) 건드리지 않는다.
+  */
+  const lastPreviewRef = useRef<string | null>(null)
+  useEffect(() => {
+    const closed = lastPreviewRef.current
+    lastPreviewRef.current = preview ? selectedId : null
+    if (closed === null || selectedId !== null) return
+    if (document.activeElement !== null && document.activeElement !== document.body) return
+
+    const row = [
+      ...document.querySelectorAll<HTMLElement>(`button[data-place-id="${CSS.escape(closed)}"]`),
+    ].find((candidate) => candidate.getClientRects().length > 0)
+    row?.focus()
+  }, [preview, selectedId])
 
   /*
     ── 현재 위치 ────────────────────────────────────────────────────────────
@@ -605,6 +668,17 @@ export function PlaceMapView({
   })
   /** 둘 다 있을 때만 그린다 — 헤더가 토글을 갖는 화면은 주지 않는다 */
   const showToggle = listHref !== undefined && mapHref !== undefined
+  /*
+    ── 미리보기 (#1227)
+
+    **목록에 없는 id 로도 연다** — 공유 링크 · 재검색 밖으로 나간 장소. 그때는 `summary` 가
+    `null` 이고 패널이 상세 응답으로 그린다. 지도 SDK 가 실패한 갈래(목록 폴백)는 위에서 이미
+    돌아갔다 — 행이 상세 링크라 미리보기가 할 일이 없다.
+  */
+  const previewId = preview ? selectedId : null
+  const previewSummary =
+    previewId === null ? null : (places.find((place) => place.placeId === previewId) ?? null)
+  const closePreview = () => setSelectedId(null)
 
   return (
     /*
@@ -613,7 +687,7 @@ export function PlaceMapView({
         그 높이만큼 넘쳐 지도 화면에 세로 스크롤이 난다. `fill` 이면 부모가 정한 높이를
         채우고, 아니면 예전처럼 스스로 뷰포트를 채운다 — `/places` 는 픽셀이 같다.
       */
-    <div className={cn('relative', fill ? 'h-full' : 'map-canvas-height')}>
+    <div ref={rootRef} className={cn('relative', fill ? 'h-full' : 'map-canvas-height')}>
       {/* 지도가 바탕이다. 데스크톱은 좌측 패널이 그 위에 얹힌다 (아트보드 05) */}
       <MapCanvas
         pins={pins}
@@ -625,6 +699,7 @@ export function PlaceMapView({
         center={center}
         /* 카드를 누르면 그 핀으로 옮기고 동네가 보이는 단계까지 확대한다 */
         selectedLevel={SELECTED_PLACE_MAP_LEVEL}
+        selectedOffset={preview ? selectedOffset : undefined}
         focusMarker={focusMarker}
         onFailure={setFailure}
         className="h-full w-full"
@@ -640,7 +715,13 @@ export function PlaceMapView({
         단계를 피해야 해서 그 계산이 CSS 에 있다.
       */}
       {offerResearch && (
-        <div className="map-research-offset absolute inset-x-0 z-30 flex justify-center px-4">
+        <div
+          className={cn(
+            'map-research-offset absolute inset-x-0 z-30 flex justify-center px-4',
+            // 1280 부터 미리보기가 목록 옆에 서면 지도 가운데가 그 뒤다 — 남은 지도의 가운데로 (#1227)
+            previewId !== null && panelOpen && 'map-research-beside-preview',
+          )}
+        >
           <button
             type="button"
             onClick={researchHere}
@@ -780,6 +861,12 @@ export function PlaceMapView({
           // 16 이었을 때는 패널이 그 위에 바로 얹혀 축척이 눌려 보였다 (실측: 막대가
           // 바닥에서 0~19px, 왼쪽 6px 부터 129px 폭). 32 면 13px 이 남는다.
           'absolute bottom-8 left-4 z-30 hidden lg:block',
+          /*
+            **1024~1279 는 미리보기가 목록 자리를 쓴다** (#1227). 400 + 12 + 400 을 나란히 두면
+            지도가 300 남짓 남아 고른 핀 둘레가 안 보인다. `invisible` 이라 a11y 트리 · Tab 에서도
+            빠진다 — `inert` 를 폭마다 갈라 걸 수 없어서 CSS 로 감춘다. 목록 스크롤과 선택은 남는다.
+          */
+          previewId !== null && 'lg:max-xl:invisible',
           // 기본 24. 위에 떠 있는 것이 있는 화면은 `panelTopInset` 으로 밀어 내린다 (#556)
           panelTopInset === undefined && 'top-6',
         )}
@@ -900,9 +987,43 @@ export function PlaceMapView({
         </div>
       </div>
 
+      {/*
+        ── 데스크톱 미리보기 (#1227) — 1280 부터 목록 옆, 그 아래는 목록 자리
+
+        목록 패널과 **같은 위아래 여백 · 같은 폭**이다(`top-6` · `bottom-8` · 400). 옆자리는
+        목록 400 + 간격 12 뒤다(`.map-preview-beside`). 목록을 접으면 그 자리로 당겨 온다.
+      */}
+      {previewId !== null && (
+        <div
+          ref={previewPanelRef}
+          className={cn(
+            'map-panel-width bg-bg border-border absolute top-6 bottom-8 left-4 z-30 hidden overflow-hidden rounded-xl border shadow-lg lg:block',
+            /*
+              1280 부터 목록이 열려 있으면 그 옆, 접혀 있으면 **펼치기 버튼 오른쪽**이다 — 버튼 자리
+              (16 · 44)에 서면 버튼을 덮어 목록으로 돌아갈 길이 닫기 하나가 된다 (리뷰 지적).
+            */
+            panelOpen ? 'map-preview-beside' : 'map-preview-after-handle',
+          )}
+        >
+          <PlaceMapPreview
+            key={previewId}
+            placeId={previewId}
+            summary={previewSummary}
+            authed={authed}
+            variant="panel"
+            onClose={closePreview}
+          />
+        </div>
+      )}
+
       {/* ── 모바일: 하단 시트 3단 ────────────────────────────────────────── */}
       <MapSheet
         label="장소 목록"
+        /*
+          미리보기가 열리면 **같은 자리를 내준다** (#1227). 언마운트하지 않는다 — 닫으면 보던
+          목록 스크롤 · 단계 그대로 돌아와야 한다.
+        */
+        className={cn(previewId !== null && 'hidden')}
         stop={sheetStop}
         onStopChange={setSheetStop}
         /*
@@ -941,6 +1062,27 @@ export function PlaceMapView({
           />
         )}
       </MapSheet>
+
+      {/*
+        모바일 미리보기 — 목록 시트와 **같은 층(`z-30`) · 같은 바닥(탭바 위)**이다. 높이는 내용만큼이고
+        상한이 있다(`.map-preview-sheet`) — 위쪽 검색 · 보기 전환을 덮지 않는다.
+      */}
+      {previewId !== null && (
+        // 목록 시트(`MapSheet`)와 같은 면이다 — 같은 자리를 번갈아 쓴다
+        <div
+          ref={previewSheetRef}
+          className="map-sheet-clears-tabbar map-preview-sheet bg-bg border-border fixed inset-x-0 z-30 flex flex-col overflow-hidden rounded-t-xl border-t shadow-lg lg:hidden"
+        >
+          <PlaceMapPreview
+            key={previewId}
+            placeId={previewId}
+            summary={previewSummary}
+            authed={authed}
+            variant="sheet"
+            onClose={closePreview}
+          />
+        </div>
+      )}
     </div>
   )
 }
