@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.QPlaceEnt
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceKeyword;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
+import com.hondigagae.domainlayer.place.application.port.out.query.PlaceCoordinateQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSitemapEntryQueryResult;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
 import com.hondigagae.shared.travel.pet.PetSizeType;
@@ -44,19 +45,13 @@ public class PlaceCustomRepositoryImpl implements PlaceCustomRepository {
      *
      * <p>같은 원천 안에서는 적재 순서(TourAPI 는 contentId 순)이며 시간순이 아니다 — 이 목록에
      * "최신순" 의 뜻은 없다. 최신순이 필요해지면 커서를 정렬 키와 함께 다시 설계해야 한다.
+     *
+     * <p>기준 좌표가 없는 목록만 여기로 온다. 거리순(#1202)은 {@link #findCoordinatesByCriteria} 로 후보를 받아
+     * Processor 가 정렬한다 — ai-service 후보 조회처럼 좌표 없이 부르는 쪽의 SQL·순서는 그대로다.
      */
     @Override
     public Slice<PlaceEntity> searchByCriteria(PlaceSearchCriteria criteria) {
-        BooleanBuilder where = visible()
-            .and(commonFilters(criteria.contentType(), criteria.petAllowanceType(), criteria.indoor(),
-                criteria.allowedPetSize(), criteria.petSizeType(), criteria.petWeightKg(),
-                criteria.sourceCategory(), criteria.keyword()));
-        if (criteria.areaCode() != null) {
-            where.and(place.areaCode.eq(criteria.areaCode()));
-        }
-        if (criteria.sigunguCode() != null) {
-            where.and(place.sigunguCode.eq(criteria.sigunguCode()));
-        }
+        BooleanBuilder where = listFilters(criteria);
         if (criteria.lastPlaceId() != null) {
             // 오름차순이라 커서는 "그 뒤" 다. 정렬과 방향이 어긋나면 같은 페이지를 무한히 돌려준다.
             where.and(place.id.gt(criteria.lastPlaceId()));
@@ -73,6 +68,49 @@ public class PlaceCustomRepositoryImpl implements PlaceCustomRepository {
         boolean hasNext = rows.size() > criteria.size();
         List<PlaceEntity> content = hasNext ? rows.subList(0, criteria.size()) : rows;
         return new SliceImpl<>(content, PageRequest.of(0, criteria.size()), hasNext);
+    }
+
+    /**
+     * 거리순 목록의 후보 (#1202). <b>목록과 같은 필터({@link #listFilters})</b>에 좌표가 둘 다 있는 행만 더해
+     * 아이디·좌표 세 컬럼을 전량 준다. 새 쿼리지만 노출 규칙을 그대로 거친다 — 빠뜨리면 병합·delisted 장소가
+     * 거리순에서만 살아난다.
+     *
+     * <p>정렬하지 않고 {@code lastPlaceId} 로 자르지도 않는다. 거리순 커서는 id 가 아니라 (거리, id) 키로 넘으므로
+     * 그 비교는 거리를 아는 호출한 쪽(Processor)이 한다. 좌표가 없는 장소는 거리를 잴 수 없어 빠진다 — 주변
+     * 검색과 같은 판단이다.
+     *
+     * <p>엔티티 전체(개요 TEXT 등)를 읽지 않으려고 projection 으로 가져온다. 제주 2,300여 곳이라 페이지마다 전량을
+     * 메모리에서 정렬해도 싸다. 전국으로 넓히면 공간 인덱스·DB 정렬로 옮길 자리가 여기다.
+     */
+    @Override
+    public List<PlaceCoordinateQueryResult> findCoordinatesByCriteria(PlaceSearchCriteria criteria) {
+        BooleanBuilder where = listFilters(criteria)
+            .and(place.lat.isNotNull())
+            .and(place.lng.isNotNull());
+
+        return queryFactory
+            .select(Projections.constructor(PlaceCoordinateQueryResult.class, place.id, place.lat, place.lng))
+            .from(place)
+            .where(where)
+            .fetch();
+    }
+
+    /**
+     * 목록(id 순·거리순)이 함께 거는 필터 — 노출 규칙, 공통 필터, 지역. 커서와 정렬은 넣지 않는다(정렬 키마다 다르다).
+     * 두 목록이 이 한곳을 거치므로 필터가 갈라지지 않는다.
+     */
+    private BooleanBuilder listFilters(PlaceSearchCriteria criteria) {
+        BooleanBuilder where = visible()
+            .and(commonFilters(criteria.contentType(), criteria.petAllowanceType(), criteria.indoor(),
+                criteria.allowedPetSize(), criteria.petSizeType(), criteria.petWeightKg(),
+                criteria.sourceCategory(), criteria.keyword()));
+        if (criteria.areaCode() != null) {
+            where.and(place.areaCode.eq(criteria.areaCode()));
+        }
+        if (criteria.sigunguCode() != null) {
+            where.and(place.sigunguCode.eq(criteria.sigunguCode()));
+        }
+        return where;
     }
 
     @Override

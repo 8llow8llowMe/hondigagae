@@ -122,6 +122,8 @@ public class PlacePresenter {
             .indoor(info.indoor())
             .sourceCategory(info.sourceCategory())
             .sourceName(info.source() == null ? null : info.source().getDisplayName())
+            // 거리순 목록에서만 값이 있다. null 을 0 으로 접지 않는다 — 0m 는 "바로 그 자리" 라는 뜻이다.
+            .distanceMeters(info.distanceMeters())
             .build();
     }
 

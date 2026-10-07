@@ -48,13 +48,20 @@ public class PlaceWebController {
             + "각각 이름 또는 주소에 부분 일치해야 합니다(대소문자 무시).\n\n"
             + "**필수 파라미터는 없습니다.** 전부 생략하면 전체 장소의 첫 페이지(20개)가 옵니다. "
             + "선택 파라미터는 채운 것만 AND 조건으로 걸립니다.\n\n"
-            + "**정렬은 `placeId` 오름차순이며 최신순이 아닙니다.** 아이디 대역이 원천별로 갈려 있어 "
-            + "사진·개요가 있는 관광정보(TourAPI) 장소가 먼저 오고, 이미지가 없는 문화정보원·식약처 장소가 뒤에 옵니다.\n\n"
+            + "**좌표(lat·lng)를 주지 않으면 정렬은 `placeId` 오름차순이며 최신순이 아닙니다.** 아이디 대역이 원천별로 갈려 있어 "
+            + "사진·개요가 있는 관광정보(TourAPI) 장소가 먼저 오고, 이미지가 없는 문화정보원·식약처 장소가 뒤에 옵니다. "
+            + "이때 항목의 `distanceMeters` 는 null 입니다.\n\n"
+            + "**거리순** — `lat` 과 `lng` 를 **함께** 주면 그 점에서 가까운 순으로 정렬합니다. 하나만 주면 400(`PLACE_109`)입니다. "
+            + "정렬 키는 (반올림한 거리 m, `placeId`) 오름차순이고, 항목의 `distanceMeters` 가 그 거리입니다. "
+            + "반경 제한은 없고 다른 필터는 그대로 함께 걸립니다. **좌표가 없는 장소는 거리순 목록에 오지 않습니다**(주변 검색과 같은 판단). "
+            + "커서는 그대로 `lastPlaceId` 입니다 — 직전 응답 마지막 항목의 `placeId` 를 넣고 같은 `lat`·`lng` 를 다시 보냅니다. "
+            + "그 장소가 그사이 목록에서 빠져도(병합·삭제) 이어지고, 장소를 찾을 수 없거나 좌표가 없으면 400(`PLACE_110`)입니다.\n\n"
             + "호출 예\n"
             + "- 제주 음식점·카페 20개: `GET /api/v1/places?areaCode=39&contentType=RESTAURANT`\n"
             + "- 중형견 동반 가능한 실내 장소: `GET /api/v1/places?petAllowanceType=ALLOWED&indoor=true&petSizeType=MEDIUM`\n"
             + "- 성산이 이름이나 주소에 들어간 곳: `GET /api/v1/places?keyword=성산`\n"
-            + "- 다음 페이지: 직전 응답 `items` 마지막의 `placeId` 를 `lastPlaceId` 로")
+            + "- 중문 근처부터 음식점·카페: `GET /api/v1/places?lat=33.2541&lng=126.4129&contentType=RESTAURANT`\n"
+            + "- 다음 페이지: 직전 응답 `contents` 마지막의 `placeId` 를 `lastPlaceId` 로 (거리순이면 같은 `lat`·`lng` 와 함께)")
     @GetMapping
     public ResponseEntity<Response<SliceResponse<PlaceItem>>> getPlaces(
         @Parameter(description = "[선택] 관광 지역코드. 제주=39. 생략하면 지역 제한 없음 (현재 적재 데이터는 제주만이라 결과가 같습니다)", example = "39") @RequestParam(required = false) String areaCode,
@@ -76,11 +83,21 @@ public class PlaceWebController {
         @Size(max = PlaceKeyword.MAX_LENGTH, message = PlaceValidationMessage.KEYWORD_MAX_INVALID)
         @PlaceKeywordTokenLimit
         @RequestParam(required = false) String keyword,
-        @Parameter(description = "[선택] 커서. 첫 페이지는 생략하고, 다음 페이지는 직전 응답 마지막 항목의 placeId 를 넣습니다(그 아이디 **뒤**부터 옵니다). 예시 값은 형식 안내용", example = "126434") @RequestParam(required = false) Long lastPlaceId,
+        @Parameter(description = "[선택] 기준 위도 (WGS84, -90~90). lng 와 함께 보내면 이 점에서 가까운 순으로 정렬합니다. 하나만 보내면 400(PLACE_109). 생략하면 placeId 순", example = "33.2541")
+        @Min(value = -90, message = PlaceValidationMessage.LAT_RANGE_INVALID)
+        @Max(value = 90, message = PlaceValidationMessage.LAT_RANGE_INVALID)
+        @RequestParam(required = false) Double lat,
+        @Parameter(description = "[선택] 기준 경도 (WGS84, -180~180). lat 과 함께 보냅니다", example = "126.4129")
+        @Min(value = -180, message = PlaceValidationMessage.LNG_RANGE_INVALID)
+        @Max(value = 180, message = PlaceValidationMessage.LNG_RANGE_INVALID)
+        @RequestParam(required = false) Double lng,
+        @Parameter(description = "[선택] 커서. 첫 페이지는 생략하고, 다음 페이지는 직전 응답 마지막 항목의 placeId 를 넣습니다(그 항목 **뒤**부터 옵니다). 거리순이어도 같습니다. 예시 값은 형식 안내용", example = "126434")
+        @RequestParam(required = false) Long lastPlaceId,
         @Parameter(description = "[선택, 기본 20] 조회 개수 (1~50)", example = "20")
         @Positive(message = PlaceValidationMessage.SIZE_POSITIVE) @Max(value = 50, message = PlaceValidationMessage.SIZE_MAX_INVALID)
         @RequestParam(defaultValue = "20") int size
     ) {
+        // lat·lng 짝 검사는 PlaceSearchCriteria 생성자가 한다 — 하나만 오면 여기서 PLACE_109 로 끝난다.
         PlaceSearchCriteria criteria = PlaceSearchCriteria.builder()
             .areaCode(areaCode)
             .sigunguCode(sigunguCode)
@@ -92,6 +109,8 @@ public class PlaceWebController {
             .petWeightKg(petWeightKg)
             .sourceCategory(sourceCategory)
             .keyword(keyword)
+            .lat(lat)
+            .lng(lng)
             .lastPlaceId(lastPlaceId)
             .size(size)
             .build();

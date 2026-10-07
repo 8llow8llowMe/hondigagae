@@ -12,6 +12,7 @@ import com.hondigagae.domainlayer.place.application.mapper.PlaceMapper;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.out.PlaceRepositoryPort;
+import com.hondigagae.domainlayer.place.application.port.out.query.PlaceCoordinateQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceImageQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceIntroQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlacePetInfoQueryResult;
@@ -40,6 +41,16 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
     public PlaceSliceQueryResult findPlaces(PlaceSearchCriteria criteria) {
         Slice<PlaceEntity> slice = placeRepository.searchByCriteria(criteria);
         return new PlaceSliceQueryResult(placeMapper.toDomains(slice.getContent()), slice.hasNext());
+    }
+
+    @Override
+    public List<PlaceCoordinateQueryResult> findCoordinates(PlaceSearchCriteria criteria) {
+        return placeRepository.findCoordinatesByCriteria(criteria);
+    }
+
+    @Override
+    public Optional<PlaceCoordinateQueryResult> findCoordinateById(long placeId) {
+        return placeRepository.findCoordinateById(placeId);
     }
 
     @Override

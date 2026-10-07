@@ -49,6 +49,45 @@ class CachedPlaceSearchEnvelopeSerializationTest {
             assertThat(place.petAllowanceType()).isEqualTo(PetAllowanceType.ALLOWED);
             assertThat(place.source()).isEqualTo(PlaceSource.TOUR_API);
             assertThat(place.lat()).isEqualByComparingTo("33.458");
+            assertThat(place.distanceMeters()).isNull();
+        });
+    }
+
+    @Test
+    @DisplayName("거리순 목록 캐시의 distanceMeters 도 왕복 뒤에 그대로다 (#1202)")
+    void distanceListKeepsDistanceMeters() {
+        contextRunner.run(context -> {
+            ObjectMapper objectMapper = context.getBean(ObjectMapper.class);
+            PlaceSummaryInfo withDistance = PlaceSummaryInfo.builder()
+                .placeId(2L)
+                .contentType(ContentType.RESTAURANT)
+                .title("중문 식당")
+                .petAllowanceType(PetAllowanceType.ALLOWED)
+                .distanceMeters(820)
+                .build();
+            CachedPlaceListEnvelope original = new CachedPlaceListEnvelope(List.of(withDistance), false);
+
+            CachedPlaceListEnvelope restored = objectMapper.readValue(
+                objectMapper.writeValueAsString(original), CachedPlaceListEnvelope.class);
+
+            assertThat(restored.places().get(0).distanceMeters()).isEqualTo(820);
+        });
+    }
+
+    @Test
+    @DisplayName("distanceMeters 가 생기기 전에 쓴 주변 캐시(v2)도 그대로 읽힌다 — 주변 네임스페이스를 올리지 않은 근거")
+    void nearbyEntryWrittenBeforeDistanceFieldStillReads() {
+        contextRunner.run(context -> {
+            ObjectMapper objectMapper = context.getBean(ObjectMapper.class);
+            String legacy = """
+                {"places":[{"place":{"placeId":1,"contentType":"TOURIST_SPOT","title":"성산일출봉",\
+                "petAllowanceType":"ALLOWED"},"distanceMeters":120}],"totalCount":1}""";
+
+            CachedNearbyEnvelope restored = objectMapper.readValue(legacy, CachedNearbyEnvelope.class);
+
+            assertThat(restored.places().get(0).distanceMeters()).isEqualTo(120);
+            assertThat(restored.places().get(0).place().title()).isEqualTo("성산일출봉");
+            assertThat(restored.places().get(0).place().distanceMeters()).isNull();
         });
     }
 

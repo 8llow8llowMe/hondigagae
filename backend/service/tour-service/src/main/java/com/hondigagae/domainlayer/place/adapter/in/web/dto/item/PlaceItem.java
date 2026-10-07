@@ -54,7 +54,12 @@ public record PlaceItem(
     String sourceCategory,
 
     @Schema(description = "정보 출처", example = "문화정보원")
-    String sourceName
+    String sourceName,
+
+    @Schema(description = "기준 좌표(lat·lng)로부터의 거리(m, 반올림). 장소 목록을 lat·lng 로 거리순 조회했을 때만 값이 있고 "
+        + "정렬 키와 같은 값이다. 좌표 없는 목록에서는 null 이다. 주변 검색(/places/nearby)은 이 값이 아니라 바깥 "
+        + "NearbyPlaceItem.distanceMeters 를 본다 — 그 안쪽 place 의 이 값은 null 이다", example = "820", nullable = true)
+    Integer distanceMeters
 ) {
 
 }
