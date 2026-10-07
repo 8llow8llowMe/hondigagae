@@ -25,6 +25,7 @@ import com.hondigagae.global.properties.AiLlmProperties;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.net.SocketTimeoutException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -547,7 +548,7 @@ class OllamaLlmAdapterTest {
     }
 
     @Test
-    @DisplayName("Ollama 의 나노초 지표를 밀리초로 갈라 남긴다 — 프리필과 디코드를 구분해야 무엇을 줄일지 정한다")
+    @DisplayName("Ollama 지표를 밀리초로 갈라 남긴다 — 프리필과 디코드를 구분해야 무엇을 줄일지 정한다")
     void splitsPrefillAndDecode() {
         ListAppender<ILoggingEvent> appender = attachAppender();
         // 프리필 8.2초 · 디코드 56.8초 (dev 실측 63~71초의 모양)
@@ -562,6 +563,31 @@ class OllamaLlmAdapterTest {
         // 모델이 이미 올라와 있으면 0 이다. 0 이 아니면 keep-alive 를 의심할 신호라 지우지 않는다.
         assertThat(logged).contains("loadMs=0");
         assertThat(logged).contains("outputTokens=820");
+    }
+
+    /*
+     * #1235. 위 테스트가 전에는 나노초 Long 을 넣어 통과했는데, Spring AI 1.1.8 의 OllamaChatModel 은 Duration 을
+     * 싣는다 — dev 에서 단계별 시간이 전부 null 이었다. 가짜 응답은 이제 Duration 이고, 숫자는 호환 경로로만 본다.
+     */
+    @Test
+    @DisplayName("나노초 숫자로 온 지표도 읽는다 — 다른 버전 호환 (#1235)")
+    void readsNumericNanosForCompatibility() {
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+            .keyValue("total-duration", 3_000_000_000L)
+            .keyValue("load-duration", 1_500_000_000L)
+            .keyValue("prompt-eval-duration", 500_000_000L)
+            .keyValue("eval-duration", 1_000_000_000L)
+            .usage(new DefaultUsage(100, 10))
+            .build();
+        when(ollamaChatModel.call(any(Prompt.class)))
+            .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage(ONE_ITEM_DRAFT))), metadata));
+
+        adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+
+        String logged = timingLog(appender);
+        assertThat(logged).contains("totalMs=3000").contains("loadMs=1500")
+            .contains("prefillMs=500").contains("decodeMs=1000");
     }
 
     @Test
@@ -654,13 +680,18 @@ class OllamaLlmAdapterTest {
         return appender;
     }
 
-    /** Ollama 가 싣는 나노초 지표를 그대로 흉내 낸 응답. 계측이 그것을 읽는지 본다 (#489). */
+    /**
+     * Spring AI 의 OllamaChatModel 이 싣는 지표를 그대로 흉내 낸 응답. 계측이 그것을 읽는지 본다 (#489).
+     *
+     * <p><b>값은 {@link Duration} 이다</b> — Spring AI 1.1.8 이 Ollama 의 나노초를 Duration 으로 바꿔 싣는다. 전에 이
+     * 자리에 나노초 Long 을 넣어 테스트는 통과하고 dev 에서는 전부 null 이었다 (#1235).
+     */
     private void stubResponseWithOllamaTiming(String text, long promptEvalNanos, long evalNanos) {
         ChatResponseMetadata metadata = ChatResponseMetadata.builder()
-            .keyValue("total-duration", promptEvalNanos + evalNanos)
-            .keyValue("load-duration", 0L)
-            .keyValue("prompt-eval-duration", promptEvalNanos)
-            .keyValue("eval-duration", evalNanos)
+            .keyValue("total-duration", Duration.ofNanos(promptEvalNanos + evalNanos))
+            .keyValue("load-duration", Duration.ZERO)
+            .keyValue("prompt-eval-duration", Duration.ofNanos(promptEvalNanos))
+            .keyValue("eval-duration", Duration.ofNanos(evalNanos))
             .usage(new DefaultUsage(7400, 820))
             .build();
         when(ollamaChatModel.call(any(Prompt.class)))
