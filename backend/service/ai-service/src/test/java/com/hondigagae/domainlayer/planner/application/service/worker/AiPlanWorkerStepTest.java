@@ -276,6 +276,44 @@ class AiPlanWorkerStepTest {
         assertThat(llm.lastQuery.safeCandidates()).extracting(PlaceCandidate::placeId).containsExactly(100L);
     }
 
+    // 음식점 권역 할당 · 요청 카페 권역 순환 (#1245) ──────────────────────────────
+
+    @Test
+    @DisplayName("숙박 다음에 동반 가능 음식점도 권역마다 찾아 싣는다 — 숙박 조회가 실패해도 음식점은 싣는다")
+    void spreadsRestaurantsEvenWhenLodgingFails() {
+        AiPlanJob job = pendingJob(null);
+        RecordingCandidates candidates = new RecordingCandidates();
+        candidates.lodgingFailure = new AiPlanException(AiPlanErrorCode.INTERNAL_SERVICE_UNAVAILABLE);
+        candidates.restaurants = List.of(
+            restaurant(701L, "중문 식당", 33.2500, 126.4100),
+            restaurant(702L, "애월 식당", 33.4600, 126.3100));
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        assertThat(llm.lastQuery.safeCandidates()).extracting(PlaceCandidate::placeId)
+            .containsExactly(100L, 701L, 702L);
+    }
+
+    @Test
+    @DisplayName("실내 카페 요청 후보를 넉넉히 가져와 권역을 돌아가며 앞에 둔다 — placeId 순 앞 8곳은 북서부에 몰렸다")
+    void picksRequestedCafesAcrossZones() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("requestNote", MEASURED_NOTE);
+        RecordingCandidates candidates = new RecordingCandidates();
+        candidates.requested = List.of(
+            restaurant(801L, "당당", 33.4600, 126.3100),
+            restaurant(802L, "애월더선셋", 33.4700, 126.3300),
+            restaurant(803L, "중문 카페", 33.2400, 126.4000));
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        assertThat(candidates.requestedSize).isEqualTo(50);
+        assertThat(llm.lastQuery.safeCandidates()).extracting(PlaceCandidate::placeId)
+            .containsExactly(801L, 803L, 802L, 100L);
+    }
+
     // 단계별 소요 지표 (#985) ────────────────────────────────────────────────
 
     @Test
@@ -421,6 +459,14 @@ class AiPlanWorkerStepTest {
             .build();
     }
 
+    /** 실내 카페 — 실내 · 카페 요청 조건에도 맞는다. */
+    private static PlaceCandidateQueryResult restaurant(long placeId, String title, double lat, double lng) {
+        return PlaceCandidateQueryResult.builder()
+            .placeId(placeId).title(title).contentTypeName("음식점").indoor(true).sourceCategory("카페")
+            .lat(lat).lng(lng)
+            .build();
+    }
+
     /** 저장된 잡을 들고 있으면서 밟은 단계를 순서대로 기록한다. */
     private static final class FakeJobStore implements AiPlanJobStorePort {
 
@@ -548,6 +594,14 @@ class AiPlanWorkerStepTest {
         private List<PlaceCandidateQueryResult> stays = List.of();
         private AiPlanException lodgingFailure;
         private String lodgingSigunguCode;
+        /** 음식점 검색이 돌려줄 장소 (#1245). 비우면 음식점을 더 싣지 않는다. */
+        private List<PlaceCandidateQueryResult> restaurants = List.of();
+        private int requestedSize;
+
+        @Override
+        public List<PlaceCandidateQueryResult> findRestaurantCandidates(String areaCode, String sigunguCode, int size) {
+            return restaurants;
+        }
 
         @Override
         public List<PlaceCandidateQueryResult> findLodgingCandidates(String areaCode, String sigunguCode, int size) {
@@ -572,6 +626,7 @@ class AiPlanWorkerStepTest {
             String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory
         ) {
             requestedLookups++;
+            requestedSize = size;
             requestedIndoor = indoor;
             requestedCategory = sourceCategory;
             return requested;

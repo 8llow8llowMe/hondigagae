@@ -26,6 +26,9 @@ public class PlaceCandidateClientAdapter implements PlaceCandidateQueryPort {
     /** tour-service {@code ContentType.LODGING} 의 이름. 공용 enum 이 없어 값을 적는다 (#1236). */
     private static final String CONTENT_TYPE_LODGING = "LODGING";
 
+    /** tour-service {@code ContentType.RESTAURANT}(카페 포함)의 이름 (#1245). */
+    private static final String CONTENT_TYPE_RESTAURANT = "RESTAURANT";
+
     private final PlaceCandidateClient placeCandidateClient;
     private final PinnedPlaceCandidateClient pinnedPlaceCandidateClient;
     private final InternalResponseSupport internalResponseSupport;
@@ -45,6 +48,11 @@ public class PlaceCandidateClientAdapter implements PlaceCandidateQueryPort {
     @Override
     public List<PlaceCandidateQueryResult> findLodgingCandidates(String areaCode, String sigunguCode, int size) {
         return search(areaCode, sigunguCode, size, null, null, CONTENT_TYPE_LODGING);
+    }
+
+    @Override
+    public List<PlaceCandidateQueryResult> findRestaurantCandidates(String areaCode, String sigunguCode, int size) {
+        return search(areaCode, sigunguCode, size, null, null, CONTENT_TYPE_RESTAURANT);
     }
 
     private List<PlaceCandidateQueryResult> search(

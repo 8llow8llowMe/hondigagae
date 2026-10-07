@@ -10,7 +10,8 @@ import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.application.model.RequestNoteConstraints;
-import com.hondigagae.domainlayer.planner.application.service.LodgingZonePolicy;
+import com.hondigagae.domainlayer.planner.application.service.CandidateZonePolicy;
+import com.hondigagae.domainlayer.planner.application.service.CandidateZonePolicy.Kind;
 import com.hondigagae.domainlayer.planner.application.service.RequestNoteCandidatePolicy;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobEventPort;
@@ -54,10 +55,11 @@ public class AiPlanWorker {
     private static final int REQUEST_SLOT = 8;
 
     /**
-     * 숙박을 권역마다 싣기 위해 한 번에 가져올 숙박 수 (#1236). tour-service 목록 API 의 한 페이지 상한이다 —
-     * dev 의 제주 동반 가능 숙박은 56곳이라 한 페이지로 6권역이 다 잡힌다.
+     * 권역마다 고르려고 한 번에 가져올 수 (#1236 · #1245). tour-service 목록 API 의 한 페이지 상한이다 — dev 의 제주
+     * 동반 가능 숙박 56곳 · 음식점 126곳 모두 첫 페이지에 6권역이 다 잡힌다(음식점 남동부만 1곳). 요청 조건(실내 ·
+     * 카페) 후보도 이만큼 가져와 권역을 돌아가며 {@link #REQUEST_SLOT} 곳을 고른다.
      */
-    private static final int LODGING_FETCH_SIZE = 50;
+    private static final int ZONE_FETCH_SIZE = 50;
 
     private final AiPlanJobStorePort aiPlanJobStorePort;
     private final AiPlanJobEventPort aiPlanJobEventPort;
@@ -436,7 +438,8 @@ public class AiPlanWorker {
             .map(this::toCandidate)
             .toList();
         searched = reserveRequested(areaCode, sigunguCode, searched, requestNote);
-        searched = spreadLodging(areaCode, sigunguCode, searched);
+        searched = spreadByZone(Kind.LODGING, areaCode, sigunguCode, searched);
+        searched = spreadByZone(Kind.RESTAURANT, areaCode, sigunguCode, searched);
         if (sigunguCode != null && searched.isEmpty()) {
             // 지역 전체로 넓히지 않는다. 사용자가 "제주시만" 이라고 한 요청에 서귀포 장소를
             // 섞으면 조건을 무시한 일정이 되고, 그 사실이 응답에 드러나지도 않는다.
@@ -475,14 +478,16 @@ public class AiPlanWorker {
             return searched;
         }
         int quota = Math.min(REQUEST_SLOT, aiLlmProperties.placeCandidateSize());
-        List<PlaceCandidate> matches = placeCandidateQueryPort
+        List<PlaceCandidate> found = placeCandidateQueryPort
             .findRequestedCandidates(
-                areaCode, sigunguCode, quota, constraints.indoorFilter(), constraints.categoryFilter())
+                areaCode, sigunguCode, ZONE_FETCH_SIZE, constraints.indoorFilter(), constraints.categoryFilter())
             .stream()
             .map(this::toCandidate)
             // 실내 검색에는 숙소도 걸린다. 숙소가 앞자리를 차지하면 요청을 반영한 것처럼 보이기만 한다
             .filter(constraints::matches)
             .toList();
+        // placeId 순 앞에서 자르면 한 권역에 몰린다 — dev 실내 카페 앞 8곳 중 5곳이 북서부였다 (#1245)
+        List<PlaceCandidate> matches = CandidateZonePolicy.acrossZones(found, quota);
         if (matches.isEmpty()) {
             log.info("AI plan request has no matching candidates cafe={} indoor={} areaCode={} sigunguCode={}",
                 constraints.cafe(), constraints.indoor(), areaCode, sigunguCode);
@@ -491,31 +496,35 @@ public class AiPlanWorker {
     }
 
     /**
-     * 숙박을 권역마다 싣는다 (#1236). 지역 검색 상위 N 에는 숙박이 우연히만 들어, 서쪽 일정에 묵을 곳이 풀에 없을 수
-     * 있었다. 상한은 그대로라 일반 검색의 꼬리가 빠진다({@link LodgingZonePolicy}).
+     * 숙박 · 음식점을 권역마다 싣는다 (#1236 · #1245). 지역 검색 상위 N 에는 둘 다 우연히만 들어, 서쪽 일정에 묵을
+     * 곳이나 그 근처의 식사 자리가 풀에 없을 수 있었다. 상한은 그대로라 일반 검색의 꼬리가 빠진다
+     * ({@link CandidateZonePolicy}).
      *
-     * <p><b>못 가져와도 생성은 계속한다</b> — 숙박은 동선을 낫게 할 뿐, 없다고 일정이 틀리지는 않는다. 장소가 하나도
-     * 없으면 숙박만으로 일정을 짤 수 없으니 싣지 않는다(후보 없음 실패는 어댑터가 낸다).
+     * <p><b>못 가져와도 생성은 계속한다</b> — 동선을 낫게 할 뿐, 없다고 일정이 틀리지는 않는다. 종류마다 따로 부르므로
+     * 한쪽이 실패해도 다른 쪽은 싣는다. 장소가 하나도 없으면 싣지 않는다(후보 없음 실패는 어댑터가 낸다).
      */
-    private List<PlaceCandidate> spreadLodging(String areaCode, String sigunguCode, List<PlaceCandidate> searched) {
+    private List<PlaceCandidate> spreadByZone(
+        Kind kind, String areaCode, String sigunguCode, List<PlaceCandidate> searched
+    ) {
         if (searched.isEmpty()) {
             return searched;
         }
-        List<PlaceCandidate> stays;
+        List<PlaceCandidate> found;
         try {
-            stays = placeCandidateQueryPort.findLodgingCandidates(areaCode, sigunguCode, LODGING_FETCH_SIZE).stream()
-                .map(this::toCandidate)
-                .toList();
+            List<PlaceCandidateQueryResult> results = kind == Kind.LODGING
+                ? placeCandidateQueryPort.findLodgingCandidates(areaCode, sigunguCode, ZONE_FETCH_SIZE)
+                : placeCandidateQueryPort.findRestaurantCandidates(areaCode, sigunguCode, ZONE_FETCH_SIZE);
+            found = results.stream().map(this::toCandidate).toList();
         } catch (AiPlanException exception) {
-            log.warn("Lodging candidates lookup failed, continuing without them. errorCode={}",
-                exception.getErrorCode().getCode());
+            log.warn("Zone candidates lookup failed, continuing without them. kind={} errorCode={}",
+                kind, exception.getErrorCode().getCode());
             return searched;
         }
-        List<PlaceCandidate> spread = LodgingZonePolicy.spread(stays, searched, aiLlmProperties.placeCandidateSize());
-        long before = searched.stream().filter(LodgingZonePolicy::isLodging).count();
-        long after = spread.stream().filter(LodgingZonePolicy::isLodging).count();
-        log.info("AI plan lodging candidates spread by zone fetched={} before={} after={} areaCode={} sigunguCode={}",
-            stays.size(), before, after, areaCode, sigunguCode);
+        List<PlaceCandidate> spread =
+            CandidateZonePolicy.spread(kind, found, searched, aiLlmProperties.placeCandidateSize());
+        log.info("AI plan candidates spread by zone kind={} fetched={} before={} after={} areaCode={} sigunguCode={}",
+            kind, found.size(), searched.stream().filter(kind::matches).count(),
+            spread.stream().filter(kind::matches).count(), areaCode, sigunguCode);
         return spread;
     }
 
