@@ -70,8 +70,10 @@ test.describe('담기 목록 보기의 거리순 (#1217)', () => {
 
     await page.goto(`/plans/${planId}/days/1/add?view=list`)
 
-    // 순서의 이유를 목록 위 한 줄이 말한다
-    await expect(page.getByText(messages.plan.addPlaceNearbyCaption)).toBeVisible()
+    // 어느 장소에서 잰 거리인지 목록 위 한 줄이 이름으로 말한다 (#1221)
+    await expect(
+      page.getByText(messages.plan.addPlaceNearbyCaptionPrevious.replace('{name}', title)),
+    ).toBeVisible()
 
     const rows = page.locator('#plan-add-place-list li')
     await expect(rows.first()).toContainText(title)
@@ -108,6 +110,6 @@ test.describe('담기 목록 보기의 거리순 (#1217)', () => {
       ),
     ).toBeVisible()
     // 0건에는 순서가 없다 — 목록 위 한 줄은 서지 않는다
-    await expect(page.getByText(messages.plan.addPlaceNearbyCaption)).toHaveCount(0)
+    await expect(page.getByText('가까운 순이에요.', { exact: false })).toHaveCount(0)
   })
 })

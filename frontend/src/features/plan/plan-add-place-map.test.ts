@@ -273,20 +273,26 @@ describe('담기 목록 보기의 거리순 (#1217)', () => {
   const page = readSourceWithoutComments('app/(main)/plans/[planId]/days/[day]/add/page.tsx')
 
   it('서버와 클라이언트가 같은 함수로 기준점을 낸다 — key 가 맞아야 하이드레이션이 된다', () => {
-    expect(code).toContain('addPlaceListOrigin(detail.data, day)')
+    expect(code).toContain('addPlaceListBasis(detail.data, day)')
     expect(page).toContain('addPlaceListOrigin(detail, day)')
     expect(page).toContain('placeKeys.list(filters, origin)')
   })
 
   it('목록 보기에서만, 상세가 온 뒤에 조회한다 — 지도에서 쓰지 않을 요청을 내지 않는다', () => {
     expect(code).toContain(
-      "usePlaceList(filters, view === 'list' && frozenOrigin !== null, listOrigin)",
+      "usePlaceList(filters, view === 'list' && frozenBasis !== null, listOrigin)",
     )
   })
 
   it('기준점을 처음 값으로 얼린다 — 담을 때마다 목록이 처음부터 다시 받아지지 않게', () => {
-    expect(code).toContain('if (frozenOrigin === null && liveOrigin !== undefined)')
-    expect(code).not.toMatch(/usePlaceList\([^)]*liveOrigin/)
+    expect(code).toContain('if (frozenBasis === null && liveBasis !== undefined)')
+    expect(code).not.toMatch(/usePlaceList\([^)]*liveBasis/)
+  })
+
+  /* 목록 위 한 줄도 얼린 기준점에서 나온다 — 말하는 장소와 잰 점이 같아야 한다 (#1221) */
+  it('목록 위 한 줄이 얼린 기준점의 이름을 말한다', () => {
+    expect(code).toContain('addPlaceNearbyCaption(frozenBasis?.value ?? null)')
+    expect(code).not.toContain('addPlaceNearbyCaption(liveBasis')
   })
 
   /*
