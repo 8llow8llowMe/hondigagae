@@ -676,7 +676,7 @@ export function toEmergencyBoardQuery(params: EmergencyBoardParams): string
 | ------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | 기준 도메인         | `src/lib/seo/site.ts`                   | `NEXT_PUBLIC_SITE_URL` 을 읽는 곳은 여기 하나다. **운영(`https://www.hondigagae.com`)만 색인한다**             |
 | `robots.txt`        | `app/robots.ts` · `lib/seo/robots.ts`   | 운영이 아니면 `Disallow: /`. 운영은 `/api/` · `/oauth/` · `proxy.ts` `PROTECTED_PATHS` 만 막는다               |
-| `sitemap.xml`       | `app/sitemap.ts` · `lib/seo/sitemap.ts` | 요청마다 만든다(`force-dynamic`). 정적 공개 화면 + 올레 전량 + **색인 대상 장소**. 실패해도 500 을 내지 않는다 |
+| `sitemap.xml`       | `app/sitemap.ts` · `lib/seo/sitemap.ts` | 요청마다(`force-dynamic`). 정적 + 올레 + **색인 대상 장소**(전용 API 한 번 · `lastmod`, #1210). 500 을 안 낸다 |
 | 화면 메타데이터     | `lib/seo/page-metadata.ts`              | 공개 화면은 **`pageMetadata({ title, description, path, image })` 를 거친다** (`app/seo-metadata.test.ts`)     |
 | 검색 문구           | `lib/messages/seo.ts`                   | 화면 `h1` 과 따로 둔다. 제목은 사람들이 치는 말(제주 · 반려견 · 강아지 · 애견동반)을 담는다                    |
 | 장소 상세 색인 여부 | `lib/seo/place.ts` `isIndexablePlace`   | 동반 정보가 `UNKNOWN` 이거나 `delisted` 면 `noindex, follow`. **사이트맵도 같은 함수를 쓴다**                  |
