@@ -1,3 +1,4 @@
+import type { LatLng } from '@/lib/geo/coord'
 import { normalizeKeyword } from '@/lib/url/keyword'
 import { PET_SIZE_CODES } from '@/types/pet'
 import {
@@ -112,11 +113,20 @@ export function toPlaceFilterQuery(filters: PlaceFilters): string {
   return params.toString()
 }
 
-/** API 호출용 쿼리 문자열. 기본값도 명시하고 커서·size 를 포함한다 */
+/**
+ * API 호출용 쿼리 문자열. 기본값도 명시하고 커서·size 를 포함한다.
+ *
+ * **`origin` 을 주면 `lat` · `lng` 를 함께 싣는다** (#1217) — 서버가 그 점에서 가까운 순으로 주고
+ * 행마다 `distanceMeters` 를 채운다. 둘 중 하나만 보내면 `PLACE_109` 400 이라 한 값으로 묶는다.
+ * 커서는 거리순에서도 `lastPlaceId` 그대로다(서버가 그 장소의 거리 키를 되살린다).
+ * **URL 필터(`toPlaceFilterQuery`)에는 넣지 않는다** — 기준점은 화면이 정하는 것이지 사용자가
+ * 고르는 조건이 아니다.
+ */
 export function toPlaceApiQuery(
   filters: PlaceFilters,
   cursor: string | null = null,
   size: number = PLACE_PAGE_SIZE,
+  origin: LatLng | null = null,
 ): string {
   const params = new URLSearchParams()
 
@@ -130,6 +140,10 @@ export function toPlaceApiQuery(
   if (filters.petWeightKg !== null) params.set('petWeightKg', String(filters.petWeightKg))
   if (filters.sourceCategory !== null) params.set('sourceCategory', filters.sourceCategory)
   if (filters.keyword !== null) params.set('keyword', filters.keyword)
+  if (origin !== null) {
+    params.set('lat', String(origin.lat))
+    params.set('lng', String(origin.lng))
+  }
   if (cursor !== null) params.set('lastPlaceId', cursor)
   params.set('size', String(size))
 

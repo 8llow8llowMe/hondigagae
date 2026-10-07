@@ -192,3 +192,32 @@ describe('petWeightKg — 내 반려견 체중 필터', () => {
     expect(parsePlaceFilters(new URLSearchParams(toPlaceFilterQuery(filters)))).toEqual(filters)
   })
 })
+
+describe('toPlaceApiQuery — 기준 좌표 (#1217)', () => {
+  it('기준점을 주면 lat · lng 를 함께 싣는다 — 서버가 거리순으로 준다', () => {
+    const params = new URLSearchParams(
+      toPlaceApiQuery(DEFAULT_PLACE_FILTERS, null, undefined, { lat: 33.2539, lng: 126.4123 }),
+    )
+
+    expect(params.get('lat')).toBe('33.2539')
+    expect(params.get('lng')).toBe('126.4123')
+  })
+
+  it('기준점이 없으면 둘 다 보내지 않는다 — 하나만 보내면 PLACE_109 다', () => {
+    const query = toPlaceApiQuery(DEFAULT_PLACE_FILTERS, null, undefined, null)
+
+    expect(query).not.toContain('lat=')
+    expect(query).not.toContain('lng=')
+    expect(query).toBe(toPlaceApiQuery(DEFAULT_PLACE_FILTERS))
+  })
+
+  it('거리순에서도 커서는 lastPlaceId 그대로다', () => {
+    const query = toPlaceApiQuery(DEFAULT_PLACE_FILTERS, '42', undefined, {
+      lat: 33.25,
+      lng: 126.41,
+    })
+
+    expect(query).toContain('lastPlaceId=42')
+    expect(query).toContain('lat=33.25')
+  })
+})

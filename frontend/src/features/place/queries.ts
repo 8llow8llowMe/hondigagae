@@ -1,3 +1,4 @@
+import type { LatLng } from '@/lib/geo/coord'
 import type { PlaceFilters } from '@/types/place'
 
 /**
@@ -7,7 +8,14 @@ import type { PlaceFilters } from '@/types/place'
  */
 export const placeKeys = {
   all: ['places'] as const,
-  list: (filters: PlaceFilters) => [...placeKeys.all, 'list', filters] as const,
+  /**
+   * **기준점이 있으면 키가 갈린다** (#1217) — 거리순은 같은 필터라도 순서와 `distanceMeters` 가 다르다.
+   * 없으면(`null`) 예전 키 그대로라 `/places` · 지도 패널 · 담기 화면이 캐시를 나눠 쓴다.
+   */
+  list: (filters: PlaceFilters, origin: LatLng | null = null) =>
+    origin === null
+      ? ([...placeKeys.all, 'list', filters] as const)
+      : ([...placeKeys.all, 'list', filters, { lat: origin.lat, lng: origin.lng }] as const),
   detail: (placeId: string) => [...placeKeys.all, 'detail', placeId] as const,
 }
 

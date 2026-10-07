@@ -248,8 +248,8 @@ describe('담기 화면의 검색 자리 (#1012)', () => {
  * 담기 지도의 기준점 — 이슈 #1177.
  *
  * 규칙(직전 장소 → 그날 숙소 → 전날 숙소 → 없음)은 `add-place-focus.test.ts` 가, 지도가 그
- * 점에서 여는 상태 전이는 `place-map-area.test.ts` 가 잰다. 여기서는 **지도 갈래만** 넘기는지
- * 본다 — 목록 보기는 `/places` 가 좌표·정렬을 받지 않아 그대로다 (BE 후속).
+ * 점에서 여는 상태 전이는 `place-map-area.test.ts` 가 잰다. 여기서는 지도 갈래가 넘기는지 본다.
+ * 목록 보기의 거리순(#1217)은 아래 블록이 본다.
  */
 describe('담기 지도의 기준점 (#1177)', () => {
   const code = readSourceWithoutComments('src/features/plan/plan-add-place-view.tsx')
@@ -260,8 +260,36 @@ describe('담기 지도의 기준점 (#1177)', () => {
 
     expect(code.slice(mapStart, listStart)).toContain('initialFocus={addPlaceFocus(day, days)}')
   })
+})
 
-  it('목록 갈래는 넘기지 않는다 — 기준점을 쓰는 곳이 지도 한 곳이다', () => {
-    expect(code.split('addPlaceFocus(').length - 1).toBe(1)
+/**
+ * 담기 목록 보기의 거리순 — 이슈 #1217.
+ *
+ * 훅을 든 뷰는 node 환경에서 렌더되지 않아(`testing-guide.md` §1) 배선을 소스로 본다. 기준점 규칙은
+ * `add-place-focus.test.ts`, 키 분리는 `queries.test.ts`, 쿼리는 `place-filters.test.ts` 가 잰다.
+ */
+describe('담기 목록 보기의 거리순 (#1217)', () => {
+  const code = readSourceWithoutComments('src/features/plan/plan-add-place-view.tsx')
+  const page = readSourceWithoutComments('app/(main)/plans/[planId]/days/[day]/add/page.tsx')
+
+  it('서버와 클라이언트가 같은 함수로 기준점을 낸다 — key 가 맞아야 하이드레이션이 된다', () => {
+    expect(code).toContain('addPlaceListOrigin(detail.data, day)')
+    expect(page).toContain('addPlaceListOrigin(detail, day)')
+    expect(page).toContain('placeKeys.list(filters, origin)')
+  })
+
+  it('목록 보기에서만, 상세가 온 뒤에 조회한다 — 지도에서 쓰지 않을 요청을 내지 않는다', () => {
+    expect(code).toContain(
+      "usePlaceList(filters, view === 'list' && frozenOrigin !== null, listOrigin)",
+    )
+  })
+
+  it('기준점을 처음 값으로 얼린다 — 담을 때마다 목록이 처음부터 다시 받아지지 않게', () => {
+    expect(code).toContain('if (frozenOrigin === null && liveOrigin !== undefined)')
+    expect(code).not.toMatch(/usePlaceList\([^)]*liveOrigin/)
+  })
+
+  it('지도 보기의 서버 프리페치는 좌표 없는 key 그대로다', () => {
+    expect(page).toContain("view === 'list' ? addPlaceListOrigin(detail, day) : null")
   })
 })

@@ -34,3 +34,21 @@ describe('placeMetaLine', () => {
     expect(placeMetaLine('', true)).toBe(messages.place.rowIndoor)
   })
 })
+
+describe('placeMetaLine — 거리 (#1217)', () => {
+  it('거리가 있으면 맨 뒤에 붙인다 — 거리순 목록에서만 값이 온다', () => {
+    expect(placeMetaLine('제주특별자치도 서귀포시 안덕면 병악로 166', null, 1234)).toBe(
+      '서귀포시 안덕면 · 1.2km',
+    )
+  })
+
+  it('1km 미만은 m 로 쓴다', () => {
+    expect(placeMetaLine(null, true, 43)).toBe(`${messages.place.rowIndoor} · 43m`)
+  })
+
+  it('거리가 null 이면 예전 줄 그대로다', () => {
+    expect(placeMetaLine('제주특별자치도 제주시 한림읍 용금로 906-107', true, null)).toBe(
+      placeMetaLine('제주특별자치도 제주시 한림읍 용금로 906-107', true),
+    )
+  })
+})

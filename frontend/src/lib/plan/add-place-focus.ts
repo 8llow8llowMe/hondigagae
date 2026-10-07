@@ -1,6 +1,12 @@
 import type { LatLng } from '@/lib/geo/coord'
 import { itemInsertIndex } from '@/lib/plan/day-items'
-import { lodgingBasisFor, type PlanDayGroup, planItemMapCoord } from '@/lib/plan/detail'
+import {
+  groupItemsByDay,
+  lodgingBasisFor,
+  type PlanDayGroup,
+  planItemMapCoord,
+} from '@/lib/plan/detail'
+import type { PlanDetail } from '@/types/plan'
 
 /**
  * 담기 지도를 **어디서 열지** — 이슈 #1177.
@@ -43,4 +49,22 @@ export function addPlaceFocus(day: number, days: PlanDayGroup[]): LatLng | null 
 
   const lodging = lodgingBasisFor(day, days)
   return lodging === null ? null : planItemMapCoord(lodging)
+}
+
+/**
+ * 담기 **목록 보기**의 거리순 기준점 (#1217). 지도와 같은 점(`addPlaceFocus`)이다.
+ *
+ * - `undefined` — 상세를 아직 못 받았다. 조회를 미룬다 — 좌표 없이 먼저 받으면 상세가 온 뒤
+ *   기준점이 생겨 key 가 바뀌고, 목록이 `placeId` 순에서 거리순으로 한 번 뒤집힌다
+ * - `null` — 기준점이 없다(그날 · 전날 숙소 모두 좌표 없음). 좌표 없이 `placeId` 순이다
+ *
+ * **서버 프리페치와 클라이언트가 이 함수 하나를 본다** — 같은 상세에서 같은 점이 나와야 key 가 맞아
+ * 하이드레이션이 성립한다.
+ */
+export function addPlaceListOrigin(
+  detail: Pick<PlanDetail, 'items' | 'totalDays'> | undefined,
+  day: number,
+): LatLng | null | undefined {
+  if (detail === undefined) return undefined
+  return addPlaceFocus(day, groupItemsByDay(detail.items, detail.totalDays).days)
 }

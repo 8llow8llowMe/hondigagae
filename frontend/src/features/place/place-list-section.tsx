@@ -54,6 +54,13 @@ export type PlaceListSectionProps = {
    */
   keyword?: string | null
   /**
+   * 검색어 없는 0건의 설명을 바꾼다 (#1217). 기본은 `필터를 바꿔 다시 찾아보세요.` 다.
+   *
+   * 담기 화면의 거리순 목록이 쓴다 — 좌표 없는 장소는 거리순에서 빠져, 같은 필터로 `/places` 에는
+   * 있던 곳이 여기서는 0건일 수 있다. 그 사실을 말하지 않으면 필터만 탓하게 된다.
+   */
+  emptyDescription?: string | undefined
+  /**
    * 행을 다르게 그린다. 기본은 장소 상세로 가는 `PlaceRow` 다.
    *
    * 일정에 담는 화면(#82)이 같은 4상태(로딩·오류·빈 결과·목록)와 무한 스크롤을
@@ -112,6 +119,7 @@ export function PlaceListSection({
   onRetry,
   onResetFilters,
   keyword = null,
+  emptyDescription = messages.place.emptyDescription,
   inset = 'card',
   headingLevel = 2,
   columns = 1,
@@ -193,9 +201,7 @@ export function PlaceListSection({
           `초기화` 버튼은 그대로다 (그 버튼이 검색어까지 지운다 — `DEFAULT_PLACE_FILTERS`).
         */
         title={keyword === null ? messages.place.emptyTitle : searchEmptyCopy(keyword).title}
-        description={
-          keyword === null ? messages.place.emptyDescription : searchEmptyCopy(keyword).description
-        }
+        description={keyword === null ? emptyDescription : searchEmptyCopy(keyword).description}
         action={
           <Button variant="secondary" size="md" onClick={onResetFilters}>
             {messages.place.resetFilters}
