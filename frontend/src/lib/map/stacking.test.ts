@@ -43,4 +43,13 @@ describe('markerZIndex', () => {
 
     for (const z of markers) expect(z).toBeGreaterThan(MAP_LAYER_Z.route)
   })
+
+  /*
+    **기준점 마커는 모든 장소 핀 아래다** (#1223). 누를 수 없는 표시라, 겹치면 누를 수 있는 핀이
+    이겨야 한다. 선보다는 위다 — 선이 이름표를 덮으면 글자가 잘린다.
+  */
+  it('기준점 마커는 선 위, 모든 장소 핀 아래다', () => {
+    expect(MAP_LAYER_Z.focus).toBeGreaterThan(MAP_LAYER_Z.route)
+    expect(MAP_LAYER_Z.focus).toBeLessThan(markerZIndex({ isCluster: false, selected: false }))
+  })
 })

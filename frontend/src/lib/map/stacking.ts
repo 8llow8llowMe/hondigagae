@@ -34,7 +34,12 @@
  */
 export const MAP_LAYER_Z = {
   route: 0,
-  pin: 1,
+  /**
+   * 기준점 마커 (#1223) — **누를 수 있는 모든 핀 아래다.** 누를 수 없는 표시라, 겹치면 누를 수 있는
+   * 핀이 이겨야 한다. CSS `z-index` 로 들어가 정수여야 해서 `pin` 을 한 칸 올렸다(값이 아니라 순서가 계약).
+   */
+  focus: 1,
+  pin: 2,
   selectedPin: 10,
   cluster: 11,
 } as const

@@ -258,7 +258,18 @@ describe('담기 지도의 기준점 (#1177)', () => {
     const mapStart = code.indexOf("if (view === 'map')")
     const listStart = code.indexOf('<PlanAddPlaceShell', mapStart)
 
-    expect(code.slice(mapStart, listStart)).toContain('initialFocus={addPlaceFocus(day, days)}')
+    expect(code.slice(mapStart, listStart)).toContain('initialFocus={focusBasis?.coord ?? null}')
+    expect(code).toContain('const focusBasis = addPlaceFocusBasis(day, days)')
+  })
+
+  /* 기준점 마커의 이름도 같은 판정에서 나온다 — 찍는 자리와 이름이 갈리지 않게 (#1223) */
+  it('지도 갈래가 기준점 이름을 함께 넘긴다', () => {
+    const mapStart = code.indexOf("if (view === 'map')")
+    const listStart = code.indexOf('<PlanAddPlaceShell', mapStart)
+
+    expect(code.slice(mapStart, listStart)).toContain(
+      'initialFocusName={addPlaceFocusMarkerName(focusBasis)}',
+    )
   })
 })
 

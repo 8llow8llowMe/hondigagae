@@ -880,6 +880,8 @@ export const planMessages = {
   addPlaceNearbyCaptionPrevious: '‘{name}’에서 가까운 순이에요.',
   addPlaceNearbyCaptionLodging: '숙소 ‘{name}’에서 가까운 순이에요.',
   addPlaceNearbyCaptionPreviousLodging: '전날 숙소 ‘{name}’에서 가까운 순이에요.',
+  /** 지도 기준점 마커의 올레 이름 (#1223) — 코스가 아니라 시작점을 찍는다 (`planItemMapCoord`) */
+  addPlaceFocusWalkStart: '{name} 시작점',
   /** 올레는 코스 시작점에서 잰다 (`planItemMapCoord`) */
   addPlaceNearbyCaptionWalk: '‘{name}’ 시작점에서 가까운 순이에요.',
   /**

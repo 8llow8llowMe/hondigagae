@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { clusterContent, pinContent } from '@/lib/map/pin-content'
+import { clusterContent, focusMarkerContent, pinContent } from '@/lib/map/pin-content'
+import { messages } from '@/lib/messages'
 
 /**
  * 핀이 무엇으로 그려지는가 — 이슈 [#789](https://github.com/8llow8llowMe/hondigagae/issues/789).
@@ -177,5 +178,34 @@ describe('clusterContent — 묶음 마커', () => {
     expect(pinContent(STOP, { selected: false, interactive: true }).className).toContain(
       'map-pin-order',
     )
+  })
+})
+
+/*
+  **기준점 마커** (#1223). 담기 지도가 그날 기준점에서 열리는데 그 자리에 표시가 없어, 왜 여기서
+  열렸는지 알 수 없었다. 장소가 아니라 "지도를 연 자리" 라 고를 것이 없다.
+*/
+describe('focusMarkerContent — 기준점 마커 (#1223)', () => {
+  const content = focusMarkerContent('카멜리아힐')
+
+  it('누를 수 없다 — 버튼이 아니고 눌림 상태도 없다', () => {
+    expect(content.tag).toBe('div')
+    expect(content.role).toBe('img')
+    expect(content.ariaPressed).toBeNull()
+    expect(content.className).toContain('map-pin-static')
+  })
+
+  it('장소 핀과 다른 모양이다 — 같은 클래스만이면 장소로 읽힌다', () => {
+    expect(content.className).toContain('map-pin-focus')
+    expect(content.className).not.toContain('map-pin-selected')
+  })
+
+  it('보이는 글자가 기준점이라고 말한다 — 이름만이면 장소 이름표와 구별되지 않는다', () => {
+    expect(content.label).toBe(messages.map.focusMarkerText.replace('{name}', '카멜리아힐'))
+    expect(content.text).toBeNull()
+  })
+
+  it('보조기기 이름도 같은 말이다', () => {
+    expect(content.ariaLabel).toBe(messages.map.focusMarkerLabel.replace('{name}', '카멜리아힐'))
   })
 })

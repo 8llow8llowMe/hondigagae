@@ -23,8 +23,9 @@ import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
 import { messages } from '@/lib/messages'
 import {
-  addPlaceFocus,
   type AddPlaceFocusBasis,
+  addPlaceFocusBasis,
+  addPlaceFocusMarkerName,
   addPlaceListBasis,
   addPlaceNearbyCaption,
 } from '@/lib/plan/add-place-focus'
@@ -285,6 +286,8 @@ export function PlanAddPlaceView({
     })
 
   if (view === 'map') {
+    /* 기준점과 그 출처 · 항목 — 카메라(`initialFocus`)와 마커 이름이 같은 판정에서 나온다 (#1223) */
+    const focusBasis = addPlaceFocusBasis(day, days)
     return (
       /*
         **지도가 상단까지 찬다** (#556). 예전에는 머리가 정상 흐름으로 서고 남는 높이를
@@ -370,7 +373,12 @@ export function PlanAddPlaceView({
               **목록 보기는 같은 점을 따로 얼려 서버에 넘긴다** (#1217) — 클라이언트 정렬이 아니라
               `/places?lat=&lng=` 의 거리순이다. 위 `listOrigin` 주석.
             */
-            initialFocus={addPlaceFocus(day, days)}
+            initialFocus={focusBasis?.coord ?? null}
+            /*
+              **기준점 자리에 이름표를 세운다** (#1223) — 기준이 올레 시작점이거나 필터에 걸린 장소면
+              그 자리에 핀이 없어 왜 여기서 열렸는지 알 수 없었다. 마운트 때 값만 쓴다(`initialFocus` 와 같다).
+            */
+            initialFocusName={addPlaceFocusMarkerName(focusBasis)}
             renderRowAction={(place) =>
               planAddPlaceAction(place, {
                 addedPlaceIds,

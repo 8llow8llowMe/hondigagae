@@ -11,7 +11,12 @@ import {
 } from '@/lib/geo/coord'
 import { createAlwaysDrawnOverlay } from '@/lib/map/always-drawn-overlay'
 import { clusterForLevel } from '@/lib/map/cluster'
-import { clusterContent, type PinContent, pinContent } from '@/lib/map/pin-content'
+import {
+  clusterContent,
+  focusMarkerContent,
+  type PinContent,
+  pinContent,
+} from '@/lib/map/pin-content'
 import type { MapRouteSegment } from '@/lib/map/route'
 import { loadKakaoMaps, MapSdkError, type MapSdkFailure } from '@/lib/map/sdk'
 import { MAP_LAYER_Z, markerZIndex } from '@/lib/map/stacking'
@@ -212,6 +217,7 @@ export function MapCanvas({
   center,
   camera,
   selectedLevel,
+  focusMarker,
   onFailure,
   className,
 }: {
@@ -327,6 +333,13 @@ export function MapCanvas({
    */
   selectedLevel?: number
   /** SDK 를 못 쓰면 호출부가 목록으로 되돌린다 */
+  /**
+   * **지도를 연 기준점** (#1223) — 누를 수 없는 이름표 하나를 그 자리에 세운다. 담기 지도만 넘긴다;
+   * 없으면(`/places` 등) 한 글자도 다르지 않다.
+   *
+   * **호출부는 참조를 안정적으로 넘긴다** (`useMemo`) — 이 값이 바뀌면 오버레이를 지우고 다시 그린다.
+   */
+  focusMarker?: { lat: number; lng: number; name: string } | null
   onFailure?: (reason: MapSdkFailure) => void
   className?: string
 }) {
@@ -351,6 +364,11 @@ export function MapCanvas({
     정리에서 **두 배열 모두** 진다.
   */
   const polylinesRef = useRef<KakaoPolyline[]>([])
+  /**
+   * 기준점 마커 (#1223). **핀 배열에 태우지 않는다** — 선과 같은 이유다: 핀 effect 는 선택 · 확대 ·
+   * 조회마다 `overlaysRef` 를 통째로 비우고 다시 그리는데, 기준점은 마운트 때 정해져 바뀌지 않는다.
+   */
+  const focusOverlayRef = useRef<KakaoCustomOverlay | null>(null)
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
   /** 확대 단계 — 묶음 셀 크기가 여기서 갈린다 */
@@ -447,6 +465,9 @@ export function MapCanvas({
       // 선도 마커와 같은 누수 경로를 갖는다 — 지우지 않으면 지도를 다시 만들 때 남는다
       for (const polyline of polylinesRef.current) polyline.setMap(null)
       polylinesRef.current = []
+
+      focusOverlayRef.current?.setMap(null)
+      focusOverlayRef.current = null
 
       mapRef.current = null
       mapsRef.current = null
@@ -602,6 +623,38 @@ export function MapCanvas({
 
     overlaysRef.current = created
   }, [pins, selectedId, status, level, interactive])
+
+  // ── 기준점 마커 (#1223) ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current
+    const maps = mapsRef.current
+    if (map === null || maps === null || status !== 'ready') return
+
+    // 먼저 지운다 — 핀과 같은 이유다
+    focusOverlayRef.current?.setMap(null)
+    focusOverlayRef.current = null
+
+    if (focusMarker === null || focusMarker === undefined) return
+    // 좌표가 없거나 0 이면 그리지 않는다 — 핀과 같은 판단(`toLatLng`)
+    const coord = toLatLng(focusMarker)
+    if (coord === null) return
+
+    const overlay = new maps.CustomOverlay({
+      position: new maps.LatLng(coord.lat, coord.lng),
+      content: markerElement(focusMarkerContent(focusMarker.name), null),
+      /*
+        **점 아래에 선다** (`yAnchor: 0`). 장소 이름표는 아래 끝이 점을 가리키므로(`yAnchor: 1`) 점
+        **위**를 쓴다 — 기준점은 대개 그날 담은 장소라 같은 좌표에 그 장소의 핀도 선다. 같은 쪽에
+        두면 서로 덮어 둘 중 하나를 못 읽는다. 위아래로 나눠 둘 다 남긴다.
+      */
+      yAnchor: 0,
+      zIndex: MAP_LAYER_Z.focus,
+      // 누를 수 없는 표시다 — 클릭을 받으면 그 위에서 시작한 끌기가 지도에 닿지 않는다 (#789)
+      clickable: false,
+    })
+    overlay.setMap(map)
+    focusOverlayRef.current = overlay
+  }, [focusMarker, status])
 
   // ── 동선 선 ──────────────────────────────────────────────────────────────
   /*

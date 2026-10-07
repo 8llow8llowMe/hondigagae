@@ -19,6 +19,7 @@
  */
 
 import { clusterMarkerLabel, clusterMarkerText } from '@/lib/map/cluster'
+import { messages } from '@/lib/messages'
 
 /** 이 판단이 쓰는 필드만. `MapPin` 이 구조적으로 대입된다 */
 export type PinContentInput = {
@@ -136,4 +137,31 @@ export function clusterContent(count: number): PinContent {
 /** 고를 것이 없는 지도의 핀에는 `.map-pin-static` 이 따라붙는다 (#789) */
 function classNames(names: (string | false)[], interactive: boolean): string {
   return [...names, !interactive && 'map-pin-static'].filter((name) => name !== false).join(' ')
+}
+
+/**
+ * 기준점 마커 — 이슈 #1223.
+ *
+ * 담기 지도는 그날 기준점(`addPlaceFocus`)에서 열리는데, 그 자리에 아무 표시가 없어 **왜 여기서
+ * 열렸는지** 알 수 없었다 — 기준이 올레 시작점이거나 필터에 걸린 장소면 핀조차 없다.
+ *
+ * - **누를 수 없다** (`div role="img"` · `.map-pin-static`). 장소가 아니라 "지도를 연 자리" 라
+ *   고를 것이 없다 — 고를 수 없는 핀의 규칙(#789)을 그대로 따른다
+ * - **장소 핀과 모양이 다르다** (`.map-pin-focus`). 같은 이름표면 장소로 읽힌다. 색이 아니라 채움 ·
+ *   아이콘 · 놓이는 자리(점 **아래**)로 가른다 — 등급 색을 마커에 쓰지 않는다(DESIGN.md §2-3)
+ * - **보이는 글자에 `기준` 이 붙는다** — 이름만이면 같은 지도의 장소 이름표와 구별되지 않는다
+ *
+ * 같은 `PinContent` 타입이라 applier(`markerElement`)가 하나로 남는다 — `clusterContent` 와 같은 이유.
+ */
+export function focusMarkerContent(name: string): PinContent {
+  const label = messages.map.focusMarkerText.replace('{name}', name)
+  return {
+    tag: 'div',
+    role: 'img',
+    className: 'map-pin map-pin-static map-pin-focus',
+    text: null,
+    label,
+    ariaLabel: messages.map.focusMarkerLabel.replace('{name}', name),
+    ariaPressed: null,
+  }
 }

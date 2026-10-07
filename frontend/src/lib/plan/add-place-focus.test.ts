@@ -5,6 +5,7 @@ import { messages } from '@/lib/messages'
 import {
   addPlaceFocus,
   addPlaceFocusBasis,
+  addPlaceFocusMarkerName,
   addPlaceListBasis,
   addPlaceListOrigin,
   addPlaceNearbyCaption,
@@ -266,5 +267,23 @@ describe('addPlaceNearbyCaption — 목록 위 한 줄 (#1221)', () => {
     expect(addPlaceNearbyCaption(basis('previous', 'A'))).toBe(
       messages.plan.addPlaceNearbyCaptionPrevious.replace('{name}', 'A'),
     )
+  })
+})
+
+describe('addPlaceFocusMarkerName — 지도 기준점 마커의 이름 (#1223)', () => {
+  it('항목 제목이다', () => {
+    const item = { ...at(2, 0, JUNGMUN), title: '카멜리아힐' }
+    expect(addPlaceFocusMarkerName({ kind: 'previous', coord: JUNGMUN, item })).toBe('카멜리아힐')
+  })
+
+  it('올레는 시작점이라고 붙인다 — 코스가 아니라 시작점을 찍는다', () => {
+    const item = { ...at(2, 0, JUNGMUN, WALK), title: '올레 7코스' }
+    expect(addPlaceFocusMarkerName({ kind: 'previous', coord: JUNGMUN, item })).toBe(
+      messages.plan.addPlaceFocusWalkStart.replace('{name}', '올레 7코스'),
+    )
+  })
+
+  it('기준점이 없으면 null', () => {
+    expect(addPlaceFocusMarkerName(null)).toBeNull()
   })
 })

@@ -144,3 +144,18 @@ export function addPlaceNearbyCaption(basis: AddPlaceFocusBasis | null): string 
   }[basis.kind]
   return template.replace('{name}', name)
 }
+
+/**
+ * 지도 기준점 마커에 실을 이름 (#1223). 기준점이 없으면 `null` — 마커도 없다.
+ *
+ * **목록 문구(`addPlaceNearbyCaption`)와 같은 판정에서 나온다** — 찍는 자리와 이름이 갈리지 않게.
+ * 출처 낱말(숙소 · 전날 숙소)은 싣지 않는다: 마커는 그 자리에 서 있어 "어디" 를 이미 말하고, 이름표가
+ * 길어질수록 지도를 덮는다. 줄임은 CSS(`.map-pin > span` 말줄임)가 맡는다. **올레는 시작점이라고
+ * 붙인다** — 코스 전체가 아니라 시작점을 찍는다.
+ */
+export function addPlaceFocusMarkerName(basis: AddPlaceFocusBasis | null): string | null {
+  if (basis === null) return null
+  return basis.item.itemType.code === 'WALK'
+    ? messages.plan.addPlaceFocusWalkStart.replace('{name}', basis.item.title)
+    : basis.item.title
+}
