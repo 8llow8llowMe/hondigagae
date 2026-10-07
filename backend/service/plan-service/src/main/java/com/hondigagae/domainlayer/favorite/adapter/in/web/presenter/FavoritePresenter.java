@@ -37,6 +37,7 @@ public class FavoritePresenter {
             .petAllowanceName(info.petAllowanceName())
             .indoor(info.indoor())
             .firstImage(info.firstImage())
+            .savedAt(info.savedAt())
             .build();
     }
 }
