@@ -318,12 +318,19 @@ describe('PhotoGallery — 캐러셀 넘기기 (#1233 D3)', () => {
     expect(markup).not.toContain(next)
   })
 
-  it('버튼은 마우스를 올렸을 때 · 포커스가 있을 때만 보인다', () => {
+  it('버튼은 사진 위에 마우스를 올렸을 때만 서서히 나타난다', () => {
     const button = renderCarousel(3).match(new RegExp(`<button[^>]*${next}[^>]*>`))?.[0] ?? ''
 
     expect(button).toContain('opacity-0')
-    expect(button).toContain('group-hover:opacity-100')
-    expect(button).toContain('group-focus-within:opacity-100')
+    expect(button).toContain('group-hover/gallery:opacity-100')
+    expect(button).toContain('transition-opacity duration-200 ease-out')
+  })
+
+  it('마우스로 누른 포커스로는 뜨지 않고 키보드 포커스만 예외다', () => {
+    const button = renderCarousel(3).match(new RegExp(`<button[^>]*${next}[^>]*>`))?.[0] ?? ''
+
+    expect(button).not.toContain('group-focus-within')
+    expect(button).toContain('group-has-[:focus-visible]/gallery:opacity-100')
   })
 
   it('상세(responsive) 캐러셀도 같은 버튼을 쓴다', () => {
