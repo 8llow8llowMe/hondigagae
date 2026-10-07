@@ -330,6 +330,27 @@ class AiPlanPromptFactoryTest {
         assertThat(prompt).doesNotContain("실내 후보 위주로 배치할 것");
     }
 
+    @Test
+    @DisplayName("실내·카페 요청은 후보의 사실로만 맞추라고 적는다 (#1170)")
+    void requestNotePinsIndoorCafeToCandidateFacts() {
+        String noted = factory.userPrompt(AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-15")
+            .requestNote("오후엔 실내 카페에서 쉬고 싶어요")
+            .build());
+        String plain = factory.userPrompt(AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-15")
+            .requestNote("바다 보며 산책하고 싶어요")
+            .build());
+
+        assertThat(noted).contains("사용자 요청: 오후엔 실내 카페에서 쉬고 싶어요");
+        assertThat(noted).contains("숙소는 대신하지 말 것");
+        assertThat(plain).contains("사용자 요청: 바다 보며 산책하고 싶어요");
+        assertThat(plain).doesNotContain("숙소는 대신하지 말 것");
+        assertThat(factory.systemPrompt()).contains("숙소는 그 요청을 대신하지 않습니다");
+    }
+
     private AiPlanGenerationQuery query(List<PetCondition> petConditions) {
         return AiPlanGenerationQuery.builder()
             .areaCode("39")

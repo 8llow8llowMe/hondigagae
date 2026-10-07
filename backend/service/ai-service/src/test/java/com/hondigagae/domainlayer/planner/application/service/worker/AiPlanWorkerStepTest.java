@@ -9,6 +9,7 @@ import com.hondigagae.domainlayer.planner.application.model.AiPlanJobSubscriptio
 import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
+import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobEventPort;
@@ -170,6 +171,75 @@ class AiPlanWorkerStepTest {
         assertThat(store.current().stepStartedAt()).isEqualTo(store.observedStepStarts.getLast());
     }
 
+    // 요청 문구의 실내 · 카페 (#1170) ───────────────────────────────────────
+
+    /** dev 실측 일정 "몽과 제주 2박 3일" 의 요청 문구 그대로. */
+    private static final String MEASURED_NOTE = "오전엔 바다 보며 산책하고 오후엔 실내 카페에서 쉬고 싶어요";
+
+    @Test
+    @DisplayName("실내 카페 요청이면 그 조건으로 더 찾아 후보 맨 앞에 둔다")
+    void reservesRequestedIndoorCafeAtTheFront() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("requestNote", MEASURED_NOTE);
+        RecordingCandidates candidates = new RecordingCandidates();
+        candidates.requested = List.of(place(200L, "바다뷰 카페", "음식점", true, "카페"));
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        assertThat(candidates.requestedIndoor).isTrue();
+        assertThat(candidates.requestedCategory).isEqualTo("카페");
+        assertThat(llm.lastQuery.safeCandidates()).extracting(PlaceCandidate::placeId).containsExactly(200L, 100L);
+        assertThat(llm.lastQuery.requestNote()).isEqualTo(MEASURED_NOTE);
+    }
+
+    @Test
+    @DisplayName("실내 요청에 걸린 숙소는 앞자리를 차지하지 않는다 — 숙소는 실내 휴식 요청을 대신하지 않는다")
+    void doesNotReserveLodgingForIndoorRequest() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("requestNote", "비 오면 실내에서 쉬고 싶어요");
+        RecordingCandidates candidates = new RecordingCandidates();
+        candidates.requested = List.of(
+            place(300L, "포시즌펜션", "숙박", true, "펜션"),
+            place(301L, "제주도립미술관", "문화시설", true, null));
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        assertThat(candidates.requestedIndoor).isTrue();
+        assertThat(candidates.requestedCategory).isNull();
+        assertThat(llm.lastQuery.safeCandidates()).extracting(PlaceCandidate::placeId).containsExactly(301L, 100L);
+    }
+
+    @Test
+    @DisplayName("맞는 후보가 없으면 생성은 끝내고 근거 맨 앞에서 없다고 말한다")
+    void disclosesUnmetRequestWithoutFailing() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("requestNote", MEASURED_NOTE);
+        FakeJobStore store = new FakeJobStore(job);
+
+        worker(store, new FakeJobEvents(), new RecordingLlm(), new RecordingCandidates()).runJob(JOB_ID);
+
+        assertThat(store.current().status()).isEqualTo(AiPlanJobStatus.COMPLETED);
+        assertThat(store.current().planDraft().reasons()).first()
+            .satisfies(reason -> {
+                assertThat(reason.code()).isEqualTo("REQUEST_UNMET");
+                assertThat(reason.description()).isEqualTo("요청하신 실내 카페가 이번 후보에 없어요.");
+            });
+    }
+
+    @Test
+    @DisplayName("실내 · 카페가 없는 요청은 추가 검색을 하지 않는다")
+    void skipsRequestedLookupWithoutIndoorOrCafe() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("requestNote", "바다 보며 산책하고 싶어요");
+        RecordingCandidates candidates = new RecordingCandidates();
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), new RecordingLlm(), candidates).runJob(JOB_ID);
+
+        assertThat(candidates.requestedLookups).isZero();
+    }
+
     // 단계별 소요 지표 (#985) ────────────────────────────────────────────────
 
     @Test
@@ -300,6 +370,15 @@ class AiPlanWorkerStepTest {
             .build();
     }
 
+    private static PlaceCandidateQueryResult place(
+        long placeId, String title, String contentTypeName, Boolean indoor, String sourceCategory
+    ) {
+        return PlaceCandidateQueryResult.builder()
+            .placeId(placeId).title(title).contentTypeName(contentTypeName)
+            .indoor(indoor).sourceCategory(sourceCategory).lat(33.5).lng(126.5)
+            .build();
+    }
+
     /** 저장된 잡을 들고 있으면서 밟은 단계를 순서대로 기록한다. */
     private static final class FakeJobStore implements AiPlanJobStorePort {
 
@@ -393,10 +472,12 @@ class AiPlanWorkerStepTest {
         private int calls;
         private boolean failing;
         private Runnable onCall;
+        private AiPlanGenerationQuery lastQuery;
 
         @Override
         public AiPlanDraft generatePlanDraft(AiPlanGenerationQuery query) {
             calls++;
+            lastQuery = query;
             if (onCall != null) {
                 onCall.run();
             }
@@ -416,6 +497,11 @@ class AiPlanWorkerStepTest {
 
         private String requestedSigunguCode;
         private boolean captured;
+        /** 요청 조건 검색이 돌려줄 장소. 비우면 맞는 곳이 없는 지역이다. */
+        private List<PlaceCandidateQueryResult> requested = List.of();
+        private int requestedLookups;
+        private Boolean requestedIndoor;
+        private String requestedCategory;
 
         @Override
         public List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, String sigunguCode, int size) {
@@ -424,6 +510,16 @@ class AiPlanWorkerStepTest {
             return List.of(PlaceCandidateQueryResult.builder()
                 .placeId(100L).title("후보").lat(33.5).lng(126.5)
                 .build());
+        }
+
+        @Override
+        public List<PlaceCandidateQueryResult> findRequestedCandidates(
+            String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory
+        ) {
+            requestedLookups++;
+            requestedIndoor = indoor;
+            requestedCategory = sourceCategory;
+            return requested;
         }
 
         @Override

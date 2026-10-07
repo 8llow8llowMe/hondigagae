@@ -22,12 +22,16 @@ public interface PlaceCandidateClient {
     /**
      * @param sigunguCode null 이면 Feign 이 쿼리에서 아예 뺀다 — tour-service 쪽 선택 파라미터라
      *                    빈 문자열을 보내면 "빈 시군구" 로 걸러질 위험이 있다
+     * @param indoor null 이면 실내 여부를 가리지 않는다. true 면 실내만
+     * @param sourceCategory null 이면 분류를 가리지 않는다. 카페는 {@code 카페}
      */
     @GetMapping("/api/v1/places")
     Response<PlaceSliceClientResponse> searchPlaces(
         @RequestParam("areaCode") String areaCode,
         @RequestParam(value = "sigunguCode", required = false) String sigunguCode,
         @RequestParam("petAllowanceType") String petAllowanceType,
-        @RequestParam("size") int size
+        @RequestParam("size") int size,
+        @RequestParam(value = "indoor", required = false) Boolean indoor,
+        @RequestParam(value = "sourceCategory", required = false) String sourceCategory
     );
 }

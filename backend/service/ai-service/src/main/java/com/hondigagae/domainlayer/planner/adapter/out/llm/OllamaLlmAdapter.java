@@ -87,7 +87,8 @@ public class OllamaLlmAdapter implements AiLlmPort {
         "PET_ALLOWED", "반려견 동반 가능",
         "WEATHER_OK", "날씨 양호",
         "INDOOR_ALTERNATIVE", "실내 대안",
-        "REST_SLOT", "휴식 시간 확보");
+        "REST_SLOT", "휴식 시간 확보",
+        "REQUEST_UNMET", "요청 반영");
 
     /** 표에 없는 코드의 이름. 코드를 그대로 내보내면 화면에 {@code CAFE_OK} 같은 기호가 보인다. */
     private static final String DEFAULT_REASON_NAME = "추천 이유";

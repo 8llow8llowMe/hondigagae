@@ -29,9 +29,23 @@ public class PlaceCandidateClientAdapter implements PlaceCandidateQueryPort {
 
     @Override
     public List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, String sigunguCode, int size) {
+        return search(areaCode, sigunguCode, size, null, null);
+    }
+
+    @Override
+    public List<PlaceCandidateQueryResult> findRequestedCandidates(
+        String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory
+    ) {
+        return search(areaCode, sigunguCode, size, indoor, sourceCategory);
+    }
+
+    private List<PlaceCandidateQueryResult> search(
+        String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory
+    ) {
         PlaceSliceClientResponse body = internalResponseSupport.requestAndUnwrapOrNull(
             InternalResponseSupport.TOUR_SERVICE,
-            () -> placeCandidateClient.searchPlaces(areaCode, sigunguCode, PET_ALLOWED, size));
+            () -> placeCandidateClient.searchPlaces(
+                areaCode, sigunguCode, PET_ALLOWED, size, indoor, sourceCategory));
 
         if (body == null || body.contents() == null) {
             log.warn("Place candidates empty areaCode={} sigunguCode={} size={}", areaCode, sigunguCode, size);

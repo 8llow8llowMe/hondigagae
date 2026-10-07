@@ -24,6 +24,19 @@ public interface PlaceCandidateQueryPort {
     List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, String sigunguCode, int size);
 
     /**
+     * 사용자 요청(실내 · 카페)에 맞는 동반 가능 장소 (#1170).
+     *
+     * <p>{@code indoor} · {@code sourceCategory} 가 null 이면 그 조건은 걸지 않는다.
+     * 기본 구현은 필터를 무시하고 {@link #findPetFriendlyCandidates} 를 부른다 — 테스트 대역이
+     * 필터를 구현하지 않아도 생성이 깨지지 않게 한다. 운영 어댑터는 필터를 검색에 넘긴다.
+     */
+    default List<PlaceCandidateQueryResult> findRequestedCandidates(
+        String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory
+    ) {
+        return findPetFriendlyCandidates(areaCode, sigunguCode, size);
+    }
+
+    /**
      * 아이디로 후보를 직접 가져온다 — 사용자가 필수 포함으로 지정한 장소는 검색 상위 N 에
      * 없어도 후보에 넣어야 하기 때문이다. 노출 불가 장소는 결과에서 빠진다.
      */
