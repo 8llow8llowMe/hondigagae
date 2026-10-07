@@ -115,7 +115,10 @@ const METADATA_CALLS: Array<{ page: string; call: string }> = [
     page: 'app/(main)/olle/[walkCourseId]/page.tsx',
     call: 'return walkCourseDetailFallbackMetadata(error)',
   },
-  { page: 'app/(main)/shared-plans/[token]/page.tsx', call: 'sharedPlanPageTitle(error)' },
+  {
+    page: 'app/(main)/shared-plans/[token]/page.tsx',
+    call: 'sharedPlanPageTitle(error, planTitle)',
+  },
 ]
 
 describe('generateMetadata 가 판정 함수로 제목을 정한다 (#980)', () => {
@@ -128,12 +131,11 @@ describe('generateMetadata 가 판정 함수로 제목을 정한다 (#980)', () 
 })
 
 /*
-  **공유 페이지 — 제목을 조회 결과로 가르되 일정 내용은 싣지 않는다** (#980,
-  `일정공유-세부명세.md` 보안 메모). 정적 `metadata` 를 `generateMetadata` 로 바꾸면서 새로 생기는
-  위험 둘을 잠근다: ① 조회한 일정 값이 제목에 흘러들어 가는 것 ② `noindex` 가 한 갈래에서라도
-  빠지는 것 — 이 페이지의 유일한 색인 방어다.
+  **공유 페이지 — 제목을 조회 결과로 가르고, 실리는 일정 값은 이름 하나다** (#980 → #1186,
+  `일정공유-세부명세.md` D8-4). 잠그는 위험 둘: ① 이름 말고 다른 일정 값(기간 · 예산 · 메모 · 항목)이
+  메타데이터로 흘러들어 가는 것 ② `noindex` 가 한 갈래에서라도 빠지는 것 — 이 페이지의 유일한 색인 방어다.
 */
-describe('공유 페이지 generateMetadata (#980)', () => {
+describe('공유 페이지 generateMetadata (#980 → #1186)', () => {
   const source = code('app/(main)/shared-plans/[token]/page.tsx')
   const start = source.indexOf('export async function generateMetadata')
   const end = source.indexOf('export default')
@@ -145,9 +147,9 @@ describe('공유 페이지 generateMetadata (#980)', () => {
     expect(end).toBeGreaterThan(start)
   })
 
-  it('조회 결과를 받아 두지 않는다 — 넘길 값이 없으니 제목에 일정이 실릴 수 없다', () => {
-    expect(metadataFn).toMatch(/await loadSharedPlan\(token\)\s*\n/)
-    expect(metadataFn).not.toMatch(/=\s*await loadSharedPlan/)
+  it('조회 결과에서 이름(title) 하나만 꺼낸다 — 다른 일정 값이 메타데이터로 갈 자리가 없다', () => {
+    expect(metadataFn).toMatch(/planTitle = \(await loadSharedPlan\(token\)\)\.title/)
+    expect(metadataFn).not.toMatch(/\b(startDate|endDate|budget|memo|items)\b/)
   })
 
   it('모든 갈래가 noindex 다 — robots 가 한 자리에만 있다', () => {

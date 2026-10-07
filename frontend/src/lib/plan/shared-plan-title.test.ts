@@ -2,18 +2,30 @@ import { describe, expect, it } from 'vitest'
 
 import { ApiError } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
-import { sharedPlanPageTitle } from '@/lib/plan/shared-plan-title'
+import { sharedPlanOpenGraph, sharedPlanPageTitle } from '@/lib/plan/shared-plan-title'
+import { BRAND_SHARE_IMAGE } from '@/lib/seo/page-metadata'
 
 /**
  * **#980.** `/shared-plans/{무효한 토큰}` 은 404 인데 탭이 `공유된 여행 일정` 이었다 — 본문
  * `h1` 은 `유효하지 않은 링크예요` 다. 메타데이터가 정적이라 조회 결과를 볼 수 없었다.
  *
- * **유효한 링크의 제목에는 일정 내용을 싣지 않는다** (`일정공유-세부명세.md` 보안 메모). 이 함수가
- * **오류만 받고 일정을 받지 않는 것**이 그 약속의 모양이다 — 넘길 자리가 없으니 실을 수 없다.
+ * **#1186.** 유효한 링크는 일정 **이름**을 싣는다(사용자 결정 2026-10-07) — 미리보기가 서비스 공통
+ * 카드라 받는 사람이 무엇을 받았는지 몰랐다. 이 함수에 넘어오는 일정 값은 이름 하나다.
  */
 describe('sharedPlanPageTitle', () => {
-  it('조회 성공은 고정 제목이다 — 일정 이름이 아니다', () => {
+  it('조회 성공은 일정 이름이다 (#1186)', () => {
+    expect(sharedPlanPageTitle(null, '몽과 제주 2박 3일')).toBe('몽과 제주 2박 3일')
+  })
+
+  it('이름을 받지 못했거나 비었으면 고정 제목이다', () => {
     expect(sharedPlanPageTitle(null)).toBe(messages.plan.sharedPageTitle)
+    expect(sharedPlanPageTitle(null, '   ')).toBe(messages.plan.sharedPageTitle)
+  })
+
+  it('오류면 이름이 있어도 상태를 말한다 — 열리지 않는 링크에 일정 이름을 달지 않는다', () => {
+    expect(sharedPlanPageTitle(new ApiError(404, 'PLAN_023', null), '몽과 제주 2박 3일')).toBe(
+      messages.plan.sharedNotFoundTitle,
+    )
   })
 
   it('404(없는 토큰·폐기·삭제·초안 회귀)는 본문과 같은 "유효하지 않은 링크" 다', () => {
@@ -49,5 +61,27 @@ describe('sharedPlanPageTitle', () => {
     ]) {
       expect(sharedPlanPageTitle(error)).toBe(messages.plan.sharedPageTitle)
     }
+  })
+})
+
+describe('sharedPlanOpenGraph — 공유 미리보기 (#1186)', () => {
+  it('유효한 링크는 제목이 일정 이름이고 설명은 무엇을 받았는지만 말한다', () => {
+    const og = sharedPlanOpenGraph('몽과 제주 2박 3일')
+
+    expect(og).toMatchObject({
+      title: '몽과 제주 2박 3일',
+      description: messages.plan.sharedOgDescription,
+      siteName: '혼디가개',
+      images: [BRAND_SHARE_IMAGE],
+    })
+  })
+
+  it('토큰 주소(url)를 싣지 않는다 — 주소가 곧 열람 권한이다', () => {
+    expect(sharedPlanOpenGraph('몽과 제주 2박 3일')).not.toHaveProperty('url')
+  })
+
+  it('이름이 없으면 내지 않는다 — 루트의 서비스 카드를 상속한다', () => {
+    expect(sharedPlanOpenGraph(null)).toBeUndefined()
+    expect(sharedPlanOpenGraph('  ')).toBeUndefined()
   })
 })
