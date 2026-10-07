@@ -235,12 +235,76 @@ class AiPlanDraftFactGuardTest {
         }
     }
 
+    @Nested
+    @DisplayName("지형 · 시설 (#1172)")
+    class FeatureAgainstPlace {
+
+        // dev 실데이터 그대로다. 여행지 원천은 분류가 "여행지", 개요가 "관광지" 한 낱말이라 모델이 이름에서 짐작한다.
+        private final PlaceCandidate yongduam = place(11L, "용두암", "관광지", false, "여행지");
+        private final PlaceCandidate marinePark = place(12L, "서귀포해양도립공원", "관광지", false, "여행지");
+        private final PlaceCandidate suwolbong = place(13L, "수월봉", "관광지", false, "여행지");
+        private final PlaceCandidate manjanggul = place(14L, "만장굴", "관광지", false, "여행지");
+        private final PlaceCandidate seongsan = place(15L, "성산일출봉", "관광지", false, "여행지");
+
+        private AiPlanDraftFactGuard featureGuard() {
+            return new AiPlanDraftFactGuard(Map.of(
+                yongduam.placeId(), yongduam, marinePark.placeId(), marinePark, suwolbong.placeId(), suwolbong,
+                manjanggul.placeId(), manjanggul, seongsan.placeId(), seongsan, BEACH.placeId(), BEACH), 1, Map.of());
+        }
+
+        @Test
+        @DisplayName("이름에서 짐작한 동굴 · 수영장 · 산 정상은 서버 문구로 바뀐다 — 2026-10-06 실측 3건")
+        void replacesGuessedFeaturesWithServerNote() {
+            AiPlanDraft draft = draft(List.of(day(1,
+                visit(yongduam, "용암 동굴 탐방하기"),
+                visit(marinePark, "수영장 주변 산책로 즐기기"),
+                visit(suwolbong, "산 정상에서 바다 전망 감상"))), List.of());
+
+            AiPlanDraft guarded = featureGuard().apply(draft);
+
+            assertThat(guarded.days().get(0).items()).extracting(AiPlanDraftItem::note)
+                .containsOnly("반려견과 함께 들르는 실외 장소예요.");
+        }
+
+        @Test
+        @DisplayName("지어낸 문장만 걷고 장소 사실과 어긋나지 않는 문장은 남긴다")
+        void dropsOnlyTheGuessedSentence() {
+            AiPlanDraft draft = draft(List.of(day(1,
+                visit(yongduam, "바닷바람이 세니 리드줄을 짧게 잡아요. 용암 동굴을 탐방해요."))), List.of());
+
+            AiPlanDraft guarded = featureGuard().apply(draft);
+
+            assertThat(note(guarded, 1)).isEqualTo("바닷바람이 세니 리드줄을 짧게 잡아요.");
+        }
+
+        @Test
+        @DisplayName("이름에 근거가 있으면 남긴다 — 만장굴의 동굴, 성산일출봉의 정상, 해수욕장의 해변")
+        void keepsFeaturesNamedByThePlace() {
+            AiPlanDraft draft = draft(List.of(day(1,
+                visit(manjanggul, "동굴 안은 서늘해요."),
+                visit(seongsan, "정상까지 계단이 이어져요."),
+                visit(BEACH, "해변을 따라 걸어요."))), List.of());
+
+            AiPlanDraft guarded = featureGuard().apply(draft);
+
+            assertThat(guarded.days().get(0).items()).extracting(AiPlanDraftItem::note)
+                .containsExactly("동굴 안은 서늘해요.", "정상까지 계단이 이어져요.", "해변을 따라 걸어요.");
+        }
+    }
+
     private static AiPlanDraftFactGuard guard(int dayCount, Map<Integer, Double> maxTemperatureByDay) {
         return new AiPlanDraftFactGuard(CANDIDATES, dayCount, maxTemperatureByDay);
     }
 
     private static PlaceCandidate place(long id, String title, String contentTypeName, Boolean indoor) {
-        return new PlaceCandidate(id, title, contentTypeName, "제주특별자치도", "동반 가능", null, null, indoor, null, 33.5, 126.5);
+        return place(id, title, contentTypeName, indoor, null);
+    }
+
+    private static PlaceCandidate place(
+        long id, String title, String contentTypeName, Boolean indoor, String sourceCategory
+    ) {
+        return new PlaceCandidate(
+            id, title, contentTypeName, "제주특별자치도", "동반 가능", null, null, indoor, sourceCategory, 33.5, 126.5);
     }
 
     private static AiPlanDraft draft(List<AiPlanDraftDay> days, List<AiPlanDraftReason> reasons) {

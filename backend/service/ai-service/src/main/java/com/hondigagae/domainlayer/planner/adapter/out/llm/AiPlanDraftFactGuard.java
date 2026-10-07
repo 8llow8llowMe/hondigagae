@@ -37,6 +37,10 @@ import lombok.extern.slf4j.Slf4j;
  *       전망이 없는 날의 더위 문장은 버린다. 임계값은 프롬프트의 배치 지시와 같다</li>
  *   <li><b>메모가 장소 유형 · 실내 여부와 맞아야 한다.</b> 실내 장소를 "야외" 로, 숙소를 "산책" 하는
  *       곳으로 적은 문장은 버린다</li>
+ *   <li><b>지형 · 시설은 이름 · 분류에 있을 때만 말한다 (#1172).</b> 후보 데이터에는 개요가 없어서
+ *       (dev 의 여행지 원천은 개요가 "관광지" 한 낱말이다) 모델이 이름에서 짐작한다 — 용두암을
+ *       "용암 동굴 탐방", 서귀포해양도립공원을 "수영장 주변 산책로" 로 적었다. 동굴 · 수영장 · 정상 ·
+ *       전망 같은 주장은 장소 이름 · 분류 · 유형에 그 낱말이 있을 때만 남긴다</li>
  * </ul>
  *
  * <p><b>문장 단위로 걷는다.</b> 메모 한 줄에 맞는 말과 틀린 말이 섞여 있는 일이 흔하다 —
@@ -90,6 +94,22 @@ final class AiPlanDraftFactGuard {
         "실내\\s*(장소|공간|명소|관광지|시설)|실내(라|여서|이라|이어서|예요|이에요)");
     private static final Pattern WALK_PLACE_ASSERTION = Pattern.compile(
         "산책(을|하기)?\\s*(할\\s*수\\s*있는|하기\\s*좋은|좋은)[^.!?]*?(곳|장소|공간|카페|숙소)|산책\\s*(장소|코스|명소)");
+
+    /**
+     * 지형 · 시설 주장과, 그 주장을 뒷받침하는 이름 · 분류 · 유형 낱말 (#1172).
+     *
+     * <p>주소는 근거로 보지 않는다 — 지번의 {@code 산 12-1} 이 "산" 이 된다. 정상은 이름에 산 · 오름이
+     * 있을 때만이다. 수월봉을 "산 정상에서 바다 전망" 으로 적은 것이 실측 사례라 봉은 넣지 않았다.
+     */
+    private static final List<FeatureClaim> FEATURE_CLAIMS = List.of(
+        new FeatureClaim(Pattern.compile("동굴"), List.of("굴")),
+        new FeatureClaim(Pattern.compile("수영"), List.of("수영장", "해수욕장")),
+        new FeatureClaim(Pattern.compile("정상|등반|등산"), List.of("산", "오름")),
+        new FeatureClaim(Pattern.compile("전망"), List.of("전망", "뷰")),
+        new FeatureClaim(Pattern.compile("폭포"), List.of("폭포")),
+        new FeatureClaim(Pattern.compile("계곡"), List.of("계곡")),
+        new FeatureClaim(Pattern.compile("등대"), List.of("등대")),
+        new FeatureClaim(Pattern.compile("해변|백사장|모래사장"), List.of("해변", "해수욕장", "해안", "비치")));
 
     /** 문장 경계. 마침표 · 물음표 · 느낌표 뒤 공백에서 자른다 — {@code 3.5km} 같은 소수점은 자르지 않는다. */
     private static final Pattern SENTENCE_BOUNDARY = Pattern.compile("(?<=[.!?])\\s+");
@@ -168,11 +188,21 @@ final class AiPlanDraftFactGuard {
         if (Boolean.FALSE.equals(place.indoor()) && INDOOR_ASSERTION.matcher(sentence).find()) {
             return true;
         }
+        String facts = placeFacts(place);
+        if (FEATURE_CLAIMS.stream().anyMatch(feature -> feature.ungrounded(sentence, facts))) {
+            return true;
+        }
         // 숙소 · 음식점을 산책하는 곳이라고 적은 문장. 콘도가 "해안가에서 가벼운 산책을 할 수 있는 실외 장소" 가
         // 됐었다. "산책 뒤에 들러요" 처럼 순서를 말하는 문장은 맞으므로 남긴다.
         boolean staysOrEats = LODGING_CONTENT_TYPE.equals(place.contentTypeName())
             || RESTAURANT_CONTENT_TYPE.equals(place.contentTypeName());
         return staysOrEats && WALK_PLACE_ASSERTION.matcher(sentence).find();
+    }
+
+    /** 지형 · 시설 주장의 근거가 될 수 있는 후보 사실. 이름 · 원천 분류 · 유형만이다. */
+    private static String placeFacts(PlaceCandidate place) {
+        return String.join(" ", Objects.toString(place.title(), ""),
+            Objects.toString(place.sourceCategory(), ""), Objects.toString(place.contentTypeName(), ""));
     }
 
     private static boolean claimsHeat(String sentence) {
@@ -249,6 +279,14 @@ final class AiPlanDraftFactGuard {
 
     private static boolean isHot(Double maxTemperature) {
         return maxTemperature != null && maxTemperature >= HOT_DAY_MAX_TEMPERATURE;
+    }
+
+    /** 이 주장을 했는데 장소 사실에 근거 낱말이 하나도 없으면 지어낸 것이다. */
+    private record FeatureClaim(Pattern claim, List<String> grounds) {
+
+        boolean ungrounded(String sentence, String facts) {
+            return claim.matcher(sentence).find() && grounds.stream().noneMatch(facts::contains);
+        }
     }
 
     /** 무엇을 얼마나 걷었는지. 계속 늘면 프롬프트가 아니라 입력(후보 · 전망)을 볼 신호다. */
