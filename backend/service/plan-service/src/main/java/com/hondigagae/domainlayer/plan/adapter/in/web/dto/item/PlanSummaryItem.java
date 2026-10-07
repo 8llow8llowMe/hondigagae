@@ -32,6 +32,9 @@ public record PlanSummaryItem(
     LocalDate endDate,
 
     @Schema(description = "일정 상태", example = "{\"code\":\"DRAFT\",\"name\":\"초안\",\"description\":\"AI 또는 사용자가 작성 중인 일정입니다.\"}")
-    CodeNameDescriptionMetadata status
+    CodeNameDescriptionMetadata status,
+
+    @Schema(description = "일정 전체 항목 수(모든 일자 합). 0 이면 아직 장소를 담지 않은 빈 일정", example = "8")
+    int itemCount
 ) {
 }

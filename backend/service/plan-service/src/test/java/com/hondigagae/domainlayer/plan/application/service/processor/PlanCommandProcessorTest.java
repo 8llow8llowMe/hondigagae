@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.plan.application.service.processor;
 
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlanItemCountQueryResult;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -779,6 +780,11 @@ class PlanCommandProcessorTest {
     }
 
     private static class StubPlanItemRepositoryPort implements PlanItemRepositoryPort {
+
+        @Override
+        public List<PlanItemCountQueryResult> countByPlanIds(Collection<Long> planIds) {
+            throw new UnsupportedOperationException();
+        }
 
         @Override
         public List<PlanItem> saveAll(List<PlanItem> items) {

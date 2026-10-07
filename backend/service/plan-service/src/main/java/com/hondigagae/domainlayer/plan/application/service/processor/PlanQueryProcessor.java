@@ -13,6 +13,7 @@ import com.hondigagae.domainlayer.plan.application.port.out.PlanPetRepositoryPor
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPlaceLookupPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanWalkCourseQueryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlanItemCountQueryResult;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlanPlaceSummaryQueryResult;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlanWalkCourseSummaryQueryResult;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
@@ -244,18 +245,22 @@ public class PlanQueryProcessor {
     }
 
     /**
-     * 목록의 동행 반려견은 <b>한 번의 in 절 조회</b>로 붙인다 — 일정마다 조인 테이블을 따로 읽으면
-     * 페이지 크기(최대 50)만큼 쿼리가 늘어난다 (coding-conventions §9-7).
+     * 목록의 동행 반려견과 항목 수는 각각 <b>한 번의 in 절 질의</b>로 붙인다 — 일정마다 따로 읽으면
+     * 페이지 크기(최대 50)만큼 쿼리가 늘어난다 (coding-conventions §9-7). 항목이 없는 일정은
+     * 집계 결과에 행이 없으므로 0 으로 읽는다.
      */
     public Slice<PlanSummaryInfo> getMyPlans(long memberId, Long petId, Long lastPlanId, int size) {
         long cursor = lastPlanId == null ? Long.MAX_VALUE : lastPlanId;
         Slice<Plan> plans = planRepositoryPort.findMyPlans(memberId, petId, cursor, size);
 
-        Map<Long, List<PlanPet>> petsByPlanId = planPetRepositoryPort
-            .findByPlanIds(plans.getContent().stream().map(Plan::id).toList()).stream()
+        List<Long> planIds = plans.getContent().stream().map(Plan::id).toList();
+        Map<Long, List<PlanPet>> petsByPlanId = planPetRepositoryPort.findByPlanIds(planIds).stream()
             .collect(Collectors.groupingBy(PlanPet::planId));
+        Map<Long, Integer> itemCountByPlanId = planItemRepositoryPort.countByPlanIds(planIds).stream()
+            .collect(Collectors.toMap(PlanItemCountQueryResult::planId, result -> Math.toIntExact(result.itemCount())));
 
-        return plans.map(plan -> toSummaryInfo(plan, plan.resolvePetIds(petsByPlanId.get(plan.id()))));
+        return plans.map(plan -> toSummaryInfo(plan, plan.resolvePetIds(petsByPlanId.get(plan.id())),
+            itemCountByPlanId.getOrDefault(plan.id(), 0)));
     }
 
     /**
@@ -355,7 +360,7 @@ public class PlanQueryProcessor {
             .build();
     }
 
-    private PlanSummaryInfo toSummaryInfo(Plan plan, List<Long> petIds) {
+    private PlanSummaryInfo toSummaryInfo(Plan plan, List<Long> petIds, int itemCount) {
         return PlanSummaryInfo.builder()
             .planId(plan.id())
             .petId(plan.petId())
@@ -365,6 +370,7 @@ public class PlanQueryProcessor {
             .startDate(plan.startDate())
             .endDate(plan.endDate())
             .status(plan.status())
+            .itemCount(itemCount)
             .build();
     }
 }
