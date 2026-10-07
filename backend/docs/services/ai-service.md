@@ -483,6 +483,14 @@ keep_alive 는 요청 단위 값이라 빠뜨린 요청 하나가 서버 기본�
 (`OllamaLlmAdapter#buildRequestOptions`)을 쓴다. **트레이드오프** — 그동안 main-server 와 나눠 쓰는 메모리를 쥐고
 있는다. 메모리가 붐비면 줄이고, `-1` 은 상주다(`AI_LLM_KEEP_ALIVE`).
 
+**단계별 시간은 `Duration` 으로 온다 (#1235).** Spring AI 1.1.x 의 `OllamaChatModel` 은 Ollama 의 나노초 지표
+(`total-duration` · `load-duration` · `prompt-eval-duration` · `eval-duration`)를 `java.time.Duration` 으로 바꿔
+`ChatResponseMetadata` 에 싣는다. `OllamaLlmAdapter#durationMillis` 가 나노초 숫자만 읽던 동안 dev 의 `LLM timing` 은
+`totalMs` · `loadMs` · `prefillMs` · `decodeMs` 가 **전부 null** 이었다 — 테스트가 가짜 응답에 나노초 `Long` 을 넣어
+통과했다. 이제 `Duration` 을 읽고 숫자는 호환으로 남긴다. 고치기 전 dev 실측(2026-10-07)은 합계만 남았다 — 3일 일정
+58.9초(입력 5,614 · 출력 301 토큰, 재시작 뒤 첫 호출), 준비물 37.2초(입력 1,699 · 출력 148 토큰, 직전 호출 5시간 뒤).
+둘 다 로드가 섞였을 가능성이 높아, 배포 뒤 **같은 조건으로 연달아 두 번** 재서 첫 호출과 두 번째를 가른다.
+
 **후속 후보.** 스키마를 Ollama `format` 에 JSON 스키마로 직접 싣는 방법이 있다 — 지금은 `format=json` 에 스키마 지시
 (2,246자)를 프롬프트로 싣는다. 싣고 나면 지시문을 프롬프트에서 뺄 수 있지만, gpt-oss 가 `format` 스키마를 지키는지
 (harmony 출력 형식과 부딪히지 않는지) 먼저 확인해야 한다. 어느 쪽이든 dev 실측(출력 토큰 · 소요)으로 이 절의 숫자를 갱신한다.
