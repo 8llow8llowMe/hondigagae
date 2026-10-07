@@ -21,9 +21,13 @@ import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDetail } from '@/features/plan/use-plan-detail'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
-import type { LatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
-import { addPlaceFocus, addPlaceListOrigin } from '@/lib/plan/add-place-focus'
+import {
+  addPlaceFocus,
+  type AddPlaceFocusBasis,
+  addPlaceListBasis,
+  addPlaceNearbyCaption,
+} from '@/lib/plan/add-place-focus'
 import { itemInsertIndex, placeIdsOf } from '@/lib/plan/day-items'
 import { groupItemsByDay } from '@/lib/plan/detail'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -121,14 +125,18 @@ export function PlanAddPlaceView({
 
     **지도 보기는 이 목록을 쓰지 않는다** — `PlaceMapView` 가 자기 목록(좌표 없는 key)을 든다.
     켜 두면 지도에서 쓰지 않을 거리순 요청이 한 번 더 나간다.
+
+    **좌표만이 아니라 출처 · 항목까지 얼린다** (#1221). 목록 위 한 줄이 "어느 장소에서 잰 거리인가" 를
+    말하는데, 그 이름이 얼린 순서와 다른 시점의 것이면 말하는 장소와 잰 점이 갈린다.
   */
-  const liveOrigin = addPlaceListOrigin(detail.data, day)
-  const [frozenOrigin, setFrozenOrigin] = useState<{ value: LatLng | null } | null>(
-    liveOrigin === undefined ? null : { value: liveOrigin },
+  const liveBasis = addPlaceListBasis(detail.data, day)
+  const [frozenBasis, setFrozenBasis] = useState<{ value: AddPlaceFocusBasis | null } | null>(
+    liveBasis === undefined ? null : { value: liveBasis },
   )
-  if (frozenOrigin === null && liveOrigin !== undefined) setFrozenOrigin({ value: liveOrigin })
-  const listOrigin = frozenOrigin?.value ?? null
-  const list = usePlaceList(filters, view === 'list' && frozenOrigin !== null, listOrigin)
+  if (frozenBasis === null && liveBasis !== undefined) setFrozenBasis({ value: liveBasis })
+  const listOrigin = frozenBasis?.value?.coord ?? null
+  const nearbyCaption = addPlaceNearbyCaption(frozenBasis?.value ?? null)
+  const list = usePlaceList(filters, view === 'list' && frozenBasis !== null, listOrigin)
 
   /*
     **담기에 성공해도 화면에 남는다** (#370). 원래는 그 일자로 `replace` 이동했는데
@@ -427,10 +435,13 @@ export function PlanAddPlaceView({
       {/*
         **순서의 이유를 목록 위 한 줄로 말한다** (#1217) — 행마다 거리가 붙지만, 그 숫자가 무엇에서 잰
         것인지는 여기서만 읽힌다. 목록이 서 있을 때만이다: 골격 · 오류 · 0건에는 순서가 없다.
+
+        **어느 장소에서 잰 것인지 이름으로 말한다** (#1221 — `‘카멜리아힐’에서 가까운 순이에요.`).
+        문구 규칙은 `addPlaceNearbyCaption`. 이름이 길면 두 줄로 접힌다(`break-keep` — 어절 단위).
       */}
-      {listOrigin !== null && places.length > 0 && (
-        <p className={`text-caption text-fg-muted pt-3 font-medium ${INSET_CLASS.card}`}>
-          {messages.plan.addPlaceNearbyCaption}
+      {nearbyCaption !== null && places.length > 0 && (
+        <p className={`text-caption text-fg-muted pt-3 font-medium break-keep ${INSET_CLASS.card}`}>
+          {nearbyCaption}
         </p>
       )}
       <PlaceListSection

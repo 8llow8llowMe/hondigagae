@@ -873,10 +873,15 @@ export const planMessages = {
    */
   addPlaceSubtitleBeforeLodging: '고른 장소가 {day}일차 숙소 앞에 담겨요.',
   /**
-   * 목록 보기가 거리순일 때 목록 위 한 줄 (#1217). **"직전 장소" 라고 쓰지 않는다** — 기준점은
-   * 직전 장소 · 그날 숙소 · 전날 숙소 중 하나라(`addPlaceFocus`) 그날 숙소에서 쟀는데 "직전" 이면 거짓이다.
+   * 목록 보기가 거리순일 때 목록 위 한 줄 — **어느 장소에서 잰 거리인가** (#1217 → #1221). `{name}` 은
+   * 기준 항목의 제목. 출처마다 문장이 갈린다 — 고르는 규칙은 `addPlaceNearbyCaption`.
+   * #1217 은 출처를 몰라 `이날 동선에서 가까운 순이에요.` 로 뭉뚱그렸다.
    */
-  addPlaceNearbyCaption: '이날 동선에서 가까운 순이에요.',
+  addPlaceNearbyCaptionPrevious: '‘{name}’에서 가까운 순이에요.',
+  addPlaceNearbyCaptionLodging: '숙소 ‘{name}’에서 가까운 순이에요.',
+  addPlaceNearbyCaptionPreviousLodging: '전날 숙소 ‘{name}’에서 가까운 순이에요.',
+  /** 올레는 코스 시작점에서 잰다 (`planItemMapCoord`) */
+  addPlaceNearbyCaptionWalk: '‘{name}’ 시작점에서 가까운 순이에요.',
   /**
    * 거리순 0건 설명 뒤에 붙는 한 문장 — 좌표 없는 장소는 거리순에서 빠진다 (BE #1202). 필터 · 검색어만
    * 탓하지 않는다. 앞 문장은 필터 0건 · 검색어 0건 문구가 그대로 선다 (#1220, `PlaceListSection.emptyNote`)

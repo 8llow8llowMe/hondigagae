@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import type { LatLng } from '@/lib/geo/coord'
-import { addPlaceFocus, addPlaceListOrigin } from '@/lib/plan/add-place-focus'
+import { messages } from '@/lib/messages'
+import {
+  addPlaceFocus,
+  addPlaceFocusBasis,
+  addPlaceListBasis,
+  addPlaceListOrigin,
+  addPlaceNearbyCaption,
+} from '@/lib/plan/add-place-focus'
 import { groupItemsByDay } from '@/lib/plan/detail'
 import { planItem, planItemPlace, planItemWalkCourse } from '@/test/fixtures/plan'
 import type { PlanItemDetail } from '@/types/plan'
@@ -141,5 +148,123 @@ describe('addPlaceListOrigin (#1217)', () => {
 
   it('기준점이 없으면 null — 좌표 없이 placeId 순으로 연다', () => {
     expect(addPlaceListOrigin({ items: [], totalDays: 2 }, 1)).toBeNull()
+  })
+})
+
+/*
+  **기준점이 어디서 왔는지와 그 이름** (#1221). 목록 위 한 줄이 "어느 장소에서 잰 거리인가" 를 말한다 —
+  `1.2km` 가 무엇으로부터인지 모르면 숫자가 판단에 쓰이지 않는다.
+*/
+describe('addPlaceFocusBasis — 기준점의 출처 (#1221)', () => {
+  function named(
+    day: number,
+    sequence: number,
+    coord: LatLng | null,
+    title: string,
+    itemType = PLACE,
+  ) {
+    return { ...at(day, sequence, coord, itemType), title }
+  }
+
+  it('자리 앞 항목이면 previous 와 그 항목이다', () => {
+    const days = daysOf([
+      named(2, 0, JUNGMUN, '카멜리아힐'),
+      named(2, 1, AEWOL, '중문 펜션', LODGING),
+    ])
+
+    expect(addPlaceFocusBasis(2, days)).toMatchObject({
+      kind: 'previous',
+      coord: JUNGMUN,
+      item: { title: '카멜리아힐' },
+    })
+  })
+
+  it('자리 뒤(그날 끝 숙소)면 lodging 이다', () => {
+    const days = daysOf([named(2, 0, null, '이름만'), named(2, 1, AEWOL, '중문 펜션', LODGING)])
+
+    expect(addPlaceFocusBasis(2, days)).toMatchObject({
+      kind: 'lodging',
+      item: { title: '중문 펜션' },
+    })
+  })
+
+  it('그날에 좌표가 없으면 전날 숙소 — previous-lodging 이다', () => {
+    const days = daysOf([named(1, 0, SEOGWIPO, '애월 호텔', LODGING)])
+
+    expect(addPlaceFocusBasis(2, days)).toMatchObject({
+      kind: 'previous-lodging',
+      coord: SEOGWIPO,
+      item: { title: '애월 호텔' },
+    })
+  })
+
+  it('없으면 null — addPlaceFocus 와 같은 점을 낸다', () => {
+    const days = daysOf([named(2, 0, JUNGMUN, '카멜리아힐')])
+
+    expect(addPlaceFocusBasis(3, days)).toBeNull()
+    expect(addPlaceFocusBasis(2, days)?.coord).toEqual(addPlaceFocus(2, days))
+  })
+
+  it('목록용 진입도 같은 값이다 — 상세 없으면 undefined, 좌표는 addPlaceListOrigin 과 같다', () => {
+    const items = [named(1, 0, JUNGMUN, '카멜리아힐')]
+
+    expect(addPlaceListBasis(undefined, 1)).toBeUndefined()
+    expect(addPlaceListBasis({ items, totalDays: 2 }, 1)?.coord).toEqual(
+      addPlaceListOrigin({ items, totalDays: 2 }, 1),
+    )
+  })
+})
+
+describe('addPlaceNearbyCaption — 목록 위 한 줄 (#1221)', () => {
+  function basis(
+    kind: 'previous' | 'lodging' | 'previous-lodging',
+    title: string,
+    itemType = PLACE,
+  ) {
+    return { kind, coord: JUNGMUN, item: { ...at(2, 0, JUNGMUN, itemType), title } }
+  }
+
+  it('직전 장소는 이름만', () => {
+    expect(addPlaceNearbyCaption(basis('previous', '카멜리아힐'))).toBe(
+      '‘카멜리아힐’에서 가까운 순이에요.',
+    )
+  })
+
+  it('그날 숙소 · 전날 숙소는 출처를 붙인다', () => {
+    expect(addPlaceNearbyCaption(basis('lodging', '중문 펜션', LODGING))).toBe(
+      '숙소 ‘중문 펜션’에서 가까운 순이에요.',
+    )
+    expect(addPlaceNearbyCaption(basis('previous-lodging', '애월 호텔', LODGING))).toBe(
+      '전날 숙소 ‘애월 호텔’에서 가까운 순이에요.',
+    )
+  })
+
+  /* 올레는 코스 전체가 아니라 시작점에서 잰다 (`planItemMapCoord`) — 그렇게 말한다 */
+  it('올레는 시작점이라고 말한다', () => {
+    expect(addPlaceNearbyCaption(basis('previous', '올레 7코스', WALK))).toBe(
+      '‘올레 7코스’ 시작점에서 가까운 순이에요.',
+    )
+  })
+
+  /*
+    **긴 이름은 이름 안에서 줄인다.** 줄 끝을 말줄임하면 "가까운 순이에요" 가 잘려 문장이 무엇을
+    말하는지 사라진다 — 이름만 줄이고 문장은 끝까지 남긴다.
+  */
+  it('긴 이름은 이름만 줄이고 문장은 끝까지 남긴다', () => {
+    const caption = addPlaceNearbyCaption(
+      basis('previous', '제주특별자치도립김창열미술관부속카페테리아'),
+    )
+
+    expect(caption).toBe('‘제주특별자치도립김창열미술관부속…’에서 가까운 순이에요.')
+  })
+
+  it('기준점이 없으면 null — 줄 자체가 없다', () => {
+    expect(addPlaceNearbyCaption(null)).toBeNull()
+  })
+
+  it('문구는 메시지 모듈의 것이다', () => {
+    expect(addPlaceNearbyCaption(basis('previous', 'A'))).toBe(
+      messages.plan.addPlaceNearbyCaptionPrevious.replace('{name}', 'A'),
+    )
   })
 })
