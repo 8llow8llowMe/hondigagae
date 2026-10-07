@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuer
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
+import com.hondigagae.domainlayer.planner.application.model.RequestNoteConstraints;
 import java.time.LocalDate;
 import java.util.List;
 import java.time.temporal.ChronoUnit;
@@ -75,6 +76,8 @@ public class AiPlanPromptFactory {
             아이라"). 더위는 날씨 전망의 최고기온이 31℃ 이상인 날에만 말합니다.
         13. 항목 메모는 그 장소의 분류와 실내 여부에 맞게 씁니다. 실내 장소를 야외라고, 숙소나
             음식점을 산책하는 곳이라고 적지 않습니다.
+        14. 사용자 요청에 실내나 카페가 있으면 후보의 실내 여부와 분류가 맞는 장소를 일정에 넣습니다.
+            숙소는 그 요청을 대신하지 않습니다. 맞는 후보가 없으면 넣었다고 근거에 적지 않습니다.
         """;
 
     public String systemPrompt() {
@@ -165,6 +168,10 @@ public class AiPlanPromptFactory {
         }
         if (query.requestNote() != null && !query.requestNote().isBlank()) {
             prompt.append("- 사용자 요청: ").append(query.requestNote()).append('\n');
+            if (RequestNoteConstraints.from(query.requestNote()).asksAnything()) {
+                prompt.append("- 위 요청의 실내·카페는 후보의 실내 여부와 분류로만 맞출 것. ")
+                    .append("숙소는 대신하지 말 것. 맞는 후보가 없으면 넣었다고 적지 말 것\n");
+            }
         }
         if (!query.safePinnedPlaceIds().isEmpty()) {
             prompt.append("- 필수 포함: 후보 목록에서 [필수 포함] 표시가 붙은 장소 ")

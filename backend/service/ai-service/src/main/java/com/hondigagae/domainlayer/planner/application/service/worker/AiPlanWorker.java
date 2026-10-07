@@ -9,6 +9,8 @@ import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
+import com.hondigagae.domainlayer.planner.application.model.RequestNoteConstraints;
+import com.hondigagae.domainlayer.planner.application.service.RequestNoteCandidatePolicy;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobEventPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobMetricsPort;
@@ -43,6 +45,12 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class AiPlanWorker {
+
+    /**
+     * 요청에 맞는 장소를 풀 앞에 둘 개수. 전체 상한은 {@code placeCandidateSize} 라
+     * 프롬프트는 늘지 않고, 일반 검색의 꼬리만 빠진다 (#1170).
+     */
+    private static final int REQUEST_SLOT = 8;
 
     private final AiPlanJobStorePort aiPlanJobStorePort;
     private final AiPlanJobEventPort aiPlanJobEventPort;
@@ -99,7 +107,7 @@ public class AiPlanWorker {
 
             current.set(advanceTo(current.get(), AiPlanJobStep.DRAFTING, stepTimer));
             // LLM 포트는 domain model을 주고, 잡에도 domain 그대로 저장한다. Info 변환은 응답 조립 시점(Processor)에 한다.
-            AiPlanDraft draft = aiLlmPort.generatePlanDraft(query);
+            AiPlanDraft draft = RequestNoteCandidatePolicy.disclose(aiLlmPort.generatePlanDraft(query), query);
             log.info("AI plan draft generated jobId={} days={}", running.jobId(),
                 draft.days() == null ? 0 : draft.days().size());
 
@@ -278,7 +286,7 @@ public class AiPlanWorker {
         List<Long> pinnedPlaceIds = parseIdList(params.get("pinnedPlaceIds"));
         List<Long> favoritePlaceIds = loadFavoritePlaceIds(params.get("preferFavorites"), memberId);
         List<PlaceCandidate> placeCandidates =
-            loadCandidates(areaCode, sigunguCode, pinnedPlaceIds, favoritePlaceIds);
+            loadCandidates(areaCode, sigunguCode, pinnedPlaceIds, favoritePlaceIds, params.get("requestNote"));
 
         onStep.accept(AiPlanJobStep.WEATHER);
         List<DayWeatherOutlook> weatherOutlook =
@@ -413,12 +421,14 @@ public class AiPlanWorker {
      * 항상 부른다 — 후보가 비면 어댑터가 {@code NO_PLACE_CANDIDATES} 로 실패시킨다.
      */
     private List<PlaceCandidate> loadCandidates(
-        String areaCode, String sigunguCode, List<Long> pinnedPlaceIds, List<Long> favoritePlaceIds
+        String areaCode, String sigunguCode, List<Long> pinnedPlaceIds, List<Long> favoritePlaceIds,
+        String requestNote
     ) {
         List<PlaceCandidate> searched = placeCandidateQueryPort
             .findPetFriendlyCandidates(areaCode, sigunguCode, aiLlmProperties.placeCandidateSize()).stream()
             .map(this::toCandidate)
             .toList();
+        searched = reserveRequested(areaCode, sigunguCode, searched, requestNote);
         if (sigunguCode != null && searched.isEmpty()) {
             // 지역 전체로 넓히지 않는다. 사용자가 "제주시만" 이라고 한 요청에 서귀포 장소를
             // 섞으면 조건을 무시한 일정이 되고, 그 사실이 응답에 드러나지도 않는다.
@@ -443,6 +453,33 @@ public class AiPlanWorker {
         List<PlaceCandidate> merged = new ArrayList<>(pinned);
         searched.stream().filter(candidate -> !pinnedFound.contains(candidate.placeId())).forEach(merged::add);
         return mergeFavorites(List.copyOf(merged), favoritePlaceIds);
+    }
+
+    /**
+     * 실내 · 카페 요청이 있으면 그 장소를 후보 앞에 둔다 (#1170).
+     * 맞는 곳이 없어도 생성은 계속한다 — 없다는 말은 초안 요약이 한다.
+     */
+    private List<PlaceCandidate> reserveRequested(
+        String areaCode, String sigunguCode, List<PlaceCandidate> searched, String requestNote
+    ) {
+        RequestNoteConstraints constraints = RequestNoteConstraints.from(requestNote);
+        if (!constraints.asksAnything()) {
+            return searched;
+        }
+        int quota = Math.min(REQUEST_SLOT, aiLlmProperties.placeCandidateSize());
+        List<PlaceCandidate> matches = placeCandidateQueryPort
+            .findRequestedCandidates(
+                areaCode, sigunguCode, quota, constraints.indoorFilter(), constraints.categoryFilter())
+            .stream()
+            .map(this::toCandidate)
+            // 실내 검색에는 숙소도 걸린다. 숙소가 앞자리를 차지하면 요청을 반영한 것처럼 보이기만 한다
+            .filter(constraints::matches)
+            .toList();
+        if (matches.isEmpty()) {
+            log.info("AI plan request has no matching candidates cafe={} indoor={} areaCode={} sigunguCode={}",
+                constraints.cafe(), constraints.indoor(), areaCode, sigunguCode);
+        }
+        return RequestNoteCandidatePolicy.reserve(matches, searched, aiLlmProperties.placeCandidateSize());
     }
 
     /**
