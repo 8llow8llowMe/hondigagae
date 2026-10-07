@@ -14,6 +14,7 @@ import { planDetailPath } from '@/lib/api/plan'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
+import { addPlaceListOrigin } from '@/lib/plan/add-place-focus'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import { parsePlaceFilters, toPlaceFilterQuery } from '@/lib/url/place-filters'
 import { parseViewMode, PLAN_ADD_DEFAULT_VIEW, viewModeHref } from '@/lib/url/view-mode'
@@ -26,7 +27,8 @@ import type { PlanDetail } from '@/types/plan'
  * Suspense 경계가 있으면 응답이 먼저 스트리밍돼 soft 404 가 된다
  * (`plans/[planId]/page.tsx` 와 같은 이유, architecture-guide.md §7).
  *
- * 프리페치가 둘이다 — **일정 상세**(어느 일자에 무엇이 담겼는지)와 **장소 목록 첫 장**.
+ * 프리페치가 둘이다 — **일정 상세**(어느 일자에 무엇이 담겼는지)와 **장소 목록 첫 장**(목록 보기는
+ * 그 상세에서 낸 기준점의 거리순, #1217).
  * 상세는 `fetchQuery` + try/catch 라 404 를 404 로 낼 수 있고, 목록은 실패해도 화면을
  * 세우고 클라이언트가 다시 조회한다.
  */
@@ -81,8 +83,9 @@ export default async function PlanAddPlacePage({
   // 요청마다 새 인스턴스 — 모듈 스코프 공유는 요청 간 데이터 유출이다
   const queryClient = getServerQueryClient()
 
+  let detail: PlanDetail | undefined
   try {
-    await queryClient.fetchQuery({
+    detail = await queryClient.fetchQuery({
       queryKey: planKeys.detail(planId),
       queryFn: () =>
         serverFetch<PlanDetail>(planDetailPath(planId), { accessToken: session?.accessToken }),
@@ -94,14 +97,24 @@ export default async function PlanAddPlacePage({
     if (error instanceof ApiError && error.kind === 'not-found') notFound()
   }
 
-  await queryClient
-    .prefetchInfiniteQuery({
-      queryKey: placeKeys.list(filters),
-      queryFn: () => serverFetch<PlaceSlice>(placeListPath(filters, null)),
-      initialPageParam: null as string | null,
-      retry: false,
-    })
-    .catch(() => undefined)
+  /*
+    **목록 보기는 그날 기준점에서 거리순이다** (#1217). 클라이언트(`PlanAddPlaceView`)와 **같은 함수**
+    (`addPlaceListOrigin`)로 같은 상세에서 점을 내야 key 가 맞아 하이드레이션이 성립한다. 상세를 못 받았으면
+    (5xx 등 — 위 catch) 클라이언트도 조회를 미루므로 목록을 프리페치하지 않는다.
+
+    **지도 보기는 좌표 없는 key 그대로다** — `PlaceMapView` 의 목록이 그 key 를 쓴다.
+  */
+  const origin = view === 'list' ? addPlaceListOrigin(detail, day) : null
+  if (origin !== undefined) {
+    await queryClient
+      .prefetchInfiniteQuery({
+        queryKey: placeKeys.list(filters, origin),
+        queryFn: () => serverFetch<PlaceSlice>(placeListPath(filters, null, origin)),
+        initialPageParam: null as string | null,
+        retry: false,
+      })
+      .catch(() => undefined)
+  }
 
   /*
     **지도 보기는 레일 2단을 쓰지 않는다.** 280 레일을 함께 두면 지도가 세 번 접힌다

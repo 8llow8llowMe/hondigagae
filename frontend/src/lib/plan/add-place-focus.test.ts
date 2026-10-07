@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { LatLng } from '@/lib/geo/coord'
-import { addPlaceFocus } from '@/lib/plan/add-place-focus'
+import { addPlaceFocus, addPlaceListOrigin } from '@/lib/plan/add-place-focus'
 import { groupItemsByDay } from '@/lib/plan/detail'
 import { planItem, planItemPlace, planItemWalkCourse } from '@/test/fixtures/plan'
 import type { PlanItemDetail } from '@/types/plan'
@@ -118,5 +118,28 @@ describe('addPlaceFocus — 담기 지도의 기준점 (#1177)', () => {
 
   it('기간 밖 일자는 null 이다', () => {
     expect(addPlaceFocus(9, daysOf([at(1, 0, JUNGMUN, LODGING)]))).toBeNull()
+  })
+})
+
+/*
+  **목록 보기도 같은 기준점이다** (#1217). 서버 프리페치와 클라이언트가 같은 함수를 봐야 캐시 키가
+  맞는다 — 어긋나면 하이드레이션이 빗나가 첫 화면에서 목록을 한 번 더 받는다.
+*/
+describe('addPlaceListOrigin (#1217)', () => {
+  it('상세를 아직 못 받았으면 undefined — 조회를 미룬다', () => {
+    expect(addPlaceListOrigin(undefined, 1)).toBeUndefined()
+  })
+
+  it('받았으면 지도와 같은 기준점이다', () => {
+    const items = [at(1, 1, JUNGMUN), at(1, 2, SEOGWIPO)]
+
+    expect(addPlaceListOrigin({ items, totalDays: 2 }, 1)).toEqual(SEOGWIPO)
+    expect(addPlaceListOrigin({ items, totalDays: 2 }, 1)).toEqual(
+      addPlaceFocus(1, groupItemsByDay(items, 2).days),
+    )
+  })
+
+  it('기준점이 없으면 null — 좌표 없이 placeId 순으로 연다', () => {
+    expect(addPlaceListOrigin({ items: [], totalDays: 2 }, 1)).toBeNull()
   })
 })

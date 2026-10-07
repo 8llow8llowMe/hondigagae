@@ -127,6 +127,20 @@ function renderRow(overrides: Record<string, unknown> = {}) {
   )
 }
 
+describe('PlanAddPlaceRow — 거리순 목록의 거리 (#1217)', () => {
+  it('거리가 오면 메타 줄 끝에 붙는다', () => {
+    const markup = renderRow({ place: { ...placeSummary, distanceMeters: 1234 } })
+
+    expect(markup).toContain('· 1.2km')
+  })
+
+  it('거리가 없으면(좌표 없는 목록) 붙지 않는다', () => {
+    const markup = renderRow({ place: { ...placeSummary, distanceMeters: null } })
+
+    expect(markup).not.toMatch(/\d(m|km)</)
+  })
+})
+
 describe('PlanAddPlaceRow — 고르는 목록의 행', () => {
   it('목록 화면과 같은 내용을 쓴다 — 제목·주소·태그', () => {
     const markup = renderRow()

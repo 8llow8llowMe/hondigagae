@@ -872,6 +872,14 @@ export const planMessages = {
    * 담은 뒤 일정에서 숙소 앞에 선 것을 보고 잘못 담긴 줄 안다.
    */
   addPlaceSubtitleBeforeLodging: '고른 장소가 {day}일차 숙소 앞에 담겨요.',
+  /**
+   * 목록 보기가 거리순일 때 목록 위 한 줄 (#1217). **"직전 장소" 라고 쓰지 않는다** — 기준점은
+   * 직전 장소 · 그날 숙소 · 전날 숙소 중 하나라(`addPlaceFocus`) 그날 숙소에서 쟀는데 "직전" 이면 거짓이다.
+   */
+  addPlaceNearbyCaption: '이날 동선에서 가까운 순이에요.',
+  /** 거리순 0건 — 좌표 없는 장소는 거리순에서 빠진다 (BE #1202). 필터만 탓하지 않는다 */
+  addPlaceNearbyEmptyDescription:
+    '필터를 바꿔 다시 찾아보세요. 위치 정보가 없는 곳은 가까운 순 목록에 나오지 않아요.',
   addPlaceBack: '일정으로 돌아가기',
 
   /**

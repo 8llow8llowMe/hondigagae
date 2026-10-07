@@ -28,6 +28,58 @@ function body(search: string): SliceResponse<PlaceSummary> {
   return list(search).payload.dataBody as SliceResponse<PlaceSummary>
 }
 
+/*
+  **목록의 기준 좌표 거리순** (#1217 · BE #1202). 담기 목록 보기가 dev 없이도 거리순 · 커서 · 거리 표기를
+  보이도록 목이 같은 계약을 흉내 낸다.
+*/
+describe('resolveMock — 목록 거리순 (#1217)', () => {
+  const JUNGMUN = 'lat=33.2539&lng=126.4123'
+
+  it('lat · lng 를 주면 가까운 순이고 distanceMeters 가 정렬 키다', () => {
+    const page = body(`areaCode=39&${JUNGMUN}&size=50`)
+    const distances = page.contents.map((place) => place.distanceMeters)
+
+    expect(distances.every((meters) => typeof meters === 'number')).toBe(true)
+    expect(distances).toEqual([...distances].sort((left, right) => (left ?? 0) - (right ?? 0)))
+  })
+
+  it('좌표 없이 부르면 예전 순서 그대로고 distanceMeters 는 null 이다', () => {
+    const page = body('areaCode=39&size=5')
+
+    expect(page.contents.every((place) => place.distanceMeters === null)).toBe(true)
+    expect(page.contents.map((place) => place.placeId)).toEqual(
+      MOCK_PLACES.slice(0, 5).map((place) => place.placeId),
+    )
+  })
+
+  it('커서는 lastPlaceId 로 이어진다 — 페이지 사이 중복 · 누락이 없다', () => {
+    const all = body(`areaCode=39&${JUNGMUN}&size=50`).contents.map((place) => place.placeId)
+    const first = body(`areaCode=39&${JUNGMUN}&size=5`)
+    const second = body(
+      `areaCode=39&${JUNGMUN}&size=5&lastPlaceId=${first.contents.at(-1)?.placeId ?? ''}`,
+    )
+
+    expect([...first.contents, ...second.contents].map((place) => place.placeId)).toEqual(
+      all.slice(0, 10),
+    )
+    expect(first.hasNext).toBe(true)
+  })
+
+  it('하나만 주면 400 PLACE_109 다', () => {
+    const result = list('areaCode=39&lat=33.25&size=5')
+
+    expect(result.status).toBe(400)
+    expect(result.payload.dataHeader.resultCode).toBe('PLACE_109')
+  })
+
+  it('되살릴 수 없는 커서는 400 PLACE_110 이다', () => {
+    const result = list(`areaCode=39&${JUNGMUN}&size=5&lastPlaceId=1`)
+
+    expect(result.status).toBe(400)
+    expect(result.payload.dataHeader.resultCode).toBe('PLACE_110')
+  })
+})
+
 describe('resolveMock — 처리 범위', () => {
   it('구현되지 않은 경로는 null 을 반환해 실제 게이트웨이로 넘긴다', () => {
     /*

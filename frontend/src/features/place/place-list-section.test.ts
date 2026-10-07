@@ -81,6 +81,14 @@ describe('PlaceListSection — 에러 분기', () => {
     expect(markup).toContain(messages.place.resetFilters)
     expect(markup).not.toContain(messages.common.retry)
   })
+
+  it('담는 곳이 빈 결과 설명을 바꿀 수 있다 — 거리순은 좌표 없는 곳이 빠진다 (#1217)', () => {
+    const markup = render({ places: [], emptyDescription: '다른 설명' })
+
+    expect(markup).toContain('다른 설명')
+    expect(markup).not.toContain(messages.place.emptyDescription)
+    expect(markup).toContain(messages.place.resetFilters)
+  })
 })
 
 describe('PlaceListSection — 빈 결과', () => {

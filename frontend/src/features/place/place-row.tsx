@@ -115,7 +115,8 @@ export function PlaceRowContent({
   */
   const thumbnail = listThumbnailSrc(place.firstImage2, place.firstImage)
   const illustration = placeIllustration(place.contentType.code)
-  const meta = placeMetaLine(place.addr1, place.indoor)
+  // 거리는 거리순 목록에서만 온다 — 그 밖에서는 `null` 이라 줄이 그대로다 (#1217)
+  const meta = placeMetaLine(place.addr1, place.indoor, place.distanceMeters)
 
   return (
     <>

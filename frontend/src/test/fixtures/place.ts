@@ -36,6 +36,7 @@ export const placeSummary: PlaceSummary = {
   indoor: true,
   sourceCategory: '미술관',
   sourceName: '문화정보원',
+  distanceMeters: null,
 }
 
 /** 좌표가 없는 장소 — 마커를 그리면 안 된다 */

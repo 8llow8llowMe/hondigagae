@@ -1,4 +1,5 @@
 import { paths } from '@/lib/api/paths'
+import type { LatLng } from '@/lib/geo/coord'
 import { toPlaceApiQuery } from '@/lib/url/place-filters'
 import type { SliceResponse } from '@/types/api'
 import type { PlaceFilters, PlaceSummary } from '@/types/place'
@@ -6,8 +7,13 @@ import type { PlaceFilters, PlaceSummary } from '@/types/place'
 export type PlaceSlice = SliceResponse<PlaceSummary>
 
 /** 경로·파라미터만 만든다. 전송은 client.ts / server.ts 가 나눠 담당한다 */
-export function placeListPath(filters: PlaceFilters, cursor: string | null): string {
-  return paths.places.list(toPlaceApiQuery(filters, cursor))
+/** `origin` 이 있으면 거리순이다 (#1217, `toPlaceApiQuery`) */
+export function placeListPath(
+  filters: PlaceFilters,
+  cursor: string | null,
+  origin: LatLng | null = null,
+): string {
+  return paths.places.list(toPlaceApiQuery(filters, cursor, undefined, origin))
 }
 
 export function placeDetailPath(placeId: string): string {

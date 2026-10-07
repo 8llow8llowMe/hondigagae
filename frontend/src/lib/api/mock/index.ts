@@ -276,6 +276,19 @@ function placeList(params: URLSearchParams): MockResult {
 
   const filtered = MOCK_PLACES.filter((place) => matches(place, params))
 
+  /*
+    **기준 좌표가 있으면 거리순이다** (#1217 · BE #1202). 둘 다 와야 한다 — 하나만이면 `PLACE_109`.
+    정렬 키는 (반올림 m, placeId) 이고 응답 `distanceMeters` 가 그 키다. 좌표 없는 장소는 빠진다.
+  */
+  const rawLat = params.get('lat')
+  const rawLng = params.get('lng')
+  if ((rawLat === null) !== (rawLng === null)) {
+    return fail(400, 'PLACE_109', 'lat과 lng는 함께 보내야 합니다.')
+  }
+  if (rawLat !== null && rawLng !== null) {
+    return distanceSortedList(filtered, { lat: Number(rawLat), lng: Number(rawLng) }, params, size)
+  }
+
   // 커서 = 직전 응답의 마지막 placeId. 그 다음 항목부터 자른다
   const cursor = params.get('lastPlaceId')
   const start = cursor === null ? 0 : filtered.findIndex((place) => place.placeId === cursor) + 1
@@ -332,6 +345,38 @@ function nearbyPlaces(params: URLSearchParams): MockResult {
     status: 200,
     payload: ok({ places: within.slice(0, size), totalCount: within.length, radius }),
   }
+}
+
+function distanceSortedList(
+  filtered: readonly PlaceSummary[],
+  origin: { lat: number; lng: number },
+  params: URLSearchParams,
+  size: number,
+): MockResult {
+  const sorted = filtered
+    .flatMap((place) => {
+      const meters = haversineMeters(origin, toLatLng(place))
+      return meters === null ? [] : [{ ...place, distanceMeters: Math.round(meters) }]
+    })
+    .sort(
+      (left, right) =>
+        left.distanceMeters - right.distanceMeters ||
+        (BigInt(left.placeId) < BigInt(right.placeId) ? -1 : 1),
+    )
+
+  // 커서는 그대로 lastPlaceId — 그 장소의 (거리, id) 키 다음부터다. 없으면 되살릴 수 없다
+  const cursor = params.get('lastPlaceId')
+  const at = cursor === null ? -1 : sorted.findIndex((place) => place.placeId === cursor)
+  if (cursor !== null && at === -1) {
+    return fail(400, 'PLACE_110', '거리순 목록의 커서 장소를 찾을 수 없습니다.')
+  }
+
+  const start = at + 1
+  const body: SliceResponse<PlaceSummary> = {
+    contents: sorted.slice(start, start + size),
+    hasNext: start + size < sorted.length,
+  }
+  return { status: 200, payload: ok(body) }
 }
 
 /** 빠졌거나 숫자가 아니면 `null`. `Number(null) === 0` 함정을 여기서 막는다 */

@@ -44,6 +44,12 @@ export type PlaceSummary = {
   sourceCategory: string | null
   /** 정보 출처 표시명 (예: 문화정보원) */
   sourceName: string
+  /**
+   * 기준 좌표로부터의 거리(m, 반올림) — #1202 · #1217. **목록을 `lat` · `lng` 로 거리순 조회했을 때만**
+   * 값이 있고 정렬 키와 같은 값이다. 좌표 없는 목록과 주변 조회 안쪽 `place` 에서는 `null` 이다 —
+   * 주변 조회의 거리는 바깥 `NearbyPlaceItem.distanceMeters` 다.
+   */
+  distanceMeters: number | null
 }
 
 /**

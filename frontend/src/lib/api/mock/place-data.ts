@@ -127,7 +127,8 @@ const SIZE = {
   },
 } as const
 
-type Seed = Omit<PlaceSummary, 'placeId'>
+/** `distanceMeters` 는 시드에 두지 않는다 — 기준 좌표가 있는 목록 조회만 채운다 (#1217, `index.ts`) */
+type Seed = Omit<PlaceSummary, 'placeId' | 'distanceMeters'>
 
 const SEEDS: Seed[] = [
   {
@@ -288,6 +289,7 @@ export const MOCK_PLACES: PlaceSummary[] = Array.from({ length: PAGES }, (_, pag
       ...seed,
       // 문자열 ID 를 유지한다 — 숫자로 다루면 정밀도가 손상된다
       placeId: String(ID_BASE + BigInt(ordinal)),
+      distanceMeters: null,
       title: page === 0 ? seed.title : `${seed.title} ${page + 1}호점`,
     }
   }),

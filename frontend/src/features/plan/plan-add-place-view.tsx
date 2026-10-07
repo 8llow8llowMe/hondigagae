@@ -1,8 +1,7 @@
 'use client'
 
+import { type ReactNode, useState } from 'react'
 import { useRouter } from 'next/navigation'
-
-import type { ReactNode } from 'react'
 
 import { BackLink } from '@/components/back-link'
 import { ButtonLink } from '@/components/button'
@@ -22,10 +21,12 @@ import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDetail } from '@/features/plan/use-plan-detail'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
+import type { LatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
-import { addPlaceFocus } from '@/lib/plan/add-place-focus'
+import { addPlaceFocus, addPlaceListOrigin } from '@/lib/plan/add-place-focus'
 import { itemInsertIndex, placeIdsOf } from '@/lib/plan/day-items'
 import { groupItemsByDay } from '@/lib/plan/detail'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { PLAN_ADD_DEFAULT_VIEW, type ViewMode, viewModeHref } from '@/lib/url/view-mode'
 import type { PlaceFilters, PlaceSummary } from '@/types/place'
 
@@ -105,7 +106,29 @@ export function PlanAddPlaceView({
 }) {
   const router = useRouter()
   const detail = usePlanDetail(planId)
-  const list = usePlaceList(filters)
+
+  /*
+    **목록 보기도 그날 기준점에서 가까운 순이다** (#1217 · BE #1202). 지도(#1177)와 같은 점이다.
+
+    **처음 받은 값으로 얼린다** — 지도의 `initialFocus` 와 같은 이유다. 담기에 성공하면(#370 —
+    화면에 남는다) 그날의 마지막 장소가 바뀌어 기준점도 바뀌는데, 그대로 따라가면 key 가 바뀌어
+    목록이 처음부터 다시 받아지고 보던 자리가 사라진다. 다음에 갈 곳을 연달아 담는 동안 순서는
+    그대로 두고, 다시 들어오면 새 기준점이다.
+
+    상세를 아직 못 받았으면(`undefined`) 조회를 미룬다 — 좌표 없이 먼저 받으면 상세가 온 뒤 목록이
+    한 번 뒤집힌다. 서버가 상세를 프리페치하므로 보통 첫 렌더부터 있다. 얼리는 것은 렌더 중 상태
+    갱신이다(React 의 "이전 렌더 값 저장" 패턴) — effect 로 미루면 한 렌더 늦게 조회가 켜진다.
+
+    **지도 보기는 이 목록을 쓰지 않는다** — `PlaceMapView` 가 자기 목록(좌표 없는 key)을 든다.
+    켜 두면 지도에서 쓰지 않을 거리순 요청이 한 번 더 나간다.
+  */
+  const liveOrigin = addPlaceListOrigin(detail.data, day)
+  const [frozenOrigin, setFrozenOrigin] = useState<{ value: LatLng | null } | null>(
+    liveOrigin === undefined ? null : { value: liveOrigin },
+  )
+  if (frozenOrigin === null && liveOrigin !== undefined) setFrozenOrigin({ value: liveOrigin })
+  const listOrigin = frozenOrigin?.value ?? null
+  const list = usePlaceList(filters, view === 'list' && frozenOrigin !== null, listOrigin)
 
   /*
     **담기에 성공해도 화면에 남는다** (#370). 원래는 그 일자로 `replace` 이동했는데
@@ -336,8 +359,8 @@ export function PlanAddPlaceView({
               `PlaceMapView` 가 **마운트 때 값만** 쓰므로(`initialFocus`) 렌더마다 새 객체여도
               카메라가 다시 옮겨지지 않는다. 담기 응답으로 기준점이 바뀌어도 마찬가지다(#370).
 
-              **목록 보기에는 넘기지 않는다** — `/places` 가 좌표·정렬을 받지 않아, 클라이언트에서
-              정렬하면 받아 둔 페이지만 정렬하는 거짓이 된다 (담기지도 세부명세 #1177 · BE 후속).
+              **목록 보기는 같은 점을 따로 얼려 서버에 넘긴다** (#1217) — 클라이언트 정렬이 아니라
+              `/places?lat=&lng=` 의 거리순이다. 위 `listOrigin` 주석.
             */
             initialFocus={addPlaceFocus(day, days)}
             renderRowAction={(place) =>
@@ -401,6 +424,15 @@ export function PlanAddPlaceView({
         </>
       }
     >
+      {/*
+        **순서의 이유를 목록 위 한 줄로 말한다** (#1217) — 행마다 거리가 붙지만, 그 숫자가 무엇에서 잰
+        것인지는 여기서만 읽힌다. 목록이 서 있을 때만이다: 골격 · 오류 · 0건에는 순서가 없다.
+      */}
+      {listOrigin !== null && places.length > 0 && (
+        <p className={`text-caption text-fg-muted pt-3 font-medium ${INSET_CLASS.card}`}>
+          {messages.plan.addPlaceNearbyCaption}
+        </p>
+      )}
       <PlaceListSection
         /*
           **인셋을 넘기지 않는다** (#451). 기본값 `card`(16/20)가 곧 이 목록의 자리다 —
@@ -414,7 +446,12 @@ export function PlanAddPlaceView({
         */
         headingLevel={3}
         places={places}
+        /* 상세를 받기 전(조회가 꺼진 동안)에도 `isPending` 이라 골격이 선다 */
         loading={list.isPending}
+        /* 거리순은 좌표 없는 장소가 빠진다 — 0건이면 그 사실도 말한다 (#1217) */
+        emptyDescription={
+          listOrigin === null ? undefined : messages.plan.addPlaceNearbyEmptyDescription
+        }
         errorStatus={toErrorStatus(list.error)}
         errorMessage={list.error instanceof ApiError ? list.error.rawMessage : undefined}
         hasNext={lastPage?.hasNext ?? false}
