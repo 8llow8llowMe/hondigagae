@@ -808,7 +808,7 @@ function PlaceOpenStatus({
       ) : (
         openNow !== null && (
           // 영업 중은 무게를 주고, 영업 시간 아님은 그대로 둔다
-          <Badge tone="neutral" className={openNow ? 'text-fg font-semibold' : ''}>
+          <Badge tone="neutral" strong={openNow}>
             {openNow ? messages.place.detailOpenNow : messages.place.detailOpenClosed}
           </Badge>
         )

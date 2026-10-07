@@ -358,16 +358,15 @@ describe('PlaceDetailSection — 서버 문구를 그대로 쓴다', () => {
   #530 — 헤더의 동반 배지가 서버 `name` 그대로 `정보 없음` 이라, `중소형견 가능` ·
   `목줄 필요` 옆에서 **무엇의 정보가 없다는 것인지** 말하지 않는 배지가 됐다.
   목록 행 · 홈 행과 같은 처리다 (`place-row.tsx` 의 `PlaceBadges` 주석이 근거다).
+
+  **#1226 이후 머리에는 어떤 code 에서도 동반 배지가 없다** (아래 #1226 describe 가 잠근다).
+  여기 남은 것은 `UNKNOWN` 이어도 동반 절이 사라지지 않는다는 것이다.
 */
 describe('PlaceDetailSection — 동반 정보 없음 (#530)', () => {
   const unknown: PlaceDetail = {
     ...placeDetail,
     petAllowanceType: { code: 'UNKNOWN', name: '동반 정보 없음', description: null },
   }
-
-  it('UNKNOWN 이면 헤더 배지를 그리지 않는다', () => {
-    expect(render({ place: unknown })).not.toContain('동반 정보 없음')
-  })
 
   /*
     **동반 조건을 감추는 것이 아니다.** 아래 `반려견 동반` 섹션이 같은 `allowance` 를
@@ -399,17 +398,19 @@ describe('PlaceDetailSection — 머리는 동반을 말하지 않는다 (#1226)
     expect(head).not.toContain('lg:contents')
   })
 
-  it('실내 여부를 모르면 모름 배지만 선다', () => {
+  it('실내 여부를 모르면 모름 배지가 서고, 동반 칩은 여전히 없다', () => {
     const head = header(render({ place: { ...placeDetail, indoor: null } }))
 
     expect(head).toContain(messages.place.rowIndoorUnknown)
+    expect(head).not.toContain(placeDetail.petAllowanceType.name)
   })
 
   it('실내 여부를 알면 태그 줄을 만들지 않는다 — 빈 줄이 gap 을 먹는다', () => {
     const head = header(render({ place: { ...placeDetail, indoor: true } }))
 
     expect(head).not.toContain(messages.place.rowIndoorUnknown)
-    expect(head).not.toContain('gap-1.5')
+    // 배지를 감싸는 줄 자체가 없어야 한다 — 빈 `div` 가 머리의 `gap-3` 을 한 번 더 먹는다
+    expect(head).not.toContain('<div class="flex">')
   })
 
   it('목줄은 체크리스트 줄로 옮겨 간다 — 칩을 걷어도 사라지지 않는다', () => {
