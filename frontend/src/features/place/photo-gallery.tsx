@@ -9,11 +9,13 @@ import {
 } from 'react'
 import Image from 'next/image'
 
+import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { PhotoViewer, type ViewerImage } from '@/features/place/photo-viewer'
 import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { placeIllustration } from '@/lib/place/illustration'
 import { INSET_CLASS } from '@/lib/ui/inset'
+import { swipeTarget } from '@/lib/ui/scroll'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceImage } from '@/types/place'
 
@@ -109,12 +111,15 @@ export function PhotoGallery({
 
       {/*
         사진 출처는 갤러리 바로 아래. 정보 출처는 본문 끝 — 각각 자기 자료 옆에서 읽힌다.
+        미리보기(`carousel`)는 사진 위 좌하단에 얹는다 — `MobileCarousel` (#1233 D3).
         인셋은 제목 줄과 같은 카드 값이다 — 갤러리는 L0 위의 전폭 미디어라 카드 가장자리에
         맞추고(`SurfaceStack` 의 24), 글줄은 카드 안 글줄과 같은 축에 선다 (#443).
       */}
-      <p className={cn('text-caption text-fg-muted', INSET_CLASS.card)}>
-        {messages.place.photoSource}
-      </p>
+      {layout === 'responsive' && (
+        <p className={cn('text-caption text-fg-muted', INSET_CLASS.card)}>
+          {messages.place.photoSource}
+        </p>
+      )}
 
       <PhotoViewer
         images={viewerImages}
@@ -171,27 +176,110 @@ function IllustrationTile({ src, layout }: { src: string; layout: 'responsive' |
 }
 
 /**
- * 마우스·펜으로 가로 스크롤 컨테이너를 **잡아 끌게** 한다.
+ * 마우스·펜으로 가로 스크롤 컨테이너를 **잡아 끌게** 하고, 놓으면 **고른 칸으로 부드럽게** 보낸다.
  *
  * **터치에는 걸지 않는다.** 손가락 스크롤은 브라우저가 이미 관성·고무줄까지 붙여 처리하고,
  * 거기에 `scrollLeft` 를 직접 쓰면 두 힘이 겹쳐 끊긴다. `pointerType` 으로 갈라 터치는
  * 네이티브에 맡긴다 — 그래서 이 훅은 **실제 휴대폰의 동작을 바꾸지 않는다.**
  *
- * 그 대신 좁은 폭을 마우스로 보는 경우(반응형 확인·터치 없는 노트북)를 연다. 지금까지는
- * 가로 휠 제스처를 아는 사람만 넘길 수 있었다.
+ * 그 대신 좁은 폭을 마우스로 보는 경우(반응형 확인·터치 없는 노트북 · 지도 미리보기 패널)를 연다.
+ *
+ * **놓을 때 갈 칸을 직접 고른다** (#1233 D3). 예전에는 스냅만 다시 켜서 브라우저가 가장 가까운 칸으로
+ * **애니메이션 없이** 붙였다 — 툭 붙고, 30% 를 끌어도 되돌아갔다. 이제 끈 거리 · 속도로 칸을 고르고
+ * (`swipeTarget`) 그 칸으로 `smooth` 스크롤한 뒤, **스크롤이 끝나면** 스냅을 다시 켠다. 스냅을 먼저
+ * 켜면 브라우저가 애니메이션 도중에 가로채 다시 툭 붙인다.
  *
  * **끌고 난 직후의 클릭을 삼킨다.** 타일이 뷰어를 여는 버튼이라, 그러지 않으면 사진을
  * 넘기려고 끌 때마다 뷰어가 열린다. 임계값(`DRAG_SLOP_PX`) 아래로 움직였으면 누른 것으로
  * 보고 통과시킨다 — 손이 조금 흔들렸다고 클릭이 사라지면 안 된다.
  */
 const DRAG_SLOP_PX = 6
+/** 놓기 직전 속도를 재는 구간 — 그보다 오래된 움직임은 "튕김" 이 아니다 */
+const VELOCITY_WINDOW_MS = 80
+/** `scrollend` 가 없는 브라우저에서 스냅을 다시 켤 때까지 기다리는 시간 */
+const SETTLE_FALLBACK_MS = 450
+/** 사진 사이 간격 — `ul` 의 `gap-2` 와 같다 */
+const ITEM_GAP_PX = 8
 
-function useDragScroll(trackRef: React.RefObject<HTMLElement | null>) {
+function useCarouselScroll(trackRef: React.RefObject<HTMLElement | null>, count: number) {
   /** 끄는 중인 포인터. 없으면 null */
-  const drag = useRef<{ startX: number; startScrollLeft: number } | null>(null)
+  const drag = useRef<{
+    startX: number
+    startScrollLeft: number
+    startIndex: number
+    /** 최근 포인터 위치 — 놓기 직전 속도를 잰다 */
+    samples: { x: number; t: number }[]
+  } | null>(null)
   /** 직전 포인터 동작이 "끌기" 였나 — 뒤따르는 click 을 삼킬지 정한다 */
   const dragged = useRef(false)
+  /** 진행 중인 부드러운 스크롤의 마무리(스냅 복구)를 걷는다. 새로 누르면 먼저 부른다 */
+  const cancelSettle = useRef<(() => void) | null>(null)
   const [grabbing, setGrabbing] = useState(false)
+
+  useEffect(() => () => cancelSettle.current?.(), [])
+
+  /** 칸 하나의 폭 + 간격. 칸이 없으면 0 */
+  const step = useCallback(() => {
+    const item = trackRef.current?.firstElementChild as HTMLElement | null | undefined
+    return item == null ? 0 : item.clientWidth + ITEM_GAP_PX
+  }, [trackRef])
+
+  /**
+   * `target` 칸으로 보낸다. 좌표는 **그 칸의 스냅 자리**다 — 칸의 왼쪽 끝을 스크롤 영역 왼쪽에
+   * 맞춘 값(`snap-start`)이라, 끝나고 스냅을 다시 켜도 움직이지 않는다.
+   */
+  const goTo = useCallback(
+    (target: number) => {
+      const track = trackRef.current
+      const item = track?.children[target] as HTMLElement | undefined
+      if (track == null || item === undefined) return
+
+      cancelSettle.current?.()
+
+      const max = track.scrollWidth - track.clientWidth
+      const left = Math.min(
+        max,
+        Math.max(
+          0,
+          track.scrollLeft +
+            item.getBoundingClientRect().left -
+            track.getBoundingClientRect().left -
+            (Number.parseFloat(getComputedStyle(track).scrollPaddingLeft) || 0),
+        ),
+      )
+
+      const restore = () => {
+        cancelSettle.current = null
+        track.style.scrollSnapType = ''
+      }
+
+      // 이미 그 자리다 — 스크롤이 일어나지 않아 `scrollend` 도 오지 않는다
+      if (Math.abs(track.scrollLeft - left) < 1) {
+        restore()
+        return
+      }
+
+      /*
+        **`smooth` 를 JS 가 정하므로 `prefers-reduced-motion` 을 직접 본다.** 전역 CSS 규칙은
+        `scroll-behavior` 속성만 덮고, `scrollTo` 의 `behavior: 'smooth'` 는 못 덮는다.
+      */
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      // 애니메이션 동안 스냅이 가로채지 않게 끈다
+      track.style.scrollSnapType = 'none'
+      track.scrollTo({ left, behavior: reduce ? 'auto' : 'smooth' })
+
+      if (reduce) {
+        restore()
+      } else if ('onscrollend' in track) {
+        track.addEventListener('scrollend', restore, { once: true })
+        cancelSettle.current = () => track.removeEventListener('scrollend', restore)
+      } else {
+        const timer = window.setTimeout(restore, SETTLE_FALLBACK_MS)
+        cancelSettle.current = () => window.clearTimeout(timer)
+      }
+    },
+    [trackRef],
+  )
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
@@ -201,13 +289,23 @@ function useDragScroll(trackRef: React.RefObject<HTMLElement | null>) {
       const track = trackRef.current
       if (track === null) return
 
-      drag.current = { startX: event.clientX, startScrollLeft: track.scrollLeft }
+      // 넘어가던 중에 다시 잡았다 — 끝나고 스냅을 켜는 예약이 끄는 도중에 터지지 않게 걷는다
+      cancelSettle.current?.()
+      cancelSettle.current = null
+
+      const width = step()
+      drag.current = {
+        startX: event.clientX,
+        startScrollLeft: track.scrollLeft,
+        startIndex: width > 0 ? Math.round(track.scrollLeft / width) : 0,
+        samples: [{ x: event.clientX, t: event.timeStamp }],
+      }
       dragged.current = false
       setGrabbing(true)
       // 포인터가 컨테이너 밖으로 나가도 계속 추적한다
       event.currentTarget.setPointerCapture(event.pointerId)
     },
-    [trackRef],
+    [trackRef, step],
   )
 
   const onPointerMove = useCallback(
@@ -219,10 +317,18 @@ function useDragScroll(trackRef: React.RefObject<HTMLElement | null>) {
       const moved = event.clientX - state.startX
       if (Math.abs(moved) > DRAG_SLOP_PX) dragged.current = true
 
+      state.samples.push({ x: event.clientX, t: event.timeStamp })
+      // 속도 구간보다 오래된 것은 버린다 — 하나는 남겨 구간의 시작점으로 쓴다
+      while (
+        state.samples.length > 2 &&
+        event.timeStamp - (state.samples[1]?.t ?? event.timeStamp) > VELOCITY_WINDOW_MS
+      ) {
+        state.samples.shift()
+      }
+
       /*
         `scroll-snap-type` 을 끄고 끈다. 켜 둔 채 `scrollLeft` 를 쓰면 브라우저가 매
-        프레임 스냅 지점으로 되돌려 손을 따라오지 않는다. 손을 떼면 되돌리고, 그때
-        브라우저가 가장 가까운 사진으로 붙인다 — 터치와 같은 마무리다.
+        프레임 스냅 지점으로 되돌려 손을 따라오지 않는다.
       */
       track.style.scrollSnapType = 'none'
       track.scrollLeft = state.startScrollLeft - moved
@@ -232,19 +338,38 @@ function useDragScroll(trackRef: React.RefObject<HTMLElement | null>) {
 
   const endDrag = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
-      if (drag.current === null) return
+      const state = drag.current
+      if (state === null) return
 
       drag.current = null
       setGrabbing(false)
 
-      const track = trackRef.current
-      if (track !== null) track.style.scrollSnapType = ''
-
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
         event.currentTarget.releasePointerCapture(event.pointerId)
       }
+
+      // 누르기만 했다 — 손 떨림만큼 밀린 것은 원래 칸으로 돌린다
+      if (!dragged.current) {
+        goTo(state.startIndex)
+        return
+      }
+
+      const first = state.samples[0]
+      const elapsed = first === undefined ? 0 : event.timeStamp - first.t
+      // 부호를 스크롤 방향으로 뒤집는다 — 포인터가 왼쪽으로 가면 다음 칸이다
+      const velocity = first === undefined || elapsed <= 0 ? 0 : (first.x - event.clientX) / elapsed
+
+      goTo(
+        swipeTarget({
+          dragPx: state.startX - event.clientX,
+          velocity,
+          step: step(),
+          index: state.startIndex,
+          count,
+        }),
+      )
     },
-    [trackRef],
+    [goTo, step, count],
   )
 
   /** 끌기였으면 뒤따르는 click 을 캡처 단계에서 삼킨다 (타일 버튼에 닿기 전이다) */
@@ -258,6 +383,7 @@ function useDragScroll(trackRef: React.RefObject<HTMLElement | null>) {
 
   return {
     grabbing,
+    goTo,
     handlers: {
       onPointerDown,
       onPointerMove,
@@ -277,7 +403,10 @@ function MobileCarousel({
   images: GalleryImage[]
   title: string
   onOpen: (index: number) => void
-  /** 폭과 상관없이 선다 (`layout="carousel"`). 아니면 `md` 부터 모자이크에 자리를 내준다 */
+  /**
+   * 폭과 상관없이 선다 (`layout="carousel"` — 지도 미리보기). 아니면 `md` 부터 모자이크에 자리를
+   * 내준다. 미리보기는 사진 출처도 사진 위에 얹는다(#1233 D3) — 상세는 갤러리 아래 줄 그대로다.
+   */
   always: boolean
 }) {
   const trackRef = useRef<HTMLUListElement>(null)
@@ -298,7 +427,7 @@ function MobileCarousel({
     뷰어를 여는 버튼과 그 이름(`{n}번째 사진 크게 보기`)은 사진 유무와 상관없다.
   */
   const [reach, setReach] = useState(0)
-  const { grabbing, handlers } = useDragScroll(trackRef)
+  const { grabbing, goTo, handlers } = useCarouselScroll(trackRef, images.length)
 
   const syncIndex = useCallback(() => {
     const track = trackRef.current
@@ -308,7 +437,7 @@ function MobileCarousel({
     if (item === null) return
 
     // 항목 폭 + gap 으로 나눈다. scrollLeft 를 항목 수로 나누면 마지막에서 어긋난다.
-    const step = item.clientWidth + 8
+    const step = item.clientWidth + ITEM_GAP_PX
     const next = Math.min(images.length - 1, Math.round(track.scrollLeft / step))
     setIndex(next)
     setReach((previous) => Math.max(previous, next))
@@ -322,8 +451,28 @@ function MobileCarousel({
     return () => track.removeEventListener('scroll', syncIndex)
   }, [syncIndex])
 
+  /*
+    **← → 로 한 칸** (#1233 D5) — 사진 타일(`<button>`)에 포커스가 있을 때 듣는다. 포커스는 **넘어간 칸의
+    타일로 따라간다** — 화면 밖으로 밀린 타일에 포커스가 남으면 다음 Enter 가 보이지 않는 사진을 연다.
+    스크롤은 `goTo` 가 하므로 `preventScroll`. 바깥 `div` 에 걸지 않는 이유: 정적 요소가 키를 다루면
+    역할 없는 상호작용이 된다(`jsx-a11y/no-static-element-interactions`).
+  */
+  function onTileKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, position: number) {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+
+    event.preventDefault()
+    const target = position + (event.key === 'ArrowRight' ? 1 : -1)
+    if (target < 0 || target >= images.length) return
+
+    goTo(target)
+    trackRef.current?.children[target]?.querySelector('button')?.focus({ preventScroll: true })
+  }
+
   return (
-    <div className={cn('relative', !always && 'md:hidden')}>
+    <div
+      // `group` — 이전/다음 버튼이 마우스를 올렸을 때 · 포커스가 안에 있을 때만 보인다
+      className={cn('group relative', !always && 'md:hidden')}
+    >
       <ul
         ref={trackRef}
         {...handlers}
@@ -331,8 +480,7 @@ function MobileCarousel({
           `touch-pan-x` 로 세로 스크롤은 페이지에 넘긴다 — 갤러리 위에서 손가락을 위로
           쓸었을 때 페이지가 안 움직이면 캐러셀에 갇힌다.
 
-          커서는 **잡을 수 있다는 유일한 신호**다. 스크롤바는 `scrollbar-none` 으로 숨겼고
-          모바일 폭이라 화살표를 둘 자리도 없다.
+          커서는 **잡을 수 있다는 신호**다. 스크롤바는 `scrollbar-none` 으로 숨겼다.
         */
         className={`flex touch-pan-x snap-x snap-mandatory scrollbar-none gap-2 overflow-x-auto px-4 ${
           grabbing ? 'cursor-grabbing' : 'cursor-grab'
@@ -344,7 +492,11 @@ function MobileCarousel({
             className="bg-band relative shrink-0 snap-start overflow-hidden rounded-md"
             style={{ width: 'var(--gallery-w-mobile)', height: 'var(--gallery-h-mobile)' }}
           >
-            <GalleryTileButton position={position} onOpen={onOpen}>
+            <GalleryTileButton
+              position={position}
+              onOpen={onOpen}
+              onKeyDown={(event) => onTileKeyDown(event, position)}
+            >
               {position <= reach + 1 && (
                 <Image
                   src={image.src}
@@ -368,13 +520,64 @@ function MobileCarousel({
         ))}
       </ul>
 
+      {/*
+        **이전/다음 버튼 (#1233 D3)** — 끌기 · 가로 휠을 모르는 마우스 사용자의 길이다. 손을 올렸을 때 ·
+        포커스가 있을 때만 보인다(사진을 가리지 않는다). 첫 칸의 이전, 끝 칸의 다음은 **그리지 않는다** —
+        눌러도 안 움직이는 버튼은 고장으로 읽힌다. 터치 기기에서는 `hover` 가 없어 안 보인다.
+      */}
+      {index > 0 && <CarouselStepButton direction="prev" onClick={() => goTo(index - 1)} />}
+      {index < images.length - 1 && (
+        <CarouselStepButton direction="next" onClick={() => goTo(index + 1)} />
+      )}
+
       {/* 점 인디케이터가 아니라 카운터다 — 8장까지 가면 점은 읽히지 않는다 */}
       {images.length > 1 && (
-        <span className="bg-fg text-fg-inverse text-caption pointer-events-none absolute right-6 bottom-2 rounded-sm px-2 py-1 font-medium tabular-nums">
+        <span
+          aria-live="polite"
+          className="bg-fg text-fg-inverse text-caption pointer-events-none absolute right-6 bottom-2 rounded-sm px-2 py-1 font-medium tabular-nums"
+        >
           {index + 1}/{images.length}
         </span>
       )}
+
+      {/*
+        미리보기의 사진 출처는 **사진 위 좌하단** (#1233 D3) — 400 폭 패널에서 갤러리 아래 한 줄을
+        아낀다. 표기 의무(D5-2)는 문구 그대로 지킨다. 바탕은 `--fg` 70% — 흰 사진 위에서도 글자 대비
+        4.5:1 을 넘긴다(카운터와 같은 짝).
+      */}
+      {always && (
+        <span className="bg-fg/70 text-fg-inverse text-caption pointer-events-none absolute bottom-2 left-6 rounded-sm px-2 py-1">
+          {messages.place.photoSource}
+        </span>
+      )}
     </div>
+  )
+}
+
+/** 사진 위 좌우 세로 중앙의 원형 44 버튼 — `MobileCarousel` 의 `group` 안에서만 보인다 */
+function CarouselStepButton({
+  direction,
+  onClick,
+}: {
+  direction: 'prev' | 'next'
+  onClick: () => void
+}) {
+  const Icon = direction === 'prev' ? ChevronLeftIcon : ChevronRightIcon
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={
+        direction === 'prev' ? messages.place.galleryPrevAction : messages.place.galleryNextAction
+      }
+      className={cn(
+        'bg-bg/90 text-fg focus-visible:ring-brand-500 absolute top-1/2 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-full opacity-0 shadow-md transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:ring-2 focus-visible:outline-none',
+        direction === 'prev' ? 'left-6' : 'right-6',
+      )}
+    >
+      <Icon size={20} />
+    </button>
   )
 }
 
@@ -506,18 +709,22 @@ function GalleryTileButton({
   position,
   onOpen,
   label,
+  onKeyDown,
   children,
 }: {
   /** 0-based. 라벨에는 1부터 센 번호를 쓴다 */
   position: number
   onOpen: (index: number) => void
   label?: string
+  /** 캐러셀의 ← → (#1233). 모자이크는 넘길 것이 없어 주지 않는다 */
+  onKeyDown?: (event: React.KeyboardEvent<HTMLButtonElement>) => void
   children: React.ReactNode
 }) {
   return (
     <button
       type="button"
       onClick={() => onOpen(position)}
+      onKeyDown={onKeyDown}
       aria-label={
         label ?? messages.place.galleryOpenAction.replace('{index}', String(position + 1))
       }

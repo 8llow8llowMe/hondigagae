@@ -244,6 +244,9 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
       // 홈 추천 카드의 동반 칩은 사진 면 위에 `absolute` 로 떠 있다. 밝은 사진(하늘 · 흰 벽)
       // 위에서 흰 칩의 경계가 사라져 그림자로 되찾는다 — 카드 자체에는 그림자가 없다
       'src/features/home/place-insight-card.tsx',
+      // 갤러리 캐러셀의 이전/다음 원형 버튼 (#1233) — 사진 위에 `absolute` 로 뜬다. 밝은 사진
+      // 위에서 흰 원의 경계가 사라져 그림자로 되찾는다. 갤러리 타일 자체에는 그림자가 없다
+      'src/features/place/photo-gallery.tsx',
     ]
 
     const found = FILES.filter(({ path }) => !FLOATING.includes(path.replace(/\\/g, '/'))).flatMap(

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { centerScrollLeft, pageScrollLeft, scrollFadeSide } from '@/lib/ui/scroll'
+import { centerScrollLeft, pageScrollLeft, scrollFadeSide, swipeTarget } from '@/lib/ui/scroll'
 
 describe('centerScrollLeft', () => {
   it('선택 항목을 컨테이너 가운데로 가져온다', () => {
@@ -114,5 +114,48 @@ describe('pageScrollLeft', () => {
     expect(
       pageScrollLeft({ containerWidth: 40, scrollWidth: 300, scrollLeft: 0, direction: 'right' }),
     ).toBe(40)
+  })
+})
+
+describe('swipeTarget — 놓을 때 갈 칸 (#1233 D3)', () => {
+  // 미리보기 캐러셀 실측 폭: 사진 342 + gap 8
+  const step = 350
+
+  function target(dragPx: number, velocity: number, index = 2, count = 6) {
+    return swipeTarget({ dragPx, velocity, step, index, count })
+  }
+
+  it('칸 폭의 15% 를 넘게 끌면 끈 방향 다음 칸이다 — 느리게 끌어도', () => {
+    expect(target(step * 0.15, 0)).toBe(3)
+    expect(target(-step * 0.15, 0)).toBe(1)
+  })
+
+  it('15% 에 못 미치고 느리면 제자리로 돌아간다', () => {
+    expect(target(step * 0.14, 0.1)).toBe(2)
+    expect(target(-step * 0.14, -0.1)).toBe(2)
+  })
+
+  it('짧게 끌어도 0.3px/ms 이상으로 튕기면 다음 칸이다', () => {
+    expect(target(20, 0.3)).toBe(3)
+    expect(target(-20, -0.3)).toBe(1)
+  })
+
+  it('끌다가 반대로 튕기면 끈 만큼을 되돌린다 — 다음 칸으로 가지 않는다', () => {
+    expect(target(step * 0.4, -0.5)).toBe(2)
+  })
+
+  it('한 칸 넘게 끌면 지나친 칸을 세고 남은 거리로 다시 가른다', () => {
+    expect(target(step * 1.05, 0)).toBe(3)
+    expect(target(step * 1.2, 0)).toBe(4)
+  })
+
+  it('첫 칸 앞 · 끝 칸 뒤로 나가지 않는다', () => {
+    expect(target(-step, -1, 0)).toBe(0)
+    expect(target(step, 1, 5)).toBe(5)
+    expect(target(step * 9, 0, 2)).toBe(5)
+  })
+
+  it('끌지 않았으면 그대로다', () => {
+    expect(target(0, 0)).toBe(2)
   })
 })
