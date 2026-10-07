@@ -144,7 +144,7 @@ describe('PlaceMapPreviewBody — 하단 바와 접근성', () => {
     expect(html).toContain(`aria-label="${messages.map.previewLabel}"`)
     expect(html).toContain(`aria-label="${messages.map.previewClose}"`)
     expect(html).toContain(`href="/places/${placeSummary.placeId}"`)
-    expect(html).toContain(messages.map.rowDetailLabel.replace('{title}', placeSummary.title))
+    expect(html).toContain(messages.map.previewDetail)
   })
 
   it('하단 바가 잘리지 않게 section 에 `min-h-0` · 바에 `shrink-0` 이 있다', () => {
@@ -156,5 +156,118 @@ describe('PlaceMapPreviewBody — 하단 바와 접근성', () => {
 
   it('긴 이름이 넘치지 않는다 — `min-w-0 break-words`', () => {
     expect(render()).toMatch(/<h2[^>]*class="[^"]*min-w-0[^"]*break-words/)
+  })
+})
+
+/*
+  #1230 — 사용자 지적 네 가지: 로딩이 빈칸으로 보인다 · 상세 보기가 닫기 옆이다 · 사진이 한 장뿐이다 ·
+  정보가 너무 간략하다.
+*/
+describe('PlaceMapPreviewBody — 로딩 표시 (#1230)', () => {
+  it('판정 줄 상자는 골격과 같은 `--band` 로 칠하지 않는다 — 골격이 묻혀 빈칸으로 보였다', () => {
+    const html = render({ suitability: pending, walkSafety: pending })
+    const box = /<dl aria-busy="true" class="([^"]*)"/.exec(html)
+
+    expect(box?.[1]).toBeDefined()
+    expect(box?.[1]).not.toContain('bg-band')
+    expect(html).toContain('animate-pulse')
+    expect(html).toContain(messages.map.previewLoading)
+  })
+
+  it('라벨은 먼저 선다 — 무엇을 기다리는지 보인다', () => {
+    const html = render({ walkSafety: pending })
+
+    expect(html).toContain(messages.place.detailSummaryWalkLabel)
+  })
+
+  it('상세를 기다리는 동안에도 동반 · 지금 산책 라벨과 골격이 선다', () => {
+    const html = render({ detail: pending, walkSafety: pending })
+
+    expect(html).toContain(messages.place.detailSummaryPetLabel)
+    expect(html).toContain(messages.place.detailSummaryWalkLabel)
+    expect(html).toContain('aria-busy="true"')
+  })
+
+  it('적합도를 묻는 동안 이름 옆에 배지 모양 골격이 자리를 잡는다', () => {
+    const html = render({ suitability: pending })
+    const head = html.slice(html.indexOf('<h2'), html.indexOf('</h2>') + 400)
+
+    expect(head).toContain('animate-pulse')
+    expect(head).not.toContain(suitability.suitabilityLevel.name)
+  })
+
+  it('다 받으면 aria-busy 가 거짓이다', () => {
+    expect(render()).toContain('aria-busy="false"')
+  })
+})
+
+describe('PlaceMapPreviewBody — 상세로 가는 길은 정보 맨 아래다 (#1230)', () => {
+  it('닫기 옆(머리 줄)에 없고, 이용 안내 뒤 · 하단 바 앞에 선다', () => {
+    const html = render()
+    const link = html.indexOf(messages.map.previewDetail)
+
+    expect(link).toBeGreaterThan(html.indexOf(messages.place.detailSectionIntro))
+    expect(link).toBeLessThan(html.indexOf(messages.plan.addToPlanAction))
+    expect(link).toBeGreaterThan(html.indexOf(`aria-label="${messages.map.previewClose}"`))
+  })
+})
+
+describe('PlaceMapPreviewBody — 사진은 상세와 같은 목록 (#1230)', () => {
+  const twoImages = {
+    ...placeDetail,
+    images: [
+      ...placeDetail.images,
+      {
+        originImgUrl: 'http://tong.visitkorea.or.kr/cms/resource/mock/place-2.jpg',
+        smallImageUrl: null,
+        imgName: '두 번째',
+        cpyrhtDivCd: 'Type1',
+      },
+    ],
+  }
+
+  it('상세 응답의 이미지 목록을 캐러셀로 그린다 — 장수 카운터가 선다', () => {
+    const html = render({ detail: ok(twoImages) })
+
+    expect(html).toContain('1/2')
+    // 모자이크(데스크톱 갈래)를 그리지 않는다 — 400 폭 패널이다
+    expect(html).not.toContain('hidden md:block')
+  })
+})
+
+describe('PlaceMapPreviewBody — 이용 안내 (#1230)', () => {
+  it('휴무일 · 주차 · 유모차 · 카드 · 전체 주소를 싣는다', () => {
+    const html = render()
+
+    expect(html).toContain(messages.place.detailSectionIntro)
+    expect(html).toContain(placeDetail.intro?.restDate ?? '')
+    expect(html).toContain(`${placeDetail.addr1} ${placeDetail.addr2}`)
+  })
+
+  it('운영시간이 한 줄이면 이용 안내에서 빠진다 — 핵심 줄이 이미 같은 문장을 말한다', () => {
+    const intro = placeDetail.intro
+    if (intro === null) throw new Error('fixture 에 intro 가 있어야 한다')
+    const oneLine = { ...placeDetail, intro: { ...intro, useTime: '상시 개방' } }
+    const html = render({ detail: ok(oneLine) })
+
+    expect(html.match(/상시 개방/g)).toHaveLength(1)
+    expect(html).not.toContain(`>${messages.place.detailUseTime}<`)
+  })
+
+  it('여러 줄이면 전문을 싣는다 — 핵심 줄은 첫 줄뿐이다', () => {
+    const intro = placeDetail.intro
+    if (intro === null) throw new Error('fixture 에 intro 가 있어야 한다')
+    const multi = {
+      ...placeDetail,
+      intro: { ...intro, useTime: '09:00~18:00<br>(입장 마감 17:00)' },
+    }
+
+    expect(render({ detail: ok(multi) })).toContain('(입장 마감 17:00)')
+  })
+
+  it('값이 하나도 없으면 절이 없다', () => {
+    const bare = { ...placeDetail, intro: null, addr1: null, addr2: null }
+
+    expect(render({ detail: ok(bare) })).not.toContain(messages.place.detailSectionIntro)
   })
 })

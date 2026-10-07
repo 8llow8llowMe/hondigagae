@@ -123,7 +123,10 @@ export const mapMessages = {
   previewClose: '미리보기 닫기',
   /** 1024~1279 — 미리보기가 목록 자리를 쓰므로 돌아가는 길을 보이는 글자로 준다 */
   previewBackToList: '목록',
-  previewDetail: '상세 보기',
+  /** 정보 맨 아래 전폭 보조 버튼 (#1230) — 닫기 옆에 두지 않는다 */
+  previewDetail: '상세 정보 전체 보기',
+  /** 판정 줄 골격의 스크린리더 문구 — 보이는 것은 골격뿐이다 */
+  previewLoading: '불러오는 중',
   /** 목록에 없는 id 로 들어왔는데 상세도 못 받았을 때 */
   previewLoadFailed: '장소 정보를 불러오지 못했어요',
 

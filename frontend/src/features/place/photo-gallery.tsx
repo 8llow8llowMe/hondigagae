@@ -51,10 +51,17 @@ export function PhotoGallery({
    * `contentType.code` 다 — **한국어 `name` 으로 고르지 않는다.**
    */
   contentTypeCode = null,
+  layout = 'responsive',
 }: {
   images: PlaceImage[]
   title: string
   contentTypeCode?: string | null
+  /**
+   * `responsive`(기본) = 상세 — 모바일 캐러셀 · 데스크톱 모자이크가 **뷰포트 폭**으로 갈린다.
+   * `carousel` = 지도 미리보기(#1230) — 폭과 상관없이 캐러셀만. 미리보기는 데스크톱에서도
+   * 400 폭 패널이라, 뷰포트로 가르면 그 좁은 칸에 모자이크가 선다.
+   */
+  layout?: 'responsive' | 'carousel'
 }) {
   // `next/image` 에 넘길 수 있는 것만 남긴다 (허용 호스트 + https 승격)
   const usable = images
@@ -80,7 +87,7 @@ export function PhotoGallery({
     const illustration = placeIllustration(contentTypeCode)
     if (illustration === null) return null
 
-    return <IllustrationTile src={illustration} />
+    return <IllustrationTile src={illustration} layout={layout} />
   }
 
   const viewerImages: ViewerImage[] = usable.map((image) => ({
@@ -90,8 +97,15 @@ export function PhotoGallery({
 
   return (
     <div className="flex flex-col gap-2">
-      <MobileCarousel images={usable} title={title} onOpen={setViewerIndex} />
-      <DesktopStrip images={usable} title={title} onOpen={setViewerIndex} />
+      <MobileCarousel
+        images={usable}
+        title={title}
+        onOpen={setViewerIndex}
+        always={layout === 'carousel'}
+      />
+      {layout === 'responsive' && (
+        <DesktopStrip images={usable} title={title} onOpen={setViewerIndex} />
+      )}
 
       {/*
         사진 출처는 갤러리 바로 아래. 정보 출처는 본문 끝 — 각각 자기 자료 옆에서 읽힌다.
@@ -126,10 +140,10 @@ export function PhotoGallery({
  * (`unoptimized: true`), 원격 호스트 허용 목록과도 무관하다. `PlaceRow` 와 같은 판단이다.
  * **장식이므로 `alt=""`** — 카테고리는 바로 아래 메타 줄이 낱말로 말한다.
  */
-function IllustrationTile({ src }: { src: string }) {
+function IllustrationTile({ src, layout }: { src: string; layout: 'responsive' | 'carousel' }) {
   return (
     <>
-      <div className="px-4 md:hidden">
+      <div className={cn('px-4', layout === 'responsive' && 'md:hidden')}>
         <div
           className="bg-band relative overflow-hidden rounded-md"
           style={{ height: 'var(--gallery-h-mobile)' }}
@@ -139,7 +153,7 @@ function IllustrationTile({ src }: { src: string }) {
         </div>
       </div>
 
-      <div className="hidden md:block">
+      <div className={layout === 'responsive' ? 'hidden md:block' : 'hidden'}>
         <div
           className="bg-band relative overflow-hidden rounded-md"
           style={{
@@ -258,10 +272,13 @@ function MobileCarousel({
   images,
   title,
   onOpen,
+  always,
 }: {
   images: GalleryImage[]
   title: string
   onOpen: (index: number) => void
+  /** 폭과 상관없이 선다 (`layout="carousel"`). 아니면 `md` 부터 모자이크에 자리를 내준다 */
+  always: boolean
 }) {
   const trackRef = useRef<HTMLUListElement>(null)
   const [index, setIndex] = useState(0)
@@ -306,7 +323,7 @@ function MobileCarousel({
   }, [syncIndex])
 
   return (
-    <div className="relative md:hidden">
+    <div className={cn('relative', !always && 'md:hidden')}>
       <ul
         ref={trackRef}
         {...handlers}
