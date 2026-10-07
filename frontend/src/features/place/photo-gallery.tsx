@@ -283,8 +283,8 @@ function useCarouselScroll(trackRef: React.RefObject<HTMLElement | null>, count:
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
-      // 터치는 네이티브 스크롤에 맡긴다
-      if (event.pointerType === 'touch') return
+      // 터치는 네이티브 스크롤에 맡긴다. 왼쪽 버튼만 끈다 — 우클릭 메뉴는 pointerup 을 빠뜨릴 수 있다
+      if (event.pointerType === 'touch' || event.button !== 0) return
 
       const track = trackRef.current
       if (track === null) return
@@ -306,34 +306,6 @@ function useCarouselScroll(trackRef: React.RefObject<HTMLElement | null>, count:
       event.currentTarget.setPointerCapture(event.pointerId)
     },
     [trackRef, step],
-  )
-
-  const onPointerMove = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
-      const state = drag.current
-      const track = trackRef.current
-      if (state === null || track === null) return
-
-      const moved = event.clientX - state.startX
-      if (Math.abs(moved) > DRAG_SLOP_PX) dragged.current = true
-
-      state.samples.push({ x: event.clientX, t: event.timeStamp })
-      // 속도 구간보다 오래된 것은 버린다 — 하나는 남겨 구간의 시작점으로 쓴다
-      while (
-        state.samples.length > 2 &&
-        event.timeStamp - (state.samples[1]?.t ?? event.timeStamp) > VELOCITY_WINDOW_MS
-      ) {
-        state.samples.shift()
-      }
-
-      /*
-        `scroll-snap-type` 을 끄고 끈다. 켜 둔 채 `scrollLeft` 를 쓰면 브라우저가 매
-        프레임 스냅 지점으로 되돌려 손을 따라오지 않는다.
-      */
-      track.style.scrollSnapType = 'none'
-      track.scrollLeft = state.startScrollLeft - moved
-    },
-    [trackRef],
   )
 
   const endDrag = useCallback(
@@ -370,6 +342,39 @@ function useCarouselScroll(trackRef: React.RefObject<HTMLElement | null>, count:
       )
     },
     [goTo, step, count],
+  )
+
+  const onPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      const state = drag.current
+      const track = trackRef.current
+      if (state === null || track === null) return
+      // 버튼이 이미 떨어졌다(pointerup 이 빠졌다) — 손을 뗀 것으로 마무리한다. 아니면 스냅이 꺼진 채 남는다
+      if (event.buttons === 0) {
+        endDrag(event)
+        return
+      }
+
+      const moved = event.clientX - state.startX
+      if (Math.abs(moved) > DRAG_SLOP_PX) dragged.current = true
+
+      state.samples.push({ x: event.clientX, t: event.timeStamp })
+      // 속도 구간보다 오래된 것은 버린다 — 하나는 남겨 구간의 시작점으로 쓴다
+      while (
+        state.samples.length > 2 &&
+        event.timeStamp - (state.samples[1]?.t ?? event.timeStamp) > VELOCITY_WINDOW_MS
+      ) {
+        state.samples.shift()
+      }
+
+      /*
+        `scroll-snap-type` 을 끄고 끈다. 켜 둔 채 `scrollLeft` 를 쓰면 브라우저가 매
+        프레임 스냅 지점으로 되돌려 손을 따라오지 않는다.
+      */
+      track.style.scrollSnapType = 'none'
+      track.scrollLeft = state.startScrollLeft - moved
+    },
+    [trackRef, endDrag],
   )
 
   /** 끌기였으면 뒤따르는 click 을 캡처 단계에서 삼킨다 (타일 버튼에 닿기 전이다) */
@@ -459,6 +464,8 @@ function MobileCarousel({
   */
   function onTileKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, position: number) {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    // Alt+← (뒤로 가기) 같은 브라우저 단축키는 삼키지 않는다
+    if (event.altKey || event.metaKey || event.ctrlKey) return
 
     event.preventDefault()
     const target = position + (event.key === 'ArrowRight' ? 1 : -1)
@@ -466,6 +473,22 @@ function MobileCarousel({
 
     goTo(target)
     trackRef.current?.children[target]?.querySelector('button')?.focus({ preventScroll: true })
+  }
+
+  /*
+    이전/다음 한 칸. **끝 칸에 닿으면 그 버튼은 사라진다**(첫/끝 숨김) — 키보드로 누르던 포커스가 함께
+    사라지면 `body` 로 떨어진다(WCAG 2.4.3, 리뷰 지적). 그래서 끝 칸으로 가는 누름이면 포커스를 그 칸의
+    사진 타일로 먼저 옮긴다.
+  */
+  function step(event: React.MouseEvent<HTMLButtonElement>, delta: -1 | 1) {
+    const target = index + delta
+    const lands = target === 0 || target === images.length - 1
+    const focused = document.activeElement === event.currentTarget
+
+    goTo(target)
+    if (lands && focused) {
+      trackRef.current?.children[target]?.querySelector('button')?.focus({ preventScroll: true })
+    }
   }
 
   return (
@@ -525,12 +548,15 @@ function MobileCarousel({
         **이전/다음 버튼 (#1233 D3)** — 끌기 · 가로 휠을 모르는 마우스 사용자의 길이다. **사진 위에 마우스를
         올렸을 때만 서서히(200ms) 나타난다**(사용자 결정 2026-10-07) — 사진을 가리지 않는다. 예외는
         **키보드 포커스**(`:focus-visible`)뿐이다: 안 보이는 버튼에 포커스가 가면 어디 있는지 모른다.
-        `focus-within` 을 쓰지 않는다 — 타일을 마우스로 누르면 포커스가 남아 손을 떼도 버튼이 떠 있었다. 첫 칸의 이전, 끝 칸의 다음은 **그리지 않는다** —
+        `focus-within` 을 쓰지 않는다 — 타일을 마우스로 누르면 포커스가 남아 손을 떼도 버튼이 떠 있었다.
+        **보이지 않는 동안에는 누를 수 없다**(`pointer-events-none`). 호버가 없는 휴대폰에서는 버튼이 끝까지
+        투명한데, 그대로 두면 사진 좌우 가운데 44 자리가 보이지 않는 버튼이 되어 뷰어 열기 · 넘기기를
+        가로챈다(리뷰 지적) — 터치는 네이티브 그대로라는 이 캐러셀의 약속이 깨진다. 첫 칸의 이전, 끝 칸의 다음은 **그리지 않는다** —
         눌러도 안 움직이는 버튼은 고장으로 읽힌다. 터치 기기에서는 `hover` 가 없어 안 보인다.
       */}
-      {index > 0 && <CarouselStepButton direction="prev" onClick={() => goTo(index - 1)} />}
+      {index > 0 && <CarouselStepButton direction="prev" onClick={(event) => step(event, -1)} />}
       {index < images.length - 1 && (
-        <CarouselStepButton direction="next" onClick={() => goTo(index + 1)} />
+        <CarouselStepButton direction="next" onClick={(event) => step(event, 1)} />
       )}
 
       {/* 점 인디케이터가 아니라 카운터다 — 8장까지 가면 점은 읽히지 않는다 */}
@@ -563,7 +589,7 @@ function CarouselStepButton({
   onClick,
 }: {
   direction: 'prev' | 'next'
-  onClick: () => void
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
 }) {
   const Icon = direction === 'prev' ? ChevronLeftIcon : ChevronRightIcon
 
@@ -575,7 +601,7 @@ function CarouselStepButton({
         direction === 'prev' ? messages.place.galleryPrevAction : messages.place.galleryNextAction
       }
       className={cn(
-        'bg-bg/90 text-fg focus-visible:ring-brand-500 absolute top-1/2 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-full opacity-0 shadow-md transition-opacity duration-200 ease-out group-hover/gallery:opacity-100 group-has-[:focus-visible]/gallery:opacity-100 focus-visible:ring-2 focus-visible:outline-none',
+        'bg-bg/90 text-fg focus-visible:ring-brand-500 pointer-events-none absolute top-1/2 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-full opacity-0 shadow-md transition-opacity duration-200 ease-out group-hover/gallery:pointer-events-auto group-hover/gallery:opacity-100 group-has-[:focus-visible]/gallery:pointer-events-auto group-has-[:focus-visible]/gallery:opacity-100 focus-visible:ring-2 focus-visible:outline-none',
         direction === 'prev' ? 'left-6' : 'right-6',
       )}
     >

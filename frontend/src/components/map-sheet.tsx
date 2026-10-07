@@ -59,8 +59,8 @@ export const MAP_TOP_CONTROLS_INSET = 136
 /**
  * 여기서 시작한 제스처는 드래그로 치지 않는다 — 각자 자기 일이 있는 컨트롤이다.
  *
- * **묶음(`ChipGroup`)은 넣지 않는다.** 그 안의 칩은 `button` 이라 이미 빠지고, 묶음의
- * 빈 자리는 손잡이로 쓰는 편이 낫다. (그리고 이 파일이 배타 묶음을 *그리는* 것으로
+ * **묶음(`ChipGroup`) 선택자는 넣지 않는다.** 그 안의 칩은 `button` 이라 이미 빠지고, 묶음이 서는
+ * 필터 줄은 통째로 `[data-sheet-no-drag]` 로 빠진다(아래). (그리고 이 파일이 배타 묶음을 *그리는* 것으로
  * 오인되면 `radio-group-keys.test.ts` 가 키 핸들러를 요구한다 — 이 파일에는 없는 일이다.)
  *
  * **필터 줄(`toolbar`) 전체는 뺀다** (`data-sheet-no-drag`, 사용자 지적 2026-10-07). 칩은 `button` 이라
@@ -76,9 +76,9 @@ const DRAG_IGNORED_SELECTOR = 'button, a, input, select, textarea, [data-sheet-n
  * 올려야 하는지 모르겠다"* 가 나온 자리다 — 보이는 막대는 36×4 인데 드래그를 받는 띠는
  * 세로 16px 뿐이었고, 조금만 아래를 잡으면 목록이 스크롤됐다.
  *
- * **머리 전체를 받되 컨트롤은 뺀다.** 칩·단계 버튼에서 시작한 제스처까지 드래그로 치면
- * 필터를 누를 수 없다. 그래서 *영역* 이 아니라 *대상* 으로 가른다 — 컨트롤 사이의 빈
- * 자리도 전부 손잡이가 된다.
+ * **머리 전체를 받되 컨트롤과 필터 줄은 뺀다.** 칩·단계 버튼에서 시작한 제스처까지 드래그로 치면
+ * 필터를 누를 수 없다. 그래서 *대상* 으로 가르고, 칩이 빽빽한 필터 줄은 칩 사이 틈까지 *영역* 으로
+ * 뺀다(2026-10-07 — 칩을 누르려다 시트가 끌렸다). 잡는 자리는 그래버 띠 · 개수 줄이다.
  *
  * **목록은 여전히 드래그를 안 받는다** — 그쪽이 먹으면 스크롤이 죽는다(아래 주석).
  */
@@ -133,6 +133,12 @@ export function MapSheet({
   const [dragging, setDragging] = useState(false)
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    /*
+      **포털에서 올라온 이벤트는 받지 않는다.** React 포인터 이벤트는 포털을 지나 React 조상으로
+      버블한다 — 필터 줄이 연 지역 · 더보기 시트(`BottomSheet`, body 포털)에서 시작한 제스처가 이
+      머리까지 와서, DOM 조상에 표식이 없으니 드래그로 잡혔다(리뷰 지적). DOM 으로 이 머리 안인지 본다.
+    */
+    if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return
     // 칩·단계 버튼에서 시작한 제스처는 그 컨트롤의 것이다 (#901 D3)
     if (!shouldStartSheetDrag(event.target as HTMLElement | null)) return
 
@@ -239,11 +245,12 @@ export function MapSheet({
         className="cursor-grab touch-pan-x active:cursor-grabbing"
       >
         {/*
-          그래버 — 보이는 손잡이. **위아래 12px 여유를 둔다**(28px 띠, 사용자 지적 2026-10-07) — `pt-2 pb-1`
+          그래버 — 보이는 손잡이. **막대 밑에 12px 여유를 둔다**(24px 띠, 사용자 지적 2026-10-07) — `pt-2 pb-1`
           이던 때는 막대 바로 밑 4px 에 칩이 붙어 잡기 어려웠다. 필터 줄이 손잡이에서 빠졌으므로 이 띠와
-          개수 줄이 잡는 자리다.
+          개수 줄이 잡는 자리다. **위는 8 그대로다** — 머리가 커질수록 최소 단계 하한(아래 #901 D1)이 올라가
+          `mid` 와의 차이가 줄어든다. 12/12 면 360×640 에서 그 차이가 3px 이었다(리뷰 계산).
         */}
-        <div className="flex touch-none justify-center pt-3 pb-3">
+        <div className="flex touch-none justify-center pt-2 pb-3">
           <span aria-hidden className="bg-border-strong h-1 w-9 rounded-full" />
         </div>
 
@@ -284,7 +291,8 @@ export function MapSheet({
         단계 높이는 **비율**(`STOP_RATIO`)인데 머리는 **고정 px** 라, 기기가 짧을수록 목록이
         사라졌다. 360×640 실측으로 `/places` 는 머리가 160 인데 `min` 이 20dvh = 128 이라
         **목록 0행**이었다(개수 줄까지 잘렸다). 칩을 한 줄 레일로 합치는 안은 #883 이 유형
-        9종 때문에 보류한 판단이라 되받지 않고, 시트 쪽에 하한을 건다:
+        9종 때문에 보류한 판단이라 되받지 않고, 시트 쪽에 하한을 건다. (그래버 막대 밑 여백을 4 → 12 로
+        넓힌 2026-10-07 뒤로 머리는 약 8px 더 크다 — 그래서 그래버 위 여백은 늘리지 않았다)
 
          - 시트가 `min-h-min` — 제 min-content 아래로 줄지 않는다. 비율 높이는 그대로 두고
            그보다 작아질 때만 이 하한이 이긴다. **JS 로 머리를 재지 않으므로 SSR 마크업과

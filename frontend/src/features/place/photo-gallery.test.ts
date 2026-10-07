@@ -326,6 +326,14 @@ describe('PhotoGallery — 캐러셀 넘기기 (#1233 D3)', () => {
     expect(button).toContain('transition-opacity duration-200 ease-out')
   })
 
+  it('보이지 않는 동안에는 누를 수 없다 — 휴대폰(호버 없음)에서 사진 탭을 가로채지 않는다', () => {
+    const button = renderCarousel(3).match(new RegExp(`<button[^>]*${next}[^>]*>`))?.[0] ?? ''
+
+    expect(button).toContain('pointer-events-none')
+    expect(button).toContain('group-hover/gallery:pointer-events-auto')
+    expect(button).toContain('group-has-[:focus-visible]/gallery:pointer-events-auto')
+  })
+
   it('마우스로 누른 포커스로는 뜨지 않고 키보드 포커스만 예외다', () => {
     const button = renderCarousel(3).match(new RegExp(`<button[^>]*${next}[^>]*>`))?.[0] ?? ''
 

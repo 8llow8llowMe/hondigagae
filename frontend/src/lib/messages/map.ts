@@ -144,7 +144,8 @@ export const mapMessages = {
   previewSaveBlocked: '더 이상 확인되지 않는 장소라 저장할 수 없어요',
   /** 공유 시트가 없는 기기(데스크톱 대부분)는 링크를 복사한다 */
   previewShareCopied: '링크를 복사했어요',
-  previewShareFailed: '링크를 복사하지 못했어요',
+  /** 행동 줄 아래에 주소와 함께 남는다 — 토스트가 아니다(오류는 섹션 안에) */
+  previewShareFailed: '링크를 복사하지 못했어요. 아래 주소를 직접 복사해 주세요',
   /**
    * 오늘 판정 카드 머리 — `{pet}` 은 조사까지 붙은 이름이다(`몽과` · `몽실이와`,
    * `withCompanionParticle`). 반려견이 없으면 `previewVerdictHeadNoPet`.
@@ -166,7 +167,6 @@ export const mapMessages = {
   previewAddressCopy: '복사',
   previewAddressCopyLabel: '주소 복사',
   previewAddressCopied: '주소를 복사했어요',
-  previewAddressCopyFailed: '주소를 복사하지 못했어요',
   previewMore: '더보기',
   previewLess: '접기',
 

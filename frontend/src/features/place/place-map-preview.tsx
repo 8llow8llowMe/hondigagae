@@ -60,24 +60,26 @@ export function PlaceMapPreview({
 
   /*
     **공유 (#1233)** — 상세 정규 주소를 기기 공유 시트로, 없으면 링크 복사. 사용자가 시트를 닫은 것은
-    아무것도 띄우지 않는다. 복사 결과는 토스트로 말한다 — 끝난 일을 알리는 것이 토스트의 몫이고
-    (`toast.tsx`), 실패도 다시 누르면 되는 일이라 섹션 안에 남길 오류가 아니다(명세 D2 ④).
+    아무것도 띄우지 않는다. **복사 성공은 토스트**(끝난 일을 알린다), **실패는 행동 줄 아래에 주소와
+    함께 남긴다** — 오류를 토스트로 말하지 않는다(`toast.tsx`). 공유할 주소는 화면 어디에도 없다.
   */
+  const [shareFailedUrl, setShareFailedUrl] = useState<string | null>(null)
   async function share() {
     if (title === null) return
-    const outcome = await sharePlace(navigator, {
-      title,
-      url: placeShareUrl(window.location.origin, placeId),
-    })
+    const url = placeShareUrl(window.location.origin, placeId)
+    const outcome = await sharePlace(navigator, { title, url })
+    setShareFailedUrl(outcome === 'failed' ? url : null)
     if (outcome === 'copied') showToast({ message: messages.map.previewShareCopied })
-    if (outcome === 'failed') showToast({ message: messages.map.previewShareFailed })
   }
 
+  /*
+    주소 복사 — 성공만 토스트로 알린다. 실패는 말하지 않는다: 주소가 바로 그 행에 글자로 있어 직접
+    고를 수 있고, 실패를 토스트로 흘리는 것은 `toast.tsx` 규칙에 어긋난다.
+  */
   async function copyAddress(address: string) {
-    const copied = await copyText(navigator, address)
-    showToast({
-      message: copied ? messages.map.previewAddressCopied : messages.map.previewAddressCopyFailed,
-    })
+    if (await copyText(navigator, address)) {
+      showToast({ message: messages.map.previewAddressCopied })
+    }
   }
 
   /*
@@ -134,6 +136,7 @@ export function PlaceMapPreview({
           onAddToPlan: () => (authed ? setAddOpen(true) : setLoginIntent('add')),
           delisted: detail.data?.delisted ?? false,
           onShare: () => void share(),
+          shareFailedUrl,
           onCopyAddress: (address) => void copyAddress(address),
         }}
         headingRef={headingRef}

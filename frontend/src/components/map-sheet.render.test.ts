@@ -234,10 +234,16 @@ describe('MapSheet — 손잡이와 필터 줄 (사용자 지적 2026-10-07)', (
     expect(renderWithToolbar()).toMatch(/<div data-sheet-no-drag="true"[^>]*><p>필터 자리/)
   })
 
-  it('손잡이 줄은 위아래 12px 여유를 둔다 — 막대와 칩이 붙어 잡기 어려웠다', () => {
+  it('손잡이 막대 밑에 12px 여유를 둔다 — 막대와 칩이 붙어 잡기 어려웠다', () => {
     const grabber = /<div class="([^"]*touch-none[^"]*)"/.exec(renderWithToolbar())?.[1] ?? ''
 
-    expect(grabber.split(/\s+/)).toEqual(expect.arrayContaining(['pt-3', 'pb-3']))
+    expect(grabber.split(/\s+/)).toEqual(expect.arrayContaining(['pb-3']))
+  })
+
+  it('위 여백은 8 그대로다 — 머리가 커지면 최소 단계가 mid 에 붙는다 (#901 D1)', () => {
+    const grabber = /<div class="([^"]*touch-none[^"]*)"/.exec(renderWithToolbar())?.[1] ?? ''
+
+    expect(grabber.split(/\s+/)).toContain('pt-2')
   })
 })
 
