@@ -25,7 +25,6 @@ export function PlacePetInfoSection({
   petInfo,
   allowance,
   sourceText,
-  tel,
   petName,
   petSizeCode,
   petSizeName,
@@ -39,8 +38,6 @@ export function PlacePetInfoSection({
   allowance: EnumMetadata | null
   /** intro.chkPet — DTO 주석이 "판단은 petInfo 우선" 이라 참고 값으로만 둔다 */
   sourceText: string | null
-  /** 정보가 없을 때 안내할 전화번호 */
-  tel: string | null
   /** 선택된 반려견. null 이면 대입할 기준이 없어 그 줄을 렌더하지 않는다 */
   petName: string | null
   /** 판정용 code (`SMALL`/`MEDIUM`/`LARGE`) */
@@ -48,7 +45,7 @@ export function PlacePetInfoSection({
   /** 문장에 넣을 서버 `name`. FE 가 크기 한국어를 만들지 않는다 */
   petSizeName: string | null
 }) {
-  if (petInfo === null) return <EmptyPetInfo allowance={allowance} tel={tel} />
+  if (petInfo === null) return <EmptyPetInfo allowance={allowance} />
 
   const lines = petInfoLines(petInfo, sourceText)
   const verdict = sizeVerdictLine(petInfo, petName, petSizeCode, petSizeName)
@@ -109,7 +106,11 @@ function PetInfoLine({ label, value }: { label: string; value: string }) {
   )
 }
 
-/** 아트보드 04-① — `petInfo` 가 비어도 섹션을 숨기지 않는다. 대신 다음 행동을 준다 */
+/**
+ * 아트보드 04-① — `petInfo` 가 비어도 섹션을 숨기지 않는다. 다음 행동(전화)은 **같은 카드
+ * 위쪽 방문 핵심 줄**이 준다 (#1226) — 예전에는 여기에 `{tel} 전화` 링크가 따로 서서 같은
+ * 번호가 한 카드 안에 두 번 섰다.
+ */
 /**
  * `petInfo` 가 없는 상태. **두 갈래다.**
  *
@@ -119,7 +120,7 @@ function PetInfoLine({ label, value }: { label: string; value: string }) {
  * 같은 크기의 거짓이다. 그래서 그 갈래에서는 **서버 문장을 그대로** 쓰고 없는 것이
  * 세부 조건임을 밝힌다 (FE 가 code 별 한국어를 만들지 않는다).
  */
-function EmptyPetInfo({ allowance, tel }: { allowance: EnumMetadata | null; tel: string | null }) {
+function EmptyPetInfo({ allowance }: { allowance: EnumMetadata | null }) {
   const registered = allowance !== null && allowance.code !== 'UNKNOWN'
 
   return (
@@ -138,15 +139,6 @@ function EmptyPetInfo({ allowance, tel }: { allowance: EnumMetadata | null; tel:
           ? messages.place.detailPetInfoDetailsMissingText
           : messages.place.detailPetInfoEmptyText}
       </p>
-      {tel !== null && (
-        <a
-          href={`tel:${tel.replace(/[^\d+]/g, '')}`}
-          // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)
-          className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex min-h-11 items-center rounded-sm font-semibold tabular-nums focus-visible:ring-2 focus-visible:outline-none"
-        >
-          {messages.place.detailPetInfoEmptyTel.replace('{tel}', tel)}
-        </a>
-      )}
     </div>
   )
 }
@@ -165,9 +157,9 @@ export function petInfoLines(
     /*
       가공값 2종을 맨 앞에 둔다 — "들어갈 수 있는가" 가 첫 질문이다.
 
-      **`name` 이 아니라 `description` 을 쓴다.** `name`("일부 구역 동반 가능")은 이미 제목
-      옆 배지가 말하고 있고, 여기서 필요한 것은 조건 문장이다. `description` 이 없으면
-      `name` 으로 떨어진다 — 모르는 code 에서도 줄이 비지 않는다.
+      **`name` 이 아니라 `description` 을 쓴다.** `name`("일부 구역 동반 가능")은 등급어이고,
+      여기서 필요한 것은 조건 문장이다. `description` 이 없으면 `name` 으로 떨어진다 —
+      모르는 code 에서도 줄이 비지 않는다.
     */
     {
       label: messages.place.detailPetScope,
@@ -176,6 +168,15 @@ export function petInfoLines(
     {
       label: messages.place.detailPetSize,
       value: petInfo.allowedPetSize.description ?? petInfo.allowedPetSize.name,
+    },
+    /*
+      목줄은 **필요할 때만** 줄이 선다 (#1226). 예전에는 데스크톱 제목 아래 `목줄 필요` 칩이
+      말했는데, 칩 줄을 걷으면서 이 가공값을 말하는 곳이 사라졌다. `false` 는 "필요 없다" 를
+      보장하는 값으로 쓰지 않는다 — 칩도 `true` 일 때만 섰다.
+    */
+    {
+      label: messages.place.detailPetLeash,
+      value: petInfo.leashRequired ? messages.place.detailPetLeashRequired : null,
     },
     { label: messages.place.detailPetType, value: petInfo.acmpyTypeCd },
     { label: messages.place.detailPetAnimal, value: petInfo.acmpyPsblCpam },
