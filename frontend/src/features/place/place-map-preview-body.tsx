@@ -755,7 +755,15 @@ function PreviewUseInfo({
 
         {parking !== null && (
           <InfoRow icon={<ParkingIcon size={20} />}>
-            <span className="whitespace-pre-line">{parking}</span>
+            {/*
+              원문이 `가능` · `불가` 처럼 낱말 하나인 곳이 많다(dev 실측 수월봉) — 아이콘만으로는 무엇이
+              가능한지 읽히지 않아 `주차` 를 앞에 붙인다. 원문이 이미 `주차…` 로 시작하면 두 번 쓰지 않는다.
+            */}
+            <span className="whitespace-pre-line">
+              {parking.startsWith(messages.place.detailParking)
+                ? parking
+                : `${messages.place.detailParking} ${parking}`}
+            </span>
           </InfoRow>
         )}
 

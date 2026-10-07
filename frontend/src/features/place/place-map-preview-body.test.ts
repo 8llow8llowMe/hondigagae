@@ -291,6 +291,13 @@ describe('PlaceMapPreviewBody — ⑥ 이용 정보 (아이콘 행)', () => {
     expect(html).toContain(`aria-label="${messages.map.previewAddressCopyLabel}"`)
   })
 
+  it('주차가 낱말 하나(`가능`)여도 무엇이 가능한지 읽힌다 — 원문이 `주차…` 면 두 번 쓰지 않는다', () => {
+    expect(render()).toContain(`${messages.place.detailParking} 가능`)
+    expect(render({ detail: ok(withIntro({ parking: '주차 가능 (소형 20대)' })) })).not.toContain(
+      '주차 주차',
+    )
+  })
+
   it('운영시간이 여러 줄이면 행을 눌러 펼친다 — 전문은 접힌 채 문서에 있다', () => {
     const html = render({ detail: ok(withIntro({ useTime: '09:00~18:00<br>(입장 마감 17:00)' })) })
 
