@@ -63,7 +63,7 @@
 | GET·PUT·DELETE | `/api/v1/plans/{planId}` | 항목마다 장소 요약(주소·실내·대표 이미지·좌표) 포함. `petIds` 동행 목록 |
 | PUT | `/api/v1/plans/{planId}/days/{day}/items` |
 | GET | `/api/v1/plans/{planId}/weather` | 일자별 날씨 브리핑 + 비 오는 날 실내 대안. 여러 마리는 아이별 판정 → 가장 낮은 아이 기준(`basisPetId`·`petSuitabilities`) |
-| GET·POST·DELETE | `/api/v1/favorites/places[/{placeId}]` | 장소 즐겨찾기 (멱등, 회원당 100곳, GET {placeId} = 여부 확인) |
+| GET·POST·DELETE | `/api/v1/favorites/places[/{placeId}]` | 장소 즐겨찾기 (멱등, 회원당 100곳, GET {placeId} = 여부 확인, 목록 항목에 저장일 `savedAt`) |
 | PUT | `/api/v1/plans/{planId}/items/{planItemId}/visited` | 항목 방문 체크 (다녀옴) |
 | GET | `/api/v1/plans/{planId}/emergency` | 일자별 방문 장소 주변 동물병원·약국 브리핑 |
 | GET·POST·PUT | `/api/v1/plans/{planId}/reviews` | 완료된 일정당 후기 하나. 전체 만족도 + 방문 장소별 한 줄. 사진·공개 없음 |
