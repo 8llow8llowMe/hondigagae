@@ -6,11 +6,13 @@ import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.QPlaceEnt
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceKeyword;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
+import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSitemapEntryQueryResult;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
 import com.hondigagae.shared.travel.pet.PetSizeType;
 import com.hondigagae.shared.travel.place.AllowedPetSize;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.math.BigDecimal;
 import java.util.List;
@@ -89,6 +91,26 @@ public class PlaceCustomRepositoryImpl implements PlaceCustomRepository {
                 BigDecimal.valueOf(criteria.lng() - lngDelta), BigDecimal.valueOf(criteria.lng() + lngDelta)));
 
         return queryFactory.selectFrom(place).where(where).fetch();
+    }
+
+    /**
+     * 사이트맵용 전량. <b>노출 규칙은 목록·주변과 같은 {@link #visible()} 이다</b> — 병합된 장소는 상세가
+     * 404 이고, delisted 장소는 더는 확인되지 않는 곳이라 크롤러에 알릴 URL 이 아니다.
+     *
+     * <p>동반 구분으로는 거르지 않는다. 어느 판정을 색인할지는 호출한 쪽(사이트맵 생성)이 정한다.
+     *
+     * <p>페이지 없이 전량이라 엔티티 전체(개요 TEXT 등)를 읽지 않고 세 컬럼만 projection 으로 가져온다.
+     * 제주 2,300여 곳 규모라 한 번에 준다. 사이트맵 파일 하나의 상한(5만 URL)에 다가가면 페이지를 다시 설계한다.
+     */
+    @Override
+    public List<PlaceSitemapEntryQueryResult> findSitemapEntries() {
+        return queryFactory
+            .select(Projections.constructor(PlaceSitemapEntryQueryResult.class,
+                place.id, place.petAllowanceType, place.sourceModifiedAt))
+            .from(place)
+            .where(visible())
+            .orderBy(place.id.asc())
+            .fetch();
     }
 
     /** 노출 가능한 행 — 병합으로 흡수됐거나 원천에서 사라진 장소는 어느 검색에도 나오지 않는다. */

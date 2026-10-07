@@ -5,13 +5,16 @@ import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceImageItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceIntroItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlacePetInfoItem;
+import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceSitemapItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.NearbyPlaceResponse;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.PlaceDetailResponse;
+import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.PlaceSitemapResponse;
 import com.hondigagae.domainlayer.place.application.info.NearbyPlacesInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceDetailInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceImageInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceIntroInfo;
 import com.hondigagae.domainlayer.place.application.info.PlacePetDetailInfo;
+import com.hondigagae.domainlayer.place.application.info.PlaceSitemapEntryInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceSummariesInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceSummaryInfo;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
@@ -82,6 +85,22 @@ public class PlacePresenter {
             .intro(toIntroItem(detailInfo.intro()))
             .petInfo(toPetInfoItem(detailInfo.petInfo()))
             .images(toImageItems(detailInfo.images()))
+            .build();
+    }
+
+    /** 사이트맵 응답. 자르지 않는 전량이라 {@code totalCount} 는 개수 그대로다. */
+    public PlaceSitemapResponse toSitemapResponse(List<PlaceSitemapEntryInfo> entries) {
+        List<PlaceSitemapItem> items = entries.stream()
+            .map(entry -> PlaceSitemapItem.builder()
+                .placeId(String.valueOf(entry.placeId()))
+                .petAllowanceType(entry.petAllowanceType().toMetadata())
+                .modifiedAt(entry.modifiedAt())
+                .build())
+            .toList();
+
+        return PlaceSitemapResponse.builder()
+            .places(items)
+            .totalCount(items.size())
             .build();
     }
 

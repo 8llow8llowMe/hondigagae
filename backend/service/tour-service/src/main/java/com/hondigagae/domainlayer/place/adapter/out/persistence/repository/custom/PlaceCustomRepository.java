@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.place.adapter.out.persistence.repository.cust
 import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.PlaceEntity;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
+import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSitemapEntryQueryResult;
 import java.util.List;
 import org.springframework.data.domain.Slice;
 
@@ -19,4 +20,7 @@ public interface PlaceCustomRepository {
 
     /** 좌표 사각 범위 1차 필터. 정확한 원형 반경과 거리 정렬은 호출한 쪽이 한다. */
     List<PlaceEntity> searchNearby(NearbyPlaceCriteria criteria);
+
+    /** 사이트맵용 노출 가능 장소 전량. 3컬럼 projection, id 오름차순. */
+    List<PlaceSitemapEntryQueryResult> findSitemapEntries();
 }

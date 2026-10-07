@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceImageQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceIntroQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlacePetInfoQueryResult;
+import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSitemapEntryQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSliceQueryResult;
 import com.hondigagae.domainlayer.place.domain.model.Place;
 import java.util.Collection;
@@ -23,6 +24,9 @@ public interface PlaceRepositoryPort {
 
     /** 아이디로 노출 가능한 장소를 준다. 없는 아이디는 조용히 빠진다. */
     List<Place> findVisiblePlaces(Collection<Long> placeIds);
+
+    /** 노출 가능한 장소 전량을 아이디 오름차순으로. 사이트맵용이라 아이디·동반 구분·원천 수정일만 준다. */
+    List<PlaceSitemapEntryQueryResult> findSitemapEntries();
 
     Optional<Place> findPlaceById(long placeId);
 

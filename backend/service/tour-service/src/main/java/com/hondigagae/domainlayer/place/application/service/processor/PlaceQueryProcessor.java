@@ -9,6 +9,7 @@ import com.hondigagae.domainlayer.place.application.info.PlaceDetailInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceImageInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceIntroInfo;
 import com.hondigagae.domainlayer.place.application.info.PlacePetDetailInfo;
+import com.hondigagae.domainlayer.place.application.info.PlaceSitemapEntryInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceSummariesInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceSummaryInfo;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
@@ -111,6 +112,22 @@ public class PlaceQueryProcessor {
     public List<PlaceSummaryInfo> getVisiblePlaceSummaries(List<Long> placeIds) {
         return placeRepositoryPort.findVisiblePlaces(placeIds).stream()
             .map(this::toSummaryInfo)
+            .toList();
+    }
+
+    /**
+     * 사이트맵용 장소 전량 (#1135). 캐시를 거치지 않는다 — 크롤러가 하루 몇 번 읽는 세 컬럼 조회다.
+     *
+     * <p>수정일은 원천 수정일이다. 적재 시각({@code updatedAt})은 배치가 upsert 마다 모든 행을
+     * 갱신해 lastmod 로 내보내면 매일 전부 바뀐 것으로 보인다.
+     */
+    public List<PlaceSitemapEntryInfo> getSitemapPlaces() {
+        return placeRepositoryPort.findSitemapEntries().stream()
+            .map(entry -> PlaceSitemapEntryInfo.builder()
+                .placeId(entry.placeId())
+                .petAllowanceType(entry.petAllowanceType())
+                .modifiedAt(entry.sourceModifiedAt())
+                .build())
             .toList();
     }
 

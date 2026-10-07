@@ -4,6 +4,7 @@ import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.NearbyPlaceResponse;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.PlaceDetailResponse;
+import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.PlaceSitemapResponse;
 import com.hondigagae.domainlayer.place.adapter.in.web.validation.PlaceKeywordTokenLimit;
 import com.hondigagae.domainlayer.place.application.exception.PlaceValidationMessage;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
@@ -164,6 +165,21 @@ public class PlaceWebController {
             .size(size)
             .build();
         NearbyPlaceResponse response = placeWebUseCase.getNearbyPlaces(criteria);
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(summary = "사이트맵용 장소 목록",
+        description = "`sitemap.xml` 을 만들 때 쓰는 경량 목록입니다. 노출 가능한 장소 **전량**을 페이지 없이 한 번에 줍니다. "
+            + "항목은 placeId · petAllowanceType · modifiedAt 셋뿐이고 정렬은 placeId 오름차순입니다.\n\n"
+            + "**제외**: 다른 장소로 병합된 장소와 원천에서 사라진(delisted) 장소는 오지 않습니다 — 목록·주변 검색과 같은 노출 규칙입니다. "
+            + "동반 구분으로는 거르지 않으니 어느 판정을 색인할지는 호출한 쪽이 petAllowanceType 으로 고릅니다.\n\n"
+            + "**modifiedAt 은 원천이 준 수정일입니다.** 적재 시각이 아닙니다 — 배치가 동기화 때마다 모든 행을 다시 써서 "
+            + "적재 시각은 lastmod 로 뜻이 없습니다. 원천에 수정일이 없으면 null 이고, 그때는 lastmod 를 생략합니다.\n\n"
+            + "호출 예\n"
+            + "- 전량: `GET /api/v1/places/sitemap`")
+    @GetMapping("/sitemap")
+    public ResponseEntity<Response<PlaceSitemapResponse>> getSitemapPlaces() {
+        PlaceSitemapResponse response = placeWebUseCase.getSitemapPlaces();
         return ResponseEntity.ok().body(Response.success(response));
     }
 
