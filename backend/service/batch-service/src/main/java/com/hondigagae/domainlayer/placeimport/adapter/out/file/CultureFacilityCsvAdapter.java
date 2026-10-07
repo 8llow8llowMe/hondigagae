@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.placeimport.application.port.out.CultureFacili
 import com.hondigagae.domainlayer.placeimport.domain.enums.CultureCategoryMapping;
 import com.hondigagae.domainlayer.placeimport.domain.enums.EmergencyFacilityTypeCode;
 import com.hondigagae.domainlayer.placeimport.domain.enums.RegionCodeMapping;
+import com.hondigagae.domainlayer.placeimport.domain.model.CultureDescriptionParser;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedEmergencyFacility;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedCultureFacility;
 import com.hondigagae.domainlayer.placeimport.domain.model.OperatingHoursParser;
@@ -286,7 +287,8 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
             .lng(toDecimal(value(values, header, COL_LNG)))
             .tel(value(values, header, COL_TEL))
             .homepage(value(values, header, COL_HOMEPAGE))
-            .overview(value(values, header, COL_DESCRIPTION))
+            // 장소설명 열은 "유형 표기[, 이용 메모]" 다 — 표기는 버리고 메모만 개요로 싣는다 (#1216)
+            .overview(CultureDescriptionParser.overviewOf(value(values, header, COL_DESCRIPTION)))
             .petAvailable(petAvailable)
             // 이 원천에는 "전구역/일부구역" 문구가 없어 제한사항 문구로 부분 동반 여부를 가늠한다.
             .petAllowanceType(PetFieldParser.parseAllowanceType(petAvailable, value(values, header, COL_PET_RESTRICTION)))

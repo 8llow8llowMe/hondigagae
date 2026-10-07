@@ -83,4 +83,19 @@ class CultureFacilityCsvAdapterTest {
         assertThat(facility.weeklyHoursSpec()).isEqualTo("1234567:0000-2400");
         assertThat(facility.open24()).isTrue();
     }
+
+    @Test
+    @DisplayName("장소설명의 유형 표기는 개요로 싣지 않고 이용 메모만 싣는다 (#1216)")
+    void loadsOnlyMemoAsOverview() throws IOException {
+        Path csv = tempDir.resolve("pet_culture.csv");
+        Files.writeString(csv, String.join("\n",
+            "시설명,카테고리3,시도 명칭,위도,경도,반려동물 동반 가능정보,도로명주소,기본 정보_장소설명",
+            "용두암,여행지,제주특별자치도,33.5,126.5,Y,제주시 용두암길 15,관광지",
+            "바다목장,여행지,제주특별자치도,33.4,126.4,Y,제주시 어딘가 5,\"관광지, 악천후 시 휴장\"") + "\n");
+
+        List<ImportedCultureFacility> facilities =
+            new CultureFacilityCsvAdapter().readTravelFacilities(csv, "제주특별자치도");
+
+        assertThat(facilities).extracting(ImportedCultureFacility::overview).containsExactly(null, "악천후 시 휴장");
+    }
 }
