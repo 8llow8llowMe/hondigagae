@@ -22,7 +22,7 @@ import { toLatLng } from '@/lib/geo/coord'
 import { haversineMeters } from '@/lib/geo/distance'
 import { allowsPetSize } from '@/lib/place/pet-size'
 import type { ApiResponse, SliceResponse } from '@/types/api'
-import type { PlaceSummary } from '@/types/place'
+import type { PlaceSitemapItem, PlaceSitemapResult, PlaceSummary } from '@/types/place'
 
 /**
  * 개발용 mock 응답 계층.
@@ -60,7 +60,7 @@ function fail(status: number, resultCode: string, resultMessage: string): MockRe
 }
 
 /** `/places/{placeId}` 로 착각하면 안 되는 하위 경로 */
-const SUB_RESOURCES = new Set(['nearby'])
+const SUB_RESOURCES = new Set(['nearby', 'sitemap'])
 
 /** 백엔드 `size` 허용 범위 (1~50). 벗어나면 400 이다 */
 const MIN_SIZE = 1
@@ -142,6 +142,9 @@ export function resolveMock(
 
   // 주변 장소 — 커서가 아니라 totalCount 를 준다 (NearbyPlaceResponse)
   if (path === '/places/nearby') return nearbyPlaces(params)
+
+  // 사이트맵용 전량 (#1210) — 페이지 없이 세 필드. 상세 분기보다 먼저다
+  if (path === '/places/sitemap') return sitemapPlaces()
 
   /*
     오늘의 산책 골든타임 (#158). `lat`/`lng` 는 mock 이 쓰지 않는다 — 제주 안에서 좌표를
@@ -237,6 +240,30 @@ export function resolveMock(
   }
 
   return null
+}
+
+/**
+ * `GET /places/sitemap` — `PlaceSitemapResponse` (#1210). `placeId` 오름차순 전량.
+ *
+ * **수정일은 셋 중 하나를 비운다** — 원천에 수정일이 없는 장소(식약처 원천 등)가 실제로 있어
+ * `lastmod` 생략 갈래를 목에서도 볼 수 있게 한다. 값은 오프셋 없는 KST `LocalDateTime` 모양이다.
+ */
+function sitemapPlaces(): MockResult {
+  const places: PlaceSitemapItem[] = [...MOCK_PLACES]
+    .sort((left, right) => (BigInt(left.placeId) < BigInt(right.placeId) ? -1 : 1))
+    .map((place, index) => ({
+      placeId: place.placeId,
+      petAllowanceType: {
+        code: place.petAllowanceType.code,
+        name: place.petAllowanceType.name,
+        description: place.petAllowanceType.description ?? null,
+      },
+      modifiedAt:
+        index % 3 === 2 ? null : `2026-08-${String((index % 28) + 1).padStart(2, '0')}T14:30:05`,
+    }))
+
+  const body: PlaceSitemapResult = { places, totalCount: places.length }
+  return { status: 200, payload: ok(body) }
 }
 
 function placeList(params: URLSearchParams): MockResult {

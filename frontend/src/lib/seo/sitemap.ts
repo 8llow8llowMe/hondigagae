@@ -5,9 +5,7 @@ import { walkCourseListPath } from '@/lib/api/walk-course'
 import { LANDING_TOPICS, landingPath } from '@/lib/landing/topics'
 import { INDEXABLE_PET_ALLOWANCES } from '@/lib/seo/place'
 import { absoluteUrl } from '@/lib/seo/site'
-import { DEFAULT_PLACE_FILTERS, toPlaceApiQuery } from '@/lib/url/place-filters'
-import type { SliceResponse } from '@/types/api'
-import type { PlaceSummary } from '@/types/place'
+import type { PlaceSitemapResult } from '@/types/place'
 import type { WalkCourseList } from '@/types/walk-course'
 
 /**
@@ -17,7 +15,7 @@ import type { WalkCourseList } from '@/types/walk-course'
  * HTML 에 든 장소는 첫 20곳뿐이다. 나머지는 사이트맵이 없으면 검색엔진이 알 방법이 없다.
  *
  * **조회 함수를 주입받는다.** `serverFetch` 는 `server-only` 라 여기서 바로 부르면 테스트에서
- * 대역을 끼울 수 없다 — 페이지 순회·실패 처리가 이 파일의 핵심이라 그 부분을 잠가야 한다.
+ * 대역을 끼울 수 없다 — 판정 거르기 · 수정일 변환 · 실패 처리가 이 파일의 핵심이라 그 부분을 잠가야 한다.
  */
 export type SitemapFetcher = <T>(path: string) => Promise<T>
 
@@ -32,46 +30,67 @@ export const STATIC_PUBLIC_PATHS = [
   '/privacy',
 ] as const
 
-/** 백엔드 `@Max(50)` */
-export const SITEMAP_PAGE_SIZE = 50
+/** 사이트맵에 실을 장소 하나. `lastModified` 는 수정일을 읽을 수 있을 때만 있다 */
+export type SitemapPlace = {
+  placeId: string
+  lastModified?: string
+}
+
+const INDEXABLE = new Set<string>(INDEXABLE_PET_ALLOWANCES)
+
+/** 백엔드 `LocalDateTime` 직렬화 — 초 · 소수부는 있을 수도 없을 수도 있다. 오프셋은 없다 */
+const LOCAL_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/
 
 /**
- * 동반 판정 하나당 페이지 상한. 커서가 제자리를 돌아도(`hasNext` 인데 같은 마지막 id) 끝나게
- * 하는 안전장치다. 50 × 200 = 1만 곳 — 지금 데이터(판정별 최대 535곳)의 스무 배 가까운 여유다.
- */
-export const SITEMAP_MAX_PAGES = 200
-
-/**
- * 색인할 장소 id. **판정별로 필터를 걸어 돈다** — 전량을 돌고 걸러 내면 2,323곳을 47번에 받지만,
- * 색인 대상(638곳)만 받으면 14번 안팎이다.
+ * 원천 수정일 → `<lastmod>` (#1210).
  *
- * **실패하면 그때까지 모은 것을 돌려준다.** 사이트맵이 500 이면 검색엔진이 정적 화면까지
- * 못 읽는다. 일부라도 내는 쪽이 낫고, 하루 안에 다시 읽힌다.
+ * **`+09:00` 을 붙인다.** 서버가 주는 값은 오프셋 없는 KST `LocalDateTime` 인데, 그대로 실으면
+ * 검색엔진이 UTC 로 읽어 9시간 어긋난다. W3C Datetime 은 초 없는 `hh:mm` 도 받는다.
+ *
+ * **모양이 다르면 싣지 않는다** — 이미 오프셋이 붙었거나 날짜만 오면 계약이 바뀐 것이고, 거기에
+ * 오프셋을 또 붙이면 잘못된 날짜가 된다. 틀린 `lastmod` 보다 없는 쪽이 낫다(검색엔진은 없으면
+ * 스스로 판단한다). `null`(원천에 수정일 없음)도 생략이다.
  */
-export async function collectIndexablePlaceIds(fetcher: SitemapFetcher): Promise<string[]> {
-  const ids = new Set<string>()
+export function toLastModified(modifiedAt: string | null): string | undefined {
+  if (modifiedAt === null || !LOCAL_DATE_TIME.test(modifiedAt)) return undefined
+  return `${modifiedAt}+09:00`
+}
 
-  for (const petAllowanceType of INDEXABLE_PET_ALLOWANCES) {
-    const filters = { ...DEFAULT_PLACE_FILTERS, petAllowanceType }
-    let cursor: string | null = null
-
-    try {
-      for (let page = 0; page < SITEMAP_MAX_PAGES; page += 1) {
-        const slice: SliceResponse<PlaceSummary> = await fetcher(
-          paths.places.list(toPlaceApiQuery(filters, cursor, SITEMAP_PAGE_SIZE)),
-        )
-        for (const place of slice.contents) ids.add(place.placeId)
-
-        const last = slice.contents.at(-1)?.placeId ?? null
-        if (!slice.hasNext || last === null || last === cursor) break
-        cursor = last
-      }
-    } catch {
-      // 이 판정의 나머지는 다음 재생성에 맡긴다. 다른 판정은 계속 돈다
-    }
+/**
+ * 색인할 장소 (#1130 → #1210).
+ *
+ * **사이트맵 전용 API 한 번이다** (`/places/sitemap`, BE #1135). 예전에는 목록 API(size ≤ 50 커서)를
+ * 동반 판정 셋 × 페이지로 돌아 14번 안팎 불렀고, 장소가 늘수록 비례해 늘었다. 전용 API 는 노출
+ * 가능한 장소 전량(병합 · delisted 제외)을 세 필드로 한 번에 준다 — 제주 2,300여 곳이 압축 전 약 0.5MB.
+ *
+ * **동반 판정은 여기서 거른다.** 서버는 판정으로 거르지 않는다 — 색인 대상(`INDEXABLE_PET_ALLOWANCES`)은
+ * 상세 `robots` 와 같은 목록 하나라 FE 가 쥔다(`lib/seo/place.ts`).
+ *
+ * **실패하면 빈 목록이다.** 사이트맵이 500 이면 검색엔진이 정적 화면까지 못 읽는다. 예전처럼
+ * "모은 데까지" 는 없다 — 한 번의 호출이라 부분이 없다. 하루 안에 다시 읽힌다.
+ */
+export async function collectIndexablePlaces(fetcher: SitemapFetcher): Promise<SitemapPlace[]> {
+  let result: PlaceSitemapResult
+  try {
+    result = await fetcher<PlaceSitemapResult>(paths.places.sitemap)
+  } catch {
+    return []
   }
 
-  return [...ids]
+  const seen = new Set<string>()
+  const places: SitemapPlace[] = []
+  for (const item of result.places) {
+    if (!INDEXABLE.has(item.petAllowanceType.code) || seen.has(item.placeId)) continue
+    seen.add(item.placeId)
+
+    const lastModified = toLastModified(item.modifiedAt)
+    places.push(
+      lastModified === undefined
+        ? { placeId: item.placeId }
+        : { placeId: item.placeId, lastModified },
+    )
+  }
+  return places
 }
 
 /** 올레 코스는 커서가 없다 — 한 번에 전량이 온다 */
@@ -88,7 +107,7 @@ export async function collectWalkCourseIds(fetcher: SitemapFetcher): Promise<str
 
 export function toSitemap(
   base: string,
-  { placeIds, walkCourseIds }: { placeIds: string[]; walkCourseIds: string[] },
+  { places, walkCourseIds }: { places: SitemapPlace[]; walkCourseIds: string[] },
 ): MetadataRoute.Sitemap {
   return [
     ...STATIC_PUBLIC_PATHS.map((path) => ({
@@ -104,8 +123,10 @@ export function toSitemap(
       url: absoluteUrl(`/olle/${id}`, base),
       changeFrequency: 'monthly' as const,
     })),
-    ...placeIds.map((id) => ({
-      url: absoluteUrl(`/places/${id}`, base),
+    ...places.map(({ placeId, lastModified }) => ({
+      url: absoluteUrl(`/places/${placeId}`, base),
+      // 수정일을 모르면 키를 싣지 않는다 — 빈 `<lastmod>` 를 내지 않게
+      ...(lastModified === undefined ? {} : { lastModified }),
       changeFrequency: 'weekly' as const,
     })),
   ]

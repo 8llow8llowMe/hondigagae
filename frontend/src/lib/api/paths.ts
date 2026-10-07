@@ -58,6 +58,11 @@ export const paths = {
      * (docs/screen-inventory.md §5-1). `lat`/`lng` 가 필수라 쿼리 없이 부르지 않는다
      */
     nearby: (query: string) => `/places/nearby?${query}`,
+    /**
+     * 사이트맵용 장소 전량 (#1135 · #1210). 페이지 없이 `placeId` · `petAllowanceType` · `modifiedAt`
+     * 셋만 준다. 동반 구분으로는 거르지 않는다 — 색인할 판정은 부르는 쪽이 고른다
+     */
+    sitemap: '/places/sitemap',
     /** 장소 인사이트 — tour-service insight 컨텍스트 */
     suitability: (placeId: string, query: string) =>
       query ? `/places/${placeId}/suitability?${query}` : `/places/${placeId}/suitability`,

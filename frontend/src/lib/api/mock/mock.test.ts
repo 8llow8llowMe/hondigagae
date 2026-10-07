@@ -6,7 +6,7 @@ import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { mockStore, resetMockStore } from '@/lib/api/mock/store'
 import { isAllowedImageHost } from '@/lib/image/remote-host'
 import type { SliceResponse } from '@/types/api'
-import type { PlaceDetail, PlaceSummary } from '@/types/place'
+import type { PlaceDetail, PlaceSitemapResult, PlaceSummary } from '@/types/place'
 
 /**
  * 가입 동의 3종 — 백엔드가 `@AssertTrue` 로 **필수**로 요구한다 (#688).
@@ -215,6 +215,31 @@ describe('resolveMock — 상세', () => {
     // 상세(PlaceDetailResponse)가 아니라 NearbyPlaceResponse 다 — 커서가 없고 totalCount 가 있다
     expect(result?.payload.dataBody).toHaveProperty('totalCount')
     expect(result?.payload.dataBody).not.toHaveProperty('hasNext')
+  })
+
+  /*
+    **`/places/sitemap` 은 상세가 아니다** (#1210). 상세 분기가 먼저 잡으면 `PLACE_113` 400 이 나는데
+    — 그것이 바로 이 API 가 배포되기 전 dev 게이트웨이의 응답이다 — 목은 배포된 계약을 흉내 낸다.
+  */
+  it('/places/sitemap 은 상세로 오해되지 않는다 — 전량을 세 필드로 준다', () => {
+    const result = resolveMock('/places/sitemap', 'GET', '', null)
+    const sitemap = result?.payload.dataBody as PlaceSitemapResult
+
+    expect(result?.status).toBe(200)
+    expect(sitemap.totalCount).toBe(MOCK_PLACES.length)
+    expect(sitemap.places.map((entry) => entry.placeId)).toEqual(
+      MOCK_PLACES.map((place) => place.placeId).sort((left, right) =>
+        BigInt(left) < BigInt(right) ? -1 : 1,
+      ),
+    )
+    expect(Object.keys(sitemap.places[0] ?? {}).sort()).toEqual([
+      'modifiedAt',
+      'petAllowanceType',
+      'placeId',
+    ])
+    // 원천에 수정일이 없는 갈래(null)와 있는 갈래가 둘 다 있다 — lastmod 생략을 화면에서 볼 수 있게
+    expect(sitemap.places.some((entry) => entry.modifiedAt === null)).toBe(true)
+    expect(sitemap.places.some((entry) => entry.modifiedAt !== null)).toBe(true)
   })
 
   it('/places/nearby 는 lat·lng 없이 부르면 400 이다 — 백엔드가 필수로 받는다', () => {
