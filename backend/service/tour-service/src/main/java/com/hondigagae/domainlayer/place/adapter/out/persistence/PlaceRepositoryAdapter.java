@@ -15,6 +15,7 @@ import com.hondigagae.domainlayer.place.application.port.out.PlaceRepositoryPort
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceImageQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceIntroQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlacePetInfoQueryResult;
+import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSitemapEntryQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSliceQueryResult;
 import com.hondigagae.domainlayer.place.domain.model.Place;
 import java.util.Collection;
@@ -55,6 +56,11 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
             return List.of();
         }
         return placeMapper.toDomains(placeRepository.findVisiblePlaces(placeIds));
+    }
+
+    @Override
+    public List<PlaceSitemapEntryQueryResult> findSitemapEntries() {
+        return placeRepository.findSitemapEntries();
     }
 
     @Override

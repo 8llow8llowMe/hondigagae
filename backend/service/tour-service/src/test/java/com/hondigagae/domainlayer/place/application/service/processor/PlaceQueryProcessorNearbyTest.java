@@ -11,6 +11,7 @@ import com.hondigagae.domainlayer.place.application.port.out.PlaceSearchCachePor
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceImageQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceIntroQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlacePetInfoQueryResult;
+import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSitemapEntryQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSliceQueryResult;
 import com.hondigagae.domainlayer.place.domain.enums.PlaceSource;
 import com.hondigagae.domainlayer.place.domain.model.Place;
@@ -115,6 +116,11 @@ class PlaceQueryProcessorNearbyTest {
 
             @Override
             public List<Place> findVisiblePlaces(Collection<Long> placeIds) {
+                return List.of();
+            }
+
+            @Override
+            public List<PlaceSitemapEntryQueryResult> findSitemapEntries() {
                 return List.of();
             }
 
