@@ -175,13 +175,15 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
   - 판정은 `submitFailureAnnounce(errors, errorStatus)` 하나 — **포커스 순서의 첫 대상이 그 표시인가**
     다. 포커스 effect 와 같은 함수를 봐야 "역할을 뗐는데 포커스도 안 간" 무음 실패가 없다. 위의 두
     예외 갈래는 호출부가 `live` 로 덮는다.
-  - **`FormAlert` 의 기본값은 `live` 그대로다.** 포커스를 옮기지 않는 나머지 29개 파일(38곳)은 바뀌지 않는다.
+  - **`FormAlert` 의 기본값은 `live` 그대로다.** 포커스를 옮기지 않는 나머지 28개 파일(37곳)은 바뀌지 않는다.
     `focus` 는 포커스를 실제로 옮기는 자리(지금은 `FormFailure` 와 공유 모달의 재시도 결과 — #1159,
-    판정은 `shareFailureAnnounce`)만 넘긴다. `FormFailure.announce` 는 필수다.
+    판정은 `shareFailureAnnounce` · 일정 상태 전이의 실패 — #1203, 판정은 `planStatusResultAnnounce`)만 넘긴다. `FormFailure.announce` 는 필수다.
   - **성공 안내도 같은 계약이다** ([#1174](https://github.com/8llow8llowMe/hondigagae/issues/1174)).
     `FormNotice` 가 `announce` 를 받는다 — 기본값 `live`(`role="status"`), `focus` 면 역할을 떼고
     `tabIndex={-1}`. 지금은 일정 상태 전이의 결과만 넘긴다: 전폭 버튼에서 시작해 포커스가 `BODY` 로
     떨어졌으면 `focus`, 메뉴에서 시작해 포커스가 `⋯` 에 남았으면 `live`(판정은 `planStatusResultAnnounce`).
+    **그 전이의 실패도 같은 판정이다** ([#1203](https://github.com/8llow8llowMe/hondigagae/issues/1203)) —
+    `FormAlert` 가 `ref` 를 받아(`FormNotice` 와 같다) `focus` 면 패널이 알림으로 포커스를 옮긴다.
 - 제출 실패 시 **화면에서 첫 번째로 보이는 오류 필드로 포커스를 옮긴다.**
   - **판정 기준은 DOM 순서다.** zod 스키마의 키 선언 순서가 아니다 — 두 순서는 언제든 어긋날 수
     있고, 어긋나면 포커스가 위의 오류를 지나쳐 아래로 간다 ([#560](https://github.com/8llow8llowMe/hondigagae/issues/560)
