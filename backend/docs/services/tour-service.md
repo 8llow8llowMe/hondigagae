@@ -20,7 +20,10 @@
 
 ## 주요 API (계획)
 
-- `GET /api/v1/places` — 검색 (지역, 유형, 반려견 동반 조건, **keyword** 단어별 이름·주소 AND 검색, 커서 기반 `SliceResponse`)
+- `GET /api/v1/places` — 검색 (지역, 유형, 반려견 동반 조건, **keyword** 단어별 이름·주소 AND 검색, 커서 기반 `SliceResponse`).
+  선택 파라미터 **`lat`·`lng`(기준 좌표)를 함께 주면 거리순**이고 항목에 `distanceMeters` 가 실린다(#1202). 주지 않으면 지금처럼
+  `placeId` 오름차순이고 `distanceMeters` 는 null 이다. 하나만 주면 400(`PLACE_109`). 커서는 어느 쪽이든 `lastPlaceId` 하나다 —
+  규칙은 아래 "장소 목록 정렬" 과 "장소 목록 거리순 결정 (#1202)"
 - `GET /api/v1/places/sitemap` — 사이트맵용 장소 전량 (#1135). `placeId` · `petAllowanceType` · `modifiedAt` 만,
   페이지 없이 `placeId` 오름차순. 노출 규칙은 목록·주변과 같은 `visible()` 이라 병합·delisted 는 빠지고, 동반 구분으로는 거르지 않는다.
   `modifiedAt` 은 **원천 수정일(`sourceModifiedAt`)** 이다 — 배치 upsert 가 매번 `updated_at = NOW()` 로 모든 행을 다시 써서
@@ -143,7 +146,8 @@
   이름 또는 주소 중 한 곳에 부분 일치해야 하고, 모든 단어를 만족한 장소만 찾는다. `%`·`_`·`\`는
   와일드카드가 아니라 리터럴이다. 공백/빈 값은 필터 없음이며 원문 길이 상한은 50자다. 검색 원천은
   DB `LIKE`이고, 같은 조건의 반복 조회만 Redis 에 5분 TTL 로 둔다. 검색 의미 변경 전 캐시와 섞이지
-  않도록 목록·주변 키 네임스페이스는 각각 `list:v2`, `nearby:v2`를 쓴다. Redis 장애는 캐시 미스로 취급한다. Elasticsearch
+  않도록 목록·주변 키 네임스페이스는 각각 `list:v3`, `nearby:v2`를 쓴다(목록은 #1202 에서 기준 좌표가 키에 들어가고
+  저장 봉투에 `distanceMeters` 가 더해져 v3 로 올렸다). Redis 장애는 캐시 미스로 취급한다. Elasticsearch
   는 인프라 미구성이라 이 경로를 쓰지 않는다 (#421).
 - 날씨: 기상청 실시간 호출(`WeatherObservationPort`) + Redis **격자별** 캐시.
   TTL 은 고정값이 아니라 다음 발표 시각에 맞춘다 — 캐시는 성능 최적화가 아니라
@@ -157,6 +161,7 @@
 - 기상청 응답 등 외부 원본 스키마는 adapter 밖으로 새지 않는다 (`external-api-guide.md` §3).
 - 적합도 등급은 `SuitabilityLevel`, 동반 구분은 `PetAllowanceType` enum 사용 (`coding-conventions.md` §8-3).
 - 좌표 기반 조회는 DB 사각 범위 필터 + 애플리케이션 하버사인 정렬 조합을 쓴다 (`place-data-integration.md` §9-2). 데이터가 커지면 공간 인덱스로 옮긴다.
+  목록 거리순(#1202)은 반경이 없어 사각 범위 없이 필터에 맞는 후보 좌표 전량을 같은 하버사인으로 정렬한다.
 - **장소 목록 정렬은 `id` 오름차순이고, 그것이 곧 원천 우선순위다 (필수).** `PlaceIdFactory` 가
   TourAPI 행에는 `contentId`(제주 실측 12만~344만)를, 문화정보원·식약처 행에는 SHA-256 해시를
   2^62 이상으로 접어 주므로 **오름차순 = TourAPI 먼저**다. 사진·개요·동반 조건을 가진 쪽이
@@ -167,6 +172,10 @@
     필요해지면 커서를 정렬 키와 함께 다시 설계한다 — `lastPlaceId` 하나로는 표현되지 않는다.
   - 커서 조건은 정렬 방향과 함께 움직인다(`id > lastPlaceId`). 한쪽만 바꾸면 같은 페이지를
     무한히 돌려준다.
+  - **예외는 기준 좌표가 있을 때 하나다 — 거리순(#1202).** `lat`·`lng` 를 함께 주면 (반올림 거리 m, `id`) 오름차순이다.
+    "다음에 갈 곳" 을 고르는 화면(일정 장소 담기 목록)은 원천 우선순위가 아니라 직전 장소에서 가까운 순이어야 하고,
+    클라이언트가 받은 페이지만 정렬하면 다음 장에 더 가까운 곳이 있어도 모르는 거짓이 된다. 좌표가 없으면 위 규칙
+    그대로라 좌표 없이 부르는 쪽(ai-service 후보 조회)의 쿼리·순서는 바뀌지 않는다. 세부는 "장소 목록 거리순 결정 (#1202)".
 - 동물병원 운영시간은 원천의 절반이 비어 있다(약국은 98% 채워짐). null 을 "휴무"로 표현하지 말고 `operatingHoursKnown=false` 로 "정보 없음"임을 드러낸다.
 - 서버는 카카오 API 를 호출하지 않는다. 지도는 클라이언트 JS SDK 담당이다.
 - `petSizeType` 필터는 "받아 주지 않는 것으로 확인된 곳만 뺀다"이다. 크기 정보가 없는 곳(UNKNOWN)은
@@ -185,6 +194,36 @@
 - **명세**: 목록과 주변 검색 모두 공백 기준 최대 5개 단어를 받고, 단어마다 `(이름 OR 주소)`를 적용한 뒤 단어 조건을 AND로 결합한다.
 - **계획/작업**: 정규화·상한 판단은 `PlaceKeyword`에 모으고, 공개 API는 Bean Validation으로 `PLACE_108`과 `keyword` 필드 오류를 응답한다. Processor는 같은 규칙으로 캐시 전에 정규화·방어 검증한다.
 - **결정**: 기존 필터·노출·커서·대소문자 무시·LIKE 리터럴 이스케이프는 유지한다. 캐시는 기존 전체 구문 검색 결과를 재사용하지 않도록 v2 네임스페이스로 분리한다.
+
+## 장소 목록 거리순 결정 (#1202)
+
+- **명세**: `GET /api/v1/places` 에 선택 파라미터 `lat`·`lng` 를 더한다. **둘 다 있으면 거리순, 둘 다 없으면 `placeId` 오름차순**이고
+  별도 `sort` 파라미터는 두지 않는다 — `api-design-guide.md` §5 의 enum 정렬 파라미터 대신 좌표 유무로 가른다. 좌표 없는
+  거리순은 뜻이 없고, `sortType` 을 두면 lat·lng 짝 검증과 같은 것을 두 번 묻게 된다. 범위 검증은 주변 검색과 같은 `PLACE_103`·`PLACE_104` 다. 응답 `PlaceItem.distanceMeters`
+  (nullable)는 거리순 목록에서만 값이 있다 — 좌표 없는 목록과 주변 검색 안쪽 `place` 에서는 null 이고, 주변 검색의 거리는
+  바깥 `NearbyPlaceItem.distanceMeters` 다. 계기는 FE 일정 장소 담기 목록 보기가 그날 장소와 무관하게 제주시·한경면부터
+  나오던 것이다(`frontend/docs/features/plan/담기지도-세부명세.md` D9·D10). `/places/nearby` 는 커서가 없고 `size` 상한이 있어
+  무한 스크롤 목록을 대신하지 못한다.
+- **정렬 키**: (반올림한 거리 m, `placeId`) 오름차순. 주변 검색과 같은 `GeoDistance.meters` + `Math.round` + 아이디 동률 규칙이고
+  응답 `distanceMeters` 가 그 키라 순서와 숫자가 어긋나지 않는다. 반경 제한은 없다.
+- **필터**: 목록과 **완전히 같다** — `visible()` + 공통 필터 + 지역(`PlaceCustomRepositoryImpl.listFilters` 한곳을 두 목록이 거친다).
+  여기에 **좌표가 둘 다 있는 행만** 남긴다. 좌표 없는 장소는 거리를 잴 수 없어 거리순 목록에서 빠진다(주변 검색과 같은 판단).
+- **커서**: 그대로 `lastPlaceId` 하나다(클라이언트 계약 변화 최소). 서버가 그 장소의 좌표를 **노출 여부와 무관하게** PK 로 읽어
+  커서 키 (d0, id0) 를 되살리고 키가 그보다 큰 항목부터 준다. (거리, id) 가 전순서라 같은 반올림 거리 동률이 많아도 페이지 사이에
+  중복·누락이 없다. 직전 페이지의 마지막 장소가 그사이 병합·delisted 되어도 좌표 행은 남아 있어 이어진다. 커서 장소가 없거나
+  좌표가 없으면 400 `PLACE_110` 이다.
+- **에러 코드**: `PLACE_109` lat 과 lng 중 하나만 옴(`PlaceSearchCriteria` 생성자가 거절해 유스케이스까지 내려가지 않는다) ·
+  `PLACE_110` 거리순 커서를 되살릴 수 없음. 둘 다 `PlaceErrorCode` 의 1xx 대역(필드 단위 Bean Validation 이 아니라 상수 클래스에는 없다).
+- **계산 위치**: 주변 검색과 같이 Processor 다. 포트는 후보 행의 `(id, lat, lng)` 3컬럼 projection 전량(`findCoordinates`)과
+  커서 좌표(`findCoordinateById`)를 주고, 거리 계산·정렬·커서 비교·`size + 1` 자르기는 `PlaceQueryProcessor` 가 한다. 고른 아이디로
+  엔티티를 IN 한 번에 읽고 **고른 순서대로 다시 세운다**(IN 조회는 순서를 보장하지 않는다). 그사이 숨겨진 장소는 조용히 빠진다.
+- **규모 한계**: 제주 2,300여 곳이라 페이지마다 후보 좌표 전량을 읽어 메모리에서 정렬한다(3컬럼이라 싸다). 전국으로 넓히면
+  공간 인덱스나 DB 정렬로 옮길 지점이 `PlaceQueryProcessor#findPlacesByDistance` 와 `findCoordinatesByCriteria` 다.
+- **캐시**: 키워드 목록 캐시는 거리순도 같이 탄다. 키에 `lat`·`lng` 가 들어가고 봉투의 `PlaceSummaryInfo` 모양이 바뀌어
+  네임스페이스를 `list:v3` 로 올렸다. 주변 검색은 키 의미가 그대로이고 옛 항목이 `distanceMeters` 없이도 읽혀 `nearby:v2` 를 유지한다.
+- **하위 호환**: 좌표가 없으면 예전 `searchByCriteria` 경로 그대로다(거리 포트를 부르지 않는다 — `PlaceQueryProcessorDistanceSortTest`).
+  응답에 `distanceMeters: null` 이 더해지는 것만 다르고, ai-service 의 `PlaceSliceClientResponse` 는 `@JsonIgnoreProperties(ignoreUnknown = true)`
+  라 모르는 필드를 무시한다.
 
 ## 필수 파라미터 누락 응답 (필수)
 

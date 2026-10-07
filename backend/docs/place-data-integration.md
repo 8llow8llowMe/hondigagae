@@ -433,6 +433,7 @@ DB 는 좌표 **사각 범위**로만 1차 필터하고(`EmergencyFacilityReposi
 
 거리 계산은 `common-core` 의 `GeoDistance`(하버사인)를 쓴다. 같은 계산을 장소 주변 검색·긴급
 시설 검색·배치 중복 판정 세 곳이 따로 하면 "300m 안"의 뜻이 갈라지므로 한곳에 모았다.
+장소 목록 거리순(#1202)도 같은 계산과 같은 반올림을 주변 검색과 공유한다(`services/tour-service.md`).
 
 `type`·`open24` 필터는 파라미터가 `null` 이면 조건 자체를 끄는 방식이다
 (`:facilityType is null or h.facilityType = :facilityType`).

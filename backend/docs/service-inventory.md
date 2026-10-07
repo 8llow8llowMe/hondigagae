@@ -27,7 +27,7 @@
 - 컨텍스트: `place`, `emergency`, `insight`
 - 특징: 조회 중심 서비스, `QueryResult`/`Info`/Presenter 구조 사용. security 의존이 없는 공개 조회 서비스다. batch-service 가 적재한 데이터를 조회한다.
 - 구현 API
-  - `GET /api/v1/places` (지역·타입·반려견 동반 조건 필터, 커서 기반 `SliceResponse`)
+  - `GET /api/v1/places` (지역·타입·반려견 동반 조건 필터, 커서 기반 `SliceResponse`. 선택 기준 좌표 `lat`·`lng` 를 주면 거리순 + `distanceMeters`, #1202)
   - `GET /api/v1/places/{placeId}` (intro/petInfo/images 결합 상세)
   - `GET /api/v1/places/nearby` (좌표 반경 검색, 식당·카페 포함)
   - `GET /api/v1/emergencies/facilities` (동물병원·동물약국 반경 검색, `openNowOnly` 지금 영업 중 필터)
