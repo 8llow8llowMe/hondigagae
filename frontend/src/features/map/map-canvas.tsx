@@ -11,6 +11,7 @@ import {
 } from '@/lib/geo/coord'
 import { createAlwaysDrawnOverlay } from '@/lib/map/always-drawn-overlay'
 import { clusterForLevel } from '@/lib/map/cluster'
+import { type MapOffset, offsetCenter } from '@/lib/map/offset-center'
 import {
   clusterContent,
   focusMarkerContent,
@@ -119,23 +120,41 @@ function prefersReducedMotion(): boolean {
  */
 function zoomToward(params: {
   map: KakaoMap
+  maps: KakaoMaps
   target: KakaoLatLng
   /** 목표 확대 단계. 지금이 이미 그만큼 가까우면 확대 없이 이동만 한다 */
   level: number
   /** 예약된 이동 시점에 지도가 아직 살아 있는지 다시 확인할 곳 */
   mapRef: RefObject<KakaoMap | null>
+  /** 목표를 정중앙이 아니라 이만큼(px) 옮긴 자리에 둔다 — `selectedOffset` 주석. 없으면 정중앙 */
+  offset?: MapOffset | null
 }): () => void {
-  const { map, target, level, mapRef } = params
-  const zoomIn = map.getLevel() > level
+  const { map, maps, target, level, mapRef, offset = null } = params
+  const current = map.getLevel()
+  const zoomIn = current > level
+
+  /*
+    오프셋 중심은 **확대 전에, 지금 단계로** 잰다 (`offsetCenter` 머리주석). 확대가 끝난 뒤 투영을
+    읽으면 예약이 마지막 프레임보다 먼저 오거나 숨겨진 탭에서 애니메이션이 멈췄을 때 배율이 틀어진다.
+  */
+  const shifted = offsetCenter({
+    projection: map.getProjection(),
+    point: (x, y) => new maps.Point(x, y),
+    target,
+    offset,
+    scale: 2 ** ((zoomIn ? level : current) - current),
+  })
+  const center = shifted === null ? target : new maps.LatLng(shifted.lat, shifted.lng)
 
   if (prefersReducedMotion()) {
-    map.setCenter(target)
+    // 옵션 없는 `setLevel` 은 지금 중심을 기준으로 확대하므로 중심이 그대로 남는다
+    map.setCenter(center)
     if (zoomIn) map.setLevel(level)
     return () => undefined
   }
 
   if (!zoomIn) {
-    map.panTo(target)
+    map.panTo(center)
     return () => undefined
   }
 
@@ -143,7 +162,7 @@ function zoomToward(params: {
 
   const timer = setTimeout(() => {
     // 지도가 사라졌을 수 있다 (언마운트·SDK 실패) — ref 로 다시 확인한다
-    mapRef.current?.panTo(target)
+    mapRef.current?.panTo(center)
   }, ZOOM_MS)
 
   return () => clearTimeout(timer)
@@ -217,6 +236,7 @@ export function MapCanvas({
   center,
   camera,
   selectedLevel,
+  selectedOffset,
   focusMarker,
   onFailure,
   className,
@@ -332,6 +352,12 @@ export function MapCanvas({
    * 고르는 일과 무관하다.
    */
   selectedLevel?: number
+  /**
+   * 고른 핀을 **정중앙이 아니라 이만큼 옮긴 자리**에 둔다 (#1227). 지도 위에 뜬 표면(미리보기)이
+   * 정중앙을 덮을 때 호출부가 덮인 크기의 절반을 돌려준다. **고르는 순간 부른다** — 폭마다
+   * 배치가 갈리고 시트 높이는 내용만큼이라 값으로 넘기면 늘 한 박자 늦다. 없으면 정중앙이다.
+   */
+  selectedOffset?: (() => MapOffset | null) | undefined
   /** SDK 를 못 쓰면 호출부가 목록으로 되돌린다 */
   /**
    * **지도를 연 기준점** (#1223) — 누를 수 없는 이름표 하나를 그 자리에 세운다. 담기 지도만 넘긴다;
@@ -371,6 +397,9 @@ export function MapCanvas({
   const focusOverlayRef = useRef<KakaoCustomOverlay | null>(null)
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
+  /* 오프셋은 고르는 순간(핀 선택 · 묶음 클릭)에 잰다 — 함수 참조가 바뀌어도 카메라를 다시 움직이지 않게 ref 로 둔다 */
+  const selectedOffsetRef = useRef(selectedOffset)
+  selectedOffsetRef.current = selectedOffset
   /** 확대 단계 — 묶음 셀 크기가 여기서 갈린다 */
   const [level, setLevel] = useState(JEJU_MAP_LEVEL)
   /** 지도 생성 직후의 첫 `idle` 인가. 그것은 사용자의 이동이 아니다 */
@@ -559,9 +588,12 @@ export function MapCanvas({
             movedSinceCameraRef.current = true
             zoomToward({
               map,
+              maps,
               target: new maps.LatLng(group.center.lat, group.center.lng),
               level: Math.max(1, map.getLevel() - 2),
               mapRef,
+              // 펼친 자리도 미리보기 뒤로 보내지 않는다 (#1227) — 미리보기가 없으면 `null` 이다
+              offset: selectedOffsetRef.current?.() ?? null,
             })
           })
         : /*
@@ -724,8 +756,21 @@ export function MapCanvas({
     const level = selectedLevel ?? map.getLevel()
     movedSinceCameraRef.current = true
 
-    return zoomToward({ map, target: new maps.LatLng(coord.lat, coord.lng), level, mapRef })
-  }, [selectedId, selectedLevel])
+    return zoomToward({
+      map,
+      maps,
+      target: new maps.LatLng(coord.lat, coord.lng),
+      level,
+      mapRef,
+      offset: selectedOffsetRef.current?.() ?? null,
+    })
+    /*
+      **`status` 도 본다** (#1227). `?place=` 로 들어오면 선택이 **첫 렌더부터** 있는데, 그때는 SDK 를
+      받는 중이라 지도가 없어 위에서 돌아간다. 선택이 바뀌지 않으니 다시 돌 일이 없어, 미리보기는
+      열렸는데 지도는 제주 전체 구도에 머물렀다. 지도가 준비되는 순간 한 번 더 돈다 — `status` 는
+      `loading → ready` 한 번만 바뀌므로 #240 같은 되돌림 고리가 생기지 않는다.
+    */
+  }, [selectedId, selectedLevel, status])
 
   // ── 밖에서 중심을 옮길 때 (현재 위치 버튼) ───────────────────────────────
   useEffect(() => {

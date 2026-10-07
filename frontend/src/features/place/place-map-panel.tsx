@@ -64,6 +64,8 @@ export function PlaceMapPanel({
             <div className="flex items-stretch">
               <button
                 type="button"
+                // 미리보기를 닫으면 포커스가 이 행으로 돌아온다 (#1227, `place-map-view.tsx`)
+                data-place-id={place.placeId}
                 onClick={() => onSelect(place.placeId)}
                 aria-pressed={selected}
                 className="focus-visible:ring-brand-500 @container flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"

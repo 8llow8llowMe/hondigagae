@@ -91,3 +91,34 @@ describe('PlaceMapView — 기준점 지도의 실패 갈래 (#1177)', () => {
     expect(source).toMatch(/nearbyQuery\.isError && isRetriable\(nearbyQuery\.error\)/)
   })
 })
+
+/*
+  #1227 — 장소 미리보기. `/places` 만 켜고(`preview`), 폭마다 자리가 갈린다
+  (`docs/features/place/지도미리보기-세부명세.md` D1 · D5).
+*/
+describe('PlaceMapView — 장소 미리보기 (#1227)', () => {
+  it('1024~1279 는 미리보기가 목록 자리를 쓴다 — 목록은 invisible (a11y · Tab 에서도 빠진다)', () => {
+    expect(code).toContain("previewId !== null && 'lg:max-xl:invisible'")
+  })
+
+  it('모바일 목록 시트는 언마운트하지 않고 숨긴다 — 닫으면 스크롤 · 단계가 그대로 돌아온다', () => {
+    expect(code).toContain("className={cn(previewId !== null && 'hidden')}")
+  })
+
+  it('패널 · 시트 둘 다 key={previewId} 로 마운트한다 — 장소를 바꾸면 상태가 새로 시작한다', () => {
+    expect(code.match(/key=\{previewId\}/g)).toHaveLength(2)
+  })
+
+  it('목록을 접었으면 펼치기 버튼을 비켜 선다', () => {
+    expect(code).toContain("panelOpen ? 'map-preview-beside' : 'map-preview-after-handle'")
+  })
+
+  it('담기 지도(미리보기 꺼짐)는 정중앙 카메라 그대로다', () => {
+    expect(code).toContain('selectedOffset={preview ? selectedOffset : undefined}')
+  })
+
+  it('모바일 위 경계는 뷰포트 기준 136 이다 — root.top 에 더하지 않는다 (헤더 이중 차감)', () => {
+    expect(code).toContain('Math.max(root.top, MAP_TOP_CONTROLS_INSET)')
+    expect(code).not.toContain('root.top + MAP_TOP_CONTROLS_INSET')
+  })
+})
