@@ -82,12 +82,28 @@ describe('PlaceListSection — 에러 분기', () => {
     expect(markup).not.toContain(messages.common.retry)
   })
 
-  it('담는 곳이 빈 결과 설명을 바꿀 수 있다 — 거리순은 좌표 없는 곳이 빠진다 (#1217)', () => {
-    const markup = render({ places: [], emptyDescription: '다른 설명' })
+  /*
+    **덧붙이는 한 문장이다 — 바꾸지 않는다** (#1217 → #1220). 거리순 목록은 좌표 없는 장소가 빠져
+    그 사실을 말해야 하는데, 검색어 0건에서도 말해야 한다. 설명을 통째로 바꾸면 검색어 문구가 덮였다.
+  */
+  it('담는 곳이 빈 결과 설명 뒤에 한 문장을 덧붙인다 (#1217)', () => {
+    const markup = render({ places: [], emptyNote: '덧붙인 문장.' })
 
-    expect(markup).toContain('다른 설명')
-    expect(markup).not.toContain(messages.place.emptyDescription)
+    expect(markup).toContain(`${messages.place.emptyDescription} 덧붙인 문장.`)
     expect(markup).toContain(messages.place.resetFilters)
+  })
+
+  it('검색어 0건에도 덧붙인다 — 검색어 문구를 덮지 않는다 (#1220)', () => {
+    const markup = render({ places: [], keyword: '카페', emptyNote: '덧붙인 문장.' })
+
+    expect(markup).toContain(messages.place.searchEmptyTitle.replace('{keyword}', '카페'))
+    expect(markup).toContain(`${messages.place.searchEmptyDescription} 덧붙인 문장.`)
+  })
+
+  it('덧붙일 것이 없으면 예전 설명 그대로다', () => {
+    const markup = render({ places: [], keyword: '카페' })
+
+    expect(markup).toContain(`>${messages.place.searchEmptyDescription}<`)
   })
 })
 

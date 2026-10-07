@@ -289,6 +289,18 @@ describe('담기 목록 보기의 거리순 (#1217)', () => {
     expect(code).not.toMatch(/usePlaceList\([^)]*liveOrigin/)
   })
 
+  /*
+    **검색어 0건이 무엇으로 찾았는지 되돌려 준다** (#1220). `/places` 목록 · 지도 폴백은 넘기는데 담기
+    목록 보기만 빠져 있었다 — #1012 로 검색이 붙을 때 놓쳤다.
+  */
+  it('목록 보기가 검색어를 넘긴다 — 0건 문구가 검색어를 말한다', () => {
+    const listStart = code.lastIndexOf('<PlaceListSection')
+
+    expect(
+      code.slice(listStart, code.indexOf('/>', code.indexOf('renderRow', listStart))),
+    ).toContain('keyword={filters.keyword}')
+  })
+
   it('지도 보기의 서버 프리페치는 좌표 없는 key 그대로다', () => {
     expect(page).toContain("view === 'list' ? addPlaceListOrigin(detail, day) : null")
   })

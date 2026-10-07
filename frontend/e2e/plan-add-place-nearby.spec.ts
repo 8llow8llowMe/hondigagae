@@ -87,4 +87,27 @@ test.describe('담기 목록 보기의 거리순 (#1217)', () => {
     expect(meters.length).toBeGreaterThan(1)
     expect(meters).toEqual([...meters].sort((left, right) => left - right))
   })
+
+  /*
+    **검색어 0건은 검색어를 되돌려 주고, 거리순 안내를 덧붙인다** (#1220). 처음(#1217)에는 담기 목록 보기가
+    검색어를 넘기지 않아 필터 문구가 섰다. 두 문장이 함께 서는 것을 본다 — 하나가 다른 하나를 덮으면 깨진다.
+  */
+  test('검색어 0건이면 그 말을 되돌려 주고 위치 정보 안내를 덧붙인다', async ({ page }) => {
+    await page.goto('/plans')
+    const { planId } = await createPlanAround(page)
+    const keyword = '없는장소이름'
+
+    await page.goto(`/plans/${planId}/days/1/add?view=list&keyword=${encodeURIComponent(keyword)}`)
+
+    await expect(
+      page.getByText(messages.place.searchEmptyTitle.replace('{keyword}', keyword)),
+    ).toBeVisible()
+    await expect(
+      page.getByText(
+        `${messages.place.searchEmptyDescription} ${messages.plan.addPlaceNearbyEmptyNote}`,
+      ),
+    ).toBeVisible()
+    // 0건에는 순서가 없다 — 목록 위 한 줄은 서지 않는다
+    await expect(page.getByText(messages.plan.addPlaceNearbyCaption)).toHaveCount(0)
+  })
 })
