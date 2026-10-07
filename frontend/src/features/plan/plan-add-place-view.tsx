@@ -448,10 +448,13 @@ export function PlanAddPlaceView({
         places={places}
         /* 상세를 받기 전(조회가 꺼진 동안)에도 `isPending` 이라 골격이 선다 */
         loading={list.isPending}
-        /* 거리순은 좌표 없는 장소가 빠진다 — 0건이면 그 사실도 말한다 (#1217) */
-        emptyDescription={
-          listOrigin === null ? undefined : messages.plan.addPlaceNearbyEmptyDescription
-        }
+        /*
+          **검색어 0건이면 그 말을 되돌려 준다** (#1220) — `/places` · 지도 폴백과 같다. 머리의
+          `PlaceSearchField` 가 같은 `?keyword=` 를 쓴다.
+        */
+        keyword={filters.keyword}
+        /* 거리순은 좌표 없는 장소가 빠진다 — 0건이면 그 사실도 덧붙인다 (#1217) */
+        emptyNote={listOrigin === null ? undefined : messages.plan.addPlaceNearbyEmptyNote}
         errorStatus={toErrorStatus(list.error)}
         errorMessage={list.error instanceof ApiError ? list.error.rawMessage : undefined}
         hasNext={lastPage?.hasNext ?? false}

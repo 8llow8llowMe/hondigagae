@@ -877,9 +877,11 @@ export const planMessages = {
    * 직전 장소 · 그날 숙소 · 전날 숙소 중 하나라(`addPlaceFocus`) 그날 숙소에서 쟀는데 "직전" 이면 거짓이다.
    */
   addPlaceNearbyCaption: '이날 동선에서 가까운 순이에요.',
-  /** 거리순 0건 — 좌표 없는 장소는 거리순에서 빠진다 (BE #1202). 필터만 탓하지 않는다 */
-  addPlaceNearbyEmptyDescription:
-    '필터를 바꿔 다시 찾아보세요. 위치 정보가 없는 곳은 가까운 순 목록에 나오지 않아요.',
+  /**
+   * 거리순 0건 설명 뒤에 붙는 한 문장 — 좌표 없는 장소는 거리순에서 빠진다 (BE #1202). 필터 · 검색어만
+   * 탓하지 않는다. 앞 문장은 필터 0건 · 검색어 0건 문구가 그대로 선다 (#1220, `PlaceListSection.emptyNote`)
+   */
+  addPlaceNearbyEmptyNote: '위치 정보가 없는 곳은 가까운 순 목록에 나오지 않아요.',
   addPlaceBack: '일정으로 돌아가기',
 
   /**

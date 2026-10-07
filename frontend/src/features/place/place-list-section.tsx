@@ -49,17 +49,20 @@ export type PlaceListSectionProps = {
   /**
    * 걸려 있는 검색어 (#431). **0건 문구가 무엇으로 찾았는지 되돌려 주는 데만 쓴다.**
    *
-   * `null` 이면 필터만 걸린 0건이라 기존 문구 그대로다 — 담기 화면·지도 폴백처럼 검색
-   * 입력이 없는 사용처는 넘기지 않는다.
+   * `null` 이면 필터만 걸린 0건이라 기존 문구 그대로다. **검색 입력이 있는 사용처는 다 넘긴다** —
+   * `/places` 목록 · 지도 SDK 폴백 · 담기 목록 보기(#1220 — #1012 로 검색이 붙을 때 빠져 있었다).
    */
   keyword?: string | null
   /**
-   * 검색어 없는 0건의 설명을 바꾼다 (#1217). 기본은 `필터를 바꿔 다시 찾아보세요.` 다.
+   * 0건 설명 **뒤에 덧붙이는** 한 문장 (#1217 → #1220). 없으면 설명 그대로다.
    *
    * 담기 화면의 거리순 목록이 쓴다 — 좌표 없는 장소는 거리순에서 빠져, 같은 필터로 `/places` 에는
-   * 있던 곳이 여기서는 0건일 수 있다. 그 사실을 말하지 않으면 필터만 탓하게 된다.
+   * 있던 곳이 여기서는 0건일 수 있다. 그 사실을 말하지 않으면 필터 · 검색어만 탓하게 된다.
+   *
+   * **설명을 바꾸지 않고 덧붙인다.** #1217 은 설명을 통째로 바꾸는 prop 이었는데, 검색어 0건에서는
+   * 검색어 문구(`searchEmptyCopy`)가 그것을 덮어 좌표 안내가 사라졌다(#1220). 두 사실은 함께 참이다.
    */
-  emptyDescription?: string | undefined
+  emptyNote?: string | undefined
   /**
    * 행을 다르게 그린다. 기본은 장소 상세로 가는 `PlaceRow` 다.
    *
@@ -119,7 +122,7 @@ export function PlaceListSection({
   onRetry,
   onResetFilters,
   keyword = null,
-  emptyDescription = messages.place.emptyDescription,
+  emptyNote,
   inset = 'card',
   headingLevel = 2,
   columns = 1,
@@ -201,7 +204,10 @@ export function PlaceListSection({
           `초기화` 버튼은 그대로다 (그 버튼이 검색어까지 지운다 — `DEFAULT_PLACE_FILTERS`).
         */
         title={keyword === null ? messages.place.emptyTitle : searchEmptyCopy(keyword).title}
-        description={keyword === null ? emptyDescription : searchEmptyCopy(keyword).description}
+        description={withNote(
+          keyword === null ? messages.place.emptyDescription : searchEmptyCopy(keyword).description,
+          emptyNote,
+        )}
         action={
           <Button variant="secondary" size="md" onClick={onResetFilters}>
             {messages.place.resetFilters}
@@ -252,4 +258,9 @@ export function PlaceListSection({
       )}
     </div>
   )
+}
+
+/** 문장 뒤에 한 문장을 잇는다 — 둘 다 마침표로 끝나는 문장이라 공백 하나로 붙인다 */
+function withNote(description: string, note: string | undefined): string {
+  return note === undefined ? description : `${description} ${note}`
 }
