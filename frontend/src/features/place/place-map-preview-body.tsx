@@ -4,7 +4,7 @@ import { type ReactNode, type Ref, useId, useState } from 'react'
 import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
-import { ButtonLink } from '@/components/button'
+import { Button, ButtonLink } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
 import {
   BookmarkIcon,
@@ -69,7 +69,9 @@ export type PlaceMapPreviewActions = {
   delisted: boolean
   /** 상세 정규 주소를 공유한다 (`lib/place/share.ts`) */
   onShare: () => void
-  /** 주소를 클립보드에 복사한다 — 결과는 컨테이너가 토스트로 말한다 */
+  /** 공유 시트도 클립보드도 막혔을 때 직접 복사하라고 띄울 주소. 아니면 null */
+  shareFailedUrl: string | null
+  /** 주소를 클립보드에 복사한다 — 성공은 컨테이너가 토스트로 알린다. 실패는 주소가 화면에 그대로 있다 */
   onCopyAddress: (address: string) => void
 }
 
@@ -425,7 +427,11 @@ function PreviewActionRow({
 
   return (
     <div className="flex flex-col gap-3">
-      <nav aria-label={messages.map.previewActionsLabel}>
+      {/*
+        `nav` 가 아니라 `group` 이다 — `nav` 는 탐색 링크 랜드마크인데 여기는 저장 · 공유 같은 버튼이
+        섞인 행동 묶음이다(리뷰 지적, 명세 D5 를 고쳤다).
+      */}
+      <div role="group" aria-label={messages.map.previewActionsLabel}>
         <ul className="grid grid-cols-4 gap-2">
           <li>
             {directions === null ? (
@@ -485,9 +491,22 @@ function PreviewActionRow({
             </button>
           </li>
         </ul>
-      </nav>
+      </div>
 
       <FormAlert message={actions.saveError} />
+      {/*
+        **공유 실패는 여기 남긴다 — 토스트가 아니다** (\`toast.tsx\` "오류를 토스트로 말하지 않는다").
+        공유할 주소는 화면 어디에도 없어서, 토스트가 사라지면 다음 행동이 없다. 주소를 고를 수 있게
+        띄워 직접 복사하게 한다 — 일정 공유 모달(#1183)과 같은 처방이다.
+      */}
+      {actions.shareFailedUrl !== null && (
+        <div className="flex flex-col gap-1">
+          <FormAlert message={messages.map.previewShareFailed} />
+          <p className="text-caption text-fg-muted break-all select-all">
+            {actions.shareFailedUrl}
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -622,7 +641,7 @@ function VerdictFactRow({ fact }: { fact: PreviewVerdictFact }) {
   const caution = fact.tone !== null
   const icon = caution ? (
     <CautionIcon size={20} />
-  ) : fact.glyph !== null ? (
+  ) : fact.glyph !== null && fact.glyph.kind !== null ? (
     <WeatherGlyph glyph={fact.glyph} size={20} />
   ) : fact.key === 'walk' ? (
     <PawIcon size={20} className="text-fg-muted" />
@@ -640,6 +659,12 @@ function VerdictFactRow({ fact }: { fact: PreviewVerdictFact }) {
       <span className="inline-flex size-5 shrink-0 items-center justify-center">{icon}</span>
       <span className="min-w-0">
         {caution && <span className="sr-only">{messages.map.previewFactCaution} </span>}
+        {/*
+          그림이 없는 하늘 코드(서버가 새로 낸 값)는 20 칸에 낱말을 넣으면 넘친다 — 문장 앞에 붙인다.
+          주의 쪽은 그림이 주의 아이콘으로 바뀌므로 하늘 낱말은 sr 로 남긴다.
+        */}
+        {fact.glyph !== null && fact.glyph.kind === null && `${fact.glyph.name} · `}
+        {caution && fact.glyph?.kind != null && <span className="sr-only">{fact.glyph.name} </span>}
         {fact.text}
       </span>
     </li>
@@ -861,19 +886,16 @@ function PreviewBottomBar({
         </p>
       )}
       <div className={cn('py-3', inset)}>
-        <button
-          type="button"
+        {/* 높이 48 이 `Button size="lg"` 그대로라 외형을 손으로 복제하지 않는다 (component-guide #70) */}
+        <Button
+          variant={actions.added ? 'secondary' : 'primary'}
+          size="lg"
           onClick={actions.onAddToPlan}
           disabled={actions.delisted}
-          className={cn(
-            'text-body-1 focus-visible:ring-brand-500 h-12 w-full rounded-md font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60',
-            actions.added
-              ? 'border-border-strong text-fg bg-bg border'
-              : 'bg-brand-600 hover:bg-brand-700 text-fg-inverse',
-          )}
+          className="w-full"
         >
           {actions.added ? messages.plan.addToPlanAgainAction : messages.plan.addToPlanAction}
-        </button>
+        </Button>
       </div>
     </div>
   )

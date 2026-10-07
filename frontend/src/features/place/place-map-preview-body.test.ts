@@ -36,6 +36,7 @@ const base: PlaceMapPreviewBodyProps = {
     onAddToPlan: () => undefined,
     delisted: false,
     onShare: () => undefined,
+    shareFailedUrl: null,
     onCopyAddress: () => undefined,
   },
 }
@@ -67,6 +68,12 @@ function withIntro(over: Partial<NonNullable<PlaceDetail['intro']>>): PlaceDetai
   const intro = placeDetail.intro
   if (intro === null) throw new Error('fixture 에 intro 가 있어야 한다')
   return { ...placeDetail, intro: { ...intro, ...over } }
+}
+
+/** 행동 줄(④) 묶음만 떼어 본다 — `role="group"` 부터 저장 실패 알림 자리 앞까지 */
+function actionGroup(html: string) {
+  const start = html.indexOf(`<div role="group" aria-label="${messages.map.previewActionsLabel}"`)
+  return html.slice(start, html.indexOf('</ul>', start))
 }
 
 /** 판정 카드(⑤)만 떼어 본다 — 머리 문구부터 그 `section` 이 닫힐 때까지 */
@@ -165,9 +172,9 @@ describe('PlaceMapPreviewBody — ① 이름 · ② 상태 줄 · ③ 칩 (#1233
 describe('PlaceMapPreviewBody — ④ 행동 줄', () => {
   it('길찾기 · 전화 · 저장 · 공유 4칸이 같은 폭으로 선다', () => {
     const html = render()
-    const nav = html.slice(html.indexOf('<nav'), html.indexOf('</nav>'))
+    const nav = actionGroup(html)
 
-    expect(nav).toContain(`aria-label="${messages.map.previewActionsLabel}"`)
+    expect(nav).toContain('role="group"')
     expect(nav).toContain('grid-cols-4')
     expect(nav.match(/<li>/g)).toHaveLength(4)
     for (const word of [
@@ -185,13 +192,26 @@ describe('PlaceMapPreviewBody — ④ 행동 줄', () => {
       summary: { ...placeSummary, lat: null, lng: null, tel: null },
       detail: ok({ ...placeDetail, lat: null, lng: null, tel: null }),
     })
-    const nav = html.slice(html.indexOf('<nav'), html.indexOf('</nav>'))
+    const nav = actionGroup(html)
 
     expect(nav.match(/<li>/g)).toHaveLength(4)
     expect(nav.match(/aria-disabled="true"/g)).toHaveLength(2)
     expect(nav).toContain(messages.map.previewDirectionsUnavailable)
     expect(nav).toContain(messages.map.previewCallUnavailable)
     expect(nav).not.toContain('tel:')
+  })
+
+  it('행동 묶음은 nav 랜드마크가 아니다 — 저장 · 공유는 이동이 아니라 동작이다', () => {
+    expect(render()).not.toContain('<nav')
+  })
+
+  it('공유가 막히면 주소를 행동 줄 아래에 남긴다 — 토스트로 흘리지 않는다', () => {
+    const url = 'https://hondi.example/places/126434'
+    const html = render({ actions: { ...base.actions, shareFailedUrl: url } })
+
+    expect(html).toContain(messages.map.previewShareFailed)
+    expect(html).toMatch(new RegExp(`<p class="[^"]*select-all[^"]*">${url}</p>`))
+    expect(render()).not.toContain(messages.map.previewShareFailed)
   })
 
   it('저장되면 채운 아이콘 + 저장됨, 눌린 상태를 aria-pressed 로 말한다', () => {
