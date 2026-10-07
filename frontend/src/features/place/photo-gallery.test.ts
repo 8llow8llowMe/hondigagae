@@ -291,3 +291,70 @@ describe('PhotoGallery — 캐러셀 갈래 (#1230)', () => {
     expect(markup).toContain('hidden md:block')
   })
 })
+
+describe('PhotoGallery — 캐러셀 넘기기 (#1233 D3)', () => {
+  function renderCarousel(count: number) {
+    const images = Array.from({ length: count }, (_, index) => image(index + 1))
+
+    return renderToStaticMarkup(
+      createElement(PhotoGallery, { images, title: '수월봉', layout: 'carousel' }),
+    )
+  }
+
+  const prev = `aria-label="${messages.place.galleryPrevAction}"`
+  const next = `aria-label="${messages.place.galleryNextAction}"`
+
+  it('첫 칸에서는 이전 버튼을 숨기고 다음 버튼만 세운다', () => {
+    const markup = renderCarousel(3)
+
+    expect(markup).not.toContain(prev)
+    expect(markup).toContain(next)
+  })
+
+  it('한 장이면 넘길 곳이 없어 버튼을 세우지 않는다', () => {
+    const markup = renderCarousel(1)
+
+    expect(markup).not.toContain(prev)
+    expect(markup).not.toContain(next)
+  })
+
+  it('버튼은 마우스를 올렸을 때 · 포커스가 있을 때만 보인다', () => {
+    const button = renderCarousel(3).match(new RegExp(`<button[^>]*${next}[^>]*>`))?.[0] ?? ''
+
+    expect(button).toContain('opacity-0')
+    expect(button).toContain('group-hover:opacity-100')
+    expect(button).toContain('group-focus-within:opacity-100')
+  })
+
+  it('상세(responsive) 캐러셀도 같은 버튼을 쓴다', () => {
+    expect(render(3)).toContain(next)
+  })
+
+  it('지금 위치를 보조기기에 알린다', () => {
+    expect(renderCarousel(3)).toMatch(/aria-live="polite"[^>]*>1\/3</)
+  })
+})
+
+describe('PhotoGallery — 미리보기의 사진 출처 (#1233 D3)', () => {
+  const overlay = new RegExp(`<span[^>]*absolute[^>]*>${messages.place.photoSource}</span>`)
+
+  it('미리보기(carousel)는 출처를 사진 위 좌하단에 얹는다 — 아래 줄을 따로 두지 않는다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(PhotoGallery, {
+        images: [image(1), image(2)],
+        title: '수월봉',
+        layout: 'carousel',
+      }),
+    )
+
+    expect(markup).toMatch(overlay)
+    expect(markup.split(messages.place.photoSource)).toHaveLength(2)
+  })
+
+  it('상세(responsive)는 갤러리 아래 줄 그대로다', () => {
+    const markup = render(2)
+
+    expect(markup).not.toMatch(overlay)
+    expect(markup).toContain(messages.place.photoSource)
+  })
+})

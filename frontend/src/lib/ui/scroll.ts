@@ -82,3 +82,50 @@ export function pageScrollLeft(params: {
 
   return Math.round(Math.min(Math.max(0, next), max))
 }
+
+/** 놓을 때 다음 칸으로 넘기는 끈 거리 — 칸 폭에 대한 비율 (#1233 D3) */
+const SWIPE_DISTANCE_RATIO = 0.15
+/** 놓을 때 다음 칸으로 넘기는 속도(px/ms) — 짧게 튕긴 것도 넘긴다 */
+const SWIPE_VELOCITY = 0.3
+
+/**
+ * 마우스로 끌던 캐러셀을 놓았을 때 **갈 칸** (#1233 D3).
+ *
+ * 예전에는 놓을 때 스냅만 다시 켰다 — 브라우저가 가장 가까운 칸으로 애니메이션 없이 붙여서
+ * 30% 를 끌어도 되돌아갔다. 방향과 속도를 보고 칸을 직접 고른다:
+ *
+ * - **한 칸 넘게 끌었으면** 지나친 칸을 세고, 남은 거리로 다시 가른다.
+ * - **빠르게 튕겼으면(≥ 0.3px/ms)** 튕긴 방향이 이긴다. 끌던 쪽과 반대로 튕기면 끈 만큼을
+ *   되돌린다 — 다음 칸으로 가다 마음을 바꾼 것이다.
+ * - **느리면** 남은 거리가 칸 폭의 15% 이상일 때만 끈 방향 다음 칸이다.
+ *
+ * 부호는 **스크롤 방향**이다 — 양수가 다음 칸 쪽(포인터는 왼쪽으로 움직였다).
+ */
+export function swipeTarget(params: {
+  /** 누른 뒤 스크롤이 움직인 거리(px). 양수 = 다음 칸 쪽 */
+  dragPx: number
+  /** 놓기 직전의 속도(px/ms). 부호는 `dragPx` 와 같다 */
+  velocity: number
+  /** 칸 하나의 폭 + 사이 간격 */
+  step: number
+  /** 누를 때 있던 칸 (0-based) */
+  index: number
+  count: number
+}): number {
+  const { dragPx, velocity, step, index, count } = params
+  if (step <= 0 || count <= 0) return index
+
+  const passed = Math.trunc(dragPx / step)
+  const rest = dragPx - passed * step
+
+  let move = passed
+  if (Math.abs(velocity) >= SWIPE_VELOCITY) {
+    const direction = Math.sign(velocity)
+    // 남은 거리가 없거나 같은 쪽이면 한 칸 더, 반대쪽이면 남은 거리를 버린다
+    if (rest === 0 || Math.sign(rest) === direction) move += direction
+  } else if (Math.abs(rest) >= step * SWIPE_DISTANCE_RATIO) {
+    move += Math.sign(rest)
+  }
+
+  return Math.min(count - 1, Math.max(0, index + move))
+}
