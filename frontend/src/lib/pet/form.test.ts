@@ -30,28 +30,34 @@ const pet: Pet = {
   representative: false,
 }
 
+/**
+ * 크기를 고른 폼 값 — 저장 본문 테스트의 바탕. **`EMPTY_PET_FORM_VALUES` 는 크기를 고르지 않은 채
+ * 시작한다**(#1185) — 그 값은 스키마가 막아 `toPetSavePayload` 까지 오지 않는다.
+ */
+const FILLED = { ...EMPTY_PET_FORM_VALUES, sizeType: 'SMALL' as const }
+
 describe('toPetSavePayload', () => {
   it('빈 birthYm 을 null 로 보낸다 — 빈 문자열은 서버가 PET_104 로 거부한다', () => {
-    const payload = toPetSavePayload({ ...EMPTY_PET_FORM_VALUES, name: '몽실이', birthYm: '' })
+    const payload = toPetSavePayload({ ...FILLED, name: '몽실이', birthYm: '' })
 
     expect(payload.birthYm).toBeNull()
   })
 
   it('공백만 있는 birthYm 도 null 로 보낸다', () => {
-    const payload = toPetSavePayload({ ...EMPTY_PET_FORM_VALUES, name: '몽실이', birthYm: '   ' })
+    const payload = toPetSavePayload({ ...FILLED, name: '몽실이', birthYm: '   ' })
 
     expect(payload.birthYm).toBeNull()
   })
 
   it('빈 breed 를 null 로 보낸다 — 서버는 받아주지만 빈 배지를 그리게 된다', () => {
-    const payload = toPetSavePayload({ ...EMPTY_PET_FORM_VALUES, name: '몽실이', breed: '' })
+    const payload = toPetSavePayload({ ...FILLED, name: '몽실이', breed: '' })
 
     expect(payload.breed).toBeNull()
   })
 
   it('값이 있으면 trim 해서 보낸다', () => {
     const payload = toPetSavePayload({
-      ...EMPTY_PET_FORM_VALUES,
+      ...FILLED,
       name: '  몽실이  ',
       breed: '  말티즈  ',
       birthYm: ' 2017-05 ',
@@ -63,7 +69,7 @@ describe('toPetSavePayload', () => {
   })
 
   it('boolean 4개를 항상 명시적으로 담는다 — 누락하면 서버가 조용히 false 로 채운다', () => {
-    const payload = toPetSavePayload({ ...EMPTY_PET_FORM_VALUES, name: '몽실이' })
+    const payload = toPetSavePayload({ ...FILLED, name: '몽실이' })
 
     expect(Object.keys(payload)).toEqual(
       expect.arrayContaining(['heatSensitive', 'coldSensitive', 'noiseSensitive', 'walkPreferred']),
@@ -74,7 +80,7 @@ describe('toPetSavePayload', () => {
 
   it('enum 을 code 문자열로 보낸다 — 응답의 metadata 객체가 아니다', () => {
     const payload = toPetSavePayload({
-      ...EMPTY_PET_FORM_VALUES,
+      ...FILLED,
       name: '몽실이',
       sizeType: 'LARGE',
       activityLevel: 'HIGH',
@@ -87,7 +93,7 @@ describe('toPetSavePayload', () => {
   })
 
   it('11개 필드를 모두 담는다 — PUT 은 부분 수정이 아니다', () => {
-    const payload = toPetSavePayload({ ...EMPTY_PET_FORM_VALUES, name: '몽실이' })
+    const payload = toPetSavePayload({ ...FILLED, name: '몽실이' })
 
     expect(Object.keys(payload).sort()).toEqual(
       [
@@ -109,11 +115,11 @@ describe('toPetSavePayload', () => {
 
 describe('toPetSavePayload — 체중', () => {
   it('빈 체중을 null 로 보낸다 — 0 을 보내면 PET_108 이다', () => {
-    expect(toPetSavePayload(EMPTY_PET_FORM_VALUES).weightKg).toBeNull()
+    expect(toPetSavePayload(FILLED).weightKg).toBeNull()
   })
 
   it('입력한 체중을 숫자로 보낸다', () => {
-    expect(toPetSavePayload({ ...EMPTY_PET_FORM_VALUES, weightKg: '3.5' }).weightKg).toBe(3.5)
+    expect(toPetSavePayload({ ...FILLED, weightKg: '3.5' }).weightKg).toBe(3.5)
   })
 })
 
@@ -172,8 +178,9 @@ describe('toPetFormValues', () => {
     })
 
     // enum 에 값이 추가되면 FE 가 조용히 낡는다 (공통명세 S6-1).
-    // 폼이 깨지는 것보다 기본값으로 떨어지는 것이 낫다.
-    expect(values.sizeType).toBe('SMALL')
+    // 폼이 깨지는 것보다 기본값으로 떨어지는 것이 낫다. 크기의 기본값은 #1185 부터 "고르지 않음" 이라
+    // 수정 화면이 다시 고르게 한다 — 모르는 크기를 소형견으로 바꿔 저장하지 않는다.
+    expect(values.sizeType).toBe('')
   })
 })
 
@@ -182,5 +189,17 @@ describe('isPetSizeCode', () => {
     expect(isPetSizeCode('SMALL')).toBe(true)
     expect(isPetSizeCode('GIANT')).toBe(false)
     expect(isPetSizeCode('')).toBe(false)
+  })
+})
+
+describe('크기를 고르지 않은 값 (#1185)', () => {
+  it('등록 폼은 크기를 고르지 않은 채 시작한다 — 활동량 · 사회성은 중앙값 그대로', () => {
+    expect(EMPTY_PET_FORM_VALUES.sizeType).toBe('')
+    expect(EMPTY_PET_FORM_VALUES.activityLevel).toBe('MEDIUM')
+    expect(EMPTY_PET_FORM_VALUES.sociality).toBe('MEDIUM')
+  })
+
+  it('고르지 않은 값은 저장 본문이 되지 않는다 — 검증을 건너뛴 호출이다', () => {
+    expect(() => toPetSavePayload({ ...EMPTY_PET_FORM_VALUES, name: '몽실이' })).toThrow()
   })
 })

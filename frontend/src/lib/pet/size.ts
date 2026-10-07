@@ -61,7 +61,8 @@ export function sizeMatchesWeightInput(size: PetSizeCode, raw: string): boolean 
  */
 export function sizeChangeForWeight(
   weightInput: string,
-  currentSize: PetSizeCode,
+  // 아직 고르지 않았으면(`''`, #1185) 체중이 정한 크기로 채운다
+  currentSize: PetSizeCode | '',
 ): PetSizeCode | null {
   const derived = sizeFromWeightInput(weightInput)
 

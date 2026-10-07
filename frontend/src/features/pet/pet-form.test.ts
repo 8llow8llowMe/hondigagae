@@ -51,14 +51,19 @@ describe('PetFormFields — 구성', () => {
     expect(markup).toContain('일반적인 산책과 관광 일정을 소화합니다.')
   })
 
-  it('초기 선택이 SMALL / MEDIUM / MEDIUM 이다', () => {
+  /*
+    **크기는 고르지 않은 채 시작한다** (#1185). `소형견` 이 미리 골라져 있어 이름만 쓰고 등록됐다 —
+    대형견이 소형견으로 저장되면 갈 수 없는 곳을 추천받는다. 활동량 · 사회성은 중앙값 그대로다.
+  */
+  it('초기 선택은 크기 없음 / 활동량 MEDIUM / 사회성 MEDIUM 이다', () => {
     const markup = render()
 
-    expect(markup).toContain('id="sizeType-SMALL"')
-    expect(markup).toContain('id="activityLevel-MEDIUM"')
-    expect(markup).toContain('id="sociality-MEDIUM"')
-    // 그룹 3개에서 각각 하나만 checked
-    expect(markup.match(/checked=""/g)).toHaveLength(3)
+    expect(markup).not.toMatch(/<input[^>]*id="sizeType-[A-Z]+"[^>]*checked=""/)
+    expect(markup).toMatch(
+      /<input[^>]*checked=""[^>]*id="activityLevel-MEDIUM"|<input[^>]*id="activityLevel-MEDIUM"[^>]*checked=""/,
+    )
+    // 그룹 3개 중 활동량 · 사회성만 checked
+    expect(markup.match(/checked=""/g)).toHaveLength(2)
   })
 
   it('체크박스 초기 상태는 모두 해제다 — 서버 기본값과 같다', () => {
@@ -436,8 +441,31 @@ describe('PetFormFields — PET_004 서버 오류 (#369)', () => {
 
 describe('petFormSchema', () => {
   function check(overrides: Record<string, unknown>) {
-    return validate(petFormSchema, { ...EMPTY_PET_FORM_VALUES, name: '몽실이', ...overrides })
+    return validate(petFormSchema, {
+      ...EMPTY_PET_FORM_VALUES,
+      name: '몽실이',
+      sizeType: 'SMALL',
+      ...overrides,
+    })
   }
+
+  /*
+    **크기를 고르지 않으면 등록되지 않는다** (#1185) — 필수 문구(`PET_105`)가 이제 화면에서 닿는다.
+    체중을 읽을 수 없을 때(빈 크기라 체중이 크기를 채우지 못한 경우) 어긋남 문구가 대신 서지 않는다.
+  */
+  it('크기를 고르지 않으면 필수 문구로 막는다', () => {
+    const result = check({ sizeType: '' })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.fields.sizeType).toBe(messages.pet.sizeTypeRequired)
+  })
+
+  it('크기를 고르지 않았으면 체중이 있어도 어긋남이 아니라 필수 문구다', () => {
+    const result = check({ sizeType: '', weightKg: '30' })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.fields.sizeType).toBe(messages.pet.sizeTypeRequired)
+  })
 
   it('빈 birthYm 은 통과한다 — 선택 입력이다', () => {
     expect(check({ birthYm: '' }).ok).toBe(true)

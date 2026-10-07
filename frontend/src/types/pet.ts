@@ -99,7 +99,12 @@ export type PetFormValues = {
   name: string
   breed: string
   birthYm: string
-  sizeType: PetSizeCode
+  /**
+   * **`''` 은 "아직 고르지 않음" 이다** (#1185). 등록 폼은 이 값으로 시작한다 — 예전 `SMALL` 초기값으로는
+   * 이름만 쓰고 등록됐고, 대형견이 소형견으로 저장되면 갈 수 없는 곳을 추천받는다. 제출은 스키마가
+   * 막는다(`PET_105` 문구).
+   */
+  sizeType: PetSizeCode | ''
   /**
    * `<input>` 이 들고 있는 문자열이다. `number` 로 두면 "3." 처럼 입력 도중의 값을
    * 표현할 수 없고, 빈 값과 `0` 이 구분되지 않는다 — 여기서는 그 둘이 다른 뜻이다.

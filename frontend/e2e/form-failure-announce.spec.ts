@@ -388,6 +388,8 @@ test.describe('세션 있음 — 반려견 등록', () => {
 
     const name = page.locator('#name')
     await name.fill('콩이')
+    // 등록 폼은 크기를 고르지 않은 채 시작한다(#1185) — 저장 실패 갈래까지 가려면 골라야 한다
+    await page.locator('#sizeType-SMALL').check()
     await page.getByRole('button', { name: messages.pet.register, exact: true }).click()
     await expect(temporary(page)).toBeFocused()
     await expect(temporary(page)).not.toHaveAttribute('role', 'alert')
