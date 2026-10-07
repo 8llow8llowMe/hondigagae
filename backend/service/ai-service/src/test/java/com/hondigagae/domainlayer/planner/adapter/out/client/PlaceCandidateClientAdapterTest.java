@@ -34,7 +34,7 @@ class PlaceCandidateClientAdapterTest {
             placeCandidateClient,
             pinnedPlaceCandidateClient,
             new InternalResponseSupport(CircuitBreakerRegistry.ofDefaults()));
-        when(placeCandidateClient.searchPlaces("39", null, "ALLOWED", 8, true, "카페"))
+        when(placeCandidateClient.searchPlaces("39", null, "ALLOWED", 8, true, "카페", null))
             .thenReturn(Response.success(new PlaceSliceClientResponse(List.of(
                 new PlaceItemClientResponse(
                     "11", null, "바다뷰 카페", "제주시", 33.5, 126.5, null, null, null, true, "카페")),
@@ -47,6 +47,27 @@ class PlaceCandidateClientAdapterTest {
             assertThat(place.placeId()).isEqualTo(11L);
             assertThat(place.indoor()).isTrue();
             assertThat(place.sourceCategory()).isEqualTo("카페");
+        });
+    }
+
+    @Test
+    @DisplayName("숙박 조회는 콘텐츠 타입 LODGING 과 시군구를 검색에 넘긴다 (#1236)")
+    void passesLodgingContentType() {
+        PlaceCandidateClientAdapter adapter = new PlaceCandidateClientAdapter(
+            placeCandidateClient,
+            pinnedPlaceCandidateClient,
+            new InternalResponseSupport(CircuitBreakerRegistry.ofDefaults()));
+        when(placeCandidateClient.searchPlaces("39", "4", "ALLOWED", 50, null, null, "LODGING"))
+            .thenReturn(Response.success(new PlaceSliceClientResponse(List.of(
+                new PlaceItemClientResponse(
+                    "21", null, "포시즌펜션", "서귀포시", 33.248, 126.565, null, null, null, true, "펜션")),
+                false)));
+
+        List<PlaceCandidateQueryResult> results = adapter.findLodgingCandidates("39", "4", 50);
+
+        assertThat(results).singleElement().satisfies(place -> {
+            assertThat(place.placeId()).isEqualTo(21L);
+            assertThat(place.title()).isEqualTo("포시즌펜션");
         });
     }
 }

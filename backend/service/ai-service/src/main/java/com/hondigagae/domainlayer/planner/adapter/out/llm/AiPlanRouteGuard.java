@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.planner.adapter.out.llm;
 
 import com.hondigagae.common.geo.GeoDistance;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
+import com.hondigagae.domainlayer.planner.application.model.JejuZone;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft;

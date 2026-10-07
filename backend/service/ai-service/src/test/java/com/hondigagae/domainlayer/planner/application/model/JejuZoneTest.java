@@ -1,4 +1,4 @@
-package com.hondigagae.domainlayer.planner.adapter.out.llm;
+package com.hondigagae.domainlayer.planner.application.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

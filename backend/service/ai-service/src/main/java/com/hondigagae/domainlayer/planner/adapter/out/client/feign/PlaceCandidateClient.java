@@ -24,6 +24,7 @@ public interface PlaceCandidateClient {
      *                    빈 문자열을 보내면 "빈 시군구" 로 걸러질 위험이 있다
      * @param indoor null 이면 실내 여부를 가리지 않는다. true 면 실내만
      * @param sourceCategory null 이면 분류를 가리지 않는다. 카페는 {@code 카페}
+     * @param contentType null 이면 콘텐츠 타입을 가리지 않는다. 숙박은 {@code LODGING} (#1236)
      */
     @GetMapping("/api/v1/places")
     Response<PlaceSliceClientResponse> searchPlaces(
@@ -32,6 +33,7 @@ public interface PlaceCandidateClient {
         @RequestParam("petAllowanceType") String petAllowanceType,
         @RequestParam("size") int size,
         @RequestParam(value = "indoor", required = false) Boolean indoor,
-        @RequestParam(value = "sourceCategory", required = false) String sourceCategory
+        @RequestParam(value = "sourceCategory", required = false) String sourceCategory,
+        @RequestParam(value = "contentType", required = false) String contentType
     );
 }

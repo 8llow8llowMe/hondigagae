@@ -1,4 +1,4 @@
-package com.hondigagae.domainlayer.planner.adapter.out.llm;
+package com.hondigagae.domainlayer.planner.application.model;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -12,14 +12,18 @@ import lombok.RequiredArgsConstructor;
  * 붙여 주면 "하루는 한 권역" 이라는 지시가 문자열 비교로 끝난다.
  *
  * <p><b>거리가 아니라 구역이다.</b> 두 권역이 맞닿아 있어도 끝과 끝은 멀 수 있다. 그래서 규칙 12(이동 거리는
- * 입력에 없다)와 어긋나지 않고, 실제 거리를 보는 일은 {@link AiPlanRouteGuard} 가 한다.
+ * 입력에 없다)와 어긋나지 않고, 실제 거리를 보는 일은 어댑터의 {@code AiPlanRouteGuard} 가 한다.
  *
  * <p>권역은 줄(북 · 남) 둘과 칸(서 · 가운데 · 동) 셋을 곱한 것이다. 섬이 동서로 길고 한라산이 가운데 솟아
  * 있어서, 해안도로를 따라 도는 이동은 같은 줄의 옆 칸이나 서쪽 · 동쪽 끝의 위아래로만 짧다.
+ *
+ * <p><b>application 모델이다</b> (#1236). 처음에는 프롬프트 어댑터 안에 있었는데, 후보 풀에 숙박을 권역마다 싣는
+ * 일({@code LodgingZonePolicy})도 같은 구역 정의를 써야 해서 옮겼다 — 두 곳의 권역이 갈리면 "그 권역에 숙소가
+ * 있다" 는 풀과 "그 권역에서 숙소를 고르라" 는 프롬프트가 서로 다른 지도를 본다.
  */
 @Getter
 @RequiredArgsConstructor
-enum JejuZone {
+public enum JejuZone {
 
     NORTH_WEST("북서부"),
     NORTH("북부"),
@@ -54,7 +58,7 @@ enum JejuZone {
     /**
      * 좌표의 권역. 좌표가 없거나 제주 범위 밖이면 null 이다 — 모르는 권역을 가장 가까운 권역으로 접지 않는다.
      */
-    static JejuZone of(Double lat, Double lng) {
+    public static JejuZone of(Double lat, Double lng) {
         if (lat == null || lng == null || lat < MIN_LAT || lat > MAX_LAT || lng < MIN_LNG || lng > MAX_LNG) {
             return null;
         }
@@ -75,7 +79,7 @@ enum JejuZone {
      * 않는다</b> — 제주 시내와 서귀포 시내 사이는 한라산을 넘는 길이라 해안 쪽 이웃보다 멀고 고되다. 이 정의는
      * 시스템 프롬프트 규칙 2의 문장과 같아야 한다.
      */
-    boolean adjacentTo(JejuZone other) {
+    public boolean adjacentTo(JejuZone other) {
         if (other == null) {
             return false;
         }
