@@ -62,8 +62,12 @@ export const MAP_TOP_CONTROLS_INSET = 136
  * **묶음(`ChipGroup`)은 넣지 않는다.** 그 안의 칩은 `button` 이라 이미 빠지고, 묶음의
  * 빈 자리는 손잡이로 쓰는 편이 낫다. (그리고 이 파일이 배타 묶음을 *그리는* 것으로
  * 오인되면 `radio-group-keys.test.ts` 가 키 핸들러를 요구한다 — 이 파일에는 없는 일이다.)
+ *
+ * **필터 줄(`toolbar`) 전체는 뺀다** (`data-sheet-no-drag`, 사용자 지적 2026-10-07). 칩은 `button` 이라
+ * 빠졌지만 칩 사이 틈(6px)과 레일 위아래 여백이 손잡이로 남아, 칩을 누르려다 시트가 끌렸다. 칩이
+ * 빽빽한 줄에서는 "빈 자리도 손잡이" 가 이득보다 사고가 크다 — 대신 그래버 줄을 넓혔다(아래).
  */
-const DRAG_IGNORED_SELECTOR = 'button, a, input, select, textarea'
+const DRAG_IGNORED_SELECTOR = 'button, a, input, select, textarea, [data-sheet-no-drag]'
 
 /**
  * 이 자리에서 시트 드래그를 시작해도 되는가 ([#901](https://github.com/8llow8llowMe/hondigagae/issues/901) **D3**).
@@ -218,8 +222,8 @@ export function MapSheet({
       {/*
         **시트 머리 전체가 손잡이다** (#901 D3). 예전에는 그래버 줄(세로 16px)만 드래그를
         받아 *"어딜 잡고 올려야 하는지"* 가 읽히지 않았다 — 조금 아래를 잡으면 목록이
-        스크롤됐다. 이제 그래버 · 필터 줄 · 개수 줄이 모두 드래그를 받고, **그 안의 컨트롤
-        에서 시작한 제스처만** 빠진다(`shouldStartSheetDrag`).
+        스크롤됐다. 이제 그래버 · 개수 줄이 드래그를 받고, **컨트롤에서 시작한 제스처와
+        필터 줄 전체**는 빠진다(`shouldStartSheetDrag` — 칩 사이 틈을 잡아 끌리던 사고, 2026-10-07).
 
         **`touch-pan-x` 다.** `touch-none` 으로 덮으면 필터 레일의 가로 스크롤이 죽는다 —
         가로는 브라우저에 넘기고 세로만 이 핸들러가 받는다. 그래버 줄만 `touch-none` 이라
@@ -234,13 +238,22 @@ export function MapSheet({
         onPointerCancel={onPointerUp}
         className="cursor-grab touch-pan-x active:cursor-grabbing"
       >
-        {/* 그래버 — 보이는 손잡이. 잡을 수 있는 자리는 이 줄보다 넓다(위 주석) */}
-        <div className="flex touch-none justify-center pt-2 pb-1">
+        {/*
+          그래버 — 보이는 손잡이. **위아래 12px 여유를 둔다**(28px 띠, 사용자 지적 2026-10-07) — `pt-2 pb-1`
+          이던 때는 막대 바로 밑 4px 에 칩이 붙어 잡기 어려웠다. 필터 줄이 손잡이에서 빠졌으므로 이 띠와
+          개수 줄이 잡는 자리다.
+        */}
+        <div className="flex touch-none justify-center pt-3 pb-3">
           <span aria-hidden className="bg-border-strong h-1 w-9 rounded-full" />
         </div>
 
         {/* 필터 같은 전폭 컨트롤. 최소 단계에서도 남으므로 지도를 보면서 조건을 바꿀 수 있다 */}
-        {toolbar !== undefined && <div className="px-3 pb-2">{toolbar}</div>}
+        {toolbar !== undefined && (
+          // 필터 줄은 칩 사이 틈까지 드래그를 받지 않는다 (`DRAG_IGNORED_SELECTOR`)
+          <div data-sheet-no-drag="true" className="px-3 pb-2">
+            {toolbar}
+          </div>
+        )}
 
         {/**
          * 드래그를 못 쓰는 입력(키보드·스위치)을 위한 단계 이동. 아이콘 없이 글자로 둔다 —
