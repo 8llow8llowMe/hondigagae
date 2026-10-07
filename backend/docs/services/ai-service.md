@@ -84,6 +84,11 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
   걸러낼 뿐이지만 후보를 주는 방식은 애초에 틀릴 자리를 없앤다. 후보 줄에는 **1부터 시작하는 번호**를
   붙이고 모델은 그 번호만 적는다 — 아이디 · 이름 · 종류는 서버가 그 번호의 후보에서 채운다 (#1128, 아래
   "출력 토큰을 줄인다").
+- **실내 · 카페를 명시한 요청은 후보 풀에 반영한다** (#1170). `requestNote` 에 `실내` 또는 `카페` 가
+  있으면 그 조건으로 동반 가능 장소를 더 찾아 풀 앞에 둔다. 개수 상한(`place-candidate-size`)은
+  그대로라 일반 검색의 꼬리만 빠진다. 숙소는 실내여도 그 요청을 대신하지 않는다. 맞는 후보가
+  없으면 생성을 멈추지 않고, 근거 맨 앞에 `REQUEST_UNMET`("요청하신 실내 카페가 이번 후보에 없어요"
+  등)을 붙이고 넣었다고 말하는 근거는 뺀다.
 - **`itemType` 과 `placeId` 는 따로 볼 수 없다 (필수).** `placeId` 는 plan-service 에서
   `targetId` 가 되는데, 그 값이 `place.id` 인지 `walk_course.id` 인지를 `itemType` 이 정한다
   (`shared-travel` 의 `PlanItemType`). 어긋나면 400 도 나지 않고 **틀린 아이디가 조용히 저장된다**
