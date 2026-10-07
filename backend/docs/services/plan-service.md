@@ -20,7 +20,7 @@
 
 ## 주요 API (계획)
 
-- `GET|POST /api/v1/plans` — POST 는 `sourceAiJobId` 를 실으면 **AI 초안 담기 멱등**이다 (아래 "AI 초안 담기 멱등" 절, #970)
+- `GET|POST /api/v1/plans` — GET 목록 항목은 `itemCount`(일정 전체 항목 수, 모든 일자·유형 합, 빈 일정 0)를 싣는다. 페이지의 일정 id 로 `plan_item` 을 `in` 절 + `group by` 한 번에 집계하고 항목 없는 일정은 0 이다 (#1242). 일정 브리핑 `itemCount`(하루 단위)와 같은 정의다. POST 는 `sourceAiJobId` 를 실으면 **AI 초안 담기 멱등**이다 (아래 "AI 초안 담기 멱등" 절, #970)
 - `GET|PUT|DELETE /api/v1/plans/{planId}`
 - `POST /api/v1/plans/{planId}/copy` — 지난 일정을 새 DRAFT 로 복제
 - `PUT /api/v1/plans/{planId}/days/{day}/items` — 일자 단위 항목 일괄 편집
