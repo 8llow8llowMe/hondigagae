@@ -67,6 +67,7 @@ public class PlanPresenter {
             .startDate(info.startDate())
             .endDate(info.endDate())
             .status(info.status().toMetadata())
+            .itemCount(info.itemCount())
             .build();
     }
 

@@ -1,6 +1,8 @@
 package com.hondigagae.domainlayer.plan.adapter.out.persistence.repository;
 
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanItemEntity;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlanItemCountQueryResult;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -9,6 +11,11 @@ import org.springframework.data.jpa.repository.Query;
 public interface PlanItemRepository extends JpaRepository<PlanItemEntity, Long> {
 
     List<PlanItemEntity> findByPlanIdOrderByDayAscSequenceAsc(Long planId);
+
+    /** 일정별 항목 수. 항목이 없는 일정은 행이 나오지 않는다. */
+    @Query("select new com.hondigagae.domainlayer.plan.application.port.out.query.PlanItemCountQueryResult(item.planId, count(item)) "
+        + "from PlanItemEntity item where item.planId in :planIds group by item.planId")
+    List<PlanItemCountQueryResult> countByPlanIds(Collection<Long> planIds);
 
     /**
      * 벌크 DML 로 <b>즉시</b> 지운다. 파생 delete 는 {@code em.remove} 큐잉이라 flush 때

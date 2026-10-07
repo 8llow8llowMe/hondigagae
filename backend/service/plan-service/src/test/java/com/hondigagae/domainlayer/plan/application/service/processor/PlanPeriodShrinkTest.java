@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.plan.application.service.processor;
 
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlanItemCountQueryResult;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -230,6 +231,11 @@ class PlanPeriodShrinkTest {
 
     /** 항목 조회 횟수를 센다 — 기간을 건드리지 않은 수정이 헛된 쿼리를 하지 않는지 본다. */
     private static class StubPlanItemRepositoryPort implements PlanItemRepositoryPort {
+
+        @Override
+        public List<PlanItemCountQueryResult> countByPlanIds(Collection<Long> planIds) {
+            throw new UnsupportedOperationException();
+        }
 
         private final List<PlanItem> items;
         private int lookups;

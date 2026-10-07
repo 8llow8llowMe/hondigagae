@@ -4,6 +4,8 @@ import com.hondigagae.domainlayer.plan.adapter.out.persistence.repository.PlanIt
 import com.hondigagae.domainlayer.plan.application.mapper.PlanMapper;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPort;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlanItemCountQueryResult;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -40,5 +42,13 @@ public class PlanItemRepositoryAdapter implements PlanItemRepositoryPort {
     @Override
     public void deleteByPlanIdAndDay(long planId, int day) {
         planItemRepository.deleteByPlanIdAndDay(planId, day);
+    }
+
+    @Override
+    public List<PlanItemCountQueryResult> countByPlanIds(Collection<Long> planIds) {
+        if (planIds.isEmpty()) {
+            return List.of();
+        }
+        return planItemRepository.countByPlanIds(planIds);
     }
 }

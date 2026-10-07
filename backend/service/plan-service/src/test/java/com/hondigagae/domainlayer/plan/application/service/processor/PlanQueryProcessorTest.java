@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.plan.application.service.processor;
 
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlanItemCountQueryResult;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.plan.application.exception.PlanErrorCode;
@@ -393,6 +394,25 @@ class PlanQueryProcessorTest {
         assertThat(summaries.get(1).petIds()).containsExactly(7L);
     }
 
+    @Test
+    @DisplayName("목록은 페이지의 항목 수를 한 번에 집계하고, 일정마다 자기 수를 읽는다 — 항목이 없으면 0 이고 남의 항목은 섞이지 않는다")
+    void listCountsItemsInOneQuery() {
+        Plan filled = plan().toBuilder().id(901L).build();
+        Plan empty = plan().toBuilder().id(902L).build();
+        Plan single = plan().toBuilder().id(903L).build();
+        planRepositoryPort.plans = List.of(filled, empty, single);
+        planItemRepositoryPort.counts = List.of(
+            new PlanItemCountQueryResult(901L, 8L),   // 여러 일자 합계로 집계된 값
+            new PlanItemCountQueryResult(903L, 1L),
+            new PlanItemCountQueryResult(999L, 5L));  // 페이지 밖 일정
+
+        List<PlanSummaryInfo> summaries = processor.getMyPlans(1L, null, null, 10).getContent();
+
+        assertThat(planItemRepositoryPort.countCalls).isEqualTo(1);
+        assertThat(summaries).extracting(PlanSummaryInfo::planId).containsExactly(901L, 902L, 903L);
+        assertThat(summaries).extracting(PlanSummaryInfo::itemCount).containsExactly(8, 0, 1);
+    }
+
     private static PlanPet planPet(long id, long planId, long petId) {
         return PlanPet.builder().id(id).planId(planId).petId(petId).build();
     }
@@ -437,6 +457,16 @@ class PlanQueryProcessorTest {
     }
 
     private static class StubPlanItemRepositoryPort implements PlanItemRepositoryPort {
+
+        /** 항목이 하나도 없는 일정은 집계 행이 없다 — 실제 group by 와 같다. */
+        private List<PlanItemCountQueryResult> counts = List.of();
+        private int countCalls;
+
+        @Override
+        public List<PlanItemCountQueryResult> countByPlanIds(Collection<Long> planIds) {
+            countCalls += 1;
+            return counts.stream().filter(count -> planIds.contains(count.planId())).toList();
+        }
 
         private List<PlanItem> items = List.of();
 

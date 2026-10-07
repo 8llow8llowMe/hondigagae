@@ -1,5 +1,7 @@
 package com.hondigagae.domainlayer.plan.application.service.processor;
 
+import java.util.Collection;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlanItemCountQueryResult;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo;
@@ -607,6 +609,11 @@ class PlanWeatherProcessorTest {
     }
 
     private static class StubPlanItemRepositoryPort implements PlanItemRepositoryPort {
+
+        @Override
+        public List<PlanItemCountQueryResult> countByPlanIds(Collection<Long> planIds) {
+            throw new UnsupportedOperationException();
+        }
 
         private List<PlanItem> items = List.of(PlanItem.builder()
             .id(1000L).planId(PLAN_ID).day(1).sequence(0)
