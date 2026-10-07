@@ -395,6 +395,14 @@ class AiPlanPromptFactoryTest {
         assertThat(factory.systemPrompt()).contains("숙소는 그 요청을 대신하지 않습니다");
     }
 
+    @Test
+    @DisplayName("후보 줄에 없는 지형 · 시설을 이름만 보고 짐작하지 말라고 적는다 (#1172)")
+    void forbidsGuessingFeaturesFromPlaceNames() {
+        assertThat(factory.systemPrompt())
+            .contains("후보 줄에 없는 지형 · 시설(동굴, 수영장, 정상,")
+            .contains("장소 이름만 보고 짐작해 적지 않습니다");
+    }
+
     private AiPlanGenerationQuery query(List<PetCondition> petConditions) {
         return AiPlanGenerationQuery.builder()
             .areaCode("39")
