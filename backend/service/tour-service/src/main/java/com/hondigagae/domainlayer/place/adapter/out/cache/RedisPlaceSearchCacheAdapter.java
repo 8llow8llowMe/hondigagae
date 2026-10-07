@@ -33,7 +33,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class RedisPlaceSearchCacheAdapter implements PlaceSearchCachePort {
 
-    private static final String LIST_KEY_FORMAT = "%s:tour:place:list:v2:%s";
+    /**
+     * v3 (#1202) — 목록에 기준 좌표가 생겨 키 의미가 바뀌었고(같은 조건이라도 좌표가 다르면 순서가 다르다), 저장 봉투의
+     * {@code PlaceSummaryInfo} 에 {@code distanceMeters} 가 더해졌다. v2 항목과 섞이지 않게 네임스페이스를 올린다.
+     * 주변 검색(v2)은 키 의미가 그대로이고, 옛 항목은 {@code distanceMeters} 없이도 읽혀(null) 올리지 않는다.
+     */
+    private static final String LIST_KEY_FORMAT = "%s:tour:place:list:v3:%s";
     private static final String NEARBY_KEY_FORMAT = "%s:tour:place:nearby:v2:%s";
 
     private final StringRedisTemplate stringRedisTemplate;
@@ -114,6 +119,8 @@ public class RedisPlaceSearchCacheAdapter implements PlaceSearchCachePort {
             part(criteria.petWeightKg()),
             part(criteria.sourceCategory()),
             part(criteria.keyword()),
+            part(criteria.lat()),
+            part(criteria.lng()),
             part(criteria.lastPlaceId()),
             String.valueOf(criteria.size()));
         return LIST_KEY_FORMAT.formatted(redisProperties.normalizedKeyPrefix(), sha256(canonical));

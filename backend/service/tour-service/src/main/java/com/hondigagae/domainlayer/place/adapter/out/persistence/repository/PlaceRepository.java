@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.place.adapter.out.persistence.repository;
 
 import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.PlaceEntity;
 import com.hondigagae.domainlayer.place.adapter.out.persistence.repository.custom.PlaceCustomRepository;
+import com.hondigagae.domainlayer.place.application.port.out.query.PlaceCoordinateQueryResult;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -45,4 +46,19 @@ public interface PlaceRepository extends JpaRepository<PlaceEntity, Long>, Place
           and p.delistedAt is null
         """)
     List<PlaceEntity> findVisiblePlaces(Collection<Long> placeIds);
+
+    /**
+     * 거리순 목록의 커서 좌표 (#1202). 조건이 고정된 단건 projection 이라 정적 JPQL 로 둔다.
+     *
+     * <p><b>노출 여부를 보지 않는다.</b> 직전 페이지의 마지막 장소가 그사이 병합·delisted 되어도 좌표 행은 남아 있어
+     * 그 좌표로 거리 키를 되살리면 다음 페이지가 이어진다. 좌표가 없거나 장소가 없으면 빈 값이다.
+     */
+    @Query("""
+        select new com.hondigagae.domainlayer.place.application.port.out.query.PlaceCoordinateQueryResult(p.id, p.lat, p.lng)
+        from PlaceEntity p
+        where p.id = :placeId
+          and p.lat is not null
+          and p.lng is not null
+        """)
+    Optional<PlaceCoordinateQueryResult> findCoordinateById(long placeId);
 }

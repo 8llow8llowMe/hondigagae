@@ -9,6 +9,7 @@ import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.out.PlaceRepositoryPort;
 import com.hondigagae.domainlayer.place.application.port.out.PlaceSearchCachePort;
+import com.hondigagae.domainlayer.place.application.port.out.query.PlaceCoordinateQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceImageQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceIntroQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlacePetInfoQueryResult;
@@ -61,6 +62,16 @@ class PlaceQueryProcessorSitemapTest {
 
             @Override
             public List<Place> findNearby(NearbyPlaceCriteria criteria) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<PlaceCoordinateQueryResult> findCoordinates(PlaceSearchCriteria criteria) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Optional<PlaceCoordinateQueryResult> findCoordinateById(long placeId) {
                 throw new UnsupportedOperationException();
             }
 

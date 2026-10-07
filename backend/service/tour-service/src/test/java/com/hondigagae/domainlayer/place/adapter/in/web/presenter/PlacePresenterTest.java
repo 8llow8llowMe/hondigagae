@@ -2,10 +2,20 @@ package com.hondigagae.domainlayer.place.adapter.in.web.presenter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.NearbyPlaceItem;
+import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceItem;
+import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.NearbyPlaceResponse;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.PlaceDetailResponse;
+import com.hondigagae.domainlayer.place.application.info.NearbyPlaceInfo;
+import com.hondigagae.domainlayer.place.application.info.NearbyPlacesInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceDetailInfo;
+import com.hondigagae.domainlayer.place.application.info.PlaceSummariesInfo;
+import com.hondigagae.domainlayer.place.application.info.PlaceSummaryInfo;
+import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
+import com.hondigagae.domainlayer.place.domain.enums.ContentType;
 import com.hondigagae.domainlayer.place.domain.enums.PlaceSource;
 import com.hondigagae.domainlayer.place.domain.model.Place;
+import com.hondigagae.persistence.dto.SliceResponse;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import java.math.BigDecimal;
 import java.util.List;
@@ -99,5 +109,44 @@ class PlacePresenterTest {
         PlaceDetailResponse response = detailOf(culturePortalPlace().sourceCategory(null));
 
         assertThat(response.sourceCategory()).isNull();
+    }
+
+    @Test
+    @DisplayName("거리순 목록이면 항목에 distanceMeters 가 실린다 (#1202)")
+    void distanceListCarriesDistanceMeters() {
+        SliceResponse<PlaceItem> response = presenter.toSliceResponse(
+            new PlaceSummariesInfo(List.of(summary().distanceMeters(820).build()), true));
+
+        assertThat(response.contents()).extracting(PlaceItem::distanceMeters).containsExactly(820);
+        assertThat(response.hasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("좌표 없는 목록이면 distanceMeters 는 null 이다 — 0 으로 접지 않는다 (#1202)")
+    void idOrderListKeepsDistanceNull() {
+        SliceResponse<PlaceItem> response = presenter.toSliceResponse(
+            new PlaceSummariesInfo(List.of(summary().build()), false));
+
+        assertThat(response.contents()).extracting(PlaceItem::distanceMeters).containsOnlyNulls();
+    }
+
+    @Test
+    @DisplayName("주변 검색의 안쪽 place 에는 distanceMeters 가 없다 — 거리는 바깥 항목이 말한다 (#1202)")
+    void nearbyInnerPlaceHasNoDistance() {
+        NearbyPlaceResponse response = presenter.toNearbyResponse(
+            new NearbyPlacesInfo(List.of(NearbyPlaceInfo.builder().place(summary().build()).distanceMeters(450).build()), 1),
+            NearbyPlaceCriteria.builder().lat(33.25).lng(126.41).radius(5_000).size(15).build());
+
+        NearbyPlaceItem item = response.places().get(0);
+        assertThat(item.distanceMeters()).isEqualTo(450);
+        assertThat(item.place().distanceMeters()).isNull();
+    }
+
+    private static PlaceSummaryInfo.PlaceSummaryInfoBuilder summary() {
+        return PlaceSummaryInfo.builder()
+            .placeId(126_434L)
+            .contentType(ContentType.RESTAURANT)
+            .title("중문 식당")
+            .petAllowanceType(PetAllowanceType.ALLOWED);
     }
 }

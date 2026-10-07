@@ -17,13 +17,18 @@ import com.hondigagae.domainlayer.place.application.model.PlaceKeyword;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.out.PlaceRepositoryPort;
 import com.hondigagae.domainlayer.place.application.port.out.PlaceSearchCachePort;
+import com.hondigagae.domainlayer.place.application.port.out.query.PlaceCoordinateQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSliceQueryResult;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
 import com.hondigagae.domainlayer.place.domain.model.Place;
 import com.hondigagae.domainlayer.place.domain.model.PlaceOpenState;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -34,6 +39,11 @@ public class PlaceQueryProcessor {
     private final PlaceRepositoryPort placeRepositoryPort;
     private final PlaceSearchCachePort placeSearchCachePort;
 
+    /**
+     * 장소 목록. 기준 좌표가 있으면 거리순, 없으면 {@code placeId} 오름차순이다 (#1202).
+     *
+     * <p>키워드 캐시는 두 목록이 같이 탄다 — 캐시 키에 기준 좌표가 들어가므로 둘이 한 키를 나눠 쓰지 않는다.
+     */
     public PlaceSummariesInfo getPlaces(PlaceSearchCriteria criteria) {
         PlaceSearchCriteria query = criteria.toBuilder()
             .keyword(PlaceKeyword.normalizeForSearch(criteria.keyword()).orElse(null))
@@ -44,15 +54,84 @@ public class PlaceQueryProcessor {
                 return cached.get();
             }
         }
-        PlaceSliceQueryResult queryResult = placeRepositoryPort.findPlaces(query);
-        List<PlaceSummaryInfo> summaries = queryResult.places().stream()
-            .map(this::toSummaryInfo)
-            .toList();
-        PlaceSummariesInfo info = new PlaceSummariesInfo(summaries, queryResult.hasNext());
+        PlaceSummariesInfo info = query.hasOrigin() ? findPlacesByDistance(query) : findPlacesById(query);
         if (query.keyword() != null) {
             placeSearchCachePort.putList(query, info);
         }
         return info;
+    }
+
+    /**
+     * 좌표 없는 목록 — {@code placeId} 오름차순 커서. ai-service 의 후보 조회가 좌표 없이 이 경로를 타므로
+     * 쿼리·순서를 바꾸지 않는다. 항목의 {@code distanceMeters} 는 null 이다.
+     */
+    private PlaceSummariesInfo findPlacesById(PlaceSearchCriteria query) {
+        PlaceSliceQueryResult queryResult = placeRepositoryPort.findPlaces(query);
+        List<PlaceSummaryInfo> summaries = queryResult.places().stream()
+            .map(this::toSummaryInfo)
+            .toList();
+        return new PlaceSummariesInfo(summaries, queryResult.hasNext());
+    }
+
+    /**
+     * 거리순 목록 (#1202). 정렬 키는 <b>(반올림 거리 m, placeId) 오름차순</b>이고 응답 {@code distanceMeters} 가 그 거리다 —
+     * 주변 검색과 같은 계산·같은 동률 규칙이라 두 화면의 거리와 순서가 어긋나지 않는다.
+     *
+     * <ol>
+     *   <li>필터에 맞는 후보의 아이디·좌표를 <b>전량</b> 받아 거리를 잰다. 반경 제한은 없다.</li>
+     *   <li>커서가 있으면 그 장소의 좌표로 커서 키를 되살리고 키가 그보다 큰 것만 남긴다. 커서가 {@code lastPlaceId}
+     *       하나여도 (거리, id) 가 전순서라 동률이 많아도 페이지 사이에 중복·누락이 없다.</li>
+     *   <li>{@code size + 1} 개를 골라 hasNext 를 판정하고, 고른 아이디로 엔티티를 읽어 <b>고른 순서대로 다시 세운다</b> —
+     *       IN 조회는 순서를 보장하지 않는다.</li>
+     * </ol>
+     *
+     * <p>제주 2,300여 곳이라 페이지마다 후보 좌표 전량을 메모리에서 정렬해도 싸다. 전국으로 넓히면 공간 인덱스나
+     * DB 정렬로 옮겨야 하는 지점이 여기다 (주변 검색의 같은 주석과 같은 판단).
+     */
+    private PlaceSummariesInfo findPlacesByDistance(PlaceSearchCriteria query) {
+        DistanceRank cursor = query.lastPlaceId() == null ? null : cursorRank(query);
+        List<DistanceRank> ranked = placeRepositoryPort.findCoordinates(query).stream()
+            .map(row -> new DistanceRank(row.placeId(), distanceMeters(query.lat(), query.lng(), row.lat(), row.lng())))
+            .filter(rank -> cursor == null || DistanceRank.ORDER.compare(rank, cursor) > 0)
+            .sorted(DistanceRank.ORDER)
+            .limit(query.size() + 1L)
+            .toList();
+        boolean hasNext = ranked.size() > query.size();
+        List<DistanceRank> page = hasNext ? ranked.subList(0, query.size()) : ranked;
+
+        // 페이지 한 장을 IN 한 번으로 읽는다(N+1 아님). 후보를 고른 뒤 읽기 전에 숨겨진 장소는 조용히 빠진다 —
+        // 다음 페이지 커서는 응답 마지막 항목이라 이어지는 데 문제가 없다.
+        Map<Long, Place> placesById = placeRepositoryPort.findVisiblePlaces(page.stream().map(DistanceRank::placeId).toList())
+            .stream()
+            .collect(Collectors.toMap(Place::id, Function.identity()));
+        List<PlaceSummaryInfo> summaries = page.stream()
+            .filter(rank -> placesById.containsKey(rank.placeId()))
+            .map(rank -> toSummaryInfo(placesById.get(rank.placeId()), rank.distanceMeters()))
+            .toList();
+        return new PlaceSummariesInfo(summaries, hasNext);
+    }
+
+    /**
+     * 커서 장소의 거리 키. 좌표는 노출 여부와 무관하게 읽는다 — 직전 페이지의 마지막 장소가 그사이 숨겨져도 이어진다.
+     * 장소가 없거나 좌표가 없으면 이어 갈 기준이 없어 400 이다.
+     */
+    private DistanceRank cursorRank(PlaceSearchCriteria query) {
+        PlaceCoordinateQueryResult cursor = placeRepositoryPort.findCoordinateById(query.lastPlaceId())
+            .orElseThrow(() -> new PlaceException(PlaceErrorCode.DISTANCE_CURSOR_INVALID));
+        return new DistanceRank(cursor.placeId(), distanceMeters(query.lat(), query.lng(), cursor.lat(), cursor.lng()));
+    }
+
+    /** 응답에 싣는 거리이자 정렬 키. 목록 거리순과 주변 검색이 이 한곳에서 같은 반올림을 쓴다. */
+    private static int distanceMeters(double fromLat, double fromLng, BigDecimal toLat, BigDecimal toLng) {
+        return (int) Math.round(GeoDistance.meters(fromLat, fromLng, toLat.doubleValue(), toLng.doubleValue()));
+    }
+
+    /** 거리순 정렬·커서 비교 키. 정렬과 커서가 같은 비교자를 써야 페이지 경계에서 어긋나지 않는다. */
+    private record DistanceRank(long placeId, int distanceMeters) {
+
+        // 거리(m 반올림)는 동률이 흔하다 — 아이디로 순서를 고정해야 커서 하나로 다음 페이지가 정해진다.
+        private static final Comparator<DistanceRank> ORDER =
+            Comparator.comparingInt(DistanceRank::distanceMeters).thenComparingLong(DistanceRank::placeId);
     }
 
     /**
@@ -93,11 +172,10 @@ public class PlaceQueryProcessor {
     }
 
     private NearbyPlaceInfo toNearbyInfo(Place place, NearbyPlaceCriteria criteria) {
-        double distance = GeoDistance.meters(
-            criteria.lat(), criteria.lng(), place.lat().doubleValue(), place.lng().doubleValue());
+        // 안쪽 place 에는 거리를 싣지 않는다 — 주변 검색의 거리는 바깥 항목이 말한다.
         return NearbyPlaceInfo.builder()
             .place(toSummaryInfo(place))
-            .distanceMeters((int) Math.round(distance))
+            .distanceMeters(distanceMeters(criteria.lat(), criteria.lng(), place.lat(), place.lng()))
             .build();
     }
 
@@ -199,6 +277,11 @@ public class PlaceQueryProcessor {
     }
 
     private PlaceSummaryInfo toSummaryInfo(Place place) {
+        return toSummaryInfo(place, null);
+    }
+
+    /** @param distanceMeters 거리순 목록에서만 값이 있다. 그 밖에는 null */
+    private PlaceSummaryInfo toSummaryInfo(Place place, Integer distanceMeters) {
         return PlaceSummaryInfo.builder()
             .placeId(place.id())
             .contentType(ContentType.fromCode(place.contentTypeId()))
@@ -216,6 +299,7 @@ public class PlaceQueryProcessor {
             .indoor(place.indoor())
             .sourceCategory(place.sourceCategory())
             .source(place.source())
+            .distanceMeters(distanceMeters)
             .build();
     }
 }
