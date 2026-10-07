@@ -410,3 +410,69 @@ export function EyeOffIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/**
+ * 공유 — 지도 미리보기 행동 줄 (#1233). 세 점을 잇는 갈래 — 화살표(`↗`)는 "새 창으로 열기" 와
+ * 겹쳐 읽혀 쓰지 않는다.
+ */
+export function ShareIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="17.5" cy="5.5" r="2.5" />
+      <circle cx="6.5" cy="12" r="2.5" />
+      <circle cx="17.5" cy="18.5" r="2.5" />
+      <path d="M8.7 10.7l6.6-3.9M8.7 13.3l6.6 3.9" />
+    </Svg>
+  )
+}
+
+/** 주차 — 둥근 사각 안의 P. 이용 정보 아이콘 행 (#1233) */
+export function ParkingIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="3" />
+      <path d="M10 16.5v-9h3a2.75 2.75 0 0 1 0 5.5h-3" />
+    </Svg>
+  )
+}
+
+/**
+ * 발자국 — 반려견 동반 칩 · 지금 산책 줄 (#1233). **과하게 귀엽게 가지 않는다** (§9) — 볼록한
+ * 패드와 발가락 넷, 선 그대로다.
+ */
+export function PawIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 12.5c-2.6 0-5 2.6-5 4.8 0 1.4 1 2.2 2.3 2.2.9 0 1.6-.5 2.7-.5s1.8.5 2.7.5c1.3 0 2.3-.8 2.3-2.2 0-2.2-2.4-4.8-5-4.8z" />
+      <ellipse cx="5.5" cy="10" rx="1.6" ry="2" />
+      <ellipse cx="9.2" cy="6" rx="1.6" ry="2.1" />
+      <ellipse cx="14.8" cy="6" rx="1.6" ry="2.1" />
+      <ellipse cx="18.5" cy="10" rx="1.6" ry="2" />
+    </Svg>
+  )
+}
+
+/**
+ * 주의 — 판정 카드의 주의 쪽 사실 (#1233). 색(`--metric-mid-700`)만으로 톤을 말하지 않으려고
+ * 모양을 하나 더 준다. 사실 줄 앞의 아이콘이 이것으로 바뀐다.
+ */
+export function CautionIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M10.3 4.5 3.2 17a2 2 0 0 0 1.7 3h14.2a2 2 0 0 0 1.7-3L13.7 4.5a2 2 0 0 0-3.4 0z" />
+      <path d="M12 9.5v4" />
+      <path d="M12 16.75h.01" />
+    </Svg>
+  )
+}
+
+/** 사람 둘 — 판정 카드의 붐빔 줄 (#1233) */
+export function CrowdIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19.5a5.5 5.5 0 0 1 11 0" />
+      <path d="M15.5 5.3a3 3 0 0 1 0 5.4M17.5 14.4a5.5 5.5 0 0 1 3 5.1" />
+    </Svg>
+  )
+}

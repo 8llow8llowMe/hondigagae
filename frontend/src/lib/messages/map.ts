@@ -130,6 +130,46 @@ export const mapMessages = {
   /** 목록에 없는 id 로 들어왔는데 상세도 못 받았을 때 */
   previewLoadFailed: '장소 정보를 불러오지 못했어요',
 
+  // ── 미리보기 재설계 (#1233) ─────────────────────────────────────────────
+
+  /** 행동 줄(4칸)의 접근 이름 */
+  previewActionsLabel: '장소 행동',
+  previewCall: '전화',
+  previewSave: '저장',
+  previewSaved: '저장됨',
+  previewShare: '공유',
+  /** 비활성 칸의 이유 — 보이는 것은 흐린 칸뿐이라 스크린리더에만 말한다 */
+  previewDirectionsUnavailable: '위치 정보가 없어 길찾기를 할 수 없어요',
+  previewCallUnavailable: '전화번호가 없어요',
+  previewSaveBlocked: '더 이상 확인되지 않는 장소라 저장할 수 없어요',
+  /** 공유 시트가 없는 기기(데스크톱 대부분)는 링크를 복사한다 */
+  previewShareCopied: '링크를 복사했어요',
+  previewShareFailed: '링크를 복사하지 못했어요',
+  /**
+   * 오늘 판정 카드 머리 — `{pet}` 은 조사까지 붙은 이름이다(`몽과` · `몽실이와`,
+   * `withCompanionParticle`). 반려견이 없으면 `previewVerdictHeadNoPet`.
+   */
+  previewVerdictHead: '오늘 {pet}',
+  previewVerdictHeadNoPet: '오늘 이 장소',
+  previewPetPrompt: '반려견을 등록하면 크기 · 민감도까지 반영해요',
+  /** 근거 사실 — 날씨 줄. 하늘 상태는 아이콘(+ sr 낱말)이 말한다 (DESIGN.md §9-1) */
+  previewFactMaxTemp: '최고 {temp}℃',
+  previewFactRain: '비 {percent}%',
+  /** 근거 사실 — 산책 줄. `{value}` 는 상세 요약과 같은 `{grade} · 체감 {feelsLike}℃` */
+  previewFactWalk: '지금 산책 {value}',
+  previewFactSaferWindow: '{start}~{end} 이 더 좋아요',
+  previewFactCongestion: '{grade} · 집중률 {rate}%',
+  /** 주의 쪽 사실의 스크린리더 앞말 — 톤을 색만으로 말하지 않는다 (명세 D5) */
+  previewFactCaution: '주의',
+  previewUseInfo: '이용 정보',
+  previewRestDate: '휴무 {value}',
+  previewAddressCopy: '복사',
+  previewAddressCopyLabel: '주소 복사',
+  previewAddressCopied: '주소를 복사했어요',
+  previewAddressCopyFailed: '주소를 복사하지 못했어요',
+  previewMore: '더보기',
+  previewLess: '접기',
+
   // ── 동선 (#743) ────────────────────────────────────────────────────────
 
   /**
