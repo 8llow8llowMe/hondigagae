@@ -2,7 +2,6 @@ import { Badge } from '@/components/badge'
 import { directionsUrl } from '@/lib/geo/map-link'
 import { messages } from '@/lib/messages'
 import { hoursHeadline } from '@/lib/place/hours'
-import { cn } from '@/lib/utils/cn'
 
 /**
  * 방문 핵심 줄 — 운영 · 전화 · 길찾기 (#1226).
@@ -28,7 +27,6 @@ export function PlaceVisitKeyLine({
   tel,
   lat,
   lng,
-  className,
 }: {
   name: string
   open24: boolean | null
@@ -37,7 +35,6 @@ export function PlaceVisitKeyLine({
   tel: string | null
   lat: number | null
   lng: number | null
-  className?: string
 }) {
   const hours = hoursHeadline(useTime)
   const href = directionsUrl({ name, lat, lng })
@@ -58,22 +55,26 @@ export function PlaceVisitKeyLine({
           : openNow
             ? messages.place.detailOpenNow
             : messages.place.detailOpenClosed
-  /* 24시간이면 원문도 같은 말이라 배지 하나로 끝낸다 */
-  const showHours = hours !== null && open24 !== true
+  /*
+    **`24시간` 이어도 원문을 함께 둔다** — 판정값은 원문이 있을 때만 서므로 원문 칸 하나가 둘을 품는다. `10:00~24:00` 인데 `open24: true` 로 오는 모순이 실제로
+    온다(D5-5 청사약국). `openNow` 를 버려도 되는 근거가 "원문이 바로 아래 있어 확인할 수 있다" 인데,
+    여기서 원문을 숨기면 그 근거가 이 줄에서 사라진다. 운영시간 행도 배지와 원문을 함께 보인다.
+  */
 
-  if (status === null && !showHours && tel === null && href === null) return null
+  if (hours === null && tel === null && href === null) return null
 
   return (
     // 세로 간격을 두지 않는다 — 칸마다 터치 높이 44 가 이미 줄 사이를 벌린다
-    <div className={cn('text-body-2 text-fg flex flex-wrap items-center gap-x-4', className)}>
-      {(status !== null || showHours) && (
+    <div className="text-body-2 text-fg flex flex-wrap items-center gap-x-4">
+      {hours !== null && (
         <span className="inline-flex min-h-11 min-w-0 items-center gap-2">
           {status !== null && (
-            <Badge tone="neutral" className={openNow === true ? 'font-semibold' : ''}>
+            // 영업 중만 무게를 준다 — `24시간` · `영업 시간 아님` 은 그대로다 (운영시간 행과 같다)
+            <Badge tone="neutral" strong={status === messages.place.detailOpenNow}>
               {status}
             </Badge>
           )}
-          {showHours && <span className="min-w-0 break-keep">{hours}</span>}
+          <span className="min-w-0 break-keep">{hours}</span>
         </span>
       )}
 

@@ -44,12 +44,18 @@ describe('PlaceVisitKeyLine — 운영 · 전화 · 길찾기 한 줄', () => {
     expect(render({ openNow: false })).toContain(messages.place.detailOpenClosed)
   })
 
-  it('24시간이면 openNow 와 원문을 말하지 않는다', () => {
+  /* `10:00~24:00` 인데 `open24: true` 인 모순이 실제로 온다 — 원문이 남아야 사용자가 확인한다 (D5-5) */
+  it('24시간이면 openNow 를 말하지 않고, 원문은 남긴다', () => {
     const html = render({ open24: true, openNow: false, useTime: '10:00~24:00' })
 
     expect(html).toContain(messages.place.detailOpen24)
     expect(html).not.toContain(messages.place.detailOpenClosed)
-    expect(html).not.toContain('10:00~24:00')
+    expect(html).toContain('10:00~24:00')
+  })
+
+  it('영업 중만 굵다 — 24시간 배지는 openNow 가 true 여도 무게를 주지 않는다', () => {
+    expect(render({ openNow: true })).toContain('font-semibold')
+    expect(render({ open24: true, openNow: true })).not.toMatch(/font-semibold[^"]*">24시간/)
   })
 
   it('값이 없는 칸은 빠진다 — 좌표가 없으면 길찾기도 없다', () => {
