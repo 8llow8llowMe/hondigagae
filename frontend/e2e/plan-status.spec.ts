@@ -184,6 +184,78 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
   })
 
   /*
+    **실패해도 포커스를 놓지 않는다** (#1203 · 명세 D22-4). 성공 쪽(#1174)만 고쳐져 있던 동안
+    전폭 버튼의 실패는 포커스가 `BODY` 에 떨어진 채 `role="alert"` 로 읽히기만 했다 — 요청 중
+    버튼이 `disabled` 라 브라우저가 포커스를 놓고, 버튼이 살아나도 돌려주지 않는다.
+
+    **상태 전이 `PUT` 만 막는다.** 상세 조회 등 나머지는 그대로 실서버로 간다 — 503 봉투는
+    `pet-form-failure.spec.ts` 와 같다. 문구가 아니라 `data-form-alert` 로 집는다: 503 에서 무슨
+    문장이 서는지는 `apiErrorToFormErrors` 의 일이고, 여기서 지키는 것은 낭독 경로다.
+  */
+  test('상태 전이가 실패하면 버튼에서 온 실패는 알림으로 포커스가, 메뉴에서 온 실패는 ⋯ 에 남는다', async ({
+    page,
+  }) => {
+    await page.goto('/plans')
+    const planId = await createDraftPlan(page)
+    const statusApi = `**/api/bff/plans/${planId}`
+
+    async function failStatusChanges() {
+      await page.route(statusApi, (route) =>
+        route.request().method() === 'PUT'
+          ? route.fulfill({
+              status: 503,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                dataHeader: {
+                  success: false,
+                  resultCode: 'COMMON_503',
+                  resultMessage: '서비스를 일시적으로 사용할 수 없습니다.',
+                },
+                dataBody: null,
+              }),
+            })
+          : route.fallback(),
+      )
+    }
+
+    await page.goto(`/plans/${planId}`)
+
+    const confirmAction = page.getByRole('button', { name: '일정 확정하기' })
+    const manageMenu = page.getByRole('button', { name: '일정 관리' })
+    const failureAlert = page.locator('[data-form-alert]')
+
+    // ── 전폭 버튼의 실패 — 알림으로 포커스 ─────────────────────────────────
+    await failStatusChanges()
+    await confirmAction.click()
+
+    /*
+      **포커스가 알림에 내려앉고 역할은 없다** (form-guide.md §8 · #1102). 둘 다 두면 알림이
+      나타나며 한 번, 포커스가 옮겨 오며 한 번 — 같은 문구를 두 번 읽는다.
+    */
+    await expect(failureAlert).toBeFocused()
+    await expect(failureAlert).not.toHaveAttribute('role')
+    // 버튼은 살아 있다 — 알림 바로 위라 Shift+Tab 한 번이 다시 시도다
+    await expect(confirmAction).toBeEnabled()
+    await page.keyboard.press('Shift+Tab')
+    await expect(confirmAction).toBeFocused()
+
+    // ── 다시 시도해 성공하면 실패는 걷히고 결과가 포커스를 받는다 ─────────────
+    await page.unroute(statusApi)
+    await confirmAction.click()
+
+    await expect(page.getByText('일정을 확정했어요. 이제 링크로 공유할 수 있어요.')).toBeFocused()
+    await expect(failureAlert).toHaveCount(0)
+
+    // ── 메뉴의 실패 — 포커스는 ⋯ 에 두고 알림으로 읽힌다(지금 동작 유지) ─────
+    await failStatusChanges()
+    await manageMenu.click()
+    await page.getByRole('menuitem', { name: '초안으로 되돌리기' }).click()
+
+    await expect(failureAlert).toHaveAttribute('role', 'alert')
+    await expect(manageMenu).toBeFocused()
+  })
+
+  /*
     **동행 반려견 수정** (#622 · 명세 D13-9).
 
     `PlanEditModal` 은 `useQueryClient` 를 써서 `renderToStaticMarkup` 으로 렌더되지 않고

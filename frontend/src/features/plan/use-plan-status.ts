@@ -13,6 +13,7 @@ import {
   changesPetConditionSource,
   type PlanStatusActionKind,
   type PlanStatusActionSpec,
+  type PlanStatusFailure,
   type PlanStatusResult,
   planStatusResultAnnounce,
 } from '@/lib/plan/status-action'
@@ -43,11 +44,16 @@ const ACTION_ERRORS: Record<PlanStatusActionKind, string> = {
  * **성공도 화면이 말한다** (#1174). `result` 는 마지막으로 성공한 전이다 — 개요 아래 액션 자리가
  * 결과 한 줄(확정이면 `공유 링크` 까지)을 그린다. 다음 전이를 시작하면 걷는다: 진행 중에 직전
  * 결과가 남아 있으면 "확정했어요" 아래에서 되돌리기가 돌고, 실패하면 성공과 실패가 나란히 선다.
+ *
+ * **실패도 읽히는 길을 함께 든다** (#1203). `failure` 는 문구와 `announce` 한 쌍이다 — 성공과 같은
+ * 판정(`planStatusResultAnnounce`)으로, 전폭 버튼에서 왔으면 알림으로 포커스를 옮기고 메뉴에서
+ * 왔으면 `⋯` 에 둔 채 `role="alert"` 다. 패널의 포커스 effect 가 이 객체의 동일성에 걸려 있어
+ * 같은 실패를 다시 겪어도(재시도 실패) 새 객체라 포커스가 다시 온다.
  */
 export function usePlanStatus(planId: string) {
   const queryClient = useQueryClient()
   const [saving, setSaving] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [failure, setFailure] = useState<PlanStatusFailure | null>(null)
   const [result, setResult] = useState<PlanStatusResult | null>(null)
   // disabled 반영 전 빠른 연속 클릭을 막는다 (form-guide.md §6)
   const savingRef = useRef(false)
@@ -56,7 +62,7 @@ export function usePlanStatus(planId: string) {
     if (savingRef.current) return
     savingRef.current = true
     setSaving(true)
-    setErrorMessage(null)
+    setFailure(null)
     setResult(null)
 
     void updatePlan(planId, { status: action.nextStatus })
@@ -89,7 +95,14 @@ export function usePlanStatus(planId: string) {
         }
       })
       .catch((error: unknown) => {
-        setErrorMessage(apiErrorToFormErrors(error, ACTION_ERRORS[action.kind]).form)
+        const fallback = ACTION_ERRORS[action.kind]
+        // 필드 오류로 온 400 은 `form` 이 비지만 이 화면엔 그릴 필드가 없다 — 무음 실패 대신 기본 문구
+        const message = apiErrorToFormErrors(error, fallback).form ?? fallback
+        // 성공과 같은 시점 · 같은 판정이다 — 버튼이 살아나기(`finally`) 전의 포커스를 본다
+        setFailure({
+          message,
+          announce: planStatusResultAnnounce(document.activeElement, document.body),
+        })
       })
       .finally(() => {
         savingRef.current = false
@@ -97,5 +110,5 @@ export function usePlanStatus(planId: string) {
       })
   }
 
-  return { run, saving, errorMessage, result }
+  return { run, saving, failure, result }
 }
