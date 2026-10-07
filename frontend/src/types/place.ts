@@ -1,4 +1,4 @@
-import type { EnumMetadata } from '@/types/api'
+import type { CodeNameMetadata, EnumMetadata } from '@/types/api'
 import type { PetSizeCode } from '@/types/pet'
 
 /**
@@ -242,6 +242,25 @@ export type PetAllowanceCode = (typeof PET_ALLOWANCE_CODES)[number]
 export type NearbyPlaceItem = {
   place: PlaceSummary
   distanceMeters: number
+}
+
+/**
+ * 사이트맵용 장소 항목 (`GET /api/v1/places/sitemap`, #1135 · #1210).
+ * 근거: backend `PlaceSitemapItem` (tour-service).
+ *
+ * **`modifiedAt` 은 오프셋 없는 KST `LocalDateTime` 이다** (`2026-08-27T14:30:05`). 적재 시각이 아니라
+ * 원천이 준 수정일이고, 원천에 없으면(식약처 원천 등) `null` 이다.
+ */
+export type PlaceSitemapItem = {
+  placeId: string
+  petAllowanceType: CodeNameMetadata
+  modifiedAt: string | null
+}
+
+/** 노출 가능한 장소 **전량** — 페이지가 없다. 병합 · delisted 는 서버가 이미 뺐다 */
+export type PlaceSitemapResult = {
+  places: PlaceSitemapItem[]
+  totalCount: number
 }
 
 export type NearbyPlaceResult = {
