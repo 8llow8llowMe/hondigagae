@@ -202,6 +202,14 @@ describe('PlaceMapPreviewBody — 로딩 표시 (#1230)', () => {
 })
 
 describe('PlaceMapPreviewBody — 상세로 가는 길은 정보 맨 아래다 (#1230)', () => {
+  it('링크 이름에 장소명이 들어간다 — 로터에서 무엇의 상세인지 들린다', () => {
+    expect(render()).toMatch(
+      new RegExp(
+        `<span class="sr-only">${placeSummary.title} </span>${messages.map.previewDetail}`,
+      ),
+    )
+  })
+
   it('닫기 옆(머리 줄)에 없고, 이용 안내 뒤 · 하단 바 앞에 선다', () => {
     const html = render()
     const link = html.indexOf(messages.map.previewDetail)

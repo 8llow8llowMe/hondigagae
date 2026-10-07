@@ -1,4 +1,4 @@
-import type { Ref } from 'react'
+import { type Ref, useId } from 'react'
 
 import { ButtonLink } from '@/components/button'
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from '@/components/icons'
@@ -13,7 +13,7 @@ import { verdictSummaryLines } from '@/features/place/place-verdict-summary-line
 import { PlaceVisitKeyLine } from '@/features/place/place-visit-key-line'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
-import { galleryImages } from '@/lib/place/gallery'
+import { galleryImages, galleryImagesLeadingFirst } from '@/lib/place/gallery'
 import { hoursHeadline } from '@/lib/place/hours'
 import { placeMetaLine } from '@/lib/place/meta'
 import { toPlainText } from '@/lib/place/text'
@@ -85,13 +85,14 @@ export function PlaceMapPreviewBody({
   const level = suitability.data?.suitabilityLevel ?? null
   const inset = variant === 'sheet' ? 'px-4' : 'px-5'
   /*
-    **사진은 상세와 같은 목록이다** (#1230, `galleryImages`). dev 50곳 중 36곳이 2장 이상(최대 29장)
-    인데 대표 한 장만 보였다. 상세 응답 전에는 목록 행의 대표 사진 한 장으로 먼저 선다 — 같은 URL 이
-    첫 장이라 응답이 와도 첫 장이 바뀌지 않는다.
+    **사진은 상세의 이미지 목록이다** (#1230). dev 50곳 중 36곳이 2장 이상(최대 29장)인데 대표 한 장만
+    보였다. 상세 응답 전에는 목록 행의 대표 사진 한 장으로 먼저 서고, 응답이 오면 **대표를 첫 장으로
+    둔 채** 목록을 잇는다(`galleryImagesLeadingFirst`) — 응답의 목록에는 대표가 없어서, 그냥 바꾸면
+    방금 본 사진이 다른 사진으로 바뀌었다(리뷰 실측).
   */
   const images =
     place !== null
-      ? galleryImages(place.images, place.firstImage, place.cpyrhtDivCd)
+      ? galleryImagesLeadingFirst(place.images, place.firstImage, place.cpyrhtDivCd)
       : galleryImages([], summary?.firstImage ?? null, null)
 
   /*
@@ -120,7 +121,7 @@ export function PlaceMapPreviewBody({
         {failed ? (
           <div className={cn('flex flex-col gap-4 py-6', inset)}>
             <p className="text-body-2 text-fg-muted">{messages.map.previewLoadFailed}</p>
-            <DetailLink placeId={placeId} />
+            <DetailLink placeId={placeId} title={title} />
           </div>
         ) : title === null ? (
           <PreviewSkeleton />
@@ -194,7 +195,7 @@ export function PlaceMapPreviewBody({
             {place !== null && <PreviewUseGuide place={place} className={inset} />}
 
             <div className={inset}>
-              <DetailLink placeId={placeId} />
+              <DetailLink placeId={placeId} title={title} />
             </div>
           </div>
         )}
@@ -261,7 +262,7 @@ function PreviewTopBar({
  * 닫기 옆이면 닫으려다 상세로 가고, 하단 바 셋째 칸이면 390 에서 담기가 좁아진다. 요약을 다 읽고
  * "더 보고 싶다" 는 순간에 손이 가는 자리가 여기다. 주요 행동(담기)과 겨루지 않게 보조(secondary)다.
  */
-function DetailLink({ placeId }: { placeId: string }) {
+function DetailLink({ placeId, title }: { placeId: string; title: string | null }) {
   return (
     <ButtonLink
       href={`/places/${placeId}`}
@@ -270,6 +271,11 @@ function DetailLink({ placeId }: { placeId: string }) {
       trailing={<ChevronRightIcon size={16} aria-hidden />}
       className="w-full"
     >
+      {/*
+        링크 목록(로터)에서 무엇의 상세인지 들리게 장소명을 앞에 붙인다 — 보이는 문구가 이름에 그대로
+        들어가므로 2.5.3(보이는 라벨 포함)도 지킨다. `ButtonLink` 는 글자 버튼에 `aria-label` 을 받지 않는다.
+      */}
+      {title !== null && <span className="sr-only">{title} </span>}
       {messages.map.previewDetail}
     </ButtonLink>
   )
@@ -287,8 +293,8 @@ function DetailLink({ placeId }: { placeId: string }) {
  * (`place-detail-view.tsx` — 기준이 되는 반려견이 없다). 등급은 이름 옆 배지가 말한다.
  *
  * **묻는 중에는 라벨을 두고 값 자리에 골격을 둔다** (#1230). 무엇을 기다리는지가 먼저 보여야 한다.
- * 상자는 흰 바탕 + 테두리다 — 예전에는 `--band` 채움이라 같은 `--band` 인 골격이 묻혀 **빈칸으로
- * 보였다**(사용자 지적). `aria-busy` 로 보조기기에도 묻는 중임을 알린다.
+ * 묶음은 **위아래 1px 구분선**이다(L2 구분선, DESIGN.md §0 — 아이템에 테두리를 두르지 않는다). 예전에는
+ * `--band` 채움이라 같은 `--band` 인 골격이 묻혀 **빈칸으로 보였다**(사용자 지적). `aria-busy` 로 보조기기에도 묻는 중임을 알린다.
  */
 function PreviewVerdicts({
   place,
@@ -333,7 +339,7 @@ function PreviewVerdicts({
   const busy = lines.some((line) => line.value === null)
 
   return (
-    <dl aria-busy={busy} className="border-border rounded-md border px-4 py-1">
+    <dl aria-busy={busy} className="border-border border-y">
       {lines.map((line) => (
         <div key={line.label} className="border-border flex gap-3 border-b py-3 last:border-b-0">
           {/* 라벨 열 72 — 줄마다 같은 폭이라 값의 세로선이 맞는다 */}
@@ -368,6 +374,11 @@ function PreviewVerdicts({
  * 원문은 TourAPI 문자열이라 태그를 걷고(`toPlainText`) 줄바꿈을 살린다.
  */
 function PreviewUseGuide({ place, className }: { place: PlaceDetail; className: string }) {
+  /*
+    `useId` 다 — 패널(데스크톱)과 시트(모바일)가 **동시에 마운트**되므로(CSS 로만 갈린다) 장소 id 로
+    만들면 같은 id 가 문서에 두 번 선다(aria-labelledby 충돌, 리뷰 지적).
+  */
+  const headingId = useId()
   const intro = place.intro
   const address =
     place.addr1 === null
@@ -393,11 +404,8 @@ function PreviewUseGuide({ place, className }: { place: PlaceDetail; className: 
   if (rows.length === 0) return null
 
   return (
-    <section aria-labelledby={`preview-use-guide-${place.placeId}`} className={className}>
-      <h3
-        id={`preview-use-guide-${place.placeId}`}
-        className="text-body-1 text-fg mb-2 font-semibold"
-      >
+    <section aria-labelledby={headingId} className={className}>
+      <h3 id={headingId} className="text-body-1 text-fg mb-2 font-semibold">
         {messages.place.detailSectionIntro}
       </h3>
       <dl className="flex flex-col gap-2">

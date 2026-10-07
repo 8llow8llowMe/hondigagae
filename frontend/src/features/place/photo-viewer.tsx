@@ -5,6 +5,7 @@ import Image from 'next/image'
 
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from '@/components/icons'
 import { messages } from '@/lib/messages'
+import { toBody } from '@/lib/ui/body-portal'
 import { useOverlay } from '@/lib/ui/overlay'
 
 /** 뷰어가 그리는 한 장. `src` 판정은 `PhotoGallery` 가 이미 끝냈다 */
@@ -92,7 +93,7 @@ export function PhotoViewer({
 
   const titleId = `${base}-title`
 
-  return (
+  return toBody(
     <div className="fixed inset-0 z-50">
       {/*
         배경 덮개. Esc 와 바깥 클릭이 닫기를 맡으므로 a11y 트리에서 뺀다 — `Modal` 과 같은
@@ -188,7 +189,7 @@ export function PhotoViewer({
           </div>
         )}
       </div>
-    </div>
+    </div>,
   )
 }
 
