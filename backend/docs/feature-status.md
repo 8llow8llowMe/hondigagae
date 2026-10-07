@@ -52,7 +52,7 @@
 | GET | `/api/v1/places/{placeId}/congestions` | 기간 혼잡도(기본 7일, 최대 30일). 데이터 없는 날짜도 UNKNOWN 으로 남긴다 |
 | GET | `/api/v1/insights/regional-weather` | 제주 권역(5곳) 날씨 비교 + 나가기 좋은 권역 추천 |
 | GET | `/api/v1/insights/walk-times` | 좌표 기준 오늘 산책 안전 곡선 + 골든타임 |
-| GET | `/api/v1/places/{placeId}/suitability` | 날씨+동반조건+혼잡도 적합도. 단기+중기 합쳐 약 11일. `score` 가 null 이면 판단 근거 없음 |
+| GET | `/api/v1/places/{placeId}/suitability` | 날씨+동반조건+혼잡도 적합도. 단기+중기 합쳐 약 11일. `score` 가 null 이면 판단 근거 없음. `headline` 서술형 결론 한 문장 — 동반 불가 > 기상특보 > 크기 제한 > 동반 미확인이 먼저, 없으면 등급 문구, "오늘" 은 기준 일자가 오늘일 때만, 결정적 사실 없이 `INSUFFICIENT` 면 null. 산책 위험도에는 두지 않는다 (#1234) |
 | GET | `/api/v1/places/{placeId}/walk-safety` | 추정 노면온도·열지수 기반 산책 위험도 + 안전 시간대 |
 
 ### plan-service
