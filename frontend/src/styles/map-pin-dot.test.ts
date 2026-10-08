@@ -64,4 +64,16 @@ describe('원 핀 CSS (#1280)', () => {
     expect(block('.map-pin-dot.map-pin-static')).toContain('cursor: default')
     expect(block('.map-pin-dot.map-pin-static::before')).toContain('content: none')
   })
+
+  /*
+    기준점 이름표(`yAnchor 0` — 윗변이 좌표)는 같은 좌표의 원 핀보다 아래 층이다(`MAP_LAYER_Z.focus`).
+    원이 좌표 중심에 서므로 가장 큰 원(고른 원 34 → 반지름 17)의 아랫변보다 4 아래에서 시작해야
+    원에 덮이지 않는다. 이름 알약(반높이 ≈ 13.5)도 그 안이다.
+  */
+  it('기준점 이름표는 가장 큰 원 아래(반지름 17 + 4)에 선다', () => {
+    const rule = block('.map-pin-focus')
+
+    expect(rule).toContain('transform: translateY(calc(17px + 4px))')
+    expect(rule).not.toContain('translateY(6px)')
+  })
 })
