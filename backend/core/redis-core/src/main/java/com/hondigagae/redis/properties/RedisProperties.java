@@ -1,6 +1,7 @@
 package com.hondigagae.redis.properties;
 
 import com.hondigagae.redis.properties.enums.RedisMode;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -22,11 +23,35 @@ public record RedisProperties(
      * 문자열 하나로 받으면 노드 수와 무관하게 한 값만 관리한다.
      */
     String sentinelNodes,
-    String keyPrefix
+    String keyPrefix,
+    /**
+     * Redis 명령 하나를 기다리는 상한 ({@code infra.redis.command-timeout}, 예: {@code 1s}). 선택값이다 (#1253).
+     *
+     * <p>비우면 Lettuce 기본을 그대로 쓴다 — 동기 호출은 60초, 리액티브·비동기 명령은 상한이 없다.
+     * Redis 가 연결을 거부하면 바로 실패하지만 <b>먹통(패킷 드롭 · 응답 없음)이면 그만큼 기다린다.</b>
+     * 실패를 빨리 봐야 하는 곳(게이트웨이의 레이트 리밋 fail-open · 블랙리스트 판정)만 짧게 적는다.
+     */
+    Duration commandTimeout,
+    /**
+     * TCP 연결을 맺는 상한 ({@code infra.redis.connect-timeout}, 예: {@code 2s}). 선택값이다 (#1253).
+     *
+     * <p>비우면 Lettuce 기본(10초). 공유 연결을 처음 맺을 때 이 시간만큼 호출 스레드가 묶인다.
+     */
+    Duration connectTimeout
 ) {
 
     private static final String DEFAULT_KEY_PREFIX = "hondigagae";
     private static final int DEFAULT_SENTINEL_PORT = 26379;
+
+    /**
+     * 명령·연결 타임아웃 중 하나라도 적었는지.
+     *
+     * <p>둘 다 비었으면 연결 팩토리를 예전과 똑같이(클라이언트 설정 없이) 만든다 — 값을 적지 않은 서비스는
+     * 이 설정이 생기기 전과 다르지 않게 동작해야 한다.
+     */
+    public boolean hasClientTimeouts() {
+        return commandTimeout != null || connectTimeout != null;
+    }
 
     public String normalizedKeyPrefix() {
         if (keyPrefix == null || keyPrefix.isBlank()) {

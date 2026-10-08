@@ -111,6 +111,12 @@ infra:
     port: 6379
     password:
     key-prefix: ${REDIS_KEY_PREFIX:hondigagae:local}
+    # Redis 가 먹통(패킷 드롭 · 응답 없음)일 때 빨리 실패하게 짧게 둔다 (#1253). 비우면 Lettuce 기본이다 —
+    # 명령은 동기 60초 · 리액티브 무제한, 연결 10초. 그러면 레이트 리밋의 fail-open 이 일어나지 않고, 블랙리스트 판정이
+    # 요청마다 60초를 기다린다. 블랙리스트 확인(EXISTS) · 레이트 리밋(Lua 스크립트) 모두 짧은 명령이라 1초면 넉넉하다.
+    # 세 프로파일 같은 값 — GatewayRedisTimeoutConfigTest.
+    command-timeout: 1s
+    connect-timeout: 2s
 
 # SpringDoc (Swagger) Aggregation
 springdoc:

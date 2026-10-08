@@ -19,6 +19,7 @@ import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 /**
  * 공유 링크 공개 라우트 전용 레이트 리밋. 거부를 <b>공통 응답 봉투</b>({@code GATEWAY_001}, 429)로 낸다 (#1244).
@@ -104,9 +105,17 @@ public class SharedPlanRateLimitGatewayFilterFactory
      *
      * <p>{@code onErrorResume} 을 체인 앞에서 끊는다. 뒤에 두면 업스트림(plan-service) 오류까지 "판정 실패" 로 삼켜
      * 체인을 한 번 더 태운다.
+     *
+     * <p><b>판정은 {@code boundedElastic} 에서 구독한다 (#1253).</b> {@code RedisRateLimiter} 는 구독될 때 Redis 공유
+     * 리액티브 연결을 얻는데, {@code LettuceConnectionFactory} 는 동기·리액티브 공유 연결을 <b>팩토리 락 하나</b> 아래에서
+     * 처음 맺는다(동기 connect). Redis 가 처음부터 먹통인 채 기동하면 블랙리스트 확인({@code boundedElastic})들이 그 락을
+     * 잡고 연결 타임아웃씩 줄을 서는데, 여기서 이벤트 루프가 구독하면 <b>이벤트 루프가 같은 락을 기다려</b> 그 루프의
+     * 다른 요청까지 멈춘다. 구독 스레드만 옮기므로 판정 결과 · fail-open · 체인 1회 · 오류 처리는 그대로다 — 응답은
+     * Lettuce 의 I/O 스레드에서 오고, 체인은 종전처럼 판정이 끝난 스레드에서 이어진다.
      */
     private Mono<Optional<RateLimiter.Response>> decide(String routeId, String key) {
         return Mono.defer(() -> rateLimiter.isAllowed(routeId, key))
+            .subscribeOn(Schedulers.boundedElastic())
             .map(Optional::of)
             .onErrorResume(error -> {
                 log.warn("[SharedPlanRateLimitGatewayFilterFactory] 판정 실패, 통과시킨다: routeId={} key={} error={}",

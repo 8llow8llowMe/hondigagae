@@ -151,6 +151,6 @@ class SharedPlanTokenKeyResolverTest {
     }
 
     private static RedisProperties redisProperties(String keyPrefix) {
-        return new RedisProperties(null, null, null, null, null, null, null, keyPrefix);
+        return new RedisProperties(null, null, null, null, null, null, null, keyPrefix, null, null);
     }
 }
