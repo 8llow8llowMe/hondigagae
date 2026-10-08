@@ -185,6 +185,13 @@ gh pr create --base develop \
 [#223](https://github.com/8llow8llowMe/hondigagae/pull/223) 이 그랬다.
 assignee 가 비어 있으면 "누가 들고 있는 작업인지" 를 PR 목록에서 알 수 없다.
 
+**연달아 머지해도 앞 PR 의 라벨이 산다** ([#1269](https://github.com/8llow8llowMe/hondigagae/issues/1269)).
+머지 빌드는 **이전 성공 빌드 이후 그 잡의 범위(자기 경로 · 공용 코드 · 자기 파이프라인 파일)에 닿은
+커밋마다** 그 브랜치로 머지된 PR 을 찾아 라벨을 합친다. 전에는 HEAD 커밋의 PR 하나만 봐서, 두 PR 을
+몇 초 사이에 머지하면 대기 빌드가 하나로 합쳐져 앞 PR 의 서비스가 배포되지 않았다 — #1258 · #1262
+(ai-service) 가 바로 뒤 #1259 · #1263 의 라벨만 읽혀 그랬다. 그래도 빠진 커밋은 해당 잡을
+`FORCE_DEPLOY` 로 한 번 돌려 올린다.
+
 #### 라벨은 자동으로도 붙는다 — 그래도 확인은 한다
 
 `.github/workflows/label.yml` 이 **경로를 보고 라벨을 붙인다** (매핑은
