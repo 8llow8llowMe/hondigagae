@@ -58,4 +58,10 @@ describe('원 핀 CSS (#1280)', () => {
   it('포커스 링이 원 핀에도 선다', () => {
     expect(css).toMatch(/\.map-pin-dot:focus-visible/)
   })
+
+  /* #789 — 못 누르는 핀에 손 모양 · 보이지 않는 44 상자를 남기지 않는다 */
+  it('누를 수 없는 원 핀은 손 모양도 44 누르는 자리도 없다', () => {
+    expect(block('.map-pin-dot.map-pin-static')).toContain('cursor: default')
+    expect(block('.map-pin-dot.map-pin-static::before')).toContain('content: none')
+  })
 })
