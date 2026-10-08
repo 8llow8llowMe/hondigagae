@@ -714,3 +714,135 @@ SELECT COUNT(*) FROM place WHERE source = 'CULTURE_PORTAL' AND overview IS NOT N
 ```
 
 > 장소 상세 API 로 보면 캐시 때문에 잠시 옛 값이 올 수 있다 — §8 과 같이 **확인은 SQL 로 한다.**
+
+## 12. 잘못 병합된 쌍을 풀 때 — 코스 · 숙박 엇갈림 (#1282)
+
+#1282 로 병합에 종류 가드를 넣었다. 관광 API 의 코스 행(`[제주올레 18코스] …`)과는 합치지 않고, 숙박은 숙박하고만
+합친다(`place-data-integration.md` §4). 이 가드가 생기기 전에 합쳐진 쌍은 그대로 남는다. 한 번 병합된 행은 다시 후보가
+되지 않기 때문이다(§8 · §9 와 같은 이유). dev(2026-10-08)에서는 기존 병합 101쌍 중 셋이 여기 걸렸다.
+
+| 흡수된 문화정보원 행 | 붙은 관광 API 행 | 풀린 뒤 `placeMergeJob` 이 붙이는 곳 |
+|---|---|---|
+| `김만덕기념관`(박물관) | `[제주올레 18코스] 김만덕기념관-조천 올레`(28) | `김만덕기념관`(14), 1m — 이름 완전일치 행이 있었는데 조회 순서의 첫 행(코스)에 붙었다 |
+| `에코랜드`(박물관 분류의 테마파크) | `에코랜드 호텔`(32) | `에코랜드테마파크`(12), 0m |
+| `제주양떼목장펜션`(펜션) | `제주양떼목장`(12) | 붙지 않는다 — 펜션이 따로 남는다 |
+
+잘못 붙은 survivor 는 흡수 행의 값을 빈 칸에 받아 들고 있다(`MERGE_FIELDS_SQL`). 예를 들어 올레 코스가 기념관의
+실내 여부 · 개요 · 분류(`박물관`)를 들고 있다. 그래서 병합 표시만 풀면 안 되고, 그 값도 걷어 낸다.
+
+### 절차
+
+**코드를 먼저 배포한다.** 옛 코드가 도는 동안 풀면 다음 `placeMergeJob`(매주 월 03:00)이 같은 쌍을 다시 합친다.
+
+**1) · 2) 는 한 연결(세션)에서 이어 실행한다.** `TEMPORARY TABLE` 과 트랜잭션은 세션 범위다. 문장마다 연결을 새로 여는
+도구(문장별 `mysql -e` 등)로 돌리면 `wrong_merge` 가 사라지고 트랜잭션도 끊긴다.
+
+대상 판별은 `PlaceIdentityPolicy.isMergeableKind` 를 SQL 로 옮긴 것이다. 아래 셋 중 하나에 걸리면 대상이다.
+
+- 코스 행에 붙었다 — 이름이 `[` 로 시작하거나 여행코스(25)
+- 한쪽만 숙박(32)인데, 숙박이 아닌 쪽이 레포츠(28)도 아니다
+
+```sql
+-- 1) 대상을 센다 (읽기 전용)
+SELECT a.id AS absorbed_id, a.title AS absorbed_title, a.content_type_id AS absorbed_type,
+       s.id AS survivor_id, s.title AS survivor_title, s.content_type_id AS survivor_type
+  FROM place a
+  JOIN place s ON s.id = a.merged_into_id
+ WHERE a.source = 'CULTURE_PORTAL'
+   AND s.source = 'TOUR_API'
+   AND (TRIM(s.title) LIKE '[%'
+        OR COALESCE(s.content_type_id, '') = '25'
+        OR ((COALESCE(a.content_type_id, '') = '32') <> (COALESCE(s.content_type_id, '') = '32')
+            AND COALESCE(a.content_type_id, '') <> '28' AND COALESCE(s.content_type_id, '') <> '28'));
+```
+
+```sql
+-- 2) 푼다 — 한 트랜잭션으로
+START TRANSACTION;
+
+CREATE TEMPORARY TABLE wrong_merge AS
+SELECT a.id AS absorbed_id, s.id AS survivor_id, a.tel AS absorbed_tel
+  FROM place a
+  JOIN place s ON s.id = a.merged_into_id
+ WHERE a.source = 'CULTURE_PORTAL'
+   AND s.source = 'TOUR_API'
+   AND (TRIM(s.title) LIKE '[%'
+        OR COALESCE(s.content_type_id, '') = '25'
+        OR ((COALESCE(a.content_type_id, '') = '32') <> (COALESCE(s.content_type_id, '') = '32')
+            AND COALESCE(a.content_type_id, '') <> '28' AND COALESCE(s.content_type_id, '') <> '28'));
+
+-- 2-1) survivor 에서 병합만 채우는 칸을 비운다
+UPDATE place s
+  JOIN (SELECT DISTINCT survivor_id FROM wrong_merge) w ON w.survivor_id = s.id
+   SET s.indoor = NULL, s.outdoor = NULL, s.pet_restriction = NULL, s.pet_extra_fee = NULL,
+       s.source_category = NULL, s.homepage = NULL, s.overview = NULL, s.pet_only = FALSE,
+       s.updated_at = NOW();
+
+-- 2-2) 전화는 흡수 행에서 온 것만 비운다 — 관광 API 가 주는 번호는 다음 placeImportJob 이 다시 채운다
+UPDATE place s
+  JOIN wrong_merge w ON w.survivor_id = s.id
+   SET s.tel = NULL, s.updated_at = NOW()
+ WHERE s.tel = w.absorbed_tel;
+
+-- 2-3) 흡수 표시를 푼다
+UPDATE place a
+  JOIN wrong_merge w ON w.absorbed_id = a.id
+   SET a.merged_into_id = NULL, a.updated_at = NOW();
+
+-- 2-4 전에) 올바른 흡수 행이 둘 이상 남은 survivor 를 센다 (읽기 전용) — 0행이어야 아래 2-4 를 그대로 돌린다.
+--   MySQL 다중 테이블 UPDATE 는 대상 행을 한 번만 갱신해, 흡수 행이 둘이면 한 행의 값만 옮긴다.
+--   행이 나오면 2-4 의 마지막 JOIN 에 `AND a.id = <흡수 행 id>` 를 붙여 흡수 행마다 따로 돌린다 (dev 2026-10-08 은 0행)
+SELECT s.id, COUNT(*) AS remaining
+  FROM place s
+  JOIN (SELECT DISTINCT survivor_id FROM wrong_merge) w ON w.survivor_id = s.id
+  JOIN place a ON a.merged_into_id = s.id
+ GROUP BY s.id
+HAVING COUNT(*) > 1;
+
+-- 2-4) survivor 에 남은(올바른) 흡수 행이 있으면 그 값을 다시 옮긴다 — MERGE_FIELDS_SQL 과 같은 컬럼 · 규칙
+UPDATE place s
+  JOIN (SELECT DISTINCT survivor_id FROM wrong_merge) w ON w.survivor_id = s.id
+  JOIN place a ON a.merged_into_id = s.id
+   SET s.indoor = COALESCE(s.indoor, a.indoor),
+       s.outdoor = COALESCE(s.outdoor, a.outdoor),
+       s.pet_restriction = COALESCE(s.pet_restriction, a.pet_restriction),
+       s.pet_extra_fee = COALESCE(s.pet_extra_fee, a.pet_extra_fee),
+       s.source_category = COALESCE(s.source_category, a.source_category),
+       s.homepage = COALESCE(s.homepage, a.homepage),
+       s.tel = COALESCE(s.tel, a.tel),
+       s.overview = COALESCE(s.overview, a.overview),
+       s.pet_only = (s.pet_only OR a.pet_only),
+       s.updated_at = NOW();
+
+DROP TEMPORARY TABLE wrong_merge;
+COMMIT;
+```
+
+3) `placeMergeJob` 을 한 번 돌린다. 풀린 행과 공통 부분 일치로 새로 잡히는 쌍이 병합된다. 같은 잡의 동반 가능 여부 재계산
+스텝(#886)이 survivor 의 `pet_available` · `pet_allowance_type` · `allowed_pet_size` 도 다시 계산한다.
+
+```
+--spring.batch.job.name=placeMergeJob areaCode=39 runAt=<ISO 시각>
+```
+
+- **2-1 에서 통째로 비워도 되는 근거** — 관광 API 적재(`JdbcPlaceBulkAdapter.UPSERT_SQL`)는 이 칸들을 쓰지 않는다.
+  `pet_only` 는 넣을 때 `false` 로 넣고 바꾸지 않는다. 그래서 관광 API 행의 이 칸 값은 전부 병합이 옮긴 것이다.
+  2-4 가 올바른 흡수 행의 값은 다시 채운다. 관광 API 가 이 칸을 수집하게 되면 이 절차는 그대로 쓸 수 없다.
+- `tel` 은 관광 API 가 소유한다(`COALESCE(VALUES(tel), tel)`, §9). 흡수 행 번호와 같은 것만 비운다. 관광 API 자신의
+  번호가 우연히 같았다면 다음 `placeImportJob` 이 다시 채운다.
+- AI 일정 후보 풀이 바뀐다(풀린 행이 다시 보이고 새 병합 쌍이 하나로 줄어든다). dev 실측 중인 작업이 있으면 실행 시각을 알린다.
+- prod 는 §8 과 같이 **런북으로 사람이 적용**한다. dev 에서 1)~4) 를 돌려 건수를 확인한 뒤 옮긴다.
+
+### 확인
+
+```sql
+-- 4-1) 1) 을 다시 돌리면 0행이어야 한다
+
+-- 4-2) 병합된 문화정보원 행 수 — dev 2026-10-08 기준 예상 110
+--      = 기존 101 − 풀린 3 + 공통 부분 일치 10곳 + 풀린 행의 재병합 2곳(김만덕기념관 · 에코랜드)
+SELECT COUNT(*) FROM place WHERE source = 'CULTURE_PORTAL' AND merged_into_id IS NOT NULL;
+
+-- 4-3) 코스 행에 옮겨 붙은 분류가 남아 있지 않다 — 0 이어야 한다
+SELECT COUNT(*) FROM place
+ WHERE source = 'TOUR_API' AND (TRIM(title) LIKE '[%' OR content_type_id = '25') AND source_category IS NOT NULL;
+```
