@@ -46,11 +46,11 @@ public class SharedPlanWebController {
             + "410 을 받으면 링크를 만든 사람에게 새 링크를 요청하세요.\n\n"
             + "**필수: token (경로).**\n\n"
             + "호출 예\n"
-            + "- `GET /api/v1/shared-plans/b3RoZXJfdG9rZW5fZXhhbXBsZV92YWx1ZV8wMTIzNDU2Nzg`")
+            + "- `GET /api/v1/shared-plans/aG9uZGlnYWdhZS1zaGFyZWQtcGxhbi1leGFtcGxlISE`")
     @GetMapping("/{token}")
     public ResponseEntity<Response<SharedPlanResponse>> getSharedPlan(
         @Parameter(description = "[필수] 공유 토큰 (URL-safe Base64 43자). 발급 응답의 token 을 그대로 씁니다", required = true,
-            example = "b3RoZXJfdG9rZW5fZXhhbXBsZV92YWx1ZV8wMTIzNDU2Nzg") @PathVariable String token
+            example = "aG9uZGlnYWdhZS1zaGFyZWQtcGxhbi1leGFtcGxlISE") @PathVariable String token
     ) {
         SharedPlanResponse response = planShareLinkWebUseCase.getSharedPlan(token);
         return ResponseEntity.ok().body(Response.success(response));

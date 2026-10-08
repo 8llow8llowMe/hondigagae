@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.time.Period;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -43,6 +44,16 @@ public class PlanShareLinkProcessor {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final Base64.Encoder TOKEN_ENCODER = Base64.getUrlEncoder().withoutPadding();
+
+    /**
+     * 발급하는 토큰의 형식 — {@link #TOKEN_BYTES} 바이트를 {@link #TOKEN_ENCODER}(URL-safe Base64, 패딩 없음)로 옮긴
+     * 글자 수와 알파벳이다. 32바이트면 {@code ceil(32 × 4 / 3)} = 43자, 글자는 {@code A-Z a-z 0-9 - _} 뿐이다.
+     *
+     * <p>api-gateway 의 {@code SharedPlanTokenKeyResolver} 가 <b>같은 정규식</b>으로 레이트 리밋 키를 가른다 (#1244).
+     * 한쪽만 바꾸면 게이트웨이가 정상 토큰을 형식 위반 버킷 하나로 몰아 공유 화면 전체가 같은 한도를 나눠 쓴다.
+     */
+    private static final Pattern TOKEN_FORMAT =
+        Pattern.compile("[A-Za-z0-9_-]{" + (TOKEN_BYTES * 4 + 2) / 3 + "}");
 
     private final PlanShareLinkRepositoryPort planShareLinkRepositoryPort;
     private final PlanRepositoryPort planRepositoryPort;
@@ -111,9 +122,18 @@ public class PlanShareLinkProcessor {
      * <p>없음·폐기·일정 삭제·비공유 상태는 전부 {@code PLAN_023} 404 로 <b>같게</b> 답한다.
      * 구분해서 알려 주면 토큰을 찍어 보는 쪽에 "이 토큰은 존재했다"·"이 일정은 있다" 를 흘린다.
      * 만료만 {@code PLAN_024} 410 으로 가른다 — 받은 사람이 "새 링크를 달라" 고 말할 수 있어야 한다.
+     *
+     * <p><b>발급할 수 없는 모양의 토큰은 DB 를 보지 않고 같은 {@code PLAN_023} 404 다</b> (#1244). 토큰 컬럼의
+     * {@code utf8mb4_bin} 은 PAD SPACE 콜레이션이라 {@code WHERE token = 'T '} 가 {@code T} 행에 맞는다. 형식을 보지
+     * 않으면 뒤에 공백만 덧붙인 표기가 같은 일정을 열고, 게이트웨이는 그 표기마다 다른 레이트 리밋 버킷을 준다 —
+     * 공백 N개가 버킷 N개가 되어 링크당 한도가 무너진다. 없는 토큰과 응답을 가르지 않는 것은 위 규칙 그대로다.
      */
     @Transactional(readOnly = true)
     public Plan resolveSharedPlan(String token) {
+        if (!isWellFormedToken(token)) {
+            throw new PlanException(PlanErrorCode.SHARE_LINK_NOT_FOUND);
+        }
+
         PlanShareLink link = planShareLinkRepositoryPort.findByToken(token)
             .orElseThrow(() -> new PlanException(PlanErrorCode.SHARE_LINK_NOT_FOUND));
 
@@ -138,6 +158,14 @@ public class PlanShareLinkProcessor {
         if (!plan.status().isShareable()) {
             throw new PlanException(PlanErrorCode.SHARE_PLAN_NOT_SHAREABLE);
         }
+    }
+
+    /**
+     * 이 서비스가 발급할 수 있는 모양의 토큰인가. {@code matcher(...).matches()} 라 앞뒤 어디에 다른 글자(공백·개행
+     * 포함)가 붙어도 아니다.
+     */
+    static boolean isWellFormedToken(String token) {
+        return token != null && TOKEN_FORMAT.matcher(token).matches();
     }
 
     /** URL-safe Base64 라 경로 세그먼트에 그대로 실린다 — 인코딩 왕복에서 값이 바뀌지 않는다. */

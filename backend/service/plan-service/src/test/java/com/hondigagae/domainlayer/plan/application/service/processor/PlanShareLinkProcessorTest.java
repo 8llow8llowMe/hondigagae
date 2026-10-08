@@ -28,6 +28,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.data.domain.Slice;
 
 /**
@@ -41,10 +42,16 @@ import org.springframework.data.domain.Slice;
  *       달라지면 이 규칙은 검증된 것이 아니다
  *   <li><b>폐기는 멱등</b> — 두 번 눌러도 오류가 아니고, 폐기된 링크는 "만료" 가 아니라 "없음" 이다
  *   <li><b>발급은 멱등</b> — 유효한 링크가 있으면 같은 토큰. 회전은 폐기 후 재발급으로만
- *   <li><b>토큰 형식</b> — URL-safe Base64 43자. 짧아지거나 인코딩이 바뀌면 경로에 그대로 못 싣는다
+ *   <li><b>토큰 형식</b> — URL-safe Base64 43자. 짧아지거나 인코딩이 바뀌면 경로에 그대로 못 싣는다.
+ *       그리고 <b>그 형식이 아닌 토큰은 DB 를 보지 않고 {@code PLAN_023} 404</b> 다 (#1244) — 토큰 컬럼의
+ *       {@code utf8mb4_bin} 은 PAD SPACE 라 {@code "T "} 가 {@code T} 행에 맞는다. 공백만 덧붙인 표기가 같은 일정을
+ *       열면 게이트웨이의 링크당 한도를 표기 수만큼 우회한다
  * </ul>
  */
 class PlanShareLinkProcessorTest {
+
+    /** 형식은 맞지만 한 번도 발급하지 않은 토큰 — 32바이트의 URL-safe Base64(무패딩) 43자. */
+    private static final String UNISSUED_TOKEN = "aG9uZGlnYWdhZS1zaGFyZWQtcGxhbi1leGFtcGxlISE";
 
     private static final long PLAN_ID = 900L;
     private static final long MEMBER_ID = 1L;
@@ -88,6 +95,9 @@ class PlanShareLinkProcessorTest {
         String token = processor.issue(plan(PlanStatus.CONFIRMED)).token();
 
         assertThat(token).hasSize(43).matches("[A-Za-z0-9_-]+");
+        assertThat(PlanShareLinkProcessor.isWellFormedToken(token))
+            .as("발급한 토큰은 공개 조회의 형식 검사를 통과해야 한다 — 생성과 검사가 같은 출처다")
+            .isTrue();
     }
 
     @Test
@@ -154,9 +164,40 @@ class PlanShareLinkProcessorTest {
     }
 
     @Test
-    @DisplayName("모르는 토큰은 PLAN_023 404 다")
+    @DisplayName("형식은 맞지만 모르는 토큰은 DB 를 본 뒤 PLAN_023 404 다")
     void unknownTokenReadsAsNotFound() {
-        assertErrorCode("this-token-was-never-issued", PlanErrorCode.SHARE_LINK_NOT_FOUND);
+        assertErrorCode(UNISSUED_TOKEN, PlanErrorCode.SHARE_LINK_NOT_FOUND);
+
+        assertThat(shareLinkRepositoryPort.findByTokenCalls).as("형식이 맞으면 조회한다").isEqualTo(1);
+    }
+
+    @ParameterizedTest(name = "[{index}] \"{0}\"")
+    @ValueSource(strings = {
+        UNISSUED_TOKEN + " ",
+        UNISSUED_TOKEN + "  ",
+        UNISSUED_TOKEN + "\n",
+        UNISSUED_TOKEN + "x",
+        "aG9uZGlnYWdhZS1zaGFyZWQtcGxhbi1leGFtcGxlIS",
+        "aG9uZGlnYWdhZS1zaGFyZWQtcGxhbi1leGFtcGxlI+E",
+        "aG9uZGlnYWdhZS1zaGFyZWQtcGxhbi1leGFtcGxlI/E",
+        "aG9uZGlnYWdhZS1zaGFyZWQtcGxhbi1leGFtcGxlIS=",
+        UNISSUED_TOKEN + "=",
+        ""
+    })
+    @DisplayName("형식이 아닌 토큰은 DB 를 보지 않고 없는 토큰과 같은 PLAN_023 404 다 — 뒤 공백도 같다 (#1244)")
+    void malformedTokenIsNotFoundWithoutLookup(String token) {
+        assertErrorCode(token, PlanErrorCode.SHARE_LINK_NOT_FOUND);
+
+        assertThat(shareLinkRepositoryPort.findByTokenCalls).as("형식이 아니면 조회하지 않는다").isZero();
+    }
+
+    @Test
+    @DisplayName("발급한 토큰 뒤에 공백을 붙이면 열리지 않는다 — PAD SPACE 콜레이션이 같은 행을 돌려주기 전에 막는다 (#1244)")
+    void issuedTokenWithTrailingSpaceDoesNotOpen() {
+        String token = processor.issue(plan(PlanStatus.CONFIRMED)).token();
+
+        assertErrorCode(token + " ", PlanErrorCode.SHARE_LINK_NOT_FOUND);
+        assertThat(processor.resolveSharedPlan(token).id()).as("원래 토큰은 그대로 열린다").isEqualTo(PLAN_ID);
     }
 
     @Test
@@ -260,15 +301,24 @@ class PlanShareLinkProcessorTest {
 
         private final List<PlanShareLink> saved = new ArrayList<>();
 
+        /** 형식 검사가 DB 앞에 서는지 본다. */
+        private int findByTokenCalls;
+
         @Override
         public PlanShareLink save(PlanShareLink shareLink) {
             saved.add(shareLink);
             return shareLink;
         }
 
+        /**
+         * MySQL {@code utf8mb4_bin}(PAD SPACE) 처럼 <b>뒤 공백을 무시하고</b> 비교한다 — 운영 DB 가 실제로 그렇게
+         * 맞추므로, 형식 검사가 빠지면 {@code "T "} 가 {@code T} 의 일정을 연다는 것을 이 가짜가 재현한다.
+         */
         @Override
         public Optional<PlanShareLink> findByToken(String token) {
-            return saved.stream().filter(link -> link.token().equals(token)).findFirst();
+            findByTokenCalls++;
+            String padSpaceKey = token.replaceAll(" +$", "");
+            return saved.stream().filter(link -> link.token().equals(padSpaceKey)).findFirst();
         }
 
         @Override
