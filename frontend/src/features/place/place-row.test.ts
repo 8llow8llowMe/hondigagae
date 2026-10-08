@@ -84,8 +84,8 @@ describe('PlaceRow — 메타 줄 (아트보드 01·03)', () => {
   it('주소를 읍·면·동까지 줄이고 실내/야외를 붙인다', () => {
     const markup = render()
 
-    // fixture 의 addr1 은 `제주특별자치도 제주시 한림읍 용금로 906-107` 이다
-    expect(markup).toContain('제주시 한림읍 · 실내')
+    // fixture 의 addr1 은 `제주특별자치도 제주시 한림읍 용금로 906-107` 이다. 분류가 맨 앞이다 (#1267)
+    expect(markup).toContain('관광지 · 제주시 한림읍 · 실내')
     expect(markup).not.toContain('용금로')
   })
 
@@ -168,21 +168,23 @@ describe('PlaceRow — nullable 처리', () => {
     expect(markup).toContain(messages.place.rowIndoor)
   })
 
-  it('addr1 · indoor 가 모두 없으면 메타 줄 자체를 렌더하지 않는다', () => {
+  it('addr1 · indoor 가 모두 없어도 분류는 남는다 — 메타 줄은 분류로 시작한다 (#1267)', () => {
     const markup = render({ ...placeSummary, addr1: null, indoor: null })
 
-    expect(markup).not.toContain('tabular-nums')
+    expect(markup).toContain(`>${placeSummary.contentType.name}</p>`)
   })
 
-  it('indoor 가 null 이면 "모름" 을 점선 배지로 드러낸다', () => {
+  /*
+    **목록 행에서 `실내 여부 미확인` 을 뺐다** (#1267). 모르는 정보를 행마다 반복하면 잡음이고,
+    제주 실데이터는 대부분이 이 갈래였다. 메타 줄에서 낱말이 빠지는 것은 그대로고, 점선 배지는
+    상세 · 미리보기에 남는다.
+  */
+  it('indoor 가 null 이면 메타 줄에서 낱말만 빠지고 점선 배지를 붙이지 않는다', () => {
     const markup = render({ ...placeSummary, indoor: null })
 
-    expect(markup).toContain(messages.place.rowIndoorUnknown)
-    expect(markup).toContain('border-dashed')
-  })
-
-  it('indoor 를 아는 장소에는 점선 배지를 붙이지 않는다', () => {
-    expect(render()).not.toContain('border-dashed')
+    expect(markup).not.toContain(messages.place.rowIndoorUnknown)
+    expect(markup).not.toContain('border-dashed')
+    expect(markup).toContain('관광지 · 제주시 한림읍<')
   })
 })
 
@@ -212,15 +214,10 @@ describe('PlaceRow — 좁은 컨테이너에서도 제목이 남는다 (#240)',
     칸 폭이 511/512 로 경계를 스쳐 **같은 목록의 두 칸이 다른 배치**로 그려졌다.
     자세한 근거는 `place-row.tsx` 머리주석이 정본이다.
   */
-  it('부모가 컨테이너를 열고 태그 규칙이 컨테이너 기준이다', () => {
+  it('부모가 컨테이너를 열고 크기 규칙이 컨테이너 기준이다', () => {
     const markup = render()
 
     expect(markup).toContain('@container')
-    // 넓은 컨테이너: 우측 고정 열
-    expect(markup).toContain('@xl:flex')
-    // 좁은 컨테이너: 텍스트 블록 안 + 제목 위로 (order-first)
-    expect(markup).toContain('order-first')
-    expect(markup).toContain('@xl:hidden')
     /*
       뷰포트 기준 규칙이 남아 있으면 같은 결함이 재발한다. `@` 가 붙지 않은 `lg:` 만
       잡아야 하므로 부분문자열로 보지 않는다 — `@lg:hidden` 이 `lg:hidden` 을 포함한다.
@@ -228,13 +225,26 @@ describe('PlaceRow — 좁은 컨테이너에서도 제목이 남는다 (#240)',
     expect(markup).not.toMatch(/[^@]lg:(hidden|flex|size-24)/)
   })
 
-  /** DOM 순서는 제목이 먼저다 — 시각 순서만 `order-first` 로 바꾼다 */
-  it('스크린리더는 제목을 먼저 읽는다 — 배지가 DOM 앞으로 오지 않는다', () => {
+  /*
+    **우측 배지 열을 걷었다** (#1267). 칩이 동반 판정 하나라 176 열을 따로 둘 까닭이 없다 —
+    그 열이 1024 1열 목록에서 제목 폭을 262 로 묶었다. 이제 어느 폭이든 이름 → 칩 → 메타다.
+  */
+  it('배지를 우측 열로 빼지 않는다 — 폭과 상관없이 이름 아래 한 자리다', () => {
     const markup = render()
 
-    expect(markup.indexOf('제주특별자치도립김창열미술관')).toBeLessThan(
-      markup.indexOf('order-first'),
-    )
+    expect(markup).not.toContain('@xl:flex')
+    expect(markup).not.toContain('order-first')
+    expect(markup.split('부분 동반 가능')).toHaveLength(2)
+  })
+
+  it('시각 · DOM 순서가 같다 — 이름 → 동반 칩 → 메타', () => {
+    const markup = render()
+    const title = markup.indexOf('제주특별자치도립김창열미술관')
+    const badge = markup.indexOf('부분 동반 가능')
+    const meta = markup.indexOf('관광지 · 제주시')
+
+    expect(title).toBeLessThan(badge)
+    expect(badge).toBeLessThan(meta)
   })
 })
 
@@ -253,12 +263,11 @@ describe('PlaceRow — 동반 정보 없음 (#530)', () => {
     expect(render(unknown)).not.toContain('정보 없음')
   })
 
-  /* 동반 배지만 빠진다 — 카테고리와 실내 미확인 배지는 그대로다 */
-  it('옆 태그는 함께 사라지지 않는다', () => {
+  /* 동반 배지만 빠진다 — 분류는 메타 줄에 그대로다 */
+  it('분류는 함께 사라지지 않는다', () => {
     const markup = render({ ...unknown, indoor: null })
 
-    expect(markup).toContain(placeSummary.contentType.name)
-    expect(markup).toContain(messages.place.rowIndoorUnknown)
+    expect(markup).toContain(`>${placeSummary.contentType.name} · `)
   })
 
   /*
@@ -338,7 +347,7 @@ describe('PlaceRow — 첫 화면 사진 우선 로드 (#1132)', () => {
   **카페 칩으로 찾은 결과가 `음식점` 배지였다** (#1181). 칩과 같은 판정(음식점 + 원천 분류 `카페`)
   이면 배지도 `카페` 다 — 쓰는 글자는 서버가 준 원천 분류 그대로다.
 */
-describe('PlaceRow — 카페 분류의 유형 배지 (#1181)', () => {
+describe('PlaceRow — 카페 분류의 유형 낱말 (#1181)', () => {
   const restaurant = {
     ...placeSummary,
     contentType: { code: 'RESTAURANT', name: '음식점', description: null },
@@ -347,18 +356,18 @@ describe('PlaceRow — 카페 분류의 유형 배지 (#1181)', () => {
   it('카페 분류인 음식점은 카페라고 쓴다', () => {
     const markup = render({ ...restaurant, sourceCategory: '카페' })
 
-    expect(markup).toContain('>카페<')
-    expect(markup).not.toContain('>음식점<')
+    expect(markup).toContain('>카페 · ')
+    expect(markup).not.toContain('음식점')
   })
 
   it('원천 분류가 없거나 다른 음식점은 서버 유형 이름 그대로다', () => {
-    expect(render({ ...restaurant, sourceCategory: null })).toContain('>음식점<')
-    expect(render({ ...restaurant, sourceCategory: '한식' })).toContain('>음식점<')
+    expect(render({ ...restaurant, sourceCategory: null })).toContain('>음식점 · ')
+    expect(render({ ...restaurant, sourceCategory: '한식' })).toContain('>음식점 · ')
   })
 
   it('음식점이 아닌 유형은 원천 분류가 카페여도 바꾸지 않는다 — 칩과 같은 판정이다', () => {
     const markup = render({ ...placeSummary, sourceCategory: '카페' })
 
-    expect(markup).toContain(`>${placeSummary.contentType.name}<`)
+    expect(markup).toContain(`>${placeSummary.contentType.name} · `)
   })
 })

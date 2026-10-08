@@ -7,12 +7,14 @@ import { PlaceMapPanel } from '@/features/place/place-map-panel'
 import { messages } from '@/lib/messages'
 import { placeSummary, placeWithoutCoordinate } from '@/test/fixtures/place'
 
+/** 기본은 담기 지도처럼 행에 상세 링크를 둔다 — `/places`(미리보기 있음)는 `detailLink: false` */
 function render(overrides: Partial<Parameters<typeof PlaceMapPanel>[0]> = {}) {
   return renderToStaticMarkup(
     createElement(PlaceMapPanel, {
       places: [placeSummary],
       selectedId: null,
       onSelect: () => undefined,
+      detailLink: true,
       ...overrides,
     }),
   )
@@ -53,7 +55,7 @@ describe('PlaceMapPanel', () => {
     expect(markup).toContain('w-24')
   })
 
-  it('액션이 없어도 열 자체는 있다 — /places 는 상세 링크만 든다', () => {
+  it('상세 링크만 있어도 열이 선다 — 담기 지도의 상세는 행 링크가 유일한 길이다', () => {
     expect(render()).toContain('w-24')
   })
 
@@ -100,5 +102,30 @@ describe('PlaceMapPanel — 상세 링크 터치 영역 (#408)', () => {
 
     expect(link).toContain('h-11')
     expect(link).toContain('min-w-11')
+  })
+})
+
+/*
+  **미리보기가 있는 화면(`/places`)은 행에 상세를 두지 않는다** (#1267). 한 행에 누를 곳이
+  둘(행 = 미리보기, 버튼 = 상세)이라 차이가 드러나지 않았고, 테두리 버튼 20개가 이름보다
+  무거웠고, 이름 폭을 96 빼앗았다. 상세는 미리보기의 `상세 정보 전체 보기` 로 간다.
+*/
+describe('PlaceMapPanel — 미리보기 화면의 행 (#1267)', () => {
+  it('detailLink 가 꺼지면 상세 링크도 액션 열도 없다 — 행은 버튼 하나다', () => {
+    const markup = render({ detailLink: false })
+
+    expect(markup).not.toContain('href="/places/')
+    expect(markup).not.toContain('w-24')
+    expect(markup).not.toContain(messages.map.rowDetail + '<')
+  })
+
+  it('detailLink 가 꺼져도 행 액션은 그린다 — 열은 액션을 위해 선다', () => {
+    const markup = render({
+      detailLink: false,
+      renderRowAction: () => createElement('button', { type: 'button' }, '담기'),
+    })
+
+    expect(markup).toContain('담기')
+    expect(markup).not.toContain('href="/places/')
   })
 })

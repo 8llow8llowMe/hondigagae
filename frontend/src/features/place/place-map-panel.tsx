@@ -21,6 +21,11 @@ import type { PlaceSummary } from '@/types/place'
  * 그 제목이 선택 `<button>` **안**에 있었다 — `<button>` 의 content model 은 대화형
  * 요소를 허용하지 않는다. 담기 버튼까지 얹으면 button 안에 a + button 이 된다.
  * 그래서 선택 버튼은 내용만 감싸고, 링크와 액션은 그 **형제**인 열로 내보냈다.
+ *
+ * **미리보기가 있는 화면(`/places`)은 그 링크를 두지 않는다** (#1267, `detailLink`). 행을 누르면
+ * 미리보기가 열리고 상세는 거기의 `상세 정보 전체 보기` 로 간다 — 한 행에 누를 곳이 둘(행 = 미리보기,
+ * 버튼 = 상세)이면 차이가 드러나지 않고, 테두리 버튼 20개가 이름보다 무거웠고, 이름 폭을 96 빼앗았다.
+ * 담기 지도는 미리보기가 없어 그 링크가 상세로 가는 유일한 길이라 그대로 둔다.
  */
 export function PlaceMapPanel({
   places,
@@ -28,6 +33,7 @@ export function PlaceMapPanel({
   onSelect,
   renderRowAction,
   renderRowNotice,
+  detailLink = true,
   className,
 }: {
   places: PlaceSummary[]
@@ -42,12 +48,18 @@ export function PlaceMapPanel({
   renderRowAction?: ((place: PlaceSummary) => ReactNode) | undefined
   /** 행 **아래** 전폭 줄. 담기 실패 알림이 여기 온다 — 액션 열은 w-24 라 안 들어간다 */
   renderRowNotice?: ((place: PlaceSummary) => ReactNode) | undefined
+  /** 행에 `상세` 링크를 둔다. 미리보기가 상세로 가는 길을 갖는 화면은 끈다 (#1267) */
+  detailLink?: boolean | undefined
   className?: string
 }) {
   return (
     <ul className={cn('divide-border divide-y', className)}>
       {places.map((place) => {
         const selected = place.placeId === selectedId
+        const action = renderRowAction?.(place)
+        // 액션 열은 담을 것이 있을 때만 선다 — 빈 w-24 는 이름 폭만 빼앗는다 (#1267)
+        const hasColumn =
+          detailLink || (action !== undefined && action !== null && action !== false)
 
         return (
           <li
@@ -68,7 +80,11 @@ export function PlaceMapPanel({
                 data-place-id={place.placeId}
                 onClick={() => onSelect(place.placeId)}
                 aria-pressed={selected}
-                className="focus-visible:ring-brand-500 @container flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
+                className={cn(
+                  'focus-visible:ring-brand-500 @container flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
+                  // 액션 열이 없으면 오른쪽 인셋을 행이 갖는다
+                  !hasColumn && 'pr-4',
+                )}
               >
                 {/* `titleHref` 를 주지 않는다 — 이 버튼 안에 링크를 넣을 수 없다 */}
                 <PlaceRowContent place={place} />
@@ -80,14 +96,15 @@ export function PlaceMapPanel({
                 폭은 목록 화면의 `PlanAddPlaceRow` 와 같아야 두 보기의 행이 같은 축에서
                 끝난다.
               */}
-              <div className="flex w-24 shrink-0 flex-col items-end justify-center gap-1 py-3 pr-4">
-                {/*
+              {hasColumn && (
+                <div className="flex w-24 shrink-0 flex-col items-end justify-center gap-1 py-3 pr-4">
+                  {/*
                   **`min-w-11` 이 없으면 44×44 를 못 지킨다** (#408). 낱말이 두 글자
                   12px 라 실측 폭이 28.8px 였다 — 세로만 `h-11` 로 잡고 가로를 비워 둔
                   탓이다. **44 를 주기로 한 이상 두 축 모두다** — 세로만 잡고 가로를
                   비우면 지킨 것이 아니다. (§7 의 하한 자체는 #883 으로 지도 타깃만 남았다.)
                 */}
-                {/*
+                  {/*
                   **버튼 모양이다** (이슈 #553). 예전에는 글자뿐(`text-link`)이라 바로 아래
                   `담기`(`Button variant="secondary"`)와 나란히 섰을 때 **한쪽만 버튼처럼
                   보였다** — 같은 열에서 같은 무게로 고르는 두 갈래인데 한쪽은 링크, 한쪽은
@@ -99,16 +116,19 @@ export function PlaceMapPanel({
                   `VARIANT.secondary` + `SIZE.md` 와 같은 값으로 맞춘다 — 두 버튼이 갈리면
                   같은 열에서 테두리 색과 높이가 어긋난다.
                 */}
-                <Link
-                  href={`/places/${place.placeId}`}
-                  aria-label={messages.map.rowDetailLabel.replace('{title}', place.title)}
-                  className="border-border-strong bg-bg text-fg hover:bg-band text-body-1 focus-visible:ring-brand-500 flex h-11 min-w-11 items-center justify-center rounded-md border px-4 font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-                >
-                  {messages.map.rowDetail}
-                </Link>
+                  {detailLink && (
+                    <Link
+                      href={`/places/${place.placeId}`}
+                      aria-label={messages.map.rowDetailLabel.replace('{title}', place.title)}
+                      className="border-border-strong bg-bg text-fg hover:bg-band text-body-1 focus-visible:ring-brand-500 flex h-11 min-w-11 items-center justify-center rounded-md border px-4 font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                    >
+                      {messages.map.rowDetail}
+                    </Link>
+                  )}
 
-                {renderRowAction?.(place)}
-              </div>
+                  {action}
+                </div>
+              )}
             </div>
 
             {place.lat === null || place.lng === null ? (
