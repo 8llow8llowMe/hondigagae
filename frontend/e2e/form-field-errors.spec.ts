@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { chooseEmailSignup, sendSignupCodeWithConsent } from './helpers/signup'
+
 /**
  * **서버가 내린 필드 오류가 그 입력칸 밑에 붙는가** — 이슈 #501 (서버 쪽 #491).
  *
@@ -32,10 +34,11 @@ test.describe('서버 필드 오류 렌더 (#501)', () => {
     page,
   }) => {
     await page.goto('/signup')
+    await chooseEmailSignup(page)
 
-    // 1단계 — 코드 발송
+    // 1단계 — 코드 발송 (첫 발송은 약관 시트를 거친다, #1284)
     await page.getByLabel('이메일').fill('new-user@hondigagae.dev')
-    await page.getByRole('button', { name: '인증코드 받기' }).click()
+    await sendSignupCodeWithConsent(page)
 
     const codeInput = page.getByLabel('인증코드')
     await expect(codeInput).toBeVisible()

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 
 import { useQueryClient } from '@tanstack/react-query'
 
+import { AuthTopBar } from '@/features/auth/auth-top-bar'
 import { enterAfterSignup } from '@/features/auth/enter-after-signup'
 import { enterSession } from '@/features/auth/enter-session'
 import {
@@ -16,8 +17,8 @@ import {
   signupProfileSchema,
   type SignupProfileValues,
 } from '@/features/auth/schemas'
-import { SignupConsentFields } from '@/features/auth/signup-consent-fields'
-import { SignupHeading } from '@/features/auth/signup-parts'
+import { SignupConsentSheet } from '@/features/auth/signup-consent-sheet'
+import { SignupConsentAction, SignupStepHeading } from '@/features/auth/signup-parts'
 import { CodeStep, EmailStep, ProfileStep } from '@/features/auth/signup-steps'
 import { login, sendEmailCode, signup, verifyEmailCode } from '@/lib/api/auth'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
@@ -25,6 +26,7 @@ import { handOffLoginEmail } from '@/lib/auth/login-email-handoff'
 import {
   clearConsentErrors,
   hasConsentErrors,
+  isSignupConsentComplete,
   SIGNUP_CONSENT_KEYS,
   type SignupConsent,
   type SignupConsentKey,
@@ -33,7 +35,6 @@ import {
 import { codeStepAfterResend, type ResendOutcome } from '@/lib/form/code-step-after-resend'
 import { remainingSeconds } from '@/lib/form/cooldown'
 import { apiErrorToFormErrors, type FormErrors, NO_FORM_ERRORS } from '@/lib/form/field-errors'
-import { focusFirstError } from '@/lib/form/focus-first-error'
 import { formErrorsAfterEdit } from '@/lib/form/form-failure-display'
 import {
   focusResendResult,
@@ -69,6 +70,8 @@ export type SignupFormProps = {
   onConsentChange: (key: SignupConsentKey, checked: boolean) => void
   /** 전체 동의 (#1083). 셋을 한꺼번에 바꾸는 것은 소유자(`SignupScreen`)의 몫이다 */
   onConsentAllChange: (checked: boolean) => void
+  /** 이메일 단계의 `←` — 가입 방법 고르기로 돌아간다 (#1284) */
+  onExit: () => void
 }
 
 export function SignupForm({
@@ -76,6 +79,7 @@ export function SignupForm({
   consent,
   onConsentChange,
   onConsentAllChange,
+  onExit,
 }: SignupFormProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -116,6 +120,12 @@ export function SignupForm({
   // 동의 블록의 오류. 클라이언트 검증(MEMBER_115/116/117 복제본)과 서버 응답
   // (MEMBER_115/116/117 · MEMBER_010/011)이 같은 자리에 모인다 — #688
   const [consentErrors, setConsentErrors] = useState<FormErrors>(NO_FORM_ERRORS)
+  /*
+    약관 시트가 무엇을 하려고 떴는가 (#1284, 회원가입-세부명세 D14). `sendCode` 는 1단계 첫 발송 전,
+    `signup` 은 3단계에서 서버가 동의를 거부했을 때(`MEMBER_115/116/117` · `MEMBER_010/011`)다.
+    null 이면 닫혀 있다.
+  */
+  const [consentSheet, setConsentSheet] = useState<'sendCode' | 'signup' | null>(null)
 
   // 필드로 좁혀지지 않는 5xx·무응답을 단계별로 구분한다 — LoginFormFields 와 같은 패턴
   const [emailErrorStatus, setEmailErrorStatus] = useState<number | null>(null)
@@ -155,6 +165,14 @@ export function SignupForm({
   // step 값 자체로 초기화하면 (a) 진짜 첫 마운트와 StrictMode 의 재호출 모두
   // "안 바뀜"으로 판정되고 (b) 실제 단계 전환만 "바뀜"으로 판정된다.
   const previousStepRef = useRef<Step>(step)
+  /*
+    **마운트 때 이메일 칸으로 간다** (#1284). 이 폼은 진입 화면에서 `이메일로 가입하기` 를 눌러야만
+    서므로 마운트가 곧 사용자 동작의 결과다 — 누른 버튼이 사라져 포커스가 `BODY` 로 떨어진다.
+    StrictMode 가 두 번 불러도 같은 칸에 두 번 둘 뿐이다.
+  */
+  useEffect(() => {
+    containerRef.current?.querySelector<HTMLElement>('#email')?.focus()
+  }, [])
   useEffect(() => {
     if (previousStepRef.current === step) return
     previousStepRef.current = step
@@ -272,13 +290,17 @@ export function SignupForm({
           와서 기존 매핑을 그대로 타고, `MEMBER_010/011` 은 `field` 가 없어 **코드로**
           어느 체크박스인지 판정한다 (`toConsentErrors` 의 JSDoc).
         */
-        setConsentErrors(
-          toConsentErrors(
-            apiErrorToFormErrors(error, messages.form.submitFailed),
-            error.resultCode,
-            consent,
-          ),
+        const nextConsentErrors = toConsentErrors(
+          apiErrorToFormErrors(error, messages.form.submitFailed),
+          error.resultCode,
+          consent,
         )
+        setConsentErrors(nextConsentErrors)
+        /*
+          동의 블록이 이제 화면에 없다 (#1284) — 거부된 항목을 보일 자리는 약관 시트다. 같은 시트를
+          다시 띄워 그 항목에 오류를 달고, 실행 버튼은 "동의하고 가입하기" 로 이 제출을 다시 낸다.
+        */
+        if (hasConsentErrors(nextConsentErrors)) setConsentSheet('signup')
 
         // 409: 이 요청에서만 이메일 중복이 드러난다 — send-code 가 계정 열거 방지로
         // 가입 여부와 무관하게 항상 성공하기 때문이다(정본 D4). 여기서만 판정한다.
@@ -432,20 +454,11 @@ export function SignupForm({
   )
 
   /**
-   * 3단계 제출. **동의와 프로필을 한 번에 본다.**
+   * 3단계 제출.
    *
-   * `profileForm` 값에 동의가 없으므로(`signupConsentSchema` 의 JSDoc) `useForm` 의
-   * 검증이 대신해 주지 못한다. 서버에 보내고 400 을 받아 표시해도 결과는 같지만,
-   * 켜지 않은 체크박스를 확인하려고 왕복할 이유가 없다 — 클라이언트 검증은 백엔드
-   * 제약의 복제본이라는 규칙 그대로다 (form-guide.md §5).
-   *
-   * **동의가 막혔어도 프로필 검증을 함께 돌린다.** 여기서 바로 돌아가 버리면
-   * 비밀번호·이름·닉네임 오류가 그 제출에서는 안 보이고, 체크박스를 켠 뒤 다시 눌러야
-   * 그제서야 나온다. 백엔드는 같은 요청에서 둘 다 돌려주므로 **클라이언트가 서버보다
-   * 정보를 적게 주면 안 된다** — 복제본이라는 규칙이 개수에도 걸린다.
-   *
-   * 포커스는 합친 오류로 한 번만 옮긴다. `errorFieldSelector` 가 문서 순서상 첫 매칭을
-   * 집으므로, 합쳐 넘기는 것만으로 "화면에서 첫 번째로 보이는 오류" 가 된다.
+   * **동의는 이미 받았다** — 1단계 첫 발송이 약관 시트를 거친다 (#1284). 그래도 클라이언트 검증은
+   * 남긴다(form-guide.md §5 "백엔드 제약의 복제본"): 빠져 있으면 보내지 않고 시트를 다시 띄운다.
+   * 프로필 오류도 같은 제출에서 함께 보인다 — 시트를 닫으면 바로 칸 아래 오류가 서 있다.
    */
   const handleProfileSubmit = useCallback(() => {
     const consentResult = validate(signupConsentSchema, consent)
@@ -456,15 +469,36 @@ export function SignupForm({
     }
 
     const profileResult = validate(signupProfileSchema, profileForm.values)
-    const profileErrors = profileResult.ok ? NO_FORM_ERRORS : profileResult.errors
-
+    profileForm.setErrors(profileResult.ok ? NO_FORM_ERRORS : profileResult.errors)
     setConsentErrors(consentResult.errors)
-    profileForm.setErrors(profileErrors)
-    focusFirstError(containerRef.current, {
-      fields: { ...profileErrors.fields, ...consentResult.errors.fields },
-      form: consentResult.errors.form,
-    })
+    setConsentSheet('signup')
   }, [consent, profileForm.submit, profileForm.setErrors, profileForm.values])
+
+  /**
+   * 1단계 `인증코드 받기` (#1284).
+   *
+   * **동의가 없으면 보내지 않고 약관 시트를 띄운다** — 코드 발송이 이메일을 서버로 보내는 첫 요청이다.
+   * 단, **이메일 칸이 틀렸으면 시트보다 칸 오류가 먼저다**: 시트에 동의하고 나서야 "이메일 형식이
+   * 아니에요" 를 보면 동의가 헛수고로 읽힌다. 그 판정은 `useForm` 의 검증에 맡긴다 — 틀린 값이면
+   * `submit` 이 요청 없이 오류만 세우고 포커스 effect 가 칸으로 옮긴다.
+   *
+   * 한 번 동의하면 이메일을 고쳐 다시 보낼 때는 바로 나간다 — 동의 값은 `SignupScreen` 이 들고 있다.
+   */
+  const handleEmailSubmit = useCallback(() => {
+    if (isSignupConsentComplete(consent) || !validate(emailSchema, emailForm.values).ok) {
+      void emailForm.submit()
+      return
+    }
+    setConsentSheet('sendCode')
+  }, [consent, emailForm.submit, emailForm.values])
+
+  /** 시트의 실행 버튼 — 닫고 하려던 일을 잇는다 */
+  const handleConsentConfirm = useCallback(() => {
+    const purpose = consentSheet
+    setConsentSheet(null)
+    if (purpose === 'sendCode') void emailForm.submit()
+    if (purpose === 'signup') handleProfileSubmit()
+  }, [consentSheet, emailForm.submit, handleProfileSubmit])
 
   const emailStepErrors: FormErrors =
     stepBackMessage !== null
@@ -502,6 +536,8 @@ export function SignupForm({
 
   useEffect(() => {
     if (profileForm.submitCount === 0 || step !== 'profile') return
+    // 동의 거부면 시트가 떠 있다 — 시트가 포커스를 갖는다(`BottomSheet` 의 `useOverlay`). 뺏지 않는다
+    if (hasConsentErrors(consentErrors)) return
     /*
       서버가 돌려준 동의 오류(`MEMBER_115/116/117` · `MEMBER_010/011`)도 같은 제출의 결과다.
       프로필 오류와 합쳐 넘기면 `focusFirstError` 가 문서 순서로 고른다 — 동의 블록이 위다.
@@ -517,27 +553,53 @@ export function SignupForm({
   }, [profileForm.submitCount])
 
   /*
-    **동의 블록은 모든 단계에서 보인다.** 같은 화면의 소셜 버튼이 1단계부터 눌리는데,
-    동의를 3단계 안에 가두면 소셜로 가입하려는 사용자는 동의할 방법이 없다 — 인가코드가
-    1회용이라 콜백에서 받을 수도 없다 (회원가입-세부명세.md D8-5).
-
-    제목·단계 표시 바로 아래에 두어 "무엇에 동의하고 가입하는지" 를 입력 전에 읽게 한다.
-    단계 표시가 이 블록보다 먼저인 이유는 `SignupHeading` 의 JSDoc 에 있다 (#1083).
+    **약관 시트** (#1284). 동의 블록은 더 이상 단계 위에 서지 않는다 — 첫 발송 전과 서버 거부 때만
+    시트로 뜬다(`SignupConsentSheet` 머리주석). 시트는 body 포털이라 어느 단계 아래 두어도 같다.
   */
-  const consentBlock = (
-    <SignupConsentFields
+  const consentSheetElement = (
+    <SignupConsentSheet
+      open={consentSheet !== null}
+      onClose={() => setConsentSheet(null)}
       consent={consent}
       errors={consentErrors}
       onConsentChange={handleConsentChange}
       onConsentAllChange={handleConsentAllChange}
+      action={
+        <SignupConsentAction
+          complete={isSignupConsentComplete(consent)}
+          label={
+            consentSheet === 'signup'
+              ? messages.auth.consentAndSignup
+              : messages.auth.consentAndSendCode
+          }
+          requiredMessage={
+            consentSheet === 'signup'
+              ? messages.auth.signupConsentRequired
+              : messages.auth.emailConsentRequired
+          }
+          onConfirm={handleConsentConfirm}
+        />
+      }
     />
   )
 
+  /** 2 · 3단계의 `←` — 이메일부터 다시. 코드 · 쿨다운을 비운다("이메일 다시 입력" 과 같다) */
+  const backToEmail = () => {
+    codeForm.reset()
+    setCooldownStartedAt(null)
+    setCodeErrorStatus(null)
+    setStep('email')
+  }
+
   if (step === 'email') {
     return (
-      <div ref={containerRef} className="flex flex-col gap-6">
-        <SignupHeading step={1} />
-        {consentBlock}
+      <div ref={containerRef} className="flex flex-col gap-4">
+        <AuthTopBar back={{ onClick: onExit }} backLabel={messages.auth.signupBackToMethod} />
+        <SignupStepHeading
+          step={1}
+          heading={messages.auth.signupEmailHeading}
+          description={messages.auth.signupEmailDescription}
+        />
         <EmailStep
           values={emailForm.values}
           errors={emailStepErrors}
@@ -553,18 +615,19 @@ export function SignupForm({
             setEmailErrorStatus(null)
             emailForm.setValue(key, value)
           }}
-          onSubmit={() => void emailForm.submit()}
+          onSubmit={handleEmailSubmit}
           onRetry={() => void emailForm.submit()}
         />
+        {consentSheetElement}
       </div>
     )
   }
 
   if (step === 'code') {
     return (
-      <div ref={containerRef} className="flex flex-col gap-6">
-        <SignupHeading step={2} />
-        {consentBlock}
+      <div ref={containerRef} className="flex flex-col gap-4">
+        <AuthTopBar back={{ onClick: backToEmail }} backLabel={messages.auth.signupBackToEmail} />
+        <SignupStepHeading step={2} heading={messages.auth.signupCodeHeading} />
         <CodeStep
           email={email}
           values={codeForm.values}
@@ -582,12 +645,7 @@ export function SignupForm({
           }}
           onSubmit={() => void codeForm.submit()}
           onResend={handleResend}
-          onChangeEmail={() => {
-            codeForm.reset()
-            setCooldownStartedAt(null)
-            setCodeErrorStatus(null)
-            setStep('email')
-          }}
+          onChangeEmail={backToEmail}
           onRetry={() => (codeAction === 'resend' ? handleResend() : void codeForm.submit())}
         />
       </div>
@@ -595,9 +653,17 @@ export function SignupForm({
   }
 
   return (
-    <div ref={containerRef} className="flex flex-col gap-6">
-      <SignupHeading step={3} />
-      {consentBlock}
+    <div ref={containerRef} className="flex flex-col gap-4">
+      {/*
+        3단계의 `←` 도 이메일부터 다시다 — 2단계로 돌아가 봐야 이미 쓴 코드뿐이다. 입력한 프로필은
+        버린다: 이메일이 바뀌면 다른 계정이다(D4 의 409 처리와 같은 판단).
+      */}
+      <AuthTopBar back={{ onClick: backToEmail }} backLabel={messages.auth.signupBackToEmail} />
+      <SignupStepHeading
+        step={3}
+        heading={messages.auth.signupProfileHeading}
+        description={messages.auth.signupProfileDescription}
+      />
       <ProfileStep
         email={email}
         values={profileForm.values}
@@ -628,6 +694,7 @@ export function SignupForm({
         onSubmit={handleProfileSubmit}
         onRetry={handleProfileSubmit}
       />
+      {consentSheetElement}
     </div>
   )
 }

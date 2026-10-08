@@ -64,7 +64,7 @@ export default async function SocialSignupConsentPage({
       <AuthCardDog />
       {/* 하위 화면의 출구 (#1283 C3) — 제목은 동의 화면이 단다 */}
       <AuthTopBar
-        backHref={`/login?returnTo=${encodeURIComponent(target)}`}
+        back={{ href: `/login?returnTo=${encodeURIComponent(target)}` }}
         backLabel={messages.auth.backToLogin}
       />
       <SocialSignupConsentScreen provider={provider} returnTo={target} />

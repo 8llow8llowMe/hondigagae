@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 
 import { AuthCardDog } from '@/features/auth/auth-card-dog'
-import { AuthTopBar } from '@/features/auth/auth-top-bar'
 import { LoginReasonNotice } from '@/features/auth/login-reason-notice'
 import { SignupScreen } from '@/features/auth/signup-screen'
 import { readSession } from '@/lib/auth/session'
@@ -26,32 +25,19 @@ export default async function SignupPage({
   if (session !== null) redirect(target)
 
   /*
-    회원가입 화면에도 소셜 버튼을 둔다. 미가입 이메일이면 서버가 자동으로 가입시키므로
-    로그인 화면과 결과가 같다 — 여기에만 없으면 3단계를 다 밟은 뒤에야 더 짧은 길이
-    있었다는 것을 알게 된다 (정본 D8-3).
+    **가입 방법 고르기 → 이메일 3단계 · 약관 시트는 전부 `SignupScreen` 안이다** (#1284). 국면마다
+    상단바 `←` 의 목적지가 달라(로그인 화면 / 방법 고르기 / 이메일 단계) 상단바도 그 안에 있다.
 
-    폼과 소셜 버튼이 **가입 동의를 함께 쓴다.** 그 상태를 들 주인이 필요해 클라이언트
-    컴포넌트 하나(`SignupScreen`)로 묶었다 — 서버 컴포넌트인 이 페이지는 상태를 들 수
-    없다 (#688).
+    왜 왔는지 안내(#1157)는 진입 화면에만 선다 — 이메일 단계는 그 화면의 질문 한 줄이 제목이라
+    안내가 위에 끼면 질문이 밀린다. 서버 컴포넌트가 그린 요소를 그대로 넘긴다.
   */
   return (
-    /*
-      **로그인 화면과 같은 래퍼다** (#1157). 예전에는 fragment 라 카드 안 첫 요소가 곧 `회원가입`
-      제목이었는데, 안내가 그 위에 서면서 둘이 붙었다 — 로그인(`login/page.tsx`)의 `gap-4` 와 맞춘다.
-    */
-    <div className="flex flex-col gap-4">
+    <>
       <AuthCardDog />
-      {/*
-        하위 화면의 출구 (#1283 C3). 제목은 `SignupHeading` 이 따로 단다 — 본문 제목이 곧 화면
-        이름이라 상단바에 또 쓰지 않는다. `returnTo` 를 물고 돌아간다 — 들어온 맥락을 잃지 않게.
-      */}
-      <AuthTopBar
-        backHref={`/login?returnTo=${encodeURIComponent(target)}`}
-        backLabel={messages.auth.backToLogin}
+      <SignupScreen
+        returnTo={target}
+        notice={<LoginReasonNotice returnTo={target} screen="signup" />}
       />
-      {/* 로그인 화면에서 넘어와도 같은 맥락을 이어받는다 — `returnTo` 가 그대로 실려 온다 */}
-      <LoginReasonNotice returnTo={target} screen="signup" />
-      <SignupScreen returnTo={target} />
-    </div>
+    </>
   )
 }
