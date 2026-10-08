@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.apigateway.filter.SharedPlanRateLimitGatewayFilterFactory;
 import com.hondigagae.apigateway.ratelimit.SharedPlanTokenKeyResolver;
+import io.lettuce.core.ClientOptions;
+import java.time.Duration;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,8 @@ import org.springframework.cloud.gateway.filter.ratelimit.RedisRateLimiter;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.ApplicationContext;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 
 /**
@@ -95,5 +99,17 @@ class RateLimitWiringTest {
         assertThat(limit.getReplenishRate()).isEqualTo(2);
         assertThat(limit.getBurstCapacity()).isEqualTo(20);
         assertThat(limit.getRequestedTokens()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Redis 연결 팩토리가 yml 의 명령 타임아웃 1s · 연결 타임아웃 2s 로 만들어진다 — 리밋 fail-open 이 1초 뒤에 일어난다 (#1253)")
+    void redisClientTimeoutsAreBoundFromYml() {
+        LettuceClientConfiguration configuration = context.getBean(LettuceConnectionFactory.class).getClientConfiguration();
+
+        assertThat(configuration.getCommandTimeout()).isEqualTo(Duration.ofSeconds(1));
+        ClientOptions clientOptions = configuration.getClientOptions().orElseThrow();
+        assertThat(clientOptions.getSocketOptions().getConnectTimeout()).isEqualTo(Duration.ofSeconds(2));
+        assertThat(clientOptions.getTimeoutOptions().isTimeoutCommands())
+            .as("감시가 꺼져 있으면 리액티브 명령(리밋 판정)에는 타임아웃이 없다").isTrue();
     }
 }

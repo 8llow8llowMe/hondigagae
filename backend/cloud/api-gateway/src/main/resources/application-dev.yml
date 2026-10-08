@@ -114,6 +114,10 @@ infra:
     master-name: ${REDIS_MASTER_NAME:}
     sentinel-nodes: ${REDIS_SENTINEL_NODES:}
     key-prefix: ${REDIS_KEY_PREFIX}
+    # Redis 먹통일 때 빨리 실패하게 짧게 둔다 (#1253). 비우면 Lettuce 기본(명령 60초 · 리액티브 무제한, 연결 10초).
+    # 이유는 application-local.yml.
+    command-timeout: 1s
+    connect-timeout: 2s
 
 springdoc:
   swagger-ui:

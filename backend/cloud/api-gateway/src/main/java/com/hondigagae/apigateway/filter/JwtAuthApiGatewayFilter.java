@@ -18,6 +18,7 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @Component
 @RequiredArgsConstructor
@@ -41,28 +42,57 @@ public class JwtAuthApiGatewayFilter extends AbstractGatewayFilterFactory<Config
             }
 
             return Mono.defer(() -> {
-                try {
-                    Claims claims = jwtVerifier.validateAndGetClaims(jwt);
-                    String tokenId = claims.getId();
-                    if (tokenId != null && accessTokenBlacklistChecker.isBlacklisted(tokenId)) {
-                        throw new JwtException(JwtErrorCode.TOKEN_REVOKED);
-                    }
-
-                    ServerHttpRequest authenticatedRequest = addMemberIdHeader(sanitizedRequest, claims);
-                    return chain.filter(exchange.mutate().request(authenticatedRequest).build());
-                } catch (JwtException e) {
-                    throw e;
-                } catch (ExpiredJwtException e) {
-                    throw new JwtException(JwtErrorCode.TOKEN_EXPIRED);
-                } catch (SignatureException e) {
-                    throw new JwtException(JwtErrorCode.TOKEN_SIGNATURE_INVALID);
-                } catch (MalformedJwtException e) {
-                    throw new JwtException(JwtErrorCode.TOKEN_MALFORMED);
-                } catch (SecurityException | IllegalArgumentException e) {
-                    throw new JwtException(JwtErrorCode.TOKEN_INVALID);
-                }
+                Claims claims = verify(jwt);
+                return rejectIfRevoked(claims.getId())
+                    .then(Mono.defer(() -> {
+                        ServerHttpRequest authenticatedRequest = addMemberIdHeader(sanitizedRequest, claims);
+                        return chain.filter(exchange.mutate().request(authenticatedRequest).build());
+                    }));
             });
         };
+    }
+
+    /** 서명·만료·형식 검증. 메모리 안의 계산이라 호출 스레드(이벤트 루프)에서 그대로 한다. */
+    private Claims verify(String jwt) {
+        try {
+            return jwtVerifier.validateAndGetClaims(jwt);
+        } catch (ExpiredJwtException e) {
+            throw new JwtException(JwtErrorCode.TOKEN_EXPIRED);
+        } catch (SignatureException e) {
+            throw new JwtException(JwtErrorCode.TOKEN_SIGNATURE_INVALID);
+        } catch (MalformedJwtException e) {
+            throw new JwtException(JwtErrorCode.TOKEN_MALFORMED);
+        } catch (SecurityException | IllegalArgumentException e) {
+            throw new JwtException(JwtErrorCode.TOKEN_INVALID);
+        }
+    }
+
+    /**
+     * 로그아웃된 토큰이면 {@code TOKEN_REVOKED} 로 끝낸다. jti 가 없는 토큰은 확인하지 않는다(종전과 같다).
+     *
+     * <p><b>Redis 확인은 {@code boundedElastic} 에서 한다 (#1253).</b> {@link AccessTokenBlacklistChecker} 는 블로킹
+     * {@code RedisTemplate} 을 부르는데, 이 필터는 Netty 이벤트 루프 위에서 돈다. 이벤트 루프 스레드는 코어 수만큼밖에
+     * 없고 한 스레드가 수많은 연결을 맡으므로, Redis 가 먹통인 동안 한 요청이 명령 타임아웃만큼 루프를 붙잡으면
+     * <b>그 루프에 걸린 다른 요청 — 토큰이 없는 공개 API 까지 — 이 함께 멈춘다.</b> 예전에는 그 시간이 60초였다.
+     *
+     * <p>리액티브 템플릿으로 바꾸지 않고 스레드만 옮겼다. 판정기와 그 예외 규칙(연결 실패 · 명령 타임아웃 →
+     * fail-closed 503 또는 fail-open 통과)을 그대로 두면 판정 결과 · 예외 매핑 · 응답이 바뀌지 않는다. 리액티브 템플릿도
+     * 완전히 논블로킹은 아니다 — 동기 · 리액티브 공유 연결은 연결 팩토리의 <b>락 하나</b> 아래에서 호출 스레드가 처음
+     * 동기로 connect 한다. 그래서 같은 락을 거치는 레이트 리밋 판정도 이벤트 루프 밖에서 구독한다
+     * ({@code SharedPlanRateLimitGatewayFilterFactory#decide}). 기동 시점부터 Redis 가 먹통이면 첫 연결 시도들이 그 락에서
+     * 줄을 서지만, 그 대기는 {@code boundedElastic} 쪽에서만 일어난다.
+     *
+     * <p>판정이 끝나면 체인은 그 스레드에서 이어지고, 업스트림 전송은 Reactor Netty 가 제 이벤트 루프로 넘긴다.
+     * {@code boundedElastic} 은 스레드 수에 상한(코어 × 10)이 있어 Redis 장애 중 동시에 기다리는 확인도 그만큼으로
+     * 묶이고 나머지는 큐에서 기다린다 — 루프가 멈추는 것보다 낫고, 한 번 기다리는 길이는 명령 타임아웃이 정한다.
+     */
+    private Mono<Void> rejectIfRevoked(String tokenId) {
+        if (tokenId == null) {
+            return Mono.empty();
+        }
+        return Mono.fromCallable(() -> accessTokenBlacklistChecker.isBlacklisted(tokenId))
+            .subscribeOn(Schedulers.boundedElastic())
+            .flatMap(revoked -> revoked ? Mono.error(new JwtException(JwtErrorCode.TOKEN_REVOKED)) : Mono.empty());
     }
 
     private String getJwtFrom(ServerHttpRequest request) {

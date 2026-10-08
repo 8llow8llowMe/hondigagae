@@ -12,10 +12,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hondigagae.apigateway.exception.GatewayErrorCode;
 import com.hondigagae.apigateway.ratelimit.SharedPlanTokenKeyResolver;
 import com.hondigagae.redis.properties.RedisProperties;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,18 +35,22 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 /**
  * 공유 링크 레이트 리밋이 <b>실제로 나가는 응답</b>까지 검증한다 (#1244).
  *
  * <p>판정 자체(토큰 버킷)는 {@code RedisRateLimiter} 의 몫이라 가짜로 갈아 끼운다 — Redis 장애 때의 fail-open 은
- * 라이브러리 동작이라 {@code RateLimitFailOpenTest} 가 실제 리미터로 본다. 여기서 고정하는 것은 이 필터가 책임지는 넷이다.
+ * 라이브러리 동작이라 {@code RateLimitFailOpenTest} 가 실제 리미터로 본다. 여기서 고정하는 것은 이 필터가 책임지는 다섯이다.
  * <ul>
  *   <li><b>거부는 429 + 공통 봉투({@code GATEWAY_001})</b> — 기본 {@code RequestRateLimiter} 는 빈 본문이라
  *       프론트 파서가 사유를 잃는다 (api-design-guide §2-2). 거부는 WARN 을 쓰지 않는다 — 거부 폭주가 로그 폭주가 된다</li>
  *   <li><b>허용은 체인을 정확히 한 번 탄다</b> — 빈 {@code Mono} 를 "키 없음" 으로 오인하면 업스트림을 두 번 부른다</li>
  *   <li><b>키가 없으면 판정 없이 통과</b> — 기본 필터의 deny-empty-key(403)와 반대다</li>
  *   <li><b>판정이 실패하면 통과 + WARN 한 줄</b> — 오류 신호든 동기 예외든. 로그에 토큰 원문이 없다</li>
+ *   <li><b>판정은 이벤트 루프 밖에서 구독된다</b> (#1253) — 리미터는 구독 시점에 Redis 공유 연결을 얻는데, 첫 연결은
+ *       연결 팩토리의 락 아래에서 동기로 맺는다. 이벤트 루프가 그 락을 기다리면 그 루프의 다른 요청이 함께 멈춘다</li>
  * </ul>
  */
 class SharedPlanRateLimitGatewayFilterFactoryTest {
@@ -66,6 +73,9 @@ class SharedPlanRateLimitGatewayFilterFactoryTest {
     private ListAppender<ILoggingEvent> appender;
     private Level previousLevel;
 
+    /** Netty 이벤트 루프 흉내 — Reactor 가 블로킹 금지(NonBlocking)로 표시하는 스레드 하나다. */
+    private Scheduler eventLoop;
+
     @BeforeEach
     void setUp() {
         rateLimiter = new RecordingRateLimiter();
@@ -77,12 +87,14 @@ class SharedPlanRateLimitGatewayFilterFactoryTest {
         appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);
+        eventLoop = Schedulers.newSingle("fake-event-loop");
     }
 
     @AfterEach
     void tearDown() {
         logger.detachAppender(appender);
         logger.setLevel(previousLevel);
+        eventLoop.dispose();
     }
 
     @Test
@@ -219,6 +231,38 @@ class SharedPlanRateLimitGatewayFilterFactoryTest {
     }
 
     @Test
+    @DisplayName("판정은 이벤트 루프가 아닌 스레드에서 구독된다 — 연결 팩토리 락을 이벤트 루프가 기다리지 않는다 (#1253)")
+    void limiterDecisionIsSubscribedOffTheEventLoop() {
+        AtomicBoolean eventLoopIsNonBlocking = new AtomicBoolean();
+        Mono.fromRunnable(() -> eventLoopIsNonBlocking.set(Schedulers.isInNonBlockingThread()))
+            .subscribeOn(eventLoop)
+            .block(Duration.ofSeconds(5));
+        AtomicReference<Thread> askedOn = new AtomicReference<>();
+        AtomicReference<Thread> subscribedOn = new AtomicReference<>();
+        AtomicBoolean subscribedOnNonBlockingThread = new AtomicBoolean(true);
+        RateLimiter.Response allowed = new RateLimiter.Response(true, limiterHeaders("19"));
+        rateLimiter.respond((routeId, id) -> {
+            askedOn.set(Thread.currentThread());
+            // RedisRateLimiter 는 구독될 때 공유 연결을 얻는다(Mono.fromSupplier(factory::getReactiveConnection)). 그 자리를 흉내 낸다.
+            return Mono.fromCallable(() -> {
+                subscribedOn.set(Thread.currentThread());
+                subscribedOnNonBlockingThread.set(Schedulers.isInNonBlockingThread());
+                return allowed;
+            });
+        });
+
+        MockServerWebExchange exchange = dispatchOn(eventLoop, fixedKey(), routeConfig(), SHARED_PLAN_PATH);
+
+        assertThat(eventLoopIsNonBlocking).as("흉내 낸 이벤트 루프는 Reactor 가 블로킹을 금지하는 스레드여야 한다").isTrue();
+        assertThat(askedOn.get()).as("판정을 실제로 물었다").isNotNull();
+        assertThat(askedOn.get().getName()).doesNotStartWith("fake-event-loop");
+        assertThat(subscribedOn.get().getName()).doesNotStartWith("fake-event-loop");
+        assertThat(subscribedOnNonBlockingThread).as("연결을 얻는 구독이 블로킹이 허용된 스레드에서 일어난다").isFalse();
+        assertThat(forwarded.get()).as("판정 뒤 체인은 정확히 한 번 이어진다").isEqualTo(1);
+        assertThat(exchange.getResponse().getHeaders().getFirst("X-RateLimit-Remaining")).isEqualTo("19");
+    }
+
+    @Test
     @DisplayName("업스트림 오류는 판정 실패로 삼키지 않는다 — 체인을 두 번 타지 않고 오류가 그대로 올라간다")
     void upstreamErrorIsNotTreatedAsLimiterFailure() {
         rateLimiter.answer(true, limiterHeaders("19"));
@@ -253,6 +297,17 @@ class SharedPlanRateLimitGatewayFilterFactoryTest {
 
     private MockServerWebExchange dispatch(KeyResolver keyResolver, SharedPlanRateLimitGatewayFilterFactory.Config config,
         MockServerWebExchange exchange) {
+        return dispatchOn(Schedulers.immediate(), keyResolver, config, exchange);
+    }
+
+    /** {@link #dispatch} 와 같되 필터 구독을 {@code scheduler} 위에서 시작한다 — 실제로는 Netty 이벤트 루프 자리다. */
+    private MockServerWebExchange dispatchOn(Scheduler scheduler, KeyResolver keyResolver,
+        SharedPlanRateLimitGatewayFilterFactory.Config config, String path) {
+        return dispatchOn(scheduler, keyResolver, config, MockServerWebExchange.from(MockServerHttpRequest.get(path)));
+    }
+
+    private MockServerWebExchange dispatchOn(Scheduler scheduler, KeyResolver keyResolver,
+        SharedPlanRateLimitGatewayFilterFactory.Config config, MockServerWebExchange exchange) {
         SharedPlanRateLimitGatewayFilterFactory factory = new SharedPlanRateLimitGatewayFilterFactory(rateLimiter, keyResolver, objectMapper);
 
         factory.apply(config)
@@ -260,7 +315,8 @@ class SharedPlanRateLimitGatewayFilterFactoryTest {
                 forwarded.incrementAndGet();
                 return Mono.empty();
             })
-            .block();
+            .subscribeOn(scheduler)
+            .block(Duration.ofSeconds(5));
 
         return exchange;
     }
@@ -270,7 +326,7 @@ class SharedPlanRateLimitGatewayFilterFactoryTest {
     }
 
     private static KeyResolver realResolver() {
-        return new SharedPlanTokenKeyResolver(new RedisProperties(null, null, null, null, null, null, null, "hondigagae:test"));
+        return new SharedPlanTokenKeyResolver(new RedisProperties(null, null, null, null, null, null, null, "hondigagae:test", null, null));
     }
 
     private static SharedPlanRateLimitGatewayFilterFactory.Config routeConfig() {
