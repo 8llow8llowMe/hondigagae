@@ -313,6 +313,9 @@ class AiPlanPromptFactoryTest {
 
         assertThat(system).contains("하루는 한 권역, 많아야 맞닿은");
         assertThat(system).contains("그날 밤 숙소(lodging)도 그날 마지막 장소와 다음 날 첫 장소의");
+        // 일자 사이 이동 (#1254) — 7일 일정이 4일차 북동부 숙소에서 5일차 남서부로 61.5km 를 건넜다
+        assertThat(system).contains("다음 날은 전날 숙소의 권역이나 맞닿은 권역에서");
+        assertThat(system).contains("섬을 한 방향으로 돕니다");
         // 맞닿음 정의는 JejuZone#adjacentTo 와 같은 문장이어야 한다 — 북부-남부(한라산 너머)는 없다
         assertThat(system).contains("북서부-남서부, 북동부-남동부");
         assertThat(system).doesNotContain("북부-남부");
