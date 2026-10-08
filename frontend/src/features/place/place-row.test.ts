@@ -188,6 +188,15 @@ describe('PlaceRow — nullable 처리', () => {
   })
 })
 
+describe('PlaceRow — 썸네일 모양 (#1276)', () => {
+  it('넓은 칸에서는 3:2 가로형이다 — 원본이 3:2 라 정사각은 가로 1/3 을 잘랐다', () => {
+    const markup = render()
+
+    expect(markup).toContain('@lg:w-36')
+    expect(markup).toContain('@lg:h-24')
+  })
+})
+
 describe('PlaceRow — 링크', () => {
   it('행 전체가 상세로 가는 링크다', () => {
     const markup = render()
