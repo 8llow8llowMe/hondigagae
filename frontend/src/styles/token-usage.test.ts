@@ -314,7 +314,7 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
       /*
         루트 오류 경계 둘도 `AppShell` 밖이다 (#907). `app/error.tsx` 는 그룹 레이아웃이,
         `app/global-error.tsx` 는 루트 레이아웃이 죽었을 때 그려지므로 헤더가 없고, 같은
-        이유로 `Canvas` 를 쓸 수 없어 `(auth)` 셸과 같은 골격으로 자기 바탕을 칠한다.
+        이유로 `Canvas` 를 쓸 수 없어 #532 의 `(auth)` 셸 골격으로 자기 바탕을 칠한다.
       */
       'app/error.tsx',
       'app/global-error.tsx',

@@ -10,7 +10,6 @@ import {
   PasswordResetEmailStep,
   type PasswordResetEmailStepProps,
   PasswordResetHeading,
-  PasswordResetLoginLink,
 } from '@/features/auth/password-reset-steps'
 import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
@@ -266,26 +265,15 @@ describe('PasswordResetHeading — 제목 아래 설명 줄은 4 다 (#1084)', (
       createElement(PasswordResetHeading, { heading: messages.auth.resetCodeHeading }),
     )
 
-    expect(codeHeading.match(/<p/g)).toHaveLength(1)
+    // 제목은 `h2` 다 (#1283 — 보이는 가장 큰 글자라 구조도 제목). 설명 `p` 는 없다
+    expect(codeHeading.match(/<h2/g)).toHaveLength(1)
+    expect(codeHeading).not.toContain('<p')
   })
 
   it('1단계 폼은 설명 줄을 다시 그리지 않는다 — 실패 알림이 제목과 설명 사이에 끼던 자리다', () => {
     expect(
       emailStep({ errorStatus: 429, errors: { fields: {}, form: '잠겼습니다.' } }),
     ).not.toContain(messages.auth.resetEmailDescription)
-  })
-})
-
-describe('PasswordResetLoginLink — 1 · 2단계의 로그인 복귀 (#1084, 정본 D4)', () => {
-  const markup = renderToStaticMarkup(createElement(PasswordResetLoginLink))
-
-  it('쿼리 없이 /login 으로 간다 — 이메일을 URL 에 올리지 않는다 (D3)', () => {
-    expect(markup).toContain('href="/login"')
-    expect(markup).toContain(messages.auth.toLoginScreen)
-  })
-
-  it('누르는 자리가 44 다', () => {
-    expect(markup).toContain('min-h-11')
   })
 })
 
@@ -315,5 +303,18 @@ describe('두 단계 — 요청이 도는 동안 직전 실패를 걷는다 (#10
     { name: '2단계 재발송 중', markup: () => codeStep({ ...failed, resending: true }) },
   ])('$name', ({ markup }) => {
     expect(markup()).not.toContain('잠겼습니다.')
+  })
+})
+
+/* 칸 하나(1단계) · 두 칸 다 필수(2단계)인 폼의 `*` 는 정보가 없다 (#1283 C5, 정본 D11) */
+describe('재설정 폼 — 필수 표시(*)를 그리지 않는다 (#1283)', () => {
+  const REQUIRED_MARK = /<span aria-hidden="true"[^>]*>\*<\/span>/
+
+  it('1단계 이메일', () => {
+    expect(emailStep()).not.toMatch(REQUIRED_MARK)
+  })
+
+  it('2단계 코드 · 새 비밀번호', () => {
+    expect(codeStep()).not.toMatch(REQUIRED_MARK)
   })
 })

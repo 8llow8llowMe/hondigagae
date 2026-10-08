@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { AuthTopBar } from '@/features/auth/auth-top-bar'
 import {
   PasswordResetCodeStep,
   PasswordResetDone,
   PasswordResetEmailStep,
   PasswordResetHeading,
-  PasswordResetLoginLink,
 } from '@/features/auth/password-reset-steps'
 import {
   emailSchema,
@@ -103,9 +103,12 @@ export function PasswordResetView() {
       완료 화면에는 입력이 없다. 예전에는 여기서 그냥 돌아가, 제출 중 `disabled` 가 된 버튼과
       함께 폼이 사라지며 포커스가 `BODY` 로 떨어졌다 (#1078 실측). 남은 할 일인 "로그인 화면으로"
       링크로 옮긴다 — 완료 문구는 단계 제목의 live 영역이 이미 읽는다.
+
+      **"첫 링크" 로 찾지 않는다** (#1283). 상단바의 `←` 가 생겨 문서 순서상 첫 링크가 그것이
+      됐다 — 완료 화면의 주 행동 자리를 직접 가리킨다.
     */
     if (step === 'done') {
-      containerRef.current?.querySelector<HTMLElement>('a[href]')?.focus()
+      containerRef.current?.querySelector<HTMLElement>('[data-reset-done] a[href]')?.focus()
       return
     }
     const focusId = step === 'email' ? 'email' : 'code'
@@ -315,7 +318,19 @@ export function PasswordResetView() {
 
   return (
     <div ref={containerRef} className="flex flex-col gap-6">
-      <h1 className="text-title-1 text-fg font-bold">{messages.auth.resetTitle}</h1>
+      {/*
+        **화면 이름은 상단바의 작은 `h1`, 본문의 큰 글자는 단계 질문이다** (#1283 C4). 예전에는
+        "비밀번호 찾기"(22 굵게)와 "가입한 이메일을 알려주세요"(16 굵게)가 둘 다 제목처럼 서 있었다.
+
+        `←` 는 모든 단계에서 로그인으로 간다 — 예전 1 · 2단계 아래 "로그인으로" 링크(#1084 L3)가
+        하던 일이다. 완료 화면에서도 남겨 둔다: 주 버튼과 목적지가 같지만 자리가 상단바라 두 번
+        말하는 것으로 읽히지 않는다.
+      */}
+      <AuthTopBar
+        backHref="/login"
+        backLabel={messages.auth.backToLogin}
+        title={messages.auth.resetTitle}
+      />
       {/*
         단계는 시각적으로만 바뀐다 — 스크린리더에는 아무 일도 일어나지 않은 것과 같다.
         현재 단계 제목(과 설명 줄)을 live 영역으로도 내보낸다 (정본 D6, `PasswordResetHeading`).
@@ -373,8 +388,6 @@ export function PasswordResetView() {
       )}
 
       {step === 'done' && <PasswordResetDone />}
-
-      {step !== 'done' && <PasswordResetLoginLink />}
     </div>
   )
 }

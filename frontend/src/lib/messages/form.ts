@@ -82,8 +82,28 @@ export const authMessages = {
   rememberEmail: '이메일 기억하기',
   rememberEmailCaption: '이 기기에 이메일만 저장돼요. 공용 기기에서는 해제해 주세요.',
   capsLockOn: 'Caps Lock이 켜져 있어요.',
-  loginDivider: '또는',
-  signupPrompt: '아직 회원이 아니신가요?',
+  /*
+    로그인 화면 소셜 우선 배치 (#1283, 로그인-세부명세 D13). 소셜 버튼이 위로 올라가면서 "또는" 이
+    **아래 무엇의 머리**인지 말해야 한다 — 이메일 폼이 두 번째 수단이라는 것을 글자로 남긴다.
+  */
+  loginDivider: '또는 이메일로 로그인',
+  // 락업 아래 한 줄. 소개 화면 히어로(`about.ts` `heading`)와 같은 말이다 — 서비스 이름 하나만 다르게 부르지 않는다
+  loginTagline: '반려견과 함께하는 제주 여행',
+  /*
+    "이메일이 기억나지 않나요?" 안내 시트 (#1283 F1). **아이디 찾기 화면이 아니다** — 아이디가 곧
+    이메일이라 찾아 줄 값이 따로 없고, 이메일을 받아 가입 여부를 알려 주면 계정 열거가 된다
+    (`resetTitle` 위 주석과 같은 이유). 실제로 막히는 사람은 "어떤 방법으로 가입했는지" 를 잊은
+    사람이라 그 갈래를 안내한다.
+  */
+  emailHelpTrigger: '이메일이 기억나지 않나요?',
+  emailHelpTitle: '이메일이 기억나지 않나요?',
+  emailHelpId: '혼디가개는 가입할 때 쓴 이메일이 아이디예요.',
+  emailHelpSocial:
+    '카카오·네이버로 가입했다면 이메일 없이 위의 카카오·네이버 버튼으로 로그인할 수 있어요.',
+  emailHelpMailbox: '이메일로 가입했다면 인증코드 메일을 받은 메일함이 가입한 이메일이에요.',
+  emailHelpClose: '확인',
+  /* 인증 화면 상단바의 뒤로 (#1283 C3). 재설정 완료의 `toLoginScreen` 링크와 이름이 겹치지 않게 길게 쓴다 */
+  backToLogin: '로그인 화면으로 돌아가기',
 
   signupTitle: '회원가입',
   stepOf: (current: number, total: number) => `${total}단계 중 ${current}단계`,
@@ -205,7 +225,7 @@ export const authMessages = {
     여부를 일부러 감추는데(항상 성공 응답) 화면이 그것을 흘리면 계정 열거가 된다.
     발송 성공 문구는 이메일 존재 여부와 무관하게 늘 `resetCodeSent` 하나다.
   */
-  /* 로그인 화면 비밀번호 아래 한 줄의 오른쪽 링크 — 체크박스와 한 줄에 서도록 짧게 (#1081) */
+  /* 로그인 화면 하단 링크 줄의 왼쪽 — `회원가입` 과 한 줄에 선다 (#1081 → #1283) */
   forgotPassword: '비밀번호 찾기',
   resetTitle: '비밀번호 찾기',
   resetEmailHeading: '가입한 이메일을 알려주세요',

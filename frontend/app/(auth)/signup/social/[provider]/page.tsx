@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 
 import { AuthCardDog } from '@/features/auth/auth-card-dog'
+import { AuthTopBar } from '@/features/auth/auth-top-bar'
 import { SocialSignupConsentScreen } from '@/features/auth/social-signup-consent-screen'
 import { isOAuthProvider } from '@/lib/auth/oauth-provider'
 import { readSession } from '@/lib/auth/session'
@@ -58,9 +59,15 @@ export default async function SocialSignupConsentPage({
   if (session !== null) redirect(target)
 
   return (
-    <>
+    // 회원가입 화면과 같은 래퍼 — 상단바와 제목 사이 간격을 맞춘다 (#1283)
+    <div className="flex flex-col gap-4">
       <AuthCardDog />
+      {/* 하위 화면의 출구 (#1283 C3) — 제목은 동의 화면이 단다 */}
+      <AuthTopBar
+        backHref={`/login?returnTo=${encodeURIComponent(target)}`}
+        backLabel={messages.auth.backToLogin}
+      />
       <SocialSignupConsentScreen provider={provider} returnTo={target} />
-    </>
+    </div>
   )
 }

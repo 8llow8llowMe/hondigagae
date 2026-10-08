@@ -12,6 +12,7 @@ import { FormFailure } from '@/components/form-failure'
 import { Input } from '@/components/input'
 import { PasswordInput } from '@/components/password-input'
 import { enterSession } from '@/features/auth/enter-session'
+import { LoginEmailHelp } from '@/features/auth/login-email-help'
 import { loginSchema, type LoginValues } from '@/features/auth/schemas'
 import { SocialLoginButtons } from '@/features/auth/social-login-buttons'
 import { login, type LoginResult } from '@/lib/api/auth'
@@ -106,7 +107,12 @@ export function LoginFormFields({
         onRetry={onRetry}
       />
 
-      <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email} required>
+      {/*
+        **`required` 를 넘기지 않는다** (#1283 C5). 칸이 둘뿐이고 둘 다 필수인 폼에서 `*` 는
+        정보 없이 눈만 어지럽힌다 — 무엇이 빠졌는지는 제출할 때 칸 아래 오류가 말한다.
+        `Field` 의 `*` 는 `aria-hidden` 이라 스크린리더 쪽에서 잃는 것도 없다.
+      */}
+      <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email}>
         <Input
           id="email"
           type="email"
@@ -130,7 +136,6 @@ export function LoginFormFields({
           원인일 수 없다 — 둘이 겹칠 일이 없다.
         */
         hint={capsLock ? messages.auth.capsLockOn : undefined}
-        required
       >
         {/*
           Caps Lock 이벤트는 `PasswordInput` 이 `Input` 으로 그대로 넘기는 native prop 이라 공용
@@ -158,38 +163,20 @@ export function LoginFormFields({
       </Field>
 
       {/*
-        **비밀번호 바로 아래 한 줄** — 왼쪽 기억하기 · 오른쪽 비밀번호 찾기 (#1081). 둘 다
-        "로그인하기 전에 손댈 것" 이라 제출 버튼 위에 선다. 예전에는 비밀번호 찾기가 폼 밖
-        맨 아래에 있어, 비밀번호가 막힌 사람이 **소셜 버튼을 지나서야** 찾았다.
-
-        `items-start` 다 — 체크박스 라벨이 길어져 줄이 바뀌어도 링크가 첫 줄에 붙어 있게.
+        **비밀번호 아래에는 기억하기 하나만 둔다** (#1081 → #1283). 예전에는 오른쪽에 비밀번호
+        찾기가 함께 섰는데, 회원가입이 카드 맨 아래 따로 있어 "로그인 말고 할 일" 두 링크가 화면
+        두 곳에 흩어졌다(L3). 둘을 폼 아래 한 줄(`LoginFooterLinks`)로 모았다.
       */}
       <div className="flex flex-col gap-1">
-        <div className="flex items-start justify-between gap-3">
-          <Checkbox
-            id="remember-email"
-            label={messages.auth.rememberEmail}
-            checked={remember}
-            onCheckedChange={onRememberChange}
-            className="min-w-0"
-          />
-          {/*
-            비밀번호 찾기는 `returnTo` 를 이어받지 않는다. 재설정이 끝나면 전 기기 세션이
-            무효화돼 어차피 로그인부터 다시 해야 하고(AuthWebController), 중간에 경로를
-            들고 다니면 이메일이 오가는 화면에 쿼리를 하나 더 얹는 셈이다 — 정본 D3.
-
-            누르는 자리는 `min-h-11` 로 체크박스 줄과 같은 44 다 (DESIGN.md §7 #905 R3).
-          */}
-          <Link
-            href="/password/reset"
-            className="text-body-2 text-fg-muted inline-flex min-h-11 shrink-0 items-center underline"
-          >
-            {messages.auth.forgotPassword}
-          </Link>
-        </div>
+        <Checkbox
+          id="remember-email"
+          label={messages.auth.rememberEmail}
+          checked={remember}
+          onCheckedChange={onRememberChange}
+        />
         {/*
-          켰을 때만 보인다. **체크박스의 `description` 이 아니라 줄 전체 폭이다** — 왼쪽 칸에
-          넣으면 375 에서 링크 몫을 뺀 폭으로 세 줄이 된다. `role` 을 달지 않는 것은 이것이
+          켰을 때만 보인다. **체크박스의 `description` 이 아니라 줄 전체 폭이다** — 한때 오른쪽에
+          링크가 함께 서던 줄이라 왼쪽 칸에 넣으면 세 줄이 됐다. `role` 을 달지 않는 것은 이것이
           오류가 아니라 상시 안내라서다 (`socialConsentRequired` 와 같은 판단).
         */}
         {remember && (
@@ -343,8 +330,7 @@ export function LoginForm({ returnTo, initialEmail, onSubmittingChange }: LoginF
   }, [])
 
   return (
-    <div ref={formContainerRef} className="flex flex-col gap-6">
-      <h1 className="text-title-1 text-fg font-bold">{messages.auth.loginTitle}</h1>
+    <div ref={formContainerRef}>
       <LoginFormFields
         values={values}
         errors={errors}
@@ -375,11 +361,22 @@ export function LoginForm({ returnTo, initialEmail, onSubmittingChange }: LoginF
 }
 
 /**
- * 로그인 화면의 **두 로그인 수단과 출구** — 이메일 폼 · "또는" · 소셜 버튼 · 회원가입 입구.
+ * 로그인 화면의 **두 로그인 수단과 출구** — 소셜 버튼 · "또는 이메일로 로그인" · 이메일 폼 ·
+ * 하단 링크 줄.
  *
  * 넷을 한 클라이언트 경계로 묶는 이유는 하나다: **이메일 로그인이 도는 동안 소셜 버튼을
  * 잠근다** (#1084 L2). 페이지는 서버 컴포넌트라 형제 사이의 상태를 들 수 없다. 묶는 것은
- * 그 상태 하나뿐이라 조각의 배치 · 간격은 페이지의 `gap-4` 를 그대로 쓴다 — Fragment 다.
+ * 그 상태 하나뿐이라 조각의 배치 · 간격은 페이지의 간격을 그대로 쓴다 — Fragment 다.
+ *
+ * **소셜이 위다** (#1283 L1, 로그인-세부명세 D13). 반려견 여행 서비스의 첫 방문자 대부분은
+ * 카카오 · 네이버로 들어오는데, 이메일 폼이 화면 위 절반을 차지하고 소셜은 "또는" 아래 보조
+ * 자리였다. #1081 이 "기본 수단은 이메일" 로 둔 순서를 뒤집는다. 이메일 폼은 접지 않고
+ * 펼쳐 둔다 — 이메일 가입자에게 클릭 하나를 더 시키지 않는다 (시안 A안).
+ *
+ * **버튼 문구는 그대로 "… 로그인" 이다.** "…로 시작하기" 로 바꾸면 신규 사용자를 이 버튼으로
+ * 부르게 되는데, 로그인 화면의 소셜 버튼은 동의를 싣지 않아 최초 연동이 콜백에서
+ * `MEMBER_010/011` 로 거부된다(`SocialLoginButtons` 의 `consent` JSDoc). 각 사 가이드 문구이기도
+ * 하다(`socialLoginLabel` 주석).
  */
 export function LoginMethods({
   returnTo,
@@ -392,32 +389,28 @@ export function LoginMethods({
 
   return (
     <>
-      <LoginForm
-        returnTo={returnTo}
-        initialEmail={initialEmail}
-        onSubmittingChange={setEmailSubmitting}
-      />
+      <SocialLoginButtons returnTo={returnTo} disabled={emailSubmitting} />
       {/*
-        소셜 로그인은 폼 아래에 둔다 — 기본 수단은 이메일 로그인이다. "또는" 이 두 수단이
-        서로 대신한다는 것을 말한다: 선 없이 붙어 있으면 소셜 버튼이 이메일 로그인의 다음
-        단계로 읽힌다 (#1081).
-
         **소셜 로그인은 기억한 이메일을 읽지도 쓰지도 않는다.** 제공자가 이메일을 정하므로
         우리가 채울 칸이 없고, 성공해도 그 이메일이 이메일 로그인에 쓰일 수 있는 계정인지
         (비밀번호가 있는지) 모른다.
       */}
       <LoginDivider />
-      <SocialLoginButtons returnTo={returnTo} disabled={emailSubmitting} />
-      <LoginSignupPrompt returnTo={returnTo} />
+      <LoginForm
+        returnTo={returnTo}
+        initialEmail={initialEmail}
+        onSubmittingChange={setEmailSubmitting}
+      />
+      <LoginFooterLinks returnTo={returnTo} />
     </>
   )
 }
 
 /**
- * "또는" 구분선 — 이메일 로그인과 소셜 로그인 사이 (#1081).
+ * "또는 이메일로 로그인" 구분선 (#1081 → #1283).
  *
  * 선 둘은 장식이라 `aria-hidden` 이고, 글자만 읽힌다. `role="separator"` 를 달지 않는 것은
- * 스크린리더가 "구분선" 을 한 번 더 읽어 "또는" 과 겹치기 때문이다.
+ * 스크린리더가 "구분선" 을 한 번 더 읽어 글자와 겹치기 때문이다.
  */
 export function LoginDivider() {
   return (
@@ -430,24 +423,35 @@ export function LoginDivider() {
 }
 
 /**
- * 화면 맨 아래 "아직 회원이 아니신가요? 회원가입" (#1081).
+ * 폼 아래 링크 줄 — `비밀번호 찾기 | 회원가입` + "이메일이 기억나지 않나요?" (#1283 L3 · F1).
  *
- * **소셜 버튼 아래다.** 회원가입은 이 화면의 목적이 아니라 출구라, 로그인 수단(이메일 ·
- * 소셜)을 다 지난 자리에 둔다. `returnTo` 를 물고 간다 — 가입 후 로그인하면 원래
- * 목적지로 돌아간다 (로그인-세부명세 D4).
+ * 예전에는 비밀번호 찾기가 기억하기 오른쪽에, 회원가입이 카드 맨 아래 문장 속에 따로 있었다.
+ * 둘 다 **로그인 말고 할 일**이라 네이버 · 카카오처럼 한 줄에 모은다.
  *
- * 링크는 `min-h-11` 로 누르는 자리를 44 로 둔다 (DESIGN.md §7 #905 R3).
+ * **비밀번호 찾기는 `returnTo` 를 이어받지 않는다.** 재설정이 끝나면 전 기기 세션이 무효화돼
+ * 어차피 로그인부터 다시 해야 하고(AuthWebController), 이메일이 오가는 화면에 쿼리를 하나 더
+ * 얹을 이유가 없다 — 비밀번호찾기 정본 D3. **회원가입은 물고 간다** — 가입 후 원래 목적지로
+ * 돌아간다 (로그인-세부명세 D4).
+ *
+ * 두 링크 모두 `min-h-11` 로 누르는 자리가 44 다 (DESIGN.md §7 #905 R3). 사이의 세로선은
+ * 장식이라 `aria-hidden` — 링크 목록에서는 두 링크가 각자 이름으로 읽힌다.
  */
-export function LoginSignupPrompt({ returnTo }: { returnTo: string }) {
+export function LoginFooterLinks({ returnTo }: { returnTo: string }) {
   return (
-    <p className="text-body-2 text-fg-muted flex flex-wrap items-center justify-center gap-x-2">
-      {messages.auth.signupPrompt}
-      <Link
-        href={`/signup?returnTo=${encodeURIComponent(returnTo)}`}
-        className="text-brand-600 inline-flex min-h-11 items-center font-medium underline"
-      >
-        {messages.auth.toSignup}
-      </Link>
-    </p>
+    <div className="flex flex-col items-center">
+      <p className="text-body-2 text-fg-muted flex items-center justify-center">
+        <Link href="/password/reset" className="inline-flex min-h-11 items-center px-3">
+          {messages.auth.forgotPassword}
+        </Link>
+        <span aria-hidden="true" className="bg-border-strong h-3 w-px" />
+        <Link
+          href={`/signup?returnTo=${encodeURIComponent(returnTo)}`}
+          className="inline-flex min-h-11 items-center px-3"
+        >
+          {messages.auth.toSignup}
+        </Link>
+      </p>
+      <LoginEmailHelp />
+    </div>
   )
 }

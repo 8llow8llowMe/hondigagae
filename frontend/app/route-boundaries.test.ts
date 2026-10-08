@@ -98,7 +98,7 @@ describe('오류 경계 셋 — 어느 층이 죽어도 한국어 화면과 출�
     expect(code(path)).not.toContain('AppShell')
   })
 
-  it('app/error.tsx — 브랜드 락업이 홈 링크다 ((auth) 셸과 같은 골격)', () => {
+  it('app/error.tsx — 브랜드 락업이 홈 링크다 (#532 인증 셸의 골격)', () => {
     const markup = renderBoundary(RootError)
 
     expect(markup).toMatch(/<a[^>]*href="\/"[^>]*>[\s\S]*<svg/)

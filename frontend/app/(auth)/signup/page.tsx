@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 
 import { AuthCardDog } from '@/features/auth/auth-card-dog'
+import { AuthTopBar } from '@/features/auth/auth-top-bar'
 import { LoginReasonNotice } from '@/features/auth/login-reason-notice'
 import { SignupScreen } from '@/features/auth/signup-screen'
 import { readSession } from '@/lib/auth/session'
@@ -40,6 +41,14 @@ export default async function SignupPage({
     */
     <div className="flex flex-col gap-4">
       <AuthCardDog />
+      {/*
+        하위 화면의 출구 (#1283 C3). 제목은 `SignupHeading` 이 따로 단다 — 본문 제목이 곧 화면
+        이름이라 상단바에 또 쓰지 않는다. `returnTo` 를 물고 돌아간다 — 들어온 맥락을 잃지 않게.
+      */}
+      <AuthTopBar
+        backHref={`/login?returnTo=${encodeURIComponent(target)}`}
+        backLabel={messages.auth.backToLogin}
+      />
       {/* 로그인 화면에서 넘어와도 같은 맥락을 이어받는다 — `returnTo` 가 그대로 실려 온다 */}
       <LoginReasonNotice returnTo={target} screen="signup" />
       <SignupScreen returnTo={target} />

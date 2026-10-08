@@ -1,16 +1,21 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it } from 'vitest'
 
 import {
   LoginDivider,
+  LoginFooterLinks,
   LoginFormFields,
   type LoginFormFieldsProps,
-  LoginSignupPrompt,
+  LoginMethods,
 } from '@/features/auth/login-form'
 import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
+
+/** `Field` 의 필수 표시 — 라벨 안 `aria-hidden` `*` (`field.tsx`). 클래스가 아니라 모양으로 찾는다 */
+const REQUIRED_MARK = /<span aria-hidden="true"[^>]*>\*<\/span>/
 
 function render(overrides: Partial<LoginFormFieldsProps> = {}) {
   const props: LoginFormFieldsProps = {
@@ -144,19 +149,25 @@ describe('LoginFormFields', () => {
     expect(markup).not.toContain(messages.common.temporaryErrorTitle)
   })
 
-  it('비밀번호 아래 한 줄이 기억하기 → 비밀번호 찾기 → 로그인 버튼 순서다 (#1081)', () => {
+  /*
+    비밀번호 찾기는 폼 아래 링크 줄로 옮겼다 (#1283 L3) — 폼 안에는 기억하기만 남는다.
+  */
+  it('비밀번호 아래가 기억하기 → 로그인 버튼 순서이고 비밀번호 찾기는 폼 밖이다', () => {
     const markup = render()
 
     const password = markup.indexOf('id="password"')
     const remember = markup.indexOf(messages.auth.rememberEmail)
-    const forgot = markup.indexOf(messages.auth.forgotPassword)
     const submit = markup.indexOf('type="submit"')
 
     expect(password).toBeGreaterThan(-1)
     expect(remember).toBeGreaterThan(password)
-    expect(forgot).toBeGreaterThan(remember)
-    expect(submit).toBeGreaterThan(forgot)
-    expect(markup).toContain('href="/password/reset"')
+    expect(submit).toBeGreaterThan(remember)
+    expect(markup).not.toContain('href="/password/reset"')
+  })
+
+  /* 칸 둘이 다 필수인 폼의 `*` 는 정보가 없다 (#1283 C5) */
+  it('필수 표시(*)를 그리지 않는다', () => {
+    expect(render()).not.toMatch(REQUIRED_MARK)
   })
 
   it('이메일 기억하기는 체크박스이고 기본은 꺼져 있다', () => {
@@ -207,7 +218,7 @@ describe('LoginFormFields — 제출 중 (#1084 L2)', () => {
 })
 
 describe('LoginDivider', () => {
-  it('"또는" 만 읽히고 선은 숨긴다', () => {
+  it('"또는 이메일로 로그인" 만 읽히고 선은 숨긴다', () => {
     const markup = renderToStaticMarkup(createElement(LoginDivider))
 
     expect(markup).toContain(messages.auth.loginDivider)
@@ -215,13 +226,60 @@ describe('LoginDivider', () => {
   })
 })
 
-describe('LoginSignupPrompt', () => {
-  it('안내 문구와 returnTo 를 문 회원가입 링크를 렌더한다', () => {
-    const markup = renderToStaticMarkup(createElement(LoginSignupPrompt, { returnTo: '/plans/1' }))
+describe('LoginFooterLinks — 폼 아래 링크 줄 (#1283 L3 · F1)', () => {
+  const markup = renderToStaticMarkup(createElement(LoginFooterLinks, { returnTo: '/plans/1' }))
 
-    expect(markup).toContain(messages.auth.signupPrompt)
-    expect(markup).toContain('href="/signup?returnTo=%2Fplans%2F1"')
+  it('비밀번호 찾기 → 회원가입 순서로 한 줄에 선다', () => {
+    const forgot = markup.indexOf('href="/password/reset"')
+    const signup = markup.indexOf('href="/signup?returnTo=%2Fplans%2F1"')
+
+    expect(forgot).toBeGreaterThan(-1)
+    expect(signup).toBeGreaterThan(forgot)
+    expect(markup).toContain(messages.auth.forgotPassword)
     expect(markup).toContain(messages.auth.toSignup)
-    expect(markup).toContain('min-h-11')
+  })
+
+  /* 재설정이 끝나면 어차피 로그인부터 다시 한다 — 비밀번호찾기 정본 D3 */
+  it('비밀번호 찾기는 returnTo 를 싣지 않고, 회원가입은 싣는다', () => {
+    expect(markup).not.toContain('href="/password/reset?')
+    expect(markup).toContain('href="/signup?returnTo=%2Fplans%2F1"')
+  })
+
+  it('두 링크와 안내 버튼 모두 누르는 자리가 44 다', () => {
+    expect(markup.match(/min-h-11/g)).toHaveLength(3)
+  })
+
+  it('이메일 안내는 이동하지 않는 버튼이다 — 닫힌 시트는 그리지 않는다', () => {
+    expect(markup).toMatch(/<button type="button"[^>]*>이메일이 기억나지 않나요\?<\/button>/)
+    expect(markup).not.toContain('role="dialog"')
+  })
+})
+
+describe('LoginMethods — 소셜이 이메일 폼 위다 (#1283 L1, 로그인-세부명세 D13)', () => {
+  const markup = renderToStaticMarkup(
+    createElement(
+      QueryClientProvider,
+      { client: new QueryClient() },
+      createElement(LoginMethods, { returnTo: '/', initialEmail: '' }),
+    ),
+  )
+
+  it('카카오 → 네이버 → "또는 이메일로 로그인" → 이메일 폼 → 하단 링크 줄 순서다', () => {
+    const order = [
+      messages.auth.socialLoginLabel('카카오'),
+      messages.auth.socialLoginLabel('네이버'),
+      messages.auth.loginDivider,
+      'id="email"',
+      'type="submit"',
+      'href="/password/reset"',
+      messages.auth.emailHelpTrigger,
+    ].map((needle) => markup.indexOf(needle))
+
+    expect(order.every((index) => index > -1)).toBe(true)
+    expect([...order].sort((a, b) => a - b)).toEqual(order)
+  })
+
+  it('보이는 제목을 그리지 않는다 — 화면의 h1 은 페이지가 sr-only 로 둔다', () => {
+    expect(markup).not.toContain('<h1')
   })
 })
