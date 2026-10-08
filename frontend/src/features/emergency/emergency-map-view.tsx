@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 
 import { Button } from '@/components/button'
@@ -31,6 +31,7 @@ import { MapLocateButton } from '@/features/map/map-locate-button'
 import { formatDistance } from '@/lib/format/distance'
 import { type LatLng, SELECTED_FACILITY_MAP_LEVEL, toLatLng } from '@/lib/geo/coord'
 import type { PositionResult } from '@/lib/geo/current-position'
+import type { MapOffset } from '@/lib/map/offset-center'
 import { shouldOfferResearch } from '@/lib/map/research-offer'
 import type { MapSdkFailure } from '@/lib/map/sdk'
 import { boundsCenter, isWithinBounds, type MapBounds } from '@/lib/map/viewport'
@@ -118,6 +119,20 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
   const [boundsStale, setBoundsStale] = useState(false)
   const [sheetStop, setSheetStop] = useState<SheetStop>('mid')
   const [panelOpen, setPanelOpen] = useState(true)
+  /** 손잡이의 `aria-controls` — 접는 대상인 데스크톱 패널 (#1232 D3) */
+  const stackId = useId()
+  const stackRef = useRef<HTMLDivElement>(null)
+  /*
+    **고른 시설을 패널에 덮이지 않는 자리로 옮긴다** (#1232 D10). 도킹 패널(400)이 왼쪽을 덮어 정중앙이
+    패널 쪽으로 치우친다 — `/places` 의 `selectedOffset` 과 같은 식이다. 접혀 있으면 덮인 것이 없다.
+
+    **배치 상자(`offsetWidth`)로 잰다** — 패널은 `transform` 으로 여닫혀 그 도중에 rect 를 재면 중간
+    프레임이 나온다. 모바일은 패널이 `display: none` 이라 0 이고, 시트 쪽 보정은 이 이슈 범위 밖이다.
+  */
+  const selectedOffset = useCallback((): MapOffset | null => {
+    const width = stackRef.current?.offsetWidth ?? 0
+    return panelOpen && width > 0 ? { x: width / 2, y: 0 } : null
+  }, [panelOpen])
   const [failure, setFailure] = useState<MapSdkFailure | null>(null)
 
   /*
@@ -371,6 +386,12 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
       setBoundsStale(true)
       selectionAnchorRef.current = { radius: board.radius, position: board.position }
       setSheetStop((stop) => (stop === 'min' ? 'mid' : stop))
+      /*
+        **데스크톱은 접힌 패널을 편다** (#1232 D10) — 시트를 `mid` 로 올리는 것과 같은 판단이다. 이 화면은
+        **고른 행에만 전화 · 길찾기가 붙는다**(`EmergencyMapPanel`). 접힌 채 두면 핀 이름표만 보이고 이 화면의
+        핵심 행동에 닿을 길이 손잡이 한 번 뒤로 숨는다. `/places` 가 미리보기를 열며 펴는 것과 같다.
+      */
+      setPanelOpen(true)
     },
     [selectedId, bounds, board.radius, board.position],
   )
@@ -542,6 +563,9 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         camera={board.camera}
         /* 고르면 도로가 읽히는 단계까지 확대한다 — `/places` 보다 한 단계 깊다 */
         selectedLevel={SELECTED_FACILITY_MAP_LEVEL}
+        selectedOffset={selectedOffset}
+        /* 왼쪽은 도킹 패널이 덮는다 — 카카오 로고 · 축척을 우하단으로 비킨다 (#1232 D5) */
+        copyrightPosition="right"
         onFailure={setFailure}
         className="map-canvas-height w-full"
       />
@@ -560,7 +584,13 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         피해야 해서 그 계산이 CSS 에 있다.
       */}
       {offerResearch && bounds !== null && (
-        <div className="map-research-offset absolute inset-x-0 z-30 flex justify-center px-4">
+        <div
+          className={cn(
+            'map-research-offset absolute inset-x-0 z-30 flex justify-center px-4',
+            // 남은 지도의 가운데 — 도킹 패널(400)이 왼쪽을 덮는다. 접히면 0 (#1232 D10)
+            panelOpen && 'lg:left-100',
+          )}
+        >
           <button
             type="button"
             onClick={() => board.researchAt(boundsCenter(bounds))}
@@ -632,73 +662,74 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         )}
       </div>
 
-      {/* ── 데스크톱: 좌측 400 고정 패널 ─────────────────────────────────── */}
+      {/* ── 데스크톱: 왼쪽에 붙은 목록 패널 (#1232 D10) ──────────────────── */}
+      {/*
+        `/places` 와 **같은 패널 · 같은 손잡이 · 같은 움직임**이다 — 근거와 실측은 `place-map-view.tsx` 의 같은
+        자리와 `지도패널-도킹-세부명세.md` 에 있다. 이 화면은 미리보기가 없어 스택이 목록 하나다.
+
+        **갈아끼우지 않고 슬라이드한다** (#531 이 `/places` 에서 바꾼 것). 예전에는 `panelOpen ? <패널> :
+        <펼치기 버튼>` 으로 DOM 이 교체돼 400px 패널이 한 프레임에 나타나고 사라졌다. 이제 패널은 항상
+        마운트된 채 래퍼째 밀려나고, 닫힌 동안은 `inert` 라 Tab 이 보이지 않는 행을 지나지 않는다.
+        손잡이는 래퍼 오른쪽 끝(`left-full`) 세로 중앙이라 열림 400 · 접힘 0 에 선다.
+      */}
       <div
         className={cn(
-          // 상단은 보기 전환 토글과 같은 높이(lg 헤더의 pt-6). 하단 32 는 카카오
-          // 축척·로고 막대(바닥 0~19px)를 피한 값이다 — 줄이면 축척이 눌려 보인다
-          'absolute top-6 bottom-8 left-4 z-30 hidden lg:block',
-          panelOpen ? 'map-panel-width' : 'w-auto',
+          'absolute inset-y-0 left-0 z-30 hidden transition-transform lg:block',
+          !panelOpen && '-translate-x-full',
         )}
       >
-        {panelOpen ? (
-          // 접기 탭이 패널 밖으로 튀어나오므로 여기서 자르지 않는다
-          <div className="relative h-full">
-            <div className="bg-bg border-border flex h-full w-full flex-col overflow-hidden rounded-xl rounded-tr-none border shadow-lg">
-              {/*
-                **검색이 패널 맨 위다** (#584) — 목록 갈래가 검색을 칩 위에 두는 것과 같은
-                순서다. 검색어는 축이 아니라 **범위**이고 칩은 그 안을 좁힌다
-                (`facility-filters.ts` 의 `narrowByKeyword`).
+        <div
+          ref={stackRef}
+          id={stackId}
+          inert={!panelOpen}
+          className={cn(
+            'map-panel-width bg-bg border-border flex h-full flex-col overflow-hidden border-r',
+            // 그림자는 지도와의 경계 하나 — 접혀 있으면 x=0 에 회색 띠로 비친다 (#1123)
+            panelOpen && 'map-dock-shadow',
+          )}
+        >
+          {/*
+            **검색이 패널 맨 위다** (#584) — 목록 갈래가 검색을 칩 위에 두는 것과 같은
+            순서다. 검색어는 축이 아니라 **범위**이고 칩은 그 안을 좁힌다
+            (`facility-filters.ts` 의 `narrowByKeyword`).
 
-                **`compact` 가 아니다.** 이 패널 툴바 안쪽은 374px 로 목록 갈래의 모바일
-                검색(343px)보다 넓다 — 글자 버튼이 들어가는 자리에서 아이콘으로 줄이면
-                같은 컨트롤이 화면마다 다른 이유 없이 갈린다. 오버레이만 자리가 없다.
-              */}
-              <div className="border-border border-b px-3 py-2">
-                <EmergencySearchField
-                  filters={board.filters}
-                  onFiltersChange={board.setFilters}
-                  id="emergency-keyword-panel"
-                />
-              </div>
-
-              <div className="border-border border-b px-3 py-2">{toolbar}</div>
-
-              {board.fallback !== null && (
-                <div className="border-border border-b px-4 py-3">
-                  <PositionNotice reason={board.fallback} onRetry={board.locate} />
-                </div>
-              )}
-
-              <div className="border-border bg-bg-sunken border-b px-4 py-2">{caption}</div>
-
-              <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
-            </div>
-
-            {/* 책갈피처럼 오른쪽 모서리에 물린다 — 안쪽 머리에 두면 목록의 컨트롤로 읽힌다.
-                높이는 닫혔을 때 펼치기 버튼이 서는 자리와 같다 (top-0 · 44) */}
-            <button
-              type="button"
-              onClick={() => setPanelOpen(false)}
-              aria-expanded
-              aria-label={messages.map.collapsePanel}
-              title={messages.map.collapsePanel}
-              className="bg-bg border-border text-fg-muted hover:text-fg focus-visible:ring-brand-500 absolute top-0 -right-6 flex h-11 w-6 items-center justify-center rounded-r-lg border border-l-0 shadow-md focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
-            >
-              <ChevronLeftIcon size={16} />
-            </button>
+            **`compact` 가 아니다.** 이 패널 툴바 안쪽은 374px 로 목록 갈래의 모바일
+            검색(343px)보다 넓다 — 글자 버튼이 들어가는 자리에서 아이콘으로 줄이면
+            같은 컨트롤이 화면마다 다른 이유 없이 갈린다. 오버레이만 자리가 없다.
+          */}
+          <div className="border-border border-b px-3 py-2">
+            <EmergencySearchField
+              filters={board.filters}
+              onFiltersChange={board.setFilters}
+              id="emergency-keyword-panel"
+            />
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setPanelOpen(true)}
-            aria-expanded={false}
-            aria-label={messages.map.expandPanel}
-            className="bg-bg border-border text-fg-muted hover:text-fg focus-visible:ring-brand-500 flex size-11 items-center justify-center rounded-xl border shadow-lg focus-visible:ring-2 focus-visible:outline-none"
-          >
-            <ChevronRightIcon size={20} />
-          </button>
-        )}
+
+          <div className="border-border border-b px-3 py-2">{toolbar}</div>
+
+          {board.fallback !== null && (
+            <div className="border-border border-b px-4 py-3">
+              <PositionNotice reason={board.fallback} onRetry={board.locate} />
+            </div>
+          )}
+
+          <div className="border-border bg-bg-sunken border-b px-4 py-2">{caption}</div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
+        </div>
+
+        {/* 손잡이 하나 — 보이는 탭 24×48, 누르는 자리는 `::before` 로 44 (DESIGN.md 44px 하한) */}
+        <button
+          type="button"
+          onClick={() => setPanelOpen((open) => !open)}
+          aria-expanded={panelOpen}
+          aria-controls={stackId}
+          aria-label={panelOpen ? messages.map.collapsePanel : messages.map.expandPanel}
+          title={panelOpen ? messages.map.collapsePanel : messages.map.expandPanel}
+          className="bg-bg border-border text-fg-muted hover:text-fg focus-visible:ring-brand-500 absolute top-1/2 left-full flex h-12 w-6 -translate-y-1/2 items-center justify-center rounded-r-md border border-l-0 shadow-md before:absolute before:inset-y-0 before:left-0 before:w-11 before:content-[''] focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
+        >
+          {panelOpen ? <ChevronLeftIcon size={16} /> : <ChevronRightIcon size={16} />}
+        </button>
       </div>
 
       {/* ── 모바일: 하단 시트 3단 ────────────────────────────────────────── */}
