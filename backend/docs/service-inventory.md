@@ -100,7 +100,8 @@
 
 - `service-discovery` — Eureka 서버
 - `api-gateway` — Spring Cloud Gateway. `/api/v1/{auth,members,places,walk-courses,emergencies,insights,plans,favorites,shared-plans,ai-plans,assistant}/**` 라우팅 + JWT 1차 검증 + Swagger 집계.
-  `shared-plans` 는 일정 공유 링크의 **비인증** 공개 조회다 — 토큰이 곧 열람 권한이라 `LoggingGlobalApiGatewayFilter` 가 경로 로그에서 토큰 세그먼트를 가린다 (#627).
+  `shared-plans` 는 일정 공유 링크의 **비인증** 공개 조회다 — 토큰이 곧 열람 권한이라 게이트웨이 로그에서 토큰 세그먼트를 가린다 (#627, #1281).
+  우리 줄(요청·응답, JWT 거부)은 `ShareTokenLogMasker` 를 직접 거치고, 프레임워크 줄(오류 핸들러 500 · 체크포인트)과 스택트레이스는 `logback-spring.xml` 의 출력 변환기가 가린다.
   이 라우트에만 **레이트 리밋**이 걸린다 — 링크(토큰 해시)당 초당 2 · 버스트 20, 넘으면 429 `GATEWAY_001` (#1244, `services/plan-service.md`).
   **새 컨트롤러가 `/api/v1/` 아래 새 접두어를 열면 세 프로파일 yml 에 라우트를 같이 추가한다** — 빠지면 서비스 안에서는 동작하고
   Swagger 에도 뜨는데 프론트는 404 다 (`/insights` 3254d13, `/favorites` #202 두 번 겪었다). `GatewayRouteCoverageTest` 가

@@ -331,8 +331,24 @@ CREATE TABLE plan_review_item (
   유출 경로를 추적할 근거가 사라진다. DELETE 는 해당 일정의 **미폐기 행을 전부** 닫고 0건이어도 200 이다 —
   동시 INSERT 로 남은 형제 행이 살아남으면 "껐다" 고 믿는 동안 옛 링크가 열린다. 이미 폐기된 행의 시각은 덮어쓰지 않는다.
 - **토큰**은 `SecureRandom` 32바이트를 URL-safe Base64(패딩 없음)로 옮긴 43자다. 평문 저장 + `uk_plan_share_link_token`.
-  토큰 자체가 열람 권한이라 **게이트웨이 로그에서 마스킹한다** (`LoggingGlobalApiGatewayFilter`, `/api/v1/shared-plans/***`).
-  마스킹이 없으면 Loki 를 볼 수 있는 사람이 곧 그 일정을 볼 수 있는 사람이 된다.
+  토큰 자체가 열람 권한이라 **게이트웨이 로그에서 마스킹한다** (`ShareTokenLogMasker`, `/api/v1/shared-plans/***`).
+  마스킹이 없으면 Loki 를 볼 수 있는 사람이 곧 그 일정을 볼 수 있는 사람이 된다. 마스킹은 **두 겹**이다 (#1281).
+  - **우리 줄은 `ShareTokenLogMasker` 를 직접 부른다** — 요청·응답·오류응답·지연요청(`LoggingGlobalApiGatewayFilter`),
+    JWT 거부(`JwtAuthExceptionWebHandler` — JWT 필터가 전역이라 공유 경로에도 걸린다). 세그먼트는 라우트처럼 퍼센트
+    디코딩하고 `;매개변수` 를 뗀 값으로 고르고, 원문 세그먼트를 통째로 `***` 로 바꾼다. 라우트는 대소문자를 가리지만
+    masker 는 가리지 않는다(더 넓다). 경로를 읽지 못하면(깨진 `%`) 원문 대신 `<해석 불가 경로>` 를 찍는다.
+  - **프레임워크 줄과 스택트레이스는 출력 단계에서 가린다** — 게이트웨이 `logback-spring.xml` 이 Boot 기본 콘솔 패턴의
+    메시지·예외 부분을 `ShareTokenMaskingConverter`(`%maskShareToken`)로 감싼다. 프레임워크가 경로를 원문으로 찍는 곳은
+    셋이고 모두 `HTTP <METHOD> "<path>?<query>"` 모양이라, 변환기가 그 따옴표 안을 masker 로 바꾼다:
+    부트 오류 핸들러(`AbstractErrorWebExceptionHandler`)는 **오류 응답 상태가 정확히 500 일 때** ERROR + 스택트레이스로,
+    `HttpWebHandlerAdapter` 는 **오류 핸들러가 다시 던진 오류**(응답이 이미 나갔거나 클라이언트가 끊겼다고 본 경우)를
+    `500 Server Error for …` 또는 `Error [..] for …, but ServerHttpResponse already committed` 로 찍는다.
+    `ExceptionHandlingWebHandler` 는 **체인까지 올라온 모든 오류**에 체크포인트를 suppressed 로 붙여, 그 예외의 스택트레이스가
+    찍힐 때마다 `*__checkpoint ⇢ HTTP GET "…"` 줄이 나온다. 이 문구 밖에서는 정규형 `/shared-plans` 세그먼트 뒤 한 세그먼트를 가리는
+    안전망만 돈다. 부트 오류 핸들러는 바꾸지 않는다 — `ErrorWebExceptionHandler` 를 올리면 기본 핸들러가 사라진다
+    (`api-design-guide.md` §2-2), 그리고 `HttpWebHandlerAdapter` 줄과 체크포인트는 핸들러를 바꿔도 남는다.
+    `ShareTokenLogOutputTest` 가 실제 앱 컨텍스트에서 업스트림 실패 500 을 일으켜 콘솔 출력 전체(메시지·스택트레이스·Suppressed)에
+    토큰이 없는지, 출력 모양이 Boot 기본과 같은지 본다.
 - **공개 조회는 발급 형식(`[A-Za-z0-9_-]{43}`)이 아닌 토큰을 DB 를 보지 않고 `PLAN_023` 404 로 끊는다** (#1244,
   `PlanShareLinkProcessor#isWellFormedToken` — 정규식은 `TOKEN_BYTES`·`TOKEN_ENCODER` 에서 나온다). 토큰 컬럼의
   `utf8mb4_bin` 은 PAD SPACE 콜레이션이라 `WHERE token = 'T '` 가 `T` 행에 맞는다. 형식을 보지 않으면 뒤 공백만
@@ -432,10 +448,11 @@ plan-service 를 거쳐 tour-service 호출(최대 2회)로 **증폭**되고, to
     같은 디코딩으로 읽는다. (2) 디코딩해도 남는 변형(뒤 공백 `%20` — PAD SPACE 로 같은 행이 열린다)은 형식 검사가
     malformed 버킷으로 모으고, plan-service 는 **같은 정규식**으로 그 표기를 열지 않는다. 그래서 "해시 버킷을 받는
     표기 = 일정을 여는 표기" 다.
-  - **로그 마스킹과 토큰을 고르는 방식이 다르다.** 리졸버는 Spring 의 경로 매칭(디코딩한 세그먼트)을 쓰고, 마스킹
-    (`LoggingGlobalApiGatewayFilter`)은 원문 문자열에서 리터럴 `indexOf("/api/v1/shared-plans/")` 로 찾는다. 그래서
-    마스킹은 `/api/v1/shared-%70lans/{token}` 이나 `/api/v1/shared-plans//{token}` 처럼 표기를 바꾼 요청의 토큰을
-    **가리지 못한다**(#627 부터 있던 공백 — 이 이슈 범위 밖이라 남긴다).
+  - **로그 마스킹도 같은 방식으로 토큰을 고른다** (#1281 로 닫힘). 전에는 마스킹이 원문 문자열에서 리터럴
+    `indexOf("/api/v1/shared-plans/")` 로 찾아 `/api/v1/shared-%70lans/{token}` · `/api/v1/shared-plans;x=1/{token}` 처럼
+    표기만 바꾼 요청의 토큰을 가리지 못했다(#627 부터 있던 공백). 이제 `ShareTokenLogMasker` 가 `PathContainer` 로 읽어
+    디코딩한 세그먼트로 고른다. 프레임워크 줄도 출력 변환기가 같은 masker 로 바꾼다. "라우트 패턴이 `{token}` 으로
+    뽑는 값은 가린 결과에 남지 않는다" 를 `ShareTokenLogMaskerTest` 가 표기 조합 입력표로 잠근다.
   - **key-prefix 는 키 안에 있지만 키 앞머리가 아니다.** `RedisRateLimiter` 는 `infra.redis.key-prefix` 를 모르고 이
     id 를 감싸 `request_rate_limiter.{<routeId>.<id>}.tokens|timestamp` 로 쓴다 — 실제 키는
     `request_rate_limiter.{plan-service-shared-plans.<prefix>:shared-plan:…}.tokens` 다. id 에 접두어를 실어 dev Redis 를
@@ -480,6 +497,23 @@ plan-service 를 거쳐 tour-service 호출(최대 2회)로 **증폭**되고, to
   nginx 가 TLS 를 종료하고 `combined` 포맷의 `$request` 가 전체 경로를 남기므로 **로그 열람권만 있는 사람이
   토큰을 그대로 얻을 수 있다.** 링크 수명 30일이 그 잔여 위험의 상한이다. nginx `log_format` 치환은 인프라
   레포 몫이라 이 PR 밖이다.
+- **[보안 LOW] 비정규 표기는 정해진 문구 안에서만 가려진다** (#1281). 출력 변환기는 `HTTP <METHOD> "…"` 문구(부트 500,
+  `HttpWebHandlerAdapter` — DEBUG 의 요청 줄 포함, 체크포인트) 안이면 `shared-%70lans`·매트릭스 변수까지 라우트처럼 읽어
+  가리지만, 그 밖의 줄에서는 정규형 `/shared-plans/<토큰>` 만 가린다. 그래서 비정규 표기로 보낸 요청의 토큰은 문구 밖에서
+  경로를 원문으로 찍는 줄(예: SCG `RoutePredicateHandlerMapping` DEBUG 의 `Exchange: GET <URI>`, 경로를 메시지에 싣는 예외)에
+  남을 수 있다. 비정규 표기는 정상 경로가 만들지 않는다 — 공유 화면(Next 서버)과 브라우저는 정규형으로 보낸다. 그런 표기는
+  **이미 토큰을 가진 사람이 손으로 바꿔 보낸 요청**에서만 나오므로, 공유된 링크가 일상 트래픽으로 로그에 쌓이는 경로가 아니다.
+  운영 레벨(INFO)에서는 그 DEBUG 줄도 꺼져 있다. 저장소의 게이트웨이 설정(`application*.yml`, `observability-common.yml`)에
+  이 로거를 DEBUG 로 올린 프로파일은 없다(설정 서버는 세 프로파일 모두 꺼져 있다 — 환경변수 `LOGGING_LEVEL_*` 주입은 저장소
+  밖이라 확인하지 못했다). **wiretap 은 정규형 토큰도 남긴다** — `spring.cloud.gateway.httpserver.wiretap`·`httpclient.wiretap`
+  을 켜고 `reactor.netty` 를 DEBUG 로 올리면 요청 바이트가 16바이트 행의 헥스 덤프로 찍혀 `shared-plans` 와 토큰이 줄 사이로
+  갈라지므로 변환기가 알아보지 못한다. 켜는 동안의 로그는 공유 토큰을 담는다(둘 다 기본 꺼짐, 저장소 설정에도 없다).
+- **[보안 LOW] 콘솔 appender 밖은 가려지지 않는다.** 출력 변환기는 `logback-spring.xml` 의 `CONSOLE` 하나에만 걸려 있다.
+  로그는 콘솔로만 수집되고 저장소 어디에도 파일 로그 설정이 없다. 그래서 파일 appender 는 두지 않았다. 이 파일이 있으면
+  `logging.file.name`·`logging.pattern.console`·`logging.structured.format.console` 은 게이트웨이에서 먹지 않는다 — 파일 로그나
+  다른 출력 형식이 필요하면 그 appender 도 `%maskShareToken(...)` 으로 감싼 뒤에 켠다.
+- **[보안 LOW] 오류 응답 본문의 `path` 는 원문 경로다.** 부트 기본 오류 응답(`DefaultErrorAttributes`)을 그대로 쓰기 때문이다.
+  요청한 쪽(공유 화면은 Next 서버)에 돌아가는 값이라 게이트웨이 로그는 아니지만, 그 본문을 로그로 남기는 쪽이 있으면 거기서 남는다.
 - **[보안 LOW] 링크 단위 리밋이라 링크 하나를 겨냥한 소진은 막지 못한다** (#1244 로 증폭은 눌렀다 — 위 절).
   링크를 아는 봇이 버킷을 비우면 그 링크는 초당 2건만 열리고, 같은 링크를 연 정상 사용자도 `GATEWAY_001` 429 를
   받는다. 피해는 그 링크 하나에 갇히고(다른 링크·로그인 경로는 무관) 주인이 링크를 회전(DELETE 후 POST)하면 새 버킷이다.
