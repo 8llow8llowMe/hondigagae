@@ -108,6 +108,30 @@ export const authMessages = {
   signupTitle: '회원가입',
   stepOf: (current: number, total: number) => `${total}단계 중 ${current}단계`,
   /*
+    회원가입 흐름 개편 (#1284, 회원가입-세부명세 D14). **한 화면에 한 가지 일** — 가입 방법을
+    먼저 고르고, 이메일 단계마다 질문 한 줄이 본문 제목이다. 화면 이름("회원가입")은 진입 화면
+    제목이 대신 말한다.
+  */
+  signupWelcomeTitle: '혼디가개에 오신 걸 환영해요',
+  signupWelcomeDescription: '편한 방법으로 가입하세요.',
+  signupWithEmail: '이메일로 가입하기',
+  signupDivider: '또는',
+  signupEmailHeading: '이메일을 알려주세요',
+  signupEmailDescription: '가입 확인 코드를 보내드려요.',
+  signupCodeHeading: '메일로 받은 코드를 입력해 주세요',
+  signupProfileHeading: '거의 다 됐어요',
+  signupProfileDescription: '혼디가개에서 쓸 정보를 입력해 주세요.',
+  signupBackToMethod: '가입 방법 다시 고르기',
+  signupBackToEmail: '이메일 다시 입력하기',
+  /*
+    약관 시트 (#1284). **개인정보가 서버로 처음 나가기 직전**에 띄운다 — 이메일 가입은 코드를 보내기
+    전, 소셜 가입은 `/authorize` 전. 버튼에 "동의하고 + 다음에 일어날 일" 을 쓴다 (`BottomSheet` 의
+    "주요 버튼에 결과를 쓴다").
+  */
+  consentSheetTitle: '약관에 동의해 주세요',
+  consentAndSendCode: '동의하고 인증코드 받기',
+  consentAndSignup: '동의하고 가입하기',
+  /*
     회원가입 하단의 로그인 입구 (#1083). 질문과 링크를 나눈다 — **링크 글자는 "로그인"
     하나다.** 질문까지 링크로 묶으면 접근 가능한 이름이 문장이 되어 링크 목록에서 무엇을
     하는 링크인지 한눈에 안 읽힌다.
@@ -183,6 +207,9 @@ export const authMessages = {
     않으면 사용자는 고장으로 읽는다.
   */
   socialConsentRequired: '소셜 계정으로 가입하려면 위 동의 항목에 모두 체크해 주세요.',
+  /* 이메일 가입 약관 시트에서 버튼이 비활성인 이유 — 위 문구와 같은 판단 (#1284) */
+  emailConsentRequired: '인증코드를 받으려면 위 동의 항목에 모두 체크해 주세요.',
+  signupConsentRequired: '가입하려면 위 동의 항목에 모두 체크해 주세요.',
   /*
     소셜 콜백이 `MEMBER_010` / `MEMBER_011` 로 실패했을 때의 다음 행동.
 

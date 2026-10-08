@@ -11,10 +11,10 @@ const noop = () => undefined
 
 describe('EmailStep', () => {
   /*
-    단계 표시는 제목 바로 아래(`SignupHeading`)로 옮겼다 (#1083). 단계 컴포넌트가 또 그리면
+    단계 표시는 제목 묶음(`SignupStepHeading`, #1083 → #1284)의 몫이다. 단계 컴포넌트가 또 그리면
     한 화면에 "3단계 중 1단계" 가 두 번 선다 — 위치 이동이 복제로 끝나지 않게 잠근다.
   */
-  it('단계 표시를 그리지 않는다 — 제목 아래 SignupHeading 의 몫이다', () => {
+  it('단계 표시를 그리지 않는다 — 제목 묶음 SignupStepHeading 의 몫이다', () => {
     const markup = renderToStaticMarkup(
       createElement(EmailStep, {
         values: { email: '' },
@@ -615,5 +615,52 @@ describe('세 단계 — 5xx 에는 일시 장애 하나만 선다 (#1079)', () 
     expect(html).not.toContain(SERVER_MESSAGE)
     expect(html).not.toContain('data-form-alert')
     expect(html).not.toContain('py-12')
+  })
+})
+
+/* 전부 필수인 폼의 `*` 는 정보가 없다 (#1283 C5 → #1284) — 라벨 안 `aria-hidden` `*` 로 찾는다 */
+describe('가입 단계 — 필수 표시(*)를 그리지 않는다 (#1284)', () => {
+  const REQUIRED_MARK = /<span aria-hidden="true"[^>]*>\*<\/span>/
+  const base = {
+    errors: NO_FORM_ERRORS,
+    errorStatus: null,
+    submitting: false,
+    onValueChange: noop,
+    onSubmit: noop,
+    onRetry: noop,
+  }
+
+  it('1단계 이메일', () => {
+    expect(
+      renderToStaticMarkup(createElement(EmailStep, { ...base, values: { email: '' } })),
+    ).not.toMatch(REQUIRED_MARK)
+  })
+
+  it('2단계 인증코드', () => {
+    const markup = renderToStaticMarkup(
+      createElement(CodeStep, {
+        ...base,
+        email: 'a@b.c',
+        values: { code: '' },
+        cooldownSeconds: 0,
+        resending: false,
+        onResend: noop,
+        onChangeEmail: noop,
+      }),
+    )
+    expect(markup).not.toMatch(REQUIRED_MARK)
+  })
+
+  it('3단계 비밀번호 · 이름 · 닉네임', () => {
+    const markup = renderToStaticMarkup(
+      createElement(ProfileStep, {
+        ...base,
+        email: 'a@b.c',
+        values: { password: '', name: '', nickname: '' },
+        duplicateEmail: null,
+        returnTo: '/',
+      }),
+    )
+    expect(markup).not.toMatch(REQUIRED_MARK)
   })
 })

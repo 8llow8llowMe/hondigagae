@@ -78,6 +78,13 @@ export type SocialLoginButtonsProps = {
    * 이유는 바로 위 "로그인 중" 버튼이 말한다.
    */
   disabled?: boolean
+  /**
+   * 넘기면 **인가로 가지 않고 고른 제공자만 알린다** (#1284). 회원가입 진입 화면이 쓴다 — 거기서는
+   * 버튼을 누르면 약관 시트를 먼저 띄우고, 시트 안의 같은 컴포넌트(`providers` 하나 + `consent`)가
+   * 실제 인가를 시작한다. 그래서 이 갈래에서는 `consent` 로 잠그지 않는다: 예전 가입 화면처럼
+   * 동의 전에 흐린 버튼이 서면 고장으로 읽혔다(S2).
+   */
+  onSelect?: ((provider: OAuthProviderId) => void) | undefined
 }
 
 export function SocialLoginButtons({
@@ -85,6 +92,7 @@ export function SocialLoginButtons({
   consent,
   providers = OAUTH_PROVIDERS,
   disabled = false,
+  onSelect,
 }: SocialLoginButtonsProps) {
   const [error, setError] = useState<string | null>(null)
   // 어느 버튼이 진행 중인지. 두 버튼에 같은 loading 을 걸면 누르지 않은 쪽도 도는 것처럼 보인다
@@ -100,7 +108,11 @@ export function SocialLoginButtons({
   */
   const consentBlocked = consent !== undefined && !isSignupConsentComplete(consent)
 
-  const start = (provider: string) => {
+  const start = (provider: OAuthProviderId) => {
+    if (onSelect !== undefined) {
+      onSelect(provider)
+      return
+    }
     if (startingRef.current || consentBlocked || disabled) return
     startingRef.current = true
     setPending(provider)

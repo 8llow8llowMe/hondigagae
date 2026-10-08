@@ -3,6 +3,7 @@ import { expect, type Page, test } from '@playwright/test'
 import { MOCK_EMAIL_CODE } from '../src/lib/api/mock/auth-data'
 import { messages } from '../src/lib/messages'
 import { trackAppRouterMount, waitForAppRouterMounted } from './helpers/app-router'
+import { chooseEmailSignup, sendSignupCodeWithConsent } from './helpers/signup'
 
 /**
  * **재전송 뒤 포커스 · 실패 알림의 낭독 경로 · 5xx 뒤 값 수정** — 이슈 #1102.
@@ -74,6 +75,8 @@ test.describe('세션 없이 — 인증 화면', () => {
         verifyApi: '**/api/bff/auth/email/verify-code',
         submit: messages.auth.verifyCode,
         needsNewPassword: false,
+        // 가입은 방법 고르기 → 이메일 단계, 첫 발송은 약관 시트를 거친다 (#1284)
+        signup: true,
       },
       {
         name: '재설정 2단계',
@@ -84,6 +87,7 @@ test.describe('세션 없이 — 인증 화면', () => {
         verifyApi: '**/api/bff/auth/password/reset',
         submit: messages.auth.resetSubmit,
         needsNewPassword: true,
+        signup: false,
       },
     ] as const
 
@@ -118,8 +122,10 @@ test.describe('세션 없이 — 인증 화면', () => {
 
     /** 1단계에서 코드를 받아 2단계로 간다 */
     async function toCodeStep(page: Page, screen: (typeof SCREENS)[number]): Promise<void> {
+      if (screen.signup) await chooseEmailSignup(page)
       await page.locator('#email').fill(screen.email)
-      await page.getByRole('button', { name: screen.send }).click()
+      if (screen.signup) await sendSignupCodeWithConsent(page)
+      else await page.getByRole('button', { name: screen.send }).click()
       await expect(page.locator('#code')).toBeFocused()
     }
 
@@ -309,8 +315,9 @@ test.describe('세션 없이 — 인증 화면', () => {
     page,
   }) => {
     await open(page, '/signup')
+    await chooseEmailSignup(page)
     await page.locator('#email').fill('stepback-1102@hondigagae.dev')
-    await page.getByRole('button', { name: messages.auth.sendCode }).click()
+    await sendSignupCodeWithConsent(page)
     await expect(page.locator('#code')).toBeFocused()
 
     const expired = '인증코드가 만료되었거나 발급되지 않았습니다. 다시 요청해주세요.'
@@ -348,8 +355,9 @@ test.describe('세션 없이 — 인증 화면', () => {
     test('가입 1단계', async ({ page }) => {
       await page.route('**/api/bff/auth/email/send-code', (route) => route.fulfill(UNAVAILABLE))
       await open(page, '/signup')
+      await chooseEmailSignup(page)
       await page.locator('#email').fill('five-xx-1102@hondigagae.dev')
-      await page.getByRole('button', { name: messages.auth.sendCode }).click()
+      await sendSignupCodeWithConsent(page)
       await expect(temporary(page)).toBeFocused()
 
       await page.locator('#email').fill('five-xx-1102b@hondigagae.dev')

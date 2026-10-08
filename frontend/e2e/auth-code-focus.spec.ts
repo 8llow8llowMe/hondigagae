@@ -3,6 +3,7 @@ import { expect, type Page, test } from '@playwright/test'
 import { MOCK_EMAIL_CODE, MOCK_PASSWORD_RESET_CODE } from '../src/lib/api/mock/auth-data'
 import { messages } from '../src/lib/messages'
 import { trackAppRouterMount, waitForAppRouterMounted } from './helpers/app-router'
+import { chooseEmailSignup, sendSignupCodeWithConsent } from './helpers/signup'
 
 /**
  * **인증코드 정규화와 제출 실패 뒤 포커스** — 이슈 #1078.
@@ -47,8 +48,9 @@ async function open(page: Page, path: string): Promise<void> {
 /** 가입 2단계까지 간다 */
 async function toSignupCodeStep(page: Page, email: string): Promise<void> {
   await open(page, '/signup')
+  await chooseEmailSignup(page)
   await page.locator('#email').fill(email)
-  await page.getByRole('button', { name: messages.auth.sendCode }).click()
+  await sendSignupCodeWithConsent(page)
   await expect(page.locator('#code')).toBeFocused()
 }
 
@@ -125,7 +127,9 @@ test.describe('인증코드 정규화 (#1078)', () => {
 test.describe('제출 실패 뒤 포커스 (#1078)', () => {
   test('가입 1단계: 빈 채로 내면 이메일 칸으로 간다', async ({ page }) => {
     await open(page, '/signup')
-    await page.getByRole('button', { name: messages.auth.sendCode }).click()
+    await chooseEmailSignup(page)
+    // 빈 이메일은 약관 시트보다 칸 오류가 먼저다 (#1284 `handleEmailSubmit`)
+    await page.getByRole('button', { name: messages.auth.sendCode, exact: true }).click()
 
     await expect(page.locator('#email')).toBeFocused()
     await expect(page.locator('#email')).toHaveAttribute('aria-invalid', 'true')
@@ -138,7 +142,7 @@ test.describe('제출 실패 뒤 포커스 (#1078)', () => {
     await page.getByRole('button', { name: messages.auth.verifyCode, exact: true }).click()
     await expect(page.locator('#password')).toBeFocused()
 
-    await page.getByLabel(messages.auth.consentAllLabel).check()
+    // 동의는 1단계 발송 때 시트에서 이미 받았다 (#1284) — 3단계에는 동의 칸이 없다
 
     // 클라이언트 검증 실패 — 화면의 첫 오류
     await page.getByRole('button', { name: messages.auth.signupSubmit }).click()

@@ -412,11 +412,16 @@ export function LoginMethods({
  * 선 둘은 장식이라 `aria-hidden` 이고, 글자만 읽힌다. `role="separator"` 를 달지 않는 것은
  * 스크린리더가 "구분선" 을 한 번 더 읽어 글자와 겹치기 때문이다.
  */
-export function LoginDivider() {
+export function LoginDivider({
+  label = messages.auth.loginDivider,
+}: {
+  /** 회원가입 진입 화면은 아래가 폼이 아니라 버튼 하나라 "또는" 만 쓴다 (#1284) */
+  label?: string
+} = {}) {
   return (
     <div className="text-caption text-fg-muted flex items-center gap-3">
       <span aria-hidden="true" className="bg-border h-px flex-1" />
-      {messages.auth.loginDivider}
+      {label}
       <span aria-hidden="true" className="bg-border h-px flex-1" />
     </div>
   )

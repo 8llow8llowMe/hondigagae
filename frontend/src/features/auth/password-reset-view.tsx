@@ -327,7 +327,7 @@ export function PasswordResetView() {
         말하는 것으로 읽히지 않는다.
       */}
       <AuthTopBar
-        backHref="/login"
+        back={{ href: '/login' }}
         backLabel={messages.auth.backToLogin}
         title={messages.auth.resetTitle}
       />

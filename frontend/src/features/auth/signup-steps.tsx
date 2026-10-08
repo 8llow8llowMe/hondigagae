@@ -76,7 +76,8 @@ export function EmailStep({
         onRetry={onRetry}
       />
 
-      <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email} required>
+      {/* 칸 하나뿐인 폼의 `*` 는 정보가 없다 — 로그인 · 재설정과 같은 규칙 (#1283 C5 → #1284) */}
+      <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email}>
         <Input
           id="email"
           type="email"
@@ -157,7 +158,8 @@ export function CodeStep({
         onRetry={onRetry}
       />
 
-      <Field id="code" label={messages.auth.codeLabel} error={errors.fields.code} required>
+      {/* 칸 하나뿐인 단계라 `*` 를 달지 않는다 (#1284) */}
+      <Field id="code" label={messages.auth.codeLabel} error={errors.fields.code}>
         {/* 입력 중에 대문자화 · 공백 제거 — 재설정 2단계와 같은 칸이다 (#1078) */}
         <VerificationCodeInput
           id="code"
@@ -258,6 +260,7 @@ export function ProfileStep({
       )}
 
       {/*
+        **세 칸 다 필수라 `*` 를 달지 않는다** (#1284) — 전부 필수인 폼의 `*` 는 정보가 없다.
         규칙은 **틀리기 전에** 보인다 (#1080) — 오류가 서면 그 자리를 오류가 대신한다.
         비밀번호 확인 칸은 두지 않는다. 눈 토글로 친 값을 직접 보고 고친다 (회원가입-세부명세 D6).
       */}
@@ -266,7 +269,6 @@ export function ProfileStep({
         label={messages.auth.passwordLabel}
         error={errors.fields.password}
         hint={messages.form.passwordRule}
-        required
       >
         <PasswordInput
           id="password"
@@ -277,7 +279,7 @@ export function ProfileStep({
         />
       </Field>
 
-      <Field id="name" label={messages.auth.nameLabel} error={errors.fields.name} required>
+      <Field id="name" label={messages.auth.nameLabel} error={errors.fields.name}>
         <Input
           id="name"
           type="text"
@@ -288,12 +290,7 @@ export function ProfileStep({
         />
       </Field>
 
-      <Field
-        id="nickname"
-        label={messages.auth.nicknameLabel}
-        error={errors.fields.nickname}
-        required
-      >
+      <Field id="nickname" label={messages.auth.nicknameLabel} error={errors.fields.nickname}>
         <Input
           id="nickname"
           type="text"

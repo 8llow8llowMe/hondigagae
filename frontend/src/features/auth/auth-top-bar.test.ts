@@ -8,7 +8,7 @@ import { AuthTopBar } from '@/features/auth/auth-top-bar'
 describe('AuthTopBar — 인증 하위 화면의 ← (#1283 C3 · C4)', () => {
   const markup = renderToStaticMarkup(
     createElement(AuthTopBar, {
-      backHref: '/login',
+      back: { href: '/login' },
       backLabel: '로그인 화면으로 돌아가기',
       title: '비밀번호 찾기',
     }),
@@ -34,8 +34,20 @@ describe('AuthTopBar — 인증 하위 화면의 ← (#1283 C3 · C4)', () => {
 
   it('이름을 넘기지 않으면 제목을 그리지 않는다 — 화면이 따로 단다', () => {
     const bare = renderToStaticMarkup(
-      createElement(AuthTopBar, { backHref: '/login', backLabel: '뒤로' }),
+      createElement(AuthTopBar, { back: { href: '/login' }, backLabel: '뒤로' }),
     )
     expect(bare).not.toContain('<h1')
+  })
+})
+
+describe('AuthTopBar — 단계 되돌리기는 버튼이다 (#1284)', () => {
+  const markup = renderToStaticMarkup(
+    createElement(AuthTopBar, { back: { onClick: () => {} }, backLabel: '이메일 다시 입력하기' }),
+  )
+
+  it('주소가 없는 단계 이동이라 링크가 아니라 버튼이다', () => {
+    expect(markup).toMatch(/<button type="button"[^>]*\bsize-11\b/)
+    expect(markup).not.toContain('<a')
+    expect(markup).toContain('<span class="sr-only">이메일 다시 입력하기</span>')
   })
 })
