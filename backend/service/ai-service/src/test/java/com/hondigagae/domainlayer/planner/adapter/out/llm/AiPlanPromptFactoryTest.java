@@ -358,6 +358,50 @@ class AiPlanPromptFactoryTest {
     }
 
     @Test
+    @DisplayName("후보가 섬 전체를 덮으면 일자별 권역 순서를 제안한다 — 바꿔도 된다고 함께 적는다 (#1257)")
+    void suggestsZoneOrderAroundTheIsland() {
+        String prompt = factory.userPrompt(islandQuery("2026-10-13", "2026-10-15").build());
+
+        assertThat(prompt).contains(
+            "- 권역 순서 제안: 1일차 북서부 → 2일차 남서부 → 3일차 남부. 그날 장소와 숙소를 그 권역이나 맞닿은 권역에서 고를 것.");
+        assertThat(prompt).contains("날씨 · 요청에 맞지 않으면 맞닿은 권역으로 바꿔도 됨");
+        // 요청마다 다른 조건이라 후보 목록 뒤(캐시가 끝난 뒤)에 온다 (#1246)
+        assertThat(prompt.indexOf("- 권역 순서 제안")).isGreaterThan(prompt.indexOf("여행 조건"));
+    }
+
+    @Test
+    @DisplayName("하루짜리 · 필수 포함 · 일부 권역만 덮는 후보 · 하루 재생성에는 권역 순서를 제안하지 않는다 (#1257)")
+    void skipsZoneOrderWhenItDoesNotApply() {
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-13").build()))
+            .doesNotContain("권역 순서 제안");
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-15").pinnedPlaceIds(List.of(11L)).build()))
+            .doesNotContain("권역 순서 제안");
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-15")
+                .placeCandidates(List.of(zoned(11L, "곽지", "제주특별자치도 제주시 애월읍", 33.4505, 126.3053)))
+                .build()))
+            .doesNotContain("권역 순서 제안");
+        PlanOutline outline = PlanOutline.builder().planId(7L)
+            .days(List.of(PlanOutline.PlanOutlineDay.builder().day(1).items(List.of()).build())).build();
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-15")
+                .regenerateDay(2).planOutline(outline).build()))
+            .doesNotContain("권역 순서 제안");
+    }
+
+    /** 6권역에 하나씩 후보가 있는 질의 — 섬 전체를 덮는다. */
+    private static AiPlanGenerationQuery.AiPlanGenerationQueryBuilder islandQuery(String start, String end) {
+        return AiPlanGenerationQuery.builder()
+            .startDate(start)
+            .endDate(end)
+            .placeCandidates(List.of(
+                zoned(11L, "곽지해수욕장", "제주특별자치도 제주시 애월읍", 33.4505, 126.3053),
+                zoned(12L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631),
+                zoned(13L, "정방폭포", "제주특별자치도 서귀포시 동홍동", 33.2448, 126.5715),
+                zoned(14L, "녹산로", "제주특별자치도 서귀포시 표선면", 33.3523, 126.7470),
+                zoned(15L, "용눈이오름", "제주특별자치도 제주시 구좌읍", 33.4592, 126.8317),
+                zoned(16L, "용두암", "제주특별자치도 제주시 용담2동", 33.5163, 126.5119)));
+    }
+
+    @Test
     @DisplayName("시스템 프롬프트가 하루와 그날 숙소를 한 권역 · 맞닿은 권역 안에서 고르게 한다 (#1171)")
     void systemPromptKeepsDayAndStayWithinNeighboringZones() {
         String system = factory.systemPrompt();

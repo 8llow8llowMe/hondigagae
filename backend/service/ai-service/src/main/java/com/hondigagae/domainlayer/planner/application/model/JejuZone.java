@@ -1,5 +1,7 @@
 package com.hondigagae.domainlayer.planner.application.model;
 
+import java.util.ArrayList;
+import java.util.List;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -94,5 +96,28 @@ public enum JejuZone {
             case SOUTH -> other == SOUTH_WEST || other == SOUTH_EAST;
             case SOUTH_EAST -> other == SOUTH || other == NORTH_EAST;
         };
+    }
+
+    /**
+     * 섬을 한 바퀴 도는 순서 — 서쪽 해안을 내려가 남쪽을 지나 동쪽 해안을 올라온다. 이웃한 둘은 언제나
+     * {@link #adjacentTo} 다(북부 → 북서부로 닫힌다). 한라산을 넘는 북부-남부는 없다.
+     */
+    private static final List<JejuZone> AROUND_THE_ISLAND =
+        List.of(NORTH_WEST, SOUTH_WEST, SOUTH, SOUTH_EAST, NORTH_EAST, NORTH);
+
+    /**
+     * 일자별 권역 순서 제안 (#1257). {@code days} 일이면 한 바퀴 순서를 앞에서부터 하루씩 쓰고, 여섯 날을 넘으면
+     * 다시 북서부부터 돈다. 프롬프트 규칙 2의 "여러 날이면 섬을 한 방향으로 돈다" 를 모델이 잘 지키지 않아서 —
+     * 7일 일정이 남동부 → 남서부 56.9km 를 건넜다 — 서버가 순서를 먼저 정해 준다.
+     */
+    public static List<JejuZone> aroundTheIsland(int days) {
+        if (days <= 0) {
+            return List.of();
+        }
+        List<JejuZone> order = new ArrayList<>(days);
+        for (int day = 0; day < days; day++) {
+            order.add(AROUND_THE_ISLAND.get(day % AROUND_THE_ISLAND.size()));
+        }
+        return List.copyOf(order);
     }
 }

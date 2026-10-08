@@ -96,6 +96,17 @@ class AiPlanRepeatGuardTest {
         assertThat(guarded.days().get(1)).isSameAs(draft.days().get(1));
     }
 
+    @Test
+    @DisplayName("같은 날 같은 곳을 연달아 넣어도 바꾼다 — dev 7일 4일차 숨비아일랜드 → 숨비아일랜드 (#1257)")
+    void replacesRepeatWithinSameDay() {
+        AiPlanDraft draft = draft(day(4, meal(SAGYE_CAFE), meal(SAGYE_CAFE), lodging(DIOVILL)));
+
+        AiPlanDraft guarded = guard(SAGYE_CAFE, JUNGMUN_CAFE, DIOVILL).apply(draft);
+
+        // 첫 번째는 그대로, 두 번째만 가까운 음식점으로. 숙소는 건드리지 않는다
+        assertThat(guarded.days().get(0).items()).extracting(AiPlanDraftItem::placeId).containsExactly(11L, 12L, 21L);
+    }
+
     private static AiPlanRepeatGuard guard(PlaceCandidate... candidates) {
         return new AiPlanRepeatGuard(List.of(candidates));
     }
