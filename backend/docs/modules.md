@@ -79,6 +79,25 @@ yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 �
 항목도 조용히 버리지 않고 예외로 올린다 — Sentinel 노드 하나가 조용히 빠지면 평소에는 잘
 돌다가 페일오버 때만 못 따라가고, 그때가 되어서야 드러난다.
 
+**명령·연결 타임아웃 (선택, #1253)**: `infra.redis.command-timeout` · `infra.redis.connect-timeout` 에 `1s` 같은
+Duration 을 적는다. 지금 적은 곳은 **api-gateway 뿐**이다(`1s` · `2s`). 다른 서비스가 적을지는 서비스별로 판단한다.
+
+- **둘 다 비우면 예전 팩토리 그대로다** — 클라이언트 설정 없이 만들어 Lettuce 기본을 쓴다. 그 기본은 명령이
+  **동기 60초**(Spring Data Redis 가 끊는다) · **리액티브·비동기 상한 없음**(Lettuce `TimeoutOptions` 꺼짐), 연결 10초다.
+  Redis 가 연결을 거부하면 바로 실패하지만 먹통(패킷 드롭 · 응답 없음)이면 그만큼 기다린다
+- **하나라도 적으면** `LettuceClientConfiguration` 으로 넘긴다(standalone · sentinel 같다). 명령 타임아웃 감시
+  (`TimeoutOptions.enabled()`)를 **함께 켜서 리액티브 명령도 같은 시간에 끝난다** — 연결 타임아웃을 담으려고
+  `ClientOptions` 를 새로 넘기면 빌더 기본에 있던 감시가 사라지므로 명시한다. 0 이하는 기동 시점에 실패한다
+- **명령 타임아웃은 `QueryTimeoutException` 으로 나온다** (Lettuce `RedisCommandTimeoutException` 을 Spring Data Redis 가
+  번역). 연결 실패 `RedisConnectionFailureException` 과 예외 계층이 달라, Redis 장애를 잡는 코드는 상위 `DataAccessException` 으로 함께 잡는다(게이트웨이 블랙리스트 · auth-service `isRevoked`)
+- 끊긴 동안 명령을 쌓아 두는 Lettuce 기본(`DisconnectedBehavior.DEFAULT`)은 바꾸지 않았다. 감시는 명령을 쓰는 시점부터
+  재므로 재연결을 기다리며 쌓인 명령도 명령 타임아웃에 끝난다. `REJECT_COMMANDS` 로 바꾸면 즉시 실패하지만 페일오버 같은
+  짧은 재연결 순간의 명령까지 곧바로 오류가 된다 — 쌓아 두되 명령 타임아웃(게이트웨이 1초)이 대기 상한이다
+- 공유 연결을 **처음** 맺을 때는 호출 스레드가 연결 타임아웃(+ 핸드셰이크, 명령 타임아웃만큼)을 기다린다. 리액티브 연결도 같고,
+  동기·리액티브 공유 연결이 `LettuceConnectionFactory` 의 **락 하나**를 쓴다 — 기동 시점부터 먹통이면 첫 연결 시도들이 그 락에서
+  줄을 선다. 그래서 리액티브 체인(WebFlux)에서 Redis 를 부르는 곳은 리액티브 템플릿이라도 **이벤트 루프 밖에서 구독한다**(게이트웨이)
+- 고정: `RedisConfigurerClientTimeoutTest`(설정 · 바인딩), `RedisCommandTimeoutBehaviorTest`(가짜 Redis 로 실제 예외 타입과 시간)
+
 **포함 기준**: Redis 연동 서비스가 import 해서 쓰는 공통 설정만.
 
 **사용처**: auth-service(토큰/OAuth state), ai-service(작업 상태·결과 캐시), tour-service(날씨·혼잡도 캐시 + 예보 갱신 락), api-gateway
@@ -136,6 +155,10 @@ yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 �
 - `/api/v1/**` 경로를 각 서비스로 라우팅 — 라우트는 프로파일 yml 3개(local/dev/prod)에 **접두어 단위**로 나열한다.
   컨트롤러가 새 접두어를 열면 셋 다 고쳐야 하며, `GatewayRouteCoverageTest` 가 컨트롤러 `@RequestMapping` 접두어 ⊆ 라우트를 검사한다
 - JWT 유효성 1차 검증 (서비스 내부 인가는 각 서비스)
+  - 로그아웃 블랙리스트 확인(`AccessTokenBlacklistChecker`)은 블로킹 Redis 호출이라 **이벤트 루프 밖(`boundedElastic`)에서
+    돈다** (#1253). 전에는 Netty 이벤트 루프 위에서 불러, Redis 가 먹통인 동안 그 루프의 다른 요청(공개 API 포함)까지 최대
+    60초 멈췄다. Redis 를 읽지 못하면 연결 실패든 명령 타임아웃(`infra.redis.command-timeout: 1s`)이든 같은 규칙이다 —
+    기본 fail-closed 503 `SECURITY_008`, `jwt.blacklist-fail-open` 이면 통과. 전에는 명령 타임아웃이 500 으로 샜다
 - CORS 공통 처리
 - **레이트 리밋** — 공유 링크 공개 라우트(`plan-service-shared-plans`)에만 `SharedPlanRateLimit` 필터를 건다 (#1244).
   공유 토큰 전용이라 다른 라우트에 걸면 판정 없이 통과한다. 키는 공유 토큰의 SHA-256 해시(링크 단위, 발급 형식이
@@ -143,6 +166,11 @@ yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 �
   `ReactiveStringRedisTemplate` 을 직접 올린다 — redis-core 의 연결 팩토리 선언 반환형이 `RedisConnectionFactory` 라
   리액티브 자동구성이 저절로 켜지지 않는다(`ApiGatewayRateLimitConfig`). 근거·잔여 위험은 `services/plan-service.md`
   "공개 경로 레이트 리밋"
+- **이벤트 루프에서 Redis 연결 락을 기다리지 않는다** (#1253) — 블랙리스트 확인도 리밋 판정도 `boundedElastic` 에서
+  구독한다. 리미터는 리액티브지만 구독될 때 공유 리액티브 연결을 얻고, 그 연결은 동기 공유 연결과 같은 팩토리 락 아래에서
+  처음 맺어진다. 남은 위험: 기동 시점부터 Redis 가 먹통이면 첫 연결 시도(연결 2초 + 핸드셰이크 1초)가 그 락에서 줄을 선다.
+  그 대기는 이제 `boundedElastic` 쪽(블랙리스트 · 리밋 판정 · 액추에이터 Redis 헬스)에서만 일어나 둘과 무관한 요청은 멈추지
+  않지만, 공유 요청과 토큰을 실은 요청은 그만큼 늦는다 (`services/plan-service.md` 남은 위험)
 
 ---
 
