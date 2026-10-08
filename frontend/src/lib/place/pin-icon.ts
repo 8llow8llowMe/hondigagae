@@ -23,5 +23,7 @@ export function placePinIcon(place: {
   sourceCategory: string | null
 }): MapPinIcon {
   if (isCafePlace(place)) return 'coffee'
-  return BY_CODE[place.contentType.code] ?? 'pin'
+  const code = place.contentType.code
+  // 자기 키만 본다 — 평범한 객체라 `constructor` 같은 프로토타입 키가 `??` 를 지나친다
+  return (Object.hasOwn(BY_CODE, code) ? BY_CODE[code] : undefined) ?? 'pin'
 }
