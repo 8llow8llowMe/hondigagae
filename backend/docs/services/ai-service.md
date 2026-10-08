@@ -206,7 +206,7 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
   후보 줄에 주소 문자열만 있고 규칙 12가 "이동 거리는 입력에 없다" 고 해서 **모델에게 지리 신호가 없었고**,
   모델이 고른 `lodging` 을 **서버가 거리로 확인한 적이 없었다.**
   - **권역 (`JejuZone`)** — 한라산을 가운데 둔 6권역(북서부 · 북부 · 북동부 / 남서부 · 남부 · 남동부)을 좌표로
-    정해 후보 줄 주소 앞에 `권역: 남서부` 로 싣는다. 경계는 위도 33.36(한라산), 경도 126.42 · 126.68 이다.
+    정해 후보 줄에 `권역: 남서부` 로 싣는다(#1246 부터 전체 주소 대신 `권역: 남서부 · 한경면`). 경계는 위도 33.36(한라산), 경도 126.42 · 126.68 이다.
     제주 범위 밖이거나 좌표가 없으면 싣지 않는다. 규칙 2가 "하루는 한 권역, 많아야 맞닿은 두 권역, 그날 숙소도
     그날 끝 · 다음 날 시작의 권역이나 맞닿은 권역" 을 지시한다. **일자 사이도 잇는다 (#1254)** — "다음 날은 전날
     숙소의 권역이나 맞닿은 권역에서 시작하고, 여러 날이면 맞닿은 권역을 따라 섬을 한 방향으로 돈다". 7일 일정이
@@ -466,7 +466,8 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
 
 - **번호가 계약이다.** `place` · `lodging` 은 `query.safeCandidates()` 순서의 1부터 시작하는 번호다. 프롬프트
   (`AiPlanPromptFactory#userPrompt`)와 어댑터(`OllamaLlmAdapter#candidateAt`)가 같은 목록 순서를 쓴다.
-  후보 줄은 `- 12. [필수 포함] 수월봉 | 관광지 | 실외 | 동반: …` 처럼 번호가 맨 앞이다.
+  후보 줄은 `- 12. [필수 포함] 수월봉 | 관광지 | 실외 | 분류: … | 권역: 남서부 · 한경면` 처럼 번호가 맨 앞이다
+  (#1246 부터 주소 대신 권역 · 읍면동, `동반 가능` 은 목록 머리에 한 번).
 - **서버가 채우는 것** — `placeId` · `title` 은 그 번호의 후보 값, `itemType` 은 후보 분류(숙박 → `LODGING`,
   음식점 → `MEAL`, 그 밖 → `PLACE`), 근거 `name` 은 코드표(`PET_ALLOWED` 반려견 동반 가능 · `WEATHER_OK` 날씨 양호 ·
   `INDOOR_ALTERNATIVE` 실내 대안 · `REST_SLOT` 휴식 시간 확보, 모르는 코드는 "추천 이유" — 응답 계약
@@ -511,8 +512,10 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
 **keep-alive (`ai-llm.keep-alive`, 기본 `30m`).** 첫 시도가 더 느린 것은 Ollama 기본 keep_alive(5분)가 지나 모델이
 내려가고 다음 요청에 로드가 붙기 때문으로 본다(`LLM timing` 의 `loadMs` 가 0 이 아니다). **요청마다 싣는다** —
 keep_alive 는 요청 단위 값이라 빠뜨린 요청 하나가 서버 기본으로 되돌린다. 일정 · 준비물 호출이 같은 옵션 조립
-(`OllamaLlmAdapter#buildRequestOptions`)을 쓴다. **트레이드오프** — 그동안 main-server 와 나눠 쓰는 메모리를 쥐고
-있는다. 메모리가 붐비면 줄이고, `-1` 은 상주다(`AI_LLM_KEEP_ALIVE`).
+(`OllamaLlmAdapter#buildRequestOptions`)을 쓴다. **트레이드오프** — 그동안 Ollama 호스트의 메모리를 쥐고 있는다.
+Ollama 가 다른 서비스와 같은 호스트면 붐빌 때 줄이고, `-1` 은 상주다(`AI_LLM_KEEP_ALIVE`). **요청 값이 서버
+`OLLAMA_KEEP_ALIVE` 를 덮는다** (#1246) — dev 의 Ollama 는 전용 호스트(ollama-01, 서버 24h)인데 요청이 30분을 실어
+30분 쉬면 모델이 내려갔고, 다음 첫 요청에 로드 6~8초가 붙었다. 전용 호스트면 `AI_LLM_KEEP_ALIVE=24h` 로 맞춘다.
 
 **단계별 시간은 `Duration` 으로 온다 (#1235).** Spring AI 1.1.x 의 `OllamaChatModel` 은 Ollama 의 나노초 지표
 (`total-duration` · `load-duration` · `prompt-eval-duration` · `eval-duration`)를 `java.time.Duration` 으로 바꿔
@@ -521,6 +524,20 @@ keep_alive 는 요청 단위 값이라 빠뜨린 요청 하나가 서버 기본�
 통과했다. 이제 `Duration` 을 읽고 숫자는 호환으로 남긴다. 고치기 전 dev 실측(2026-10-07)은 합계만 남았다 — 3일 일정
 58.9초(입력 5,614 · 출력 301 토큰, 재시작 뒤 첫 호출), 준비물 37.2초(입력 1,699 · 출력 148 토큰, 직전 호출 5시간 뒤).
 둘 다 로드가 섞였을 가능성이 높아, 배포 뒤 **같은 조건으로 연달아 두 번** 재서 첫 호출과 두 번째를 가른다.
+
+**시간의 대부분은 입력 처리(prefill)이고, Ollama 가 그 값을 틀리게 보고한다 (#1246).** 값이 찍히자 생성 61~95초 중
+38~69초가 어느 지표에도 없었다(`total − load − prefill − decode`). ollama-01 에서 직접 잰 결과 그 시간은 입력 길이를
+따라 늘었다 — 후보 줄 10 · 50줄(입력 675 · 2,917 토큰)에 지표 밖 3.9 · 10.6초, 보고된 `prompt_eval_duration` 은
+83 · 94ms 로 길이와 무관했다. 같은 시간대 다른 클라이언트 요청은 없었고(GIN 로그), 추론(think=low)은 60~146자로
+짧았으며, 출력은 19~20 tok/s 로 예측대로다. 그래서:
+- **`LLM timing` 에 `prefillEstMs`(= `totalMs − loadMs − decodeMs`)를 함께 남긴다.** `prefillMs` 보고값은 긴 입력에서
+  믿지 않는다.
+- **후보 줄을 짧게 둔다.** 전체 주소 대신 `권역 · 읍면동`(`권역: 남서부 · 한경면`), 모든 후보가 같은 `동반 가능` 은
+  목록 머리에 한 번만 적고 다른 값(`부분 동반 가능` 등)만 줄에 남긴다. 도로명 · 번지는 모델이 쓸 곳이 없었다.
+- **후보 목록을 요청 조건보다 앞에 둔다.** 전에는 기간 · 요청 문구가 맨 앞이라 거기서 갈린 뒤의 후보 목록(입력의
+  대부분)을 매번 새로 처리했다(10/8 `inputTokens` 5,644 · 5,764 · 7,062 — 프롬프트 전체). 순서는 시스템 프롬프트 →
+  후보 목록 → 여행 조건 · 반려견 · 날씨 · 재생성이다. 같은 지역 · 같은 요청 종류가 이어지면 Ollama 가 후보 목록까지
+  캐시를 재사용한다(`inputTokens` 가 줄어든다). 동시 처리 1 · 모델 상주(keep-alive)일 때 잘 든다.
 
 **후속 후보.** 스키마를 Ollama `format` 에 JSON 스키마로 직접 싣는 방법이 있다 — 지금은 `format=json` 에 스키마 지시
 (2,246자)를 프롬프트로 싣는다. 싣고 나면 지시문을 프롬프트에서 뺄 수 있지만, gpt-oss 가 `format` 스키마를 지키는지
