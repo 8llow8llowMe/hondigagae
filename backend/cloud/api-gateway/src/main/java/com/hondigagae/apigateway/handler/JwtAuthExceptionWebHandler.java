@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hondigagae.apigateway.jwt.exception.JwtErrorCode;
 import com.hondigagae.apigateway.jwt.exception.JwtException;
+import com.hondigagae.apigateway.log.ShareTokenLogMasker;
 import com.hondigagae.common.dto.Response;
 import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
@@ -93,10 +94,11 @@ public class JwtAuthExceptionWebHandler implements WebExceptionHandler {
      * 검증 불가(Redis 장애)만 ERROR 로 띄운다 — 그것만 사람이 봐야 하는 신호다.
      *
      * <p>토큰 자체는 남기지 않는다. 사유와 경로면 추적에 충분하고, 토큰은 남은 수명 동안
-     * 그대로 쓸 수 있는 자격증명이다.
+     * 그대로 쓸 수 있는 자격증명이다. 경로도 공유 링크 토큰을 가려 찍는다 (#1281) — JWT 필터가 전역이라
+     * 만료 토큰을 실은 채 공유 링크를 열면 이 로그에 공유 경로가 온다.
      */
     private void logRejection(ServerWebExchange exchange, JwtErrorCode errorCode) {
-        String path = exchange.getRequest().getPath().value();
+        String path = ShareTokenLogMasker.maskPath(exchange.getRequest().getPath().value());
         if (errorCode.getHttpStatus().is5xxServerError()) {
             log.error("[JwtAuthExceptionWebHandler] 토큰 검증 불가: errorCode={} status={} path={}",
                 errorCode.name(), errorCode.getHttpStatus().value(), path);
