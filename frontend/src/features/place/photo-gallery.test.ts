@@ -284,6 +284,12 @@ describe('PhotoGallery — 캐러셀 갈래 (#1230)', () => {
     expect(markup).not.toContain('hidden md:block')
   })
 
+  it('넘긴 장도 첫 장처럼 좌우 16 을 띄운다 — 스냅 자리가 트랙 여백(px-4)을 따른다 (#1264)', () => {
+    const markup = renderCarousel(3)
+
+    expect(markup).toContain('scroll-px-4')
+  })
+
   it('기본(responsive)은 예전 그대로 — 상세 화면은 바뀌지 않는다', () => {
     const markup = render(3)
 

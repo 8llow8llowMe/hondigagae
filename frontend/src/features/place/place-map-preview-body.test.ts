@@ -440,3 +440,13 @@ describe('PlaceMapPreviewBody — 폭 갈래 · 틀', () => {
     expect(html).not.toContain('hidden md:block')
   })
 })
+
+describe('PlaceMapPreviewBody — 틀 (#1264)', () => {
+  it('스크롤 영역이 위치 기준이다 — 안의 sr-only(absolute) 가 영역 밖으로 나가 페이지를 늘리지 않는다', () => {
+    expect(render()).toContain('relative min-h-0 flex-1 overflow-y-auto')
+  })
+
+  it('닫기 줄 아래를 띄운다 — 닫기 호버 배경이 사진에 붙지 않는다', () => {
+    expect(render()).toContain('px-2 pt-2 pb-2')
+  })
+})

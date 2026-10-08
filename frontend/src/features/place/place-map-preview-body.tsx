@@ -157,7 +157,12 @@ export function PlaceMapPreviewBody({
     >
       <PreviewTopBar variant={variant} onClose={onClose} />
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/*
+        **`relative` 가 있어야 한다** (#1264). 안의 `sr-only`(absolute) 문구는 가장 가까운 위치 기준 조상에
+        놓이는데, 이 영역이 `static` 이면 그 조상이 스크롤 영역 바깥이라 클리핑을 벗어난다 — 스크롤 아래쪽
+        문구가 문서 높이를 키워 페이지 전체가 아래로 늘어났다(1520x900 에서 문서 1093).
+      */}
+      <div className="relative min-h-0 flex-1 overflow-y-auto">
         {failed ? (
           <div className={cn('flex flex-col gap-4 py-6', inset)}>
             <p className="text-body-2 text-fg-muted">{messages.map.previewLoadFailed}</p>
@@ -232,7 +237,8 @@ function PreviewTopBar({
   onClose: () => void
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-1 px-2 pt-2">
+    // 아래 `pb-2` — 닫기(44)의 호버 배경이 바로 밑 사진에 붙지 않게 띄운다 (#1264)
+    <div className="flex shrink-0 items-center gap-1 px-2 pt-2 pb-2">
       {variant === 'panel' && (
         <button
           type="button"

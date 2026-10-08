@@ -302,8 +302,11 @@ function useCarouselScroll(trackRef: React.RefObject<HTMLElement | null>, count:
       }
       dragged.current = false
       setGrabbing(true)
-      // 포인터가 컨테이너 밖으로 나가도 계속 추적한다
-      event.currentTarget.setPointerCapture(event.pointerId)
+      /*
+        **포인터 캡처는 여기서 하지 않는다** (#1264) — 끌기로 판정된 뒤(`onPointerMove`)에 건다. 누르는
+        순간 캡처하면 뒤따르는 `click` 의 대상이 타일 버튼이 아니라 이 `ul` 로 바뀌어, 마우스로 사진을
+        눌러도 뷰어가 열리지 않았다(커서는 `zoom-in` 인데).
+      */
     },
     [trackRef, step],
   )
@@ -356,7 +359,11 @@ function useCarouselScroll(trackRef: React.RefObject<HTMLElement | null>, count:
       }
 
       const moved = event.clientX - state.startX
-      if (Math.abs(moved) > DRAG_SLOP_PX) dragged.current = true
+      if (!dragged.current && Math.abs(moved) > DRAG_SLOP_PX) {
+        dragged.current = true
+        // 끌기가 확정됐다 — 포인터가 컨테이너 밖으로 나가도 계속 추적한다
+        event.currentTarget.setPointerCapture(event.pointerId)
+      }
 
       state.samples.push({ x: event.clientX, t: event.timeStamp })
       // 속도 구간보다 오래된 것은 버린다 — 하나는 남겨 구간의 시작점으로 쓴다
@@ -377,6 +384,17 @@ function useCarouselScroll(trackRef: React.RefObject<HTMLElement | null>, count:
     [trackRef, endDrag],
   )
 
+  /**
+   * 끌기로 판정되기 전에 트랙을 벗어났다 — 캡처가 아직 없어 `pointerup` 이 여기로 오지 않는다. 누른
+   * 상태를 걷는다(아니면 `cursor-grabbing` 이 남는다). 끌기 중이면 캡처돼 있어 이 이벤트가 오지 않는다.
+   */
+  const onPointerLeave = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (!dragged.current) endDrag(event)
+    },
+    [endDrag],
+  )
+
   /** 끌기였으면 뒤따르는 click 을 캡처 단계에서 삼킨다 (타일 버튼에 닿기 전이다) */
   const onClickCapture = useCallback((event: React.MouseEvent<HTMLElement>) => {
     if (!dragged.current) return
@@ -394,6 +412,7 @@ function useCarouselScroll(trackRef: React.RefObject<HTMLElement | null>, count:
       onPointerMove,
       onPointerUp: endDrag,
       onPointerCancel: endDrag,
+      onPointerLeave,
       onClickCapture,
     },
   }
@@ -505,8 +524,12 @@ function MobileCarousel({
           쓸었을 때 페이지가 안 움직이면 캐러셀에 갇힌다.
 
           커서는 **잡을 수 있다는 신호**다. 스크롤바는 `scrollbar-none` 으로 숨겼다.
+
+          **`scroll-px-4` 는 `px-4` 의 짝이다** (#1264). 없으면 `snap-start` 가 스크롤 영역 0 에 맞춰
+          둘째 장부터 사진이 패널 왼쪽 끝에 붙는다 — 여백은 첫 장에만 있었다. `goTo` 는 이미
+          `scrollPaddingLeft` 를 빼서 잰다.
         */
-        className={`flex touch-pan-x snap-x snap-mandatory scrollbar-none gap-2 overflow-x-auto px-4 ${
+        className={`flex touch-pan-x snap-x snap-mandatory scroll-px-4 scrollbar-none gap-2 overflow-x-auto px-4 ${
           grabbing ? 'cursor-grabbing' : 'cursor-grab'
         }`}
       >
