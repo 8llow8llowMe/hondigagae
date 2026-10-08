@@ -2,6 +2,8 @@ package com.hondigagae.domainlayer.placeimport.domain.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.hondigagae.domainlayer.placeimport.domain.enums.MergeNameMatch;
+import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -10,6 +12,11 @@ import org.junit.jupiter.api.Test;
  * 반경 하나를 바꾸면 어떤 실측 사례가 뒤집히는지 즉시 드러낸다.
  */
 class PlaceIdentityPolicyTest {
+
+    private static final String TOURIST_SPOT = PlaceContentType.TOURIST_SPOT.getCode();
+    private static final String CULTURE = PlaceContentType.CULTURE.getCode();
+    private static final String LEPORTS = PlaceContentType.LEPORTS.getCode();
+    private static final String LODGING = PlaceContentType.LODGING.getCode();
 
     @Test
     @DisplayName("이름 완전일치는 1,000m 까지 병합하고 그 밖은 병합하지 않는다")
@@ -41,14 +48,91 @@ class PlaceIdentityPolicyTest {
     }
 
     @Test
-    @DisplayName("도치돌목장 vs 도치돌 알파카목장(99m)은 현재 판정으로는 병합되지 않는다")
-    void documentsDochidolPairNotMatchingToday() {
-        // 실측에서는 같은 곳으로 확인된 쌍이다. 그런데 PlaceNameMatcher.isPartialMatch 는
-        // "한쪽이 다른 쪽을 통째로 품는" 관계만 보므로 도치돌목장 ⊄ 도치돌알파카목장 이라 걸리지 않는다.
-        // 이름 판정 규칙을 바꾸는 것은 동작 변경이라 이번 리팩토링(#363) 범위 밖이다 —
-        // 지금 동작을 그대로 고정해 두고, 규칙을 손볼 때 이 테스트가 먼저 뒤집히게 한다.
+    @DisplayName("도치돌목장 vs 도치돌 알파카목장(99m)은 공통 부분 일치로 병합한다")
+    void mergesDochidolPairBySharedCore() {
+        // 실측에서 같은 곳으로 확인된 쌍이다. 한쪽이 다른 쪽을 통째로 품지 않아(도치돌목장 ⊄ 도치돌알파카목장)
+        // 부분일치로는 못 잡고, #363 에서 이 테스트로 "아직 안 걸린다" 를 고정해 두었다. #1282 로 뒤집었다.
         assertThat(PlaceNameMatcher.isPartialMatch("도치돌목장", "도치돌 알파카목장")).isFalse();
-        assertThat(PlaceIdentityPolicy.isSamePlaceForMerge("도치돌목장", "도치돌 알파카목장", 99d)).isFalse();
+        assertThat(PlaceIdentityPolicy.mergeNameMatch("도치돌목장", "도치돌 알파카목장", 99d))
+            .contains(MergeNameMatch.SHARED_CORE);
+    }
+
+    @Test
+    @DisplayName("공통 부분 일치는 dev 실측의 같은 곳 쌍을 받는다")
+    void sharedCoreAcceptsMeasuredSamePlaces() {
+        // dev 2026-10-08 — 모두 같은 곳이고 대부분 주소까지 같다.
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("서귀포시기당미술관", "서귀포시립기당미술관")).isTrue();
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("제주도립미술관", "제주특별자치도립미술관")).isTrue();
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("러브랜드미술관", "제주러브랜드")).isTrue();
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("제주4·3평화기념관", "제주4·3평화공원")).isTrue();
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("월령리선인장군락", "월령 선인장군락지")).isTrue();
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("테지움사파리", "테디베어하우스 테지움")).isTrue();
+    }
+
+    @Test
+    @DisplayName("공통 부분이 지역명 · 시설 유형뿐이거나 이름의 귀퉁이만 겹치면 받지 않는다")
+    void sharedCoreRejectsGenericOrMarginalOverlap() {
+        // 미술관만 겹친다 (dev 125m, 다른 곳)
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("러브랜드미술관", "제주특별자치도립미술관")).isFalse();
+        // 지역명만 겹친다 (dev 416m, 다른 곳)
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("제주특별자치도 문예회관", "제주특별자치도 민속자연사박물관")).isFalse();
+        // 제주대 = 제주 + 1자 — 일반 낱말을 걷으면 1자만 남는다 (dev 192m, 다른 곳)
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("제주대학교박물관", "제주대 벚꽃길")).isFalse();
+        // 3자 미만 공통 부분
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("성산카페", "성산식당")).isFalse();
+        // 완전일치 · 부분일치는 더 강한 판정이 받으므로 여기서는 false 다
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("노리매", "노리매공원")).isFalse();
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("노리매공원", "노리매 공원")).isFalse();
+    }
+
+    @Test
+    @DisplayName("공통 부분 일치는 인자 순서와 무관하다 — 같은 길이의 공통 부분이 둘이면 어느 하나라도 조건을 보면 받는다")
+    void sharedCoreIsSymmetric() {
+        // 최장 공통 부분이 '서귀포시'(지역명뿐)와 '기당로터'(고유) 둘이다. 하나만 보던 구현은 순서에 따라 답이 갈렸다.
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("서귀포시기당로터", "기당로터서귀포시")).isTrue();
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("기당로터서귀포시", "서귀포시기당로터")).isTrue();
+        assertThat(PlaceNameMatcher.isSharedCoreMatch("도치돌 알파카목장", "도치돌목장"))
+            .isEqualTo(PlaceNameMatcher.isSharedCoreMatch("도치돌목장", "도치돌 알파카목장"));
+    }
+
+    @Test
+    @DisplayName("공통 부분 일치는 100m 까지만 병합한다 — 경계 포함")
+    void mergesSharedCoreOnlyWithinOneHundredMeters() {
+        assertThat(PlaceIdentityPolicy.isSamePlaceForMerge("도치돌목장", "도치돌 알파카목장", 100d)).isTrue();
+        assertThat(PlaceIdentityPolicy.isSamePlaceForMerge("도치돌목장", "도치돌 알파카목장", 101d)).isFalse();
+    }
+
+    @Test
+    @DisplayName("이름 판정은 완전일치 · 부분일치 · 공통 부분 일치 순으로 강하다")
+    void namesMatchStrengthInDeclaredOrder() {
+        assertThat(PlaceIdentityPolicy.mergeNameMatch("노리매공원", "노리매공원", 0d)).contains(MergeNameMatch.EXACT);
+        assertThat(PlaceIdentityPolicy.mergeNameMatch("노리매", "노리매공원", 0d)).contains(MergeNameMatch.CONTAINED);
+        assertThat(MergeNameMatch.EXACT).isLessThan(MergeNameMatch.CONTAINED);
+        assertThat(MergeNameMatch.CONTAINED).isLessThan(MergeNameMatch.SHARED_CORE);
+    }
+
+    @Test
+    @DisplayName("코스 행(대괄호 머리)과는 종류가 같아도 병합하지 않는다 — 김만덕기념관 · 올레 18코스")
+    void neverMergesIntoCourseRow() {
+        assertThat(PlaceIdentityPolicy.isMergeableKind(CULTURE, LEPORTS, "[제주올레 18코스] 김만덕기념관-조천 올레")).isFalse();
+        assertThat(PlaceIdentityPolicy.isMergeableKind(LEPORTS, LEPORTS, "[한라산 둘레길 1구간] 천아숲길")).isFalse();
+        // 대괄호가 머리가 아니면 코스가 아니다
+        assertThat(PlaceIdentityPolicy.isMergeableKind(TOURIST_SPOT, TOURIST_SPOT, "성산일출봉 [유네스코 세계자연유산]")).isTrue();
+        // 여행코스(25)는 이름과 무관하게 코스다 — 제주는 지금 0건이지만 적재 대상으로 남아 있다
+        assertThat(PlaceIdentityPolicy.isMergeableKind(TOURIST_SPOT, PlaceContentType.COURSE.getCode(), "동부 해안 코스")).isFalse();
+    }
+
+    @Test
+    @DisplayName("한쪽만 숙박이면 병합하지 않고, 숙박과 레포츠(캠핑장)는 병합한다")
+    void mergesLodgingOnlyWithLodgingOrLeports() {
+        // 에코랜드(테마파크) → 에코랜드 호텔, 제주양떼목장펜션 → 제주양떼목장 (dev 오병합)
+        assertThat(PlaceIdentityPolicy.isMergeableKind(CULTURE, LODGING, "에코랜드 호텔")).isFalse();
+        assertThat(PlaceIdentityPolicy.isMergeableKind(LODGING, TOURIST_SPOT, "제주양떼목장")).isFalse();
+        // 서귀포 캠파제주(펜션) → 캠파제주(레포츠 28, 같은 주소)
+        assertThat(PlaceIdentityPolicy.isMergeableKind(LODGING, LEPORTS, "캠파제주")).isTrue();
+        assertThat(PlaceIdentityPolicy.isMergeableKind(LEPORTS, LODGING, "캠파제주")).isTrue();
+        assertThat(PlaceIdentityPolicy.isMergeableKind(LODGING, LODGING, "포시즌펜션")).isTrue();
+        assertThat(PlaceIdentityPolicy.isMergeableKind(CULTURE, TOURIST_SPOT, "노리매공원")).isTrue();
     }
 
     @Test
@@ -131,6 +215,7 @@ class PlaceIdentityPolicyTest {
     void keepsMeasuredRadii() {
         assertThat(PlaceIdentityPolicy.MERGE_EXACT_NAME_RADIUS_M).isEqualTo(1_000d);
         assertThat(PlaceIdentityPolicy.MERGE_PARTIAL_NAME_RADIUS_M).isEqualTo(300d);
+        assertThat(PlaceIdentityPolicy.MERGE_SHARED_NAME_RADIUS_M).isEqualTo(100d);
         assertThat(PlaceIdentityPolicy.IMAGE_BACKFILL_RADIUS_M).isEqualTo(500d);
         assertThat(PlaceIdentityPolicy.EMERGENCY_DUPLICATE_RADIUS_M).isEqualTo(1_000d);
     }
