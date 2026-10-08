@@ -8,12 +8,13 @@ import type { ReactNode } from 'react'
 import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
-import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from '@/components/icons'
+import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { MAP_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
 import { Skeleton } from '@/components/skeleton'
 import { ViewToggle } from '@/components/view-toggle'
 import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
+import { ResearchHereButton } from '@/features/map/research-here-button'
 import { PlaceListSection, type PlaceListSectionProps } from '@/features/place/place-list-section'
 import { PlaceMapFilterBar } from '@/features/place/place-map-filter-bar'
 import { PlaceMapPanel } from '@/features/place/place-map-panel'
@@ -718,18 +719,19 @@ export function PlaceMapView({
       />
 
       {/*
-        **"이 지역에서 재검색" — 지도 하단 중앙** (#396). `/emergency` 와 **같은 문구 ·
+        **"이 지역에서 재검색" — 데스크톱은 지도 하단 중앙, `lg` 미만은 검색 줄 바로 아래** (#396 · #1278). `/emergency` 와 **같은 문구 ·
         같은 모양 · 같은 자리**다 (`messages.map.researchHere`) — 두 지도 화면에서 같은
         일을 하는 컨트롤이 다르게 생기면 안 된다. 근거와 실측은 `emergency-map-view.tsx`
         의 같은 자리에 있다.
 
-        세로 자리는 `.map-research-offset`(globals.css)이 갖는다 — 모바일 시트 최소
-        단계를 피해야 해서 그 계산이 CSS 에 있다.
+        세로 자리는 `.map-research-offset`(globals.css)이 갖는다 — 모바일은 시트에 가려지지
+        않게 위에 둔다(#1278).
       */}
       {offerResearch && (
         <div
           className={cn(
-            'map-research-offset absolute inset-x-0 z-30 flex justify-center px-4',
+            // 데스크톱만 — `lg` 미만은 상단 컨트롤 묶음 맨 아래에 선다(아래, #1278)
+            'map-research-offset absolute inset-x-0 z-30 hidden justify-center px-4 lg:flex',
             /*
               **남은 지도의 가운데** (#1232 D4) — 도킹 스택이 왼쪽을 덮으므로 그 폭만큼 비킨다. 1280 부터
               미리보기가 목록 옆에 서면 800, 그 아래는 미리보기가 목록 자리라 400 이다(#1227). 접히면 0.
@@ -738,14 +740,7 @@ export function PlaceMapView({
             previewId !== null && panelOpen && 'xl:left-200',
           )}
         >
-          <button
-            type="button"
-            onClick={researchHere}
-            className="text-body-2 bg-bg text-fg border-border hover:bg-band focus-visible:ring-brand-500 inline-flex h-11 max-w-full items-center gap-2 rounded-full border px-5 font-semibold whitespace-nowrap shadow-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
-          >
-            <SearchIcon size={16} />
-            {messages.map.researchHere}
-          </button>
+          <ResearchHereButton onClick={researchHere} />
         </div>
       )}
 
@@ -865,6 +860,16 @@ export function PlaceMapView({
             {locatable && <MapLocateButton onLocate={locate} />}
           </div>
         </div>
+
+        {/*
+          **`lg` 미만의 재검색은 상단 컨트롤 묶음 맨 아래다** (#1278). 하단에 두면 시트 중간 · 최대 단계에
+          가려졌다. 흐름 안이라 위 줄(검색 · 보기 전환 · 내 위치)이 커져도 겹치지 않는다.
+        */}
+        {offerResearch && (
+          <div className="flex justify-center px-4 pt-2 lg:hidden">
+            <ResearchHereButton onClick={researchHere} />
+          </div>
+        )}
       </div>
 
       {/* ── 데스크톱: 왼쪽에 붙은 패널 스택 (#1232) ───────────────────────── */}

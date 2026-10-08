@@ -7,10 +7,12 @@ import {
   MAP_TOP_CONTROLS_INSET,
   MapSheet,
   SHEET_STOPS,
+  sheetDragIntent,
   type SheetStop,
   shouldStartSheetDrag,
 } from '@/components/map-sheet'
 import { messages } from '@/lib/messages'
+import { readGlobalsCss } from '@/test/tokens'
 
 // 이 파일은 화면과 무관한 범용 동작(단계 전환·모달 아님)만 검증한다 —
 // 이름 자체는 호출부마다 다르므로(`src/components/map-sheet.test.ts`) 임의 값을 쓴다.
@@ -198,21 +200,48 @@ describe('shouldStartSheetDrag — 무엇이 드래그를 시작하는가 (#901 
     expect(shouldStartSheetDrag(at(null))).toBe(true)
   })
 
-  it('버튼·링크·입력에서 시작한 제스처는 그 컨트롤의 것이다', () => {
-    expect(shouldStartSheetDrag(at('button'))).toBe(false)
+  /*
+    **칩 · 버튼 위에서도 시작한다** (#1278, 사용자 결정 2026-10-08). 누를 때 막으면 머리 대부분이
+    손잡이가 아니었다. 누르기와 끌기는 움직임이 가른다(`sheetDragIntent`) — 끌기였으면 뒤따르는
+    click 을 삼켜 칩이 눌리지 않는다. 입력칸만 뺀다: 거기서 끌면 글자 선택이 그 칸의 일이다.
+  */
+  it('버튼 · 링크 위에서도 드래그 후보다 — 누르기와 끌기는 움직임이 가른다', () => {
+    const at = (match: string) => ({
+      closest: (selector: string) => (selector.split(', ').includes(match) ? match : null),
+    })
+
+    expect(shouldStartSheetDrag(at('button'))).toBe(true)
+    expect(shouldStartSheetDrag(at('a'))).toBe(true)
+    expect(shouldStartSheetDrag(at('input'))).toBe(false)
   })
 
   it('대상이 없으면 시작하지 않는다', () => {
     expect(shouldStartSheetDrag(null)).toBe(false)
   })
 
-  it('필터 줄(toolbar)은 칩 사이 틈까지 드래그를 시작하지 않는다 — 칩을 누르려다 시트가 끌렸다', () => {
-    // 실제 선택자를 받아 그 안에 표식이 있을 때만 "맞았다" 고 답하는 가짜 대상
-    const insideToolbar = {
+  it('표식(data-sheet-no-drag)을 단 자리는 여전히 뺀다 — 호출부의 탈출구다', () => {
+    const marked = {
       closest: (selector: string) => (selector.includes('[data-sheet-no-drag]') ? 'div' : null),
     }
 
-    expect(shouldStartSheetDrag(insideToolbar)).toBe(false)
+    expect(shouldStartSheetDrag(marked)).toBe(false)
+  })
+})
+
+describe('sheetDragIntent — 누르기 · 끌기 · 가로 스크롤을 움직임으로 가른다 (#1278)', () => {
+  it('8px 미만은 아직 모른다 — 손 떨림은 누르기다', () => {
+    expect(sheetDragIntent(3, 5)).toBe('pending')
+    expect(sheetDragIntent(0, -7)).toBe('pending')
+  })
+
+  it('세로로 8px 이상 · 세로가 우세하면 시트 드래그다', () => {
+    expect(sheetDragIntent(2, -8)).toBe('sheet')
+    expect(sheetDragIntent(-5, 12)).toBe('sheet')
+  })
+
+  it('가로가 우세하면 시트가 아니다 — 칩 줄 가로 스크롤의 것이다', () => {
+    expect(sheetDragIntent(10, 4)).toBe('none')
+    expect(sheetDragIntent(-9, 9)).toBe('none')
   })
 })
 
@@ -230,8 +259,10 @@ describe('MapSheet — 손잡이와 필터 줄 (사용자 지적 2026-10-07)', (
     )
   }
 
-  it('필터 줄에 드래그 제외 표식이 있다', () => {
-    expect(renderWithToolbar()).toMatch(/<div data-sheet-no-drag="true"[^>]*><p>필터 자리/)
+  /* #1278 — 필터 줄도 손잡이다. 칩을 잡고 위아래로 끌면 시트가 움직여야 한다 */
+  it('필터 줄에 드래그 제외 표식이 없다 — 칩을 잡고 끌어도 시트가 움직인다', () => {
+    expect(renderWithToolbar()).not.toContain('data-sheet-no-drag')
+    expect(renderWithToolbar()).toContain('필터 자리')
   })
 
   it('손잡이 막대 밑에 12px 여유를 둔다 — 막대와 칩이 붙어 잡기 어려웠다', () => {
@@ -254,6 +285,24 @@ describe('MapSheet — 손잡이와 필터 줄 (사용자 지적 2026-10-07)', (
 describe('MapSheet — 머리의 터치 규칙 (#901 D3)', () => {
   it('머리는 touch-pan-x 다 — 가로 스크롤을 브라우저에 남긴다', () => {
     expect(render('mid')).toContain('touch-pan-x')
+  })
+
+  /* 끄는 동안 칩 글자가 파랗게 선택됐다 (#1278, 2026-10-08 스크린샷) */
+  it('머리는 글자 선택을 막는다 — 끄는 동안 칩 글자가 선택되지 않는다', () => {
+    const head = /<div class="([^"]*touch-pan-x[^"]*)"/.exec(render('mid'))?.[1] ?? ''
+
+    expect(head.split(/\s+/)).toContain('select-none')
+  })
+
+  /*
+    `touch-action` 은 가장 가까운 스크롤 컨테이너에서 끊긴다 — 칩 줄(가로 스크롤) 안에서 세로로 끌면
+    브라우저가 제스처를 가져가 `pointercancel` 이 났다 (#1278 실측). 안쪽까지 `pan-x` 로 맞춘다.
+  */
+  it('머리 안쪽 요소까지 pan-x 다 — 칩 줄 스크롤 컨테이너에서 터치 규칙이 끊기지 않는다', () => {
+    expect(render('mid')).toContain('map-sheet-head')
+    expect(readGlobalsCss()).toMatch(
+      /\.map-sheet-head :where\(:not\(\.touch-none\)\) \{\s*touch-action: pan-x;/,
+    )
   })
 
   it('그래버 줄만 touch-none 이다 — 거기서는 가로로 끌어도 단계가 움직인다', () => {

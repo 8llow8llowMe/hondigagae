@@ -20,37 +20,42 @@ function repoSource(relative: string): string {
   return readFileSync(fileURLToPath(new URL(`../../${relative}`, import.meta.url)), 'utf8')
 }
 
-describe('재검색 알약 세로 자리 (#396)', () => {
-  it('알약의 dvh 값이 시트 최소 단계 비율과 같다', () => {
-    const sheet = repoSource('src/components/map-sheet.tsx')
-    const minRatio = /min:\s*(0?\.\d+)/.exec(sheet)?.[1]
+/*
+  **#1278 — 알약이 폭마다 다른 자리에 선다.** 데스크톱은 지도 하단 중앙(`.map-research-offset`), `lg` 미만은
+  상단 컨트롤 묶음 맨 아래(흐름 안)다. 하단에 두면 시트 중간 · 최대 단계에 가려졌고, 고정 좌표(검색 줄 아래
+  72)로 두면 `/emergency` 의 위치 안내와 겹쳤다(실측). 그래서 시트 비율과 묶이던 예전 계약(#396)은 없다.
+*/
+const SCREENS = [
+  'src/features/place/place-map-view.tsx',
+  'src/features/emergency/emergency-map-view.tsx',
+]
 
-    expect(minRatio).toBeDefined()
-
-    // 0.2 → 20dvh
-    const expectedDvh = Math.round(Number(minRatio) * 100)
+describe('재검색 알약 자리 (#1278)', () => {
+  it('하단 자리 클래스는 데스크톱 바닥(32px)만 갖는다 — 시트 비율 · 탭바와 묶이지 않는다', () => {
     const rule = /\.map-research-offset\s*\{[^}]*\}/.exec(globals)?.[0]
 
     expect(rule).toBeDefined()
-    expect(rule).toContain(`${expectedDvh}dvh`)
+    expect(rule).toContain('bottom: 32px')
+    expect(rule).not.toContain('dvh')
+    expect(rule).not.toContain('var(--tabbar-h)')
   })
 
-  it('모바일에서는 탭바 높이도 함께 뺀다 — 최소 단계 시트가 탭바 위에 앉는다', () => {
-    const rule = /\.map-research-offset\s*\{[^}]*\}/.exec(globals)?.[0]
+  it('두 지도 화면 모두 하단 알약은 lg 부터, 상단 알약은 lg 미만에서만 선다', () => {
+    for (const file of SCREENS) {
+      const source = repoSource(file)
 
-    expect(rule).toContain('var(--tabbar-h)')
+      expect(source).toMatch(
+        /'map-research-offset absolute inset-x-0 z-30 hidden justify-center px-4 lg:flex'/,
+      )
+      expect(source).toMatch(
+        /<div className="flex justify-center px-4 pt-2 lg:hidden">\s*<ResearchHereButton/,
+      )
+    }
   })
 
-  /*
-    `lg` 는 시트가 없다(`lg:hidden`). 바닥 32 는 카카오 축척·로고 막대(바닥 20px) 위다 — 막대는
-    #1232 부터 우하단이지만 바닥 높이는 두 지도 화면(`/places` · `/emergency`)이 같아야 한다.
-  */
-  it('lg 에서는 축척 막대 위 같은 바닥(32px)에 선다', () => {
-    const lgRule = /@media \(width >= 64rem\) \{\s*\.map-research-offset\s*\{[^}]*\}/.exec(
-      globals,
-    )?.[0]
-
-    expect(lgRule).toBeDefined()
-    expect(lgRule).toContain('bottom: 32px')
+  it('두 화면이 같은 버튼 컴포넌트를 쓴다 — 같은 문구 · 같은 모양 (#396)', () => {
+    for (const file of SCREENS) {
+      expect(repoSource(file).match(/<ResearchHereButton /g)).toHaveLength(2)
+    }
   })
 })

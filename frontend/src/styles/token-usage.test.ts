@@ -224,6 +224,8 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
       // 구조다. 지도와 같은 평면에 두면 어디까지가 패널인지 읽히지 않는다.
       'src/components/map-sheet.tsx',
       'src/features/place/place-map-view.tsx',
+      // 두 지도 보기가 함께 쓰는 "이 지역에서 재검색" 알약 — 지도 위에 뜬다 (#1278 에서 뽑아냈다)
+      'src/features/map/research-here-button.tsx',
       // 그 지도 보기의 로딩 골격 — 같은 좌측 패널을 같은 자리에 세운다 (`/places` loading)
       'src/features/place/place-map-skeleton.tsx',
       // 긴급 시설 지도 보기 — `place-map-view.tsx` 와 같은 구조다(#353) - 지도가

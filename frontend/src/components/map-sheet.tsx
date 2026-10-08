@@ -1,9 +1,11 @@
 'use client'
 
 import {
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   useCallback,
+  useRef,
   useState,
 } from 'react'
 
@@ -57,35 +59,46 @@ const DRAG_THRESHOLD_PX = 24
 export const MAP_TOP_CONTROLS_INSET = 136
 
 /**
- * 여기서 시작한 제스처는 드래그로 치지 않는다 — 각자 자기 일이 있는 컨트롤이다.
+ * 여기서 시작한 제스처는 드래그로 치지 않는다 — **입력칸과 표식(`data-sheet-no-drag`)뿐이다.**
  *
- * **묶음(`ChipGroup`) 선택자는 넣지 않는다.** 그 안의 칩은 `button` 이라 이미 빠지고, 묶음이 서는
- * 필터 줄은 통째로 `[data-sheet-no-drag]` 로 빠진다(아래). (그리고 이 파일이 배타 묶음을 *그리는* 것으로
- * 오인되면 `radio-group-keys.test.ts` 가 키 핸들러를 요구한다 — 이 파일에는 없는 일이다.)
+ * **칩 · 버튼 · 링크는 뺐다** (#1278, 사용자 결정 2026-10-08). 2026-10-07 에 "칩을 누르려다 시트가
+ * 끌린다" 를 막으려고 버튼과 필터 줄 전체를 뺐더니, 머리의 대부분이 손잡이가 아니어서 칩을 잡고
+ * 올리면 시트가 움직이지 않았다. 이제 **누를 때 정하지 않고 움직임이 가른다**(`sheetDragIntent`) —
+ * 세로로 충분히 끌어야 드래그고, 그랬으면 뒤따르는 click 을 삼켜 칩이 눌리지 않는다. 10-07 의 사고는
+ * 손 떨림이 드래그로 잡혀서였으므로 문턱(`DRAG_SLOP_PX`)이 막는다.
  *
- * **필터 줄(`toolbar`) 전체는 뺀다** (`data-sheet-no-drag`, 사용자 지적 2026-10-07). 칩은 `button` 이라
- * 빠졌지만 칩 사이 틈(6px)과 레일 위아래 여백이 손잡이로 남아, 칩을 누르려다 시트가 끌렸다. 칩이
- * 빽빽한 줄에서는 "빈 자리도 손잡이" 가 이득보다 사고가 크다 — 대신 그래버 줄을 넓혔다(아래).
+ * 입력칸은 그대로 뺀다 — 거기서 끄는 것은 글자 선택 · 커서 이동이라 그 칸의 일이다.
  */
-const DRAG_IGNORED_SELECTOR = 'button, a, input, select, textarea, [data-sheet-no-drag]'
+const DRAG_IGNORED_SELECTOR = 'input, select, textarea, [data-sheet-no-drag]'
 
 /**
- * 이 자리에서 시트 드래그를 시작해도 되는가 ([#901](https://github.com/8llow8llowMe/hondigagae/issues/901) **D3**).
+ * 이 자리에서 시트 드래그 **후보**를 시작해도 되는가 ([#901](https://github.com/8llow8llowMe/hondigagae/issues/901) **D3** · #1278).
  *
- * **잡는 자리를 그래버 한 줄(16px)에서 시트 머리 전체로 넓혔다.** 실기기에서 *"어딜 잡고
- * 올려야 하는지 모르겠다"* 가 나온 자리다 — 보이는 막대는 36×4 인데 드래그를 받는 띠는
- * 세로 16px 뿐이었고, 조금만 아래를 잡으면 목록이 스크롤됐다.
- *
- * **머리 전체를 받되 컨트롤과 필터 줄은 뺀다.** 칩·단계 버튼에서 시작한 제스처까지 드래그로 치면
- * 필터를 누를 수 없다. 그래서 *대상* 으로 가르고, 칩이 빽빽한 필터 줄은 칩 사이 틈까지 *영역* 으로
- * 뺀다(2026-10-07 — 칩을 누르려다 시트가 끌렸다). 잡는 자리는 그래버 띠 · 개수 줄이다.
- *
+ * 머리 전체(그래버 · 필터 줄 · 개수 줄)가 손잡이다. 후보일 뿐이고, 드래그인지는 움직임이 정한다.
  * **목록은 여전히 드래그를 안 받는다** — 그쪽이 먹으면 스크롤이 죽는다(아래 주석).
  */
 export function shouldStartSheetDrag(target: { closest(selector: string): unknown } | null) {
   if (target === null) return false
 
   return target.closest(DRAG_IGNORED_SELECTOR) === null
+}
+
+/** 이만큼 움직이기 전에는 누르기인지 끌기인지 모른다 — 손 떨림을 드래그로 잡지 않는다 (#1278) */
+const DRAG_SLOP_PX = 8
+
+/**
+ * 누른 자리에서 `(dx, dy)` 만큼 움직였을 때의 판정 (#1278).
+ *
+ * - `pending` — 아직 문턱 안이다. 손을 떼면 그냥 누르기(click)다
+ * - `sheet` — 세로가 문턱을 넘고 가로보다 크다. 시트를 끈다
+ * - `none` — 가로가 우세하다. 칩 줄 가로 스크롤의 것이다(터치는 `touch-pan-x` 라 브라우저가 가져간다)
+ */
+export function sheetDragIntent(dx: number, dy: number): 'pending' | 'sheet' | 'none' {
+  const ax = Math.abs(dx)
+  const ay = Math.abs(dy)
+  if (ax < DRAG_SLOP_PX && ay < DRAG_SLOP_PX) return 'pending'
+
+  return ay > ax ? 'sheet' : 'none'
 }
 
 export function MapSheet({
@@ -131,6 +144,18 @@ export function MapSheet({
 }) {
   const [dragOffset, setDragOffset] = useState(0)
   const [dragging, setDragging] = useState(false)
+  /**
+   * 누른 포인터. `intent` 가 `sheet` 가 되기 전에는 아무것도 잡지 않는다 — 누르는 순간 캡처하면
+   * click 대상이 칩이 아니라 머리로 바뀐다(#1264 캐러셀과 같은 함정).
+   */
+  const press = useRef<{
+    id: number
+    x: number
+    y: number
+    intent: 'pending' | 'sheet' | 'none'
+  } | null>(null)
+  /** 직전 제스처가 시트 드래그였다 — 뒤따르는 click 을 삼킨다 */
+  const dragged = useRef(false)
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     /*
@@ -139,32 +164,78 @@ export function MapSheet({
       머리까지 와서, DOM 조상에 표식이 없으니 드래그로 잡혔다(리뷰 지적). DOM 으로 이 머리 안인지 본다.
     */
     if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return
-    // 칩·단계 버튼에서 시작한 제스처는 그 컨트롤의 것이다 (#901 D3)
+    // 마우스는 왼쪽 버튼만 — 우클릭 메뉴는 pointerup 을 빠뜨릴 수 있다
+    if (event.pointerType === 'mouse' && event.button !== 0) return
     if (!shouldStartSheetDrag(event.target as HTMLElement | null)) return
 
-    event.currentTarget.setPointerCapture(event.pointerId)
-    setDragging(true)
-    setDragOffset(0)
+    press.current = { id: event.pointerId, x: event.clientX, y: event.clientY, intent: 'pending' }
+    dragged.current = false
   }, [])
 
-  const onPointerMove = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (!dragging) return
-      // 위로 끌면 음수 → 시트가 커진다
-      setDragOffset(event.movementY + dragOffset)
-    },
-    [dragging, dragOffset],
-  )
+  const onPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const state = press.current
+    if (state === null || state.id !== event.pointerId) return
+
+    const dy = event.clientY - state.y
+    if (state.intent === 'pending') {
+      state.intent = sheetDragIntent(event.clientX - state.x, dy)
+      if (state.intent !== 'sheet') return
+
+      // 끌기로 확정됐다 — 이제부터 손가락이 머리 밖으로 나가도 따라간다
+      event.currentTarget.setPointerCapture(event.pointerId)
+      dragged.current = true
+      setDragging(true)
+    }
+    if (state.intent !== 'sheet') return
+
+    /*
+      **시작점 대비 `clientY` 차다 — `movementY` 누적이 아니다** (#1278). 터치 포인터의 `movementY` 는
+      브라우저마다 믿을 수 없고, 누적은 빠진 이벤트만큼 어긋난다. 위로 끌면 음수 → 시트가 커진다.
+    */
+    setDragOffset(dy)
+  }, [])
 
   const onPointerUp = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      event.currentTarget.releasePointerCapture(event.pointerId)
+      const state = press.current
+      if (state === null || state.id !== event.pointerId) return
+      press.current = null
+
+      if (state.intent !== 'sheet') return
+
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId)
+      }
       setDragging(false)
-      onStopChange(nextStop(stop, dragOffset))
+      onStopChange(nextStop(stop, event.clientY - state.y))
       setDragOffset(0)
     },
-    [stop, dragOffset, onStopChange],
+    [stop, onStopChange],
   )
+
+  /**
+   * 브라우저가 제스처를 가져갔다(`pointercancel`) — **단계를 바꾸지 않고 제자리로 돌린다** (#1278).
+   * 예전에는 `onPointerUp` 과 같은 함수라 놓은 것으로 셌는데, 취소 이벤트의 `clientY` 가 0 이라
+   * 아래로 끌다 취소되면 시트가 오히려 한 단계 올라갔다(실측).
+   */
+  const onPointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const state = press.current
+    if (state === null || state.id !== event.pointerId) return
+    press.current = null
+    if (state.intent !== 'sheet') return
+
+    setDragging(false)
+    setDragOffset(0)
+  }, [])
+
+  /** 시트를 끌었으면 손을 뗄 때 오는 click 을 캡처 단계에서 삼킨다 — 칩이 눌리지 않게 (#1278) */
+  const onClickCapture = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    if (!dragged.current) return
+
+    dragged.current = false
+    event.preventDefault()
+    event.stopPropagation()
+  }, [])
 
   /*
     끄는 동안의 오프셋은 두 갈래 모두 같은 방식으로 빼진다 — 위로 끌면 음수라 커진다.
@@ -241,8 +312,17 @@ export function MapSheet({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        className="cursor-grab touch-pan-x active:cursor-grabbing"
+        onPointerCancel={onPointerCancel}
+        onClickCapture={onClickCapture}
+        /*
+          `select-none` — 끄는 동안 칩 글자가 선택됐다 (#1278).
+
+          **`map-sheet-head` 가 안쪽 요소까지 `touch-pan-x` 로 맞춘다** (globals.css, #1278). `touch-action`
+          은 가장 가까운 스크롤 컨테이너에서 끊긴다 — 칩 줄은 가로 스크롤 영역이라 이 머리의 `touch-pan-x`
+          가 거기까지 닿지 않았고, 칩 위에서 아래로 끌면 브라우저가 세로 제스처를 가져가
+          `pointercancel` 이 났다(실측). 실기기에서 "잘 안 잡힌다" 의 원인이다.
+        */
+        className="map-sheet-head cursor-grab touch-pan-x select-none active:cursor-grabbing"
       >
         {/*
           그래버 — 보이는 손잡이. **막대 밑에 12px 여유를 둔다**(24px 띠, 사용자 지적 2026-10-07) — `pt-2 pb-1`
@@ -256,10 +336,8 @@ export function MapSheet({
 
         {/* 필터 같은 전폭 컨트롤. 최소 단계에서도 남으므로 지도를 보면서 조건을 바꿀 수 있다 */}
         {toolbar !== undefined && (
-          // 필터 줄은 칩 사이 틈까지 드래그를 받지 않는다 (`DRAG_IGNORED_SELECTOR`)
-          <div data-sheet-no-drag="true" className="px-3 pb-2">
-            {toolbar}
-          </div>
+          // 필터 줄도 손잡이다 — 칩을 잡고 위아래로 끌면 시트가 움직인다 (#1278, `sheetDragIntent`)
+          <div className="px-3 pb-2">{toolbar}</div>
         )}
 
         {/**
