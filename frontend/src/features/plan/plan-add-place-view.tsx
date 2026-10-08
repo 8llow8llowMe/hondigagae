@@ -289,6 +289,8 @@ export function PlanAddPlaceView({
       <div className="map-canvas-height relative">
         <div className="h-full">
           <PlaceMapView
+            // 지도를 못 띄우면 담기 목록 보기로 옮긴다 (#1289)
+            fallbackHref={listHref}
             filters={filters}
             authed
             fill
@@ -372,26 +374,6 @@ export function PlanAddPlaceView({
               })
             }
             renderRowNotice={(place) => planAddPlaceNotice(place, { failure: addPlace.failure })}
-            /* **SDK 가 실패해도 담을 수 있어야 한다.** 없으면 열람 전용 화면이 된다 */
-            renderListRow={(place) => (
-              <PlanAddPlaceRow
-                key={place.placeId}
-                /*
-                  **지도 폴백은 카드가 아니라 페이지 위다** — `PlaceListSection` 도 그쪽에서
-                  `inset="main"` 이고 위 안내 줄이 `md:px-10` 이라, 행이 기본값 `card`(20)로
-                  서면 768 이상에서 안내 줄·스켈레톤(40)과 어긋난다 (`place-map-view.tsx`).
-                */
-                inset="main"
-                place={place}
-                added={addedPlaceIds.has(place.placeId)}
-                pending={addPlace.pending?.placeId === place.placeId}
-                disabled={addPlace.adding}
-                error={
-                  addPlace.failure?.target.placeId === place.placeId ? addPlace.failure.error : null
-                }
-                onAdd={onAdd}
-              />
-            )}
           />
         </div>
       </div>

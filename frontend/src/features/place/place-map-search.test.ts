@@ -23,10 +23,6 @@ const overlay = mapView.slice(
   mapView.indexOf('map-panel-width'),
 )
 const panel = mapView.slice(mapView.indexOf('map-panel-width'))
-const fallback = mapView.slice(
-  mapView.indexOf('if (failure !== null)'),
-  mapView.indexOf('const countLine'),
-)
 
 describe('지도 보기의 검색 자리 (#596)', () => {
   /*
@@ -61,23 +57,13 @@ describe('지도 보기의 검색 자리 (#596)', () => {
   })
 
   /*
-    **폴백에는 필터 칩도 `초기화` 도 없다** (`onResetFilters` 가 no-op 다). 검색을 빼면
-    `?keyword=` 를 달고 들어온 사용자가 그것을 지울 길이 화면에서 사라진다.
+    #1289 — SDK 가 실패하면 축소판 폴백(검색 · 목록)을 그리지 않고 **목록 보기로 옮긴다.** 그 축소판에 검색을
+    남겨 두던 이유(#596 — 필터 칩도 초기화도 없어 검색어를 지울 길이 없었다)는 목록 보기가 이미 해결한다.
   */
-  it('SDK 실패 폴백에도 검색이 남는다', () => {
-    expect(fallback).toContain('<PlaceSearchField')
-
-    const tag = fallback.slice(
-      fallback.indexOf('<PlaceSearchField'),
-      fallback.indexOf('/>', fallback.indexOf('<PlaceSearchField')),
-    )
-    // 카드 없는 페이지라 위 안내 줄·아래 목록과 같은 축이다
-    expect(tag).toContain('INSET_CLASS.main')
-  })
-
-  /* 0건이면 무엇으로 찾았는지 되돌려 준다 — 목록 갈래가 같은 prop 을 넘긴다 */
-  it('폴백 목록이 keyword 를 받아 0건 문구에 되돌려 준다', () => {
-    expect(fallback).toContain('keyword={filters.keyword}')
+  it('SDK 실패는 목록 보기로 옮긴다 — 축소판 폴백을 그리지 않는다', () => {
+    expect(mapView).toContain('useMapFailureFallback(failure, fallbackHref)')
+    expect(mapView).toContain('if (failure !== null) return null')
+    expect(mapView).not.toContain('place-keyword-fallback')
   })
 
   /*
@@ -85,14 +71,9 @@ describe('지도 보기의 검색 자리 (#596)', () => {
     배타적이지만 같은 파일이다. 같은 `id` 가 둘이면 `htmlFor` 가 어느 입력을 가리키는지
     문서가 정하지 못하고, 보조기기가 라벨 없는 입력을 보게 된다.
   */
-  it('네 자리의 입력 id 가 모두 다르다', () => {
+  it('세 자리의 입력 id 가 모두 다르다', () => {
     // `place-keyword-head` 는 떠 있는 머리 아래 자리다 (#1012)
-    const ids = [
-      'place-keyword-map',
-      'place-keyword-panel',
-      'place-keyword-fallback',
-      'place-keyword-head',
-    ]
+    const ids = ['place-keyword-map', 'place-keyword-panel', 'place-keyword-head']
 
     for (const id of ids) expect(mapView).toContain(`id="${id}"`)
     expect(new Set(ids).size).toBe(ids.length)
@@ -180,21 +161,5 @@ describe('머리가 있는 화면의 검색 자리 (#1012)', () => {
     expect(mapView).toContain(
       'const hasHead = head !== undefined && head !== null && head !== false',
     )
-  })
-
-  /*
-    **폴백에서는 머리가 정상 흐름이다.** 지도가 없으니 띄울 바탕이 없고, `absolute` 로 두면
-    안내 줄과 첫 행을 덮는다 (#1012 이전 375·1440 실측).
-  */
-  it('SDK 실패 폴백은 머리를 안내 줄보다 먼저, 흐름 안에 세운다', () => {
-    const head = fallback.indexOf('{hasHead && <div')
-    const notice = fallback.indexOf('role="status"')
-
-    expect(head).toBeGreaterThan(-1)
-    expect(notice).toBeGreaterThan(head)
-
-    const wrapper = fallback.slice(head, fallback.indexOf('{head}', head))
-    expect(wrapper).not.toContain('absolute')
-    expect(wrapper).toContain('INSET_CLASS.main')
   })
 })

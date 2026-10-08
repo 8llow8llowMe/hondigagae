@@ -77,11 +77,13 @@ describe('PlaceMapView — 개수 캡션의 요소 (#1177)', () => {
   첫 주변 조회의 일시 장애를 "이 지역에는 표시할 곳이 없어요" 로 말하던 것이다.
 */
 describe('PlaceMapView — 기준점 지도의 실패 갈래 (#1177)', () => {
-  it('SDK 폴백 목록이 첫 장이 아니라 지금 목록(기준점이면 주변 조회)을 그린다', () => {
-    const fallback = source.slice(source.indexOf('<PlaceListSection'))
-
-    expect(fallback).toMatch(/places=\{places\}/)
-    expect(fallback.slice(0, fallback.indexOf('/>'))).not.toContain('places={listPlaces}')
+  /*
+    #1289 — SDK 가 실패하면 축소판 목록을 그리지 않고 목록 보기로 옮긴다. 예전 이 자리는 그 축소판이 첫 장이
+    아니라 기준점 주변 조회(#1177)를 그리는지를 지켰다 — 이제 그 일은 담기 목록 보기(거리순, #1217)가 한다.
+  */
+  it('SDK 실패는 축소판 목록 대신 목록 보기로 옮긴다', () => {
+    expect(source).not.toContain('<PlaceListSection')
+    expect(source).toContain('useMapFailureFallback(failure, fallbackHref)')
   })
 
   it('주변 조회의 일시 장애는 빈 상태가 아니라 재시도다 — 패널 · 시트 두 곳 모두', () => {

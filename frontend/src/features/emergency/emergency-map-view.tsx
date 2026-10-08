@@ -10,8 +10,6 @@ import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { MAP_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
 import { ViewToggle } from '@/components/view-toggle'
 import { EmergencyFilterBar } from '@/features/emergency/emergency-filter-bar'
-import { EmergencyFilterChips } from '@/features/emergency/emergency-filter-chips'
-import { EmergencyBoardSection } from '@/features/emergency/emergency-list-view'
 import { EmergencyMapPanel } from '@/features/emergency/emergency-map-panel'
 import { EmergencyMapSkeleton } from '@/features/emergency/emergency-map-skeleton'
 import { EmergencySearchField } from '@/features/emergency/emergency-search-field'
@@ -19,16 +17,15 @@ import { emergencyBasisLabel } from '@/features/emergency/emergency-summary-line
 import {
   applyFilters,
   countsAreComplete,
-  facilityCounts,
   narrowByKeyword,
   reliefLabel,
   reliefs,
 } from '@/features/emergency/facility-filters'
-import { PositionFallbackHead } from '@/features/emergency/position-fallback-head'
 import { useEmergencyBoard } from '@/features/emergency/use-emergency-board'
 import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
 import { ResearchHereButton } from '@/features/map/research-here-button'
+import { useMapFailureFallback } from '@/features/map/use-map-failure-fallback'
 import { formatDistance } from '@/lib/format/distance'
 import { type LatLng, SELECTED_FACILITY_MAP_LEVEL, toLatLng } from '@/lib/geo/coord'
 import type { PositionResult } from '@/lib/geo/current-position'
@@ -38,7 +35,6 @@ import type { MapSdkFailure } from '@/lib/map/sdk'
 import { boundsCenter, isWithinBounds, type MapBounds } from '@/lib/map/viewport'
 import { visibleCountLabel } from '@/lib/map/visible-count'
 import { messages } from '@/lib/messages'
-import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { NearbyFacilityItem } from '@/types/emergency'
 
@@ -135,6 +131,8 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
     return panelOpen && width > 0 ? { x: width / 2, y: 0 } : null
   }, [panelOpen])
   const [failure, setFailure] = useState<MapSdkFailure | null>(null)
+  // 실패하면 목록 보기로 옮긴다 — 안내 화면을 그리지 않는다 (#1289)
+  useMapFailureFallback(failure, listHref)
 
   /*
     **선택을 풀어도 얼린 영역은 그대로 둔다** (#933).
@@ -397,76 +395,12 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
     [selectedId, bounds, board.radius, board.position],
   )
 
-  // ── SDK 실패 → 목록으로 되돌리고 안내 한 줄 ──────────────────────────────
-  if (failure !== null) {
-    return (
-      <div>
-        {/* 안내 한 줄 — 배너(링크형)가 아니다. 갈 곳이 없고 알릴 사실만 있다 */}
-        <p
-          role="status"
-          className={cn(
-            'text-caption text-fg-muted bg-bg-sunken border-border border-b py-3 font-medium',
-            // 아래 칩·목록과 같은 축 — 값이 한 곳(`inset.ts`)에 있어야 한 곳만 어긋난다
-            INSET_CLASS.main,
-          )}
-        >
-          {failureMessage(failure)}
-        </p>
-        {/*
-          **레일이 없으니 칩은 모든 폭에서 남는다** — `lg:hidden` 을 걸지 않는다 (공통명세 E0 ·
-          E5). 이 갈래는 카드가 없는 페이지라(`Canvas` 도 `Surface` 도 없다 — `/places`
-          폴백 #452 와 같다) 인셋은 페이지 값 `main` 이다. 칩 아래 선(`divider`)은 위 안내 줄과
-          같은 L0 위 스트립 규약이다.
-
-          개수는 **반경 전량**을 센다 — 지도 없이 목록만 있으니 목록 갈래와 같은 기준이다.
-          단 검색어까지는 먼저 좁힌다 (#584) — 검색어는 축이 아니라 범위다
-          (`facilityCounts` 머리주석).
-        */}
-        {/*
-          **검색도 이 갈래에 남아야 한다** (#584). 이 폴백은 카카오 키 도메인이 안 맞을 때
-          **항상** 오는 경로라 예외가 아니고(E5), 여기서는 목록 갈래가 통째로 대체된다 —
-          입력을 빼면 `?keyword=` 를 달고 들어온 사용자가 그것을 지울 방법이 없다
-          (`EmergencyFilterChips` 에는 `초기화` 가 없고, 0건일 때의 완화 버튼뿐이다).
-          지도 갈래에 검색을 두지 않는다는 판단은 **지도가 실제로 그려질 때**의 이야기다.
-
-          인셋은 아래 칩·목록과 같은 페이지 값 `main` 이다.
-        */}
-        {/*
-          **위치 폴백 블록이 이 갈래에도 선다** (#639). `EmergencySection` 이 갖고 있던
-          `PositionNotice` 가 카드 머리로 올라가면서, 여기에 다시 세우지 않으면 이 갈래만
-          "왜 거리가 없는지" 를 말하지 않게 된다 — 카카오 키 도메인이 안 맞을 때 **항상**
-          오는 경로라 예외가 아니다 (공통명세 E5).
-
-          카드가 없는 페이지라 인셋은 아래 칩·목록과 같은 `main` 이다.
-        */}
-        <PositionFallbackHead
-          reason={board.fallback}
-          regionCode={board.regionCode}
-          onRegionChange={board.researchAtRegion}
-          onLocate={board.locate}
-          inset="main"
-        />
-        <EmergencySearchField
-          filters={board.filters}
-          onFiltersChange={board.setFilters}
-          className={cn('pt-3', INSET_CLASS.main)}
-        />
-        <EmergencyFilterChips
-          filters={board.filters}
-          onFiltersChange={board.setFilters}
-          radius={board.radius}
-          onRadiusChange={board.setRadius}
-          counts={facilityCounts(narrowByKeyword(inRadius, board.filters.keyword))}
-          showCounts={board.query.data !== undefined && countsAreComplete(board.query.data)}
-          inset="main"
-          divider
-        />
-        {/* **자기 보드를 넘긴다.** `EmergencyListView` 를 렌더하면 보드가 두 벌이 된다.
-         **`inset="main"` 이다** — 카드가 아니다 (`EmergencyBoardSection` 머리주석) */}
-        <EmergencyBoardSection board={board} inset="main" />
-      </div>
-    )
-  }
+  /*
+    ── SDK 실패 → 목록 보기로 옮기는 중 (#1289) ──────────────────────────────
+    이동은 `useMapFailureFallback` 이 한다. 예전에는 여기서 안내 한 줄 + 위치 안내 + 검색 + 칩 + 보드를 다시
+    세웠는데, 목록 보기(`EmergencyListView`)가 같은 일을 이미 한다 — 두 벌을 맞춰 두는 대신 그리로 보낸다.
+  */
+  if (failure !== null) return null
 
   /*
     "지도에 보이는" 이라는 주장을 감출 두 상태를 하나로 합친다 — 선택 중이거나,
@@ -967,10 +901,4 @@ export function isSelectionStillValid(params: {
   if (params.anchorRadius !== params.currentRadius) return false
   if (params.anchorPosition !== params.currentPosition) return false
   return params.visible.some((entry) => entry.facilityId === params.selectedId)
-}
-
-function failureMessage(reason: MapSdkFailure): string {
-  if (reason === 'no-key') return messages.map.errorNoKey
-  if (reason === 'unsupported') return messages.map.errorUnsupported
-  return messages.map.errorScript
 }
