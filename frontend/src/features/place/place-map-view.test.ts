@@ -109,8 +109,14 @@ describe('PlaceMapView — 장소 미리보기 (#1227)', () => {
     expect(code.match(/key=\{previewId\}/g)).toHaveLength(2)
   })
 
-  it('목록을 접었으면 펼치기 버튼을 비켜 선다', () => {
-    expect(code).toContain("panelOpen ? 'map-preview-beside' : 'map-preview-after-handle'")
+  /*
+    #1232 D2 — 1280 부터 목록 **바로 옆**(흐름 안, 간격 0), 그 아래는 목록 자리(`absolute left-0`).
+    목록과 함께 스택 안에 있어 접으면 같이 밀려난다 — 접힌 목록 옆에 홀로 서지 않는다.
+  */
+  it('미리보기는 스택 안에서 1280 부터 흐름에 들고 그 아래는 목록 자리에 겹친다', () => {
+    expect(code).toContain(
+      'map-panel-width bg-bg border-border absolute inset-y-0 left-0 overflow-hidden border-r xl:static',
+    )
   })
 
   it('담기 지도(미리보기 꺼짐)는 정중앙 카메라 그대로다', () => {
@@ -120,5 +126,64 @@ describe('PlaceMapView — 장소 미리보기 (#1227)', () => {
   it('모바일 위 경계는 뷰포트 기준 136 이다 — root.top 에 더하지 않는다 (헤더 이중 차감)', () => {
     expect(code).toContain('Math.max(root.top, MAP_TOP_CONTROLS_INSET)')
     expect(code).not.toContain('root.top + MAP_TOP_CONTROLS_INSET')
+  })
+})
+
+/*
+  #1232 — 데스크톱 패널은 떠 있는 카드가 아니라 화면 왼쪽에 붙은 스택이다
+  (`docs/features/place/지도패널-도킹-세부명세.md` D2 · D4 · D5 · D9).
+*/
+describe('PlaceMapView — 도킹 스택 (#1232)', () => {
+  it('스택이 지도 루트의 왼쪽 위아래 끝까지 붙는다 — 바깥 여백 · 둥근 모서리가 없다', () => {
+    expect(code).toContain("'absolute inset-y-0 left-0 z-30 hidden transition-transform lg:block'")
+    expect(code).not.toMatch(/top-6 bottom-8 left-4/)
+    expect(code).not.toContain('rounded-tr-none')
+  })
+
+  it('목록은 오른쪽 경계선 하나로 미리보기와 가른다 — 패널마다 그림자를 두지 않는다', () => {
+    expect(code).toContain(
+      'map-panel-width bg-bg border-border flex h-full flex-col overflow-hidden border-r',
+    )
+    expect(code).toContain("panelOpen && 'map-dock-shadow'")
+  })
+
+  it('재검색 알약은 남은 지도의 가운데다 — 목록 400 · 1280 부터 미리보기까지 800 · 접히면 0', () => {
+    expect(code).toContain("panelOpen && 'lg:left-100'")
+    expect(code).toContain("previewId !== null && panelOpen && 'xl:left-200'")
+  })
+
+  it('카카오 축척 · 로고를 우하단으로 비킨다 — 도킹 스택이 좌하단 로고를 덮는다', () => {
+    expect(code).toContain('copyrightPosition="right"')
+  })
+
+  /*
+    D9 — 담기 화면의 머리는 열린 패널의 맨 위 블록이고, 접힌 동안에만 떠 있는 카드로 돌아온다.
+    머리는 그 화면의 유일한 퇴로(#556)라 접어도 닿아야 한다.
+  */
+  it('머리는 열린 데스크톱 패널 안, 접히면 떠 있는 기둥에 선다 — 한 번에 하나만', () => {
+    const inPanel = '{hasHead && <div className="border-border border-b p-3">{head}</div>}'
+    // 패널 안 머리는 inert 스택 안이다 — 밖이면 접힌 lg 에서 h1 · 돌아가기가 두 벌 노출된다
+    expect(code.indexOf('id={stackId}')).toBeLessThan(code.indexOf(inPanel))
+    expect(code.indexOf(inPanel)).toBeLessThan(code.indexOf('aria-controls={stackId}'))
+    // 떠 있는 기둥은 열린 lg 에서 숨는다 — 기둥 블록(`{hasHead && (`) 안의 `cn()` 이다
+    const start = code.indexOf('{hasHead && (')
+    const floating = code.slice(start, code.indexOf('{head}', start))
+    expect(floating).toContain("panelOpen && 'lg:hidden'")
+  })
+
+  /* 리뷰 지적 — 미리보기가 스택 안이라 접힌 채 고르면 화면 밖 inert 에 마운트됐다 */
+  it('미리보기를 열면 접힌 스택을 편다 — 목록 · 시트 · 핀 모두 같은 길이다', () => {
+    expect(code).toContain('if (preview && id !== null) setPanelOpen(true)')
+    expect(code.match(/onSelect=\{selectPlace\}/g)).toHaveLength(3)
+    expect(code).not.toContain('onSelect={setSelectedId}')
+  })
+
+  /* 펴는 도중 transform 중간 프레임을 재지 않는다 — 배치 상자는 transform 을 모른다 */
+  it('고른 핀 오프셋은 transform 이 아니라 배치 상자로 잰다', () => {
+    expect(code).toContain('(panel.offsetLeft + panel.offsetWidth) / 2')
+  })
+
+  it('패널 위 여백을 호출부가 정하지 않는다 — 패널이 헤더 바로 아래부터다', () => {
+    expect(code).not.toContain('panelTopInset')
   })
 })

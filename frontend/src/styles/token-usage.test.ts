@@ -231,10 +231,6 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
       'src/features/emergency/emergency-map-view.tsx',
       // 지도 우상단에 얹히는 현재 위치 버튼 — 보기 전환 토글과 같은 스택에 뜬다
       'src/features/map/map-locate-button.tsx',
-      // 담기 지도의 떠 있는 머리 카드 (#556) — 좌측 패널과 **같은 기둥**에 뜨는 표면이라
-      // 패널과 같은 곡률(16)·그림자를 쓴다. 뒤로가기가 이 화면의 유일한 퇴로라 접히는
-      // 패널 안에 넣을 수 없어 별도 표면으로 떠 있다
-      'src/features/plan/plan-add-place-view.tsx',
       // ── 드래그 중인 항목 (DESIGN.md §6 이 --shadow-md 용도에 명시한다) ─────
       // 끌고 있는 행은 손끝에 들려 목록 위에 떠 있다. 평면 카드를 띄우려고 이 목록에
       // 넣는 것이 규칙을 무너뜨리는 경로이므로, 여기 추가하기 전에 그것이 **실제로
@@ -257,6 +253,22 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
     )
 
     expect(found).toEqual([])
+  })
+
+  /*
+    #1232 — 도킹 스택의 그림자는 `clip-path` 음수 때문에 이름 있는 클래스(`.map-dock-shadow`)라 위
+    `shadow-(md|lg)` 리터럴 검사에 걸리지 않는다. 쓰는 곳을 지도 보기와 그 골격으로 따로 묶는다.
+  */
+  it('도킹 스택 그림자는 지도 보기와 그 골격만 쓴다', () => {
+    const OWNERS = [
+      'src/features/place/place-map-view.tsx',
+      'src/features/place/place-map-skeleton.tsx',
+    ]
+    const users = FILES.filter(({ text }) => /\bmap-dock-shadow\b/.test(text))
+      .map(({ path }) => path.replace(/\\/g, '/'))
+      .filter((path) => !path.endsWith('.test.ts'))
+
+    expect(users.sort()).toEqual([...OWNERS].sort())
   })
 
   it('--bg-sunken 은 바닥 전용이다 — 화면이 회색 면을 직접 칠하지 않는다', () => {

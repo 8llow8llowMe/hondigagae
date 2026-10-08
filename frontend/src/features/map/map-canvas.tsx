@@ -238,6 +238,7 @@ export function MapCanvas({
   selectedLevel,
   selectedOffset,
   focusMarker,
+  copyrightPosition = 'left',
   onFailure,
   className,
 }: {
@@ -366,6 +367,13 @@ export function MapCanvas({
    * **호출부는 참조를 안정적으로 넘긴다** (`useMemo`) — 이 값이 바뀌면 오버레이를 지우고 다시 그린다.
    */
   focusMarker?: { lat: number; lng: number; name: string } | null
+  /**
+   * 카카오 축척 · 로고 막대의 자리 (#1232). 기본은 SDK 그대로 좌하단이다.
+   *
+   * **왼쪽을 덮는 도킹 패널이 있는 지도만 `right` 를 준다** — 로고는 가리면 안 되는 표시다.
+   * 축척이 로고와 함께 옮겨지는 것을 실측했다(지도패널-도킹-세부명세 D5). 마운트 때 값만 쓴다.
+   */
+  copyrightPosition?: 'left' | 'right'
   onFailure?: (reason: MapSdkFailure) => void
   className?: string
 }) {
@@ -400,6 +408,8 @@ export function MapCanvas({
   /* 오프셋은 고르는 순간(핀 선택 · 묶음 클릭)에 잰다 — 함수 참조가 바뀌어도 카메라를 다시 움직이지 않게 ref 로 둔다 */
   const selectedOffsetRef = useRef(selectedOffset)
   selectedOffsetRef.current = selectedOffset
+  /* 생성 effect 는 의존성이 비어 있어야 한다 — 마운트 때 값을 ref 로 들고 들어간다 */
+  const copyrightPositionRef = useRef(copyrightPosition)
   /** 확대 단계 — 묶음 셀 크기가 여기서 갈린다 */
   const [level, setLevel] = useState(JEJU_MAP_LEVEL)
   /** 지도 생성 직후의 첫 `idle` 인가. 그것은 사용자의 이동이 아니다 */
@@ -457,6 +467,15 @@ export function MapCanvas({
           level: JEJU_MAP_LEVEL,
         })
         mapRef.current = map
+        /*
+          순서는 SDK 기본(축척 → 로고)을 둔다 — 로고가 모서리에 선다. **SDK 가 메서드를 거두어도 지도를
+          죽이지 않는다** — 여기서 던지면 아래 `idle` 등록 · `ready` 를 건너뛰고 실패 폴백으로 떨어진다.
+        */
+        if (
+          copyrightPositionRef.current === 'right' &&
+          typeof map.setCopyrightPosition === 'function'
+        )
+          map.setCopyrightPosition(maps.CopyrightPosition.BOTTOMRIGHT, false)
 
         idleHandler = () => {
           setLevel(map.getLevel())
