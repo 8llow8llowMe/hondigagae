@@ -282,7 +282,7 @@ class AiPlanPromptFactoryTest {
     void candidateLinesUseNumbersInsteadOfIds() {
         String prompt = factory.userPrompt(query(List.of()));
 
-        assertThat(prompt).contains("\n- 1. 장소 | 관광지 | 실내 | 동반: 동반 가능 | 입장크기: 소형견 | 체중제한: 10kg | 분류: 여행지 | 권역: 북부 | 제주\n");
+        assertThat(prompt).contains("\n- 1. 장소 | 관광지 | 실내 | 입장크기: 소형견 | 체중제한: 10kg | 분류: 여행지 | 권역: 북부\n");
         assertThat(prompt).doesNotContain("placeId");
         assertThat(prompt).endsWith("2일 일정을 만들어 주세요.");
     }
@@ -301,9 +301,60 @@ class AiPlanPromptFactoryTest {
 
         String prompt = factory.userPrompt(query);
 
-        assertThat(prompt).contains("- 1. 수월봉 | 관광지 | 실외 | 동반: 동반 가능 | 권역: 남서부 | 제주특별자치도 제주시 한경면\n");
-        assertThat(prompt).contains("- 2. 제주올레하우스 | 관광지 | 실외 | 동반: 동반 가능 | 권역: 북동부 | 제주특별자치도 제주시 구좌읍\n");
-        assertThat(prompt).contains("- 3. 해운대 | 관광지 | 실외 | 동반: 동반 가능 | 부산광역시 해운대구\n");
+        // 전체 주소 대신 권역 · 읍면동 (#1246). 제주 밖은 권역이 없고, 읍면동이 없는 주소는 위치를 싣지 않는다
+        assertThat(prompt).contains("- 1. 수월봉 | 관광지 | 실외 | 권역: 남서부 · 한경면\n");
+        assertThat(prompt).contains("- 2. 제주올레하우스 | 관광지 | 실외 | 권역: 북동부 · 구좌읍\n");
+        assertThat(prompt).contains("- 3. 해운대 | 관광지 | 실외\n");
+    }
+
+    @Test
+    @DisplayName("후보 목록이 요청 조건보다 앞에 온다 — 같은 지역 요청이 이어지면 Ollama 가 후보 목록까지 캐시를 쓴다 (#1246)")
+    void candidatesComeBeforeRequestConditions() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-15")
+            .requestNote("오후엔 실내 카페에서 쉬고 싶어요")
+            .placeCandidates(List.of(zoned(1L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631)))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        assertThat(prompt).startsWith("후보 장소 (");
+        assertThat(prompt.indexOf("- 1. 수월봉")).isLessThan(prompt.indexOf("여행 조건"));
+        assertThat(prompt.indexOf("여행 조건")).isLessThan(prompt.indexOf("- 사용자 요청:"));
+        assertThat(prompt).endsWith("3일 일정을 만들어 주세요.");
+    }
+
+    @Test
+    @DisplayName("동반 가능은 목록 머리에 한 번만 적고, 다른 동반 조건만 줄에 남긴다 (#1246)")
+    void petAllowanceOnlyWhenNotAllowed() {
+        PlaceCandidate partial = PlaceCandidate.builder()
+            .placeId(2L).title("일부 동반 카페").contentTypeName("음식점").petAllowanceName("부분 동반 가능")
+            .indoor(true).lat(33.4600).lng(126.3100).build();
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-13")
+            .placeCandidates(List.of(zoned(1L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631), partial))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        assertThat(prompt).contains("동반 조건을 따로 적지 않은 후보는 동반 가능)");
+        assertThat(prompt).contains("- 1. 수월봉 | 관광지 | 실외 | 권역: 남서부 · 한경면\n");
+        assertThat(prompt).contains("- 2. 일부 동반 카페 | 음식점 | 실내 | 동반: 부분 동반 가능 | 권역: 북서부\n");
+    }
+
+    @Test
+    @DisplayName("주소에서 읍 · 면 · 동 이름만 꺼낸다 — 도로명 · 건물 동은 아니다 (#1246)")
+    void extractsLocality() {
+        assertThat(AiPlanPromptFactory.localityOf("제주특별자치도 제주시 한경면 노을해안로 1013-70")).isEqualTo("한경면");
+        assertThat(AiPlanPromptFactory.localityOf("제주특별자치도 제주시 애월읍 곽지리 1565")).isEqualTo("애월읍");
+        assertThat(AiPlanPromptFactory.localityOf("제주특별자치도 서귀포시 색달동 2950-3")).isEqualTo("색달동");
+        assertThat(AiPlanPromptFactory.localityOf("제주특별자치도 제주시 용담2동 2580")).isEqualTo("용담2동");
+        assertThat(AiPlanPromptFactory.localityOf("제주특별자치도 제주시 첨단동길 23")).isNull();
+        assertThat(AiPlanPromptFactory.localityOf("제주특별자치도 제주시 연동 101동")).isEqualTo("연동");
+        assertThat(AiPlanPromptFactory.localityOf("서울 아파트 101동")).isNull();
+        assertThat(AiPlanPromptFactory.localityOf(null)).isNull();
     }
 
     @Test
