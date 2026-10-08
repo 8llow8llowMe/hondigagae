@@ -563,6 +563,28 @@ class OllamaLlmAdapterTest {
         // 모델이 이미 올라와 있으면 0 이다. 0 이 아니면 keep-alive 를 의심할 신호라 지우지 않는다.
         assertThat(logged).contains("loadMs=0");
         assertThat(logged).contains("outputTokens=820");
+        // 전체 - 로드 - 디코드 (#1246) — 보고된 prefillMs 가 긴 입력에서 틀려서 함께 남긴다
+        assertThat(logged).contains("prefillEstMs=8200");
+    }
+
+    @Test
+    @DisplayName("보고된 prefill 이 틀려도 전체에서 로드 · 디코드를 뺀 값이 실제 입력 처리 시간으로 남는다 (#1246)")
+    void estimatesPrefillWhenReportedValueIsWrong() {
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        // dev 실측 모양 (2026-10-08 3일 1회차): total 95.4초 · load 8.4초 · 보고 prefill 64ms · decode 18.2초
+        ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+            .keyValue("total-duration", Duration.ofMillis(95_376))
+            .keyValue("load-duration", Duration.ofMillis(8_404))
+            .keyValue("prompt-eval-duration", Duration.ofMillis(64))
+            .keyValue("eval-duration", Duration.ofMillis(18_179))
+            .usage(new DefaultUsage(5644, 342))
+            .build();
+        when(ollamaChatModel.call(any(Prompt.class)))
+            .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage(ONE_ITEM_DRAFT))), metadata));
+
+        adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+
+        assertThat(timingLog(appender)).contains("prefillMs=64").contains("prefillEstMs=68793");
     }
 
     /*
@@ -587,7 +609,7 @@ class OllamaLlmAdapterTest {
 
         String logged = timingLog(appender);
         assertThat(logged).contains("totalMs=3000").contains("loadMs=1500")
-            .contains("prefillMs=500").contains("decodeMs=1000");
+            .contains("prefillMs=500").contains("decodeMs=1000").contains("prefillEstMs=500");
     }
 
     @Test
@@ -598,7 +620,7 @@ class OllamaLlmAdapterTest {
 
         // 던지지 않는 것이 요점이다
         assertThat(adapter.generatePlanDraft(query(candidate(100L, "오설록"))).days()).hasSize(1);
-        assertThat(timingLog(appender)).contains("prefillMs=null").contains("decodeMs=null");
+        assertThat(timingLog(appender)).contains("prefillMs=null").contains("decodeMs=null").contains("prefillEstMs=null");
     }
 
     /*

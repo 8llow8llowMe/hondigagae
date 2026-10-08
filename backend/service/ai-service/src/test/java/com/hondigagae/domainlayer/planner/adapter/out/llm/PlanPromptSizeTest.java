@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.planner.adapter.out.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.withinPercentage;
 
 import com.hondigagae.domainlayer.planner.adapter.out.llm.dto.LlmPlanDraftResponse;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
@@ -93,12 +94,16 @@ class PlanPromptSizeTest {
     @Test
     @DisplayName("후보가 늘면 프롬프트가 선형으로 커진다 — 컨텍스트를 후보 수에 맞춰야 한다")
     void promptGrowsWithCandidateCount() {
-        int small = promptFactory.userPrompt(query(5)).length();
+        int five = promptFactory.userPrompt(query(5)).length();
+        int ten = promptFactory.userPrompt(query(10)).length();
         int large = promptFactory.userPrompt(query(PRODUCTION_CANDIDATE_SIZE)).length();
+        int perCandidate = (ten - five) / 5;
 
         // 후보 한 곳이 한 줄이라 개수에 비례한다. place-candidate-size 를 올릴 때
         // context-tokens 도 함께 봐야 한다는 뜻이다.
-        assertThat(large).isGreaterThan(small * 5);
+        assertThat(large - five).isCloseTo((PRODUCTION_CANDIDATE_SIZE - 5) * perCandidate, withinPercentage(10));
+        // 줄을 줄여도(#1246) 후보 목록이 사용자 프롬프트의 대부분이다 — 입력 처리 시간을 줄일 곳도 여기다
+        assertThat(large - five).isGreaterThan(large / 2);
     }
 
     /*

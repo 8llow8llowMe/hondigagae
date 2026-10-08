@@ -414,7 +414,10 @@ public class OllamaLlmAdapter implements AiLlmPort {
      *
      * <p>읽는 법:
      * <ul>
-     *   <li>{@code prefillMs} 가 크다 → 프롬프트가 길다. {@code ai-llm.place-candidate-size} 를 줄인다</li>
+     *   <li>{@code prefillEstMs} 가 크다 → 프롬프트가 길다. {@code ai-llm.place-candidate-size} 를 줄인다.
+     *       <b>{@code prefillMs}(Ollama 보고값)는 긴 입력에서 틀린다</b> (#1246) — 입력 675 · 2,917 토큰에 83 · 94ms,
+     *       5,600 토큰에도 64ms 로 길이와 무관했고, 빠진 시간이 전체에서 로드 · 디코드를 뺀 나머지로 남았다.
+     *       그래서 {@code prefillEstMs = totalMs - loadMs - decodeMs} 를 함께 남긴다</li>
      *   <li>{@code decodeMs} 가 크다 → 출력이 길거나 장비가 느리다. 프롬프트를 줄여도 거의 그대로다</li>
      *   <li>{@code loadMs} 가 0 이 아니다 → 모델이 내려갔다 다시 올라왔다. {@code ai-llm.keep-alive} 를 본다</li>
      *   <li>{@code elapsedMs} 와 {@code totalMs} 차이가 크다 → 대기·전송이 끼었다.
@@ -425,13 +428,14 @@ public class OllamaLlmAdapter implements AiLlmPort {
      * 생성을 막으면 안 된다.
      */
     private void logTiming(String operation, Prompt prompt, ChatResponse response, long elapsedMs) {
+        Long totalMs = durationMillis(response, METADATA_TOTAL_DURATION);
+        Long loadMs = durationMillis(response, METADATA_LOAD_DURATION);
+        Long decodeMs = durationMillis(response, METADATA_EVAL_DURATION);
+        Long prefillEstMs = totalMs == null || loadMs == null || decodeMs == null ? null : totalMs - loadMs - decodeMs;
         log.info("LLM timing operation={} model={} promptChars={} elapsedMs={} totalMs={} loadMs={}"
-                + " prefillMs={} decodeMs={} outputTokens={}",
-            operation, aiLlmProperties.model(), promptChars(prompt), elapsedMs,
-            durationMillis(response, METADATA_TOTAL_DURATION),
-            durationMillis(response, METADATA_LOAD_DURATION),
-            durationMillis(response, METADATA_PROMPT_EVAL_DURATION),
-            durationMillis(response, METADATA_EVAL_DURATION),
+                + " prefillMs={} prefillEstMs={} decodeMs={} outputTokens={}",
+            operation, aiLlmProperties.model(), promptChars(prompt), elapsedMs, totalMs, loadMs,
+            durationMillis(response, METADATA_PROMPT_EVAL_DURATION), prefillEstMs, decodeMs,
             outputTokens(response));
     }
 

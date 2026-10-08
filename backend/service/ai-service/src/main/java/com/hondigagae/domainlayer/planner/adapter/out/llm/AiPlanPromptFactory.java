@@ -8,9 +8,11 @@ import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.application.model.RequestNoteConstraints;
+import com.hondigagae.shared.travel.place.PetAllowanceType;
 import java.time.LocalDate;
 import java.util.List;
 import java.time.temporal.ChronoUnit;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
@@ -161,10 +163,17 @@ public class AiPlanPromptFactory {
 
     /**
      * 요청마다 달라지는 부분. 캐시 접두사 뒤에 오도록 user 메시지로 보낸다.
+     *
+     * <p><b>후보 목록을 먼저, 요청 조건을 뒤에 둔다</b> (#1246). 생성 시간의 대부분이 입력 처리(prefill)였고 — dev
+     * 실측 61~95초 중 38~69초, 입력 5,600~7,000 토큰 — 매 요청이 입력 전체를 새로 처리했다. 전에는 기간 · 요청 문구가
+     * 맨 앞이라 거기서 갈린 뒤의 후보 목록(입력의 대부분)을 Ollama 가 재사용할 수 없었다. 후보 목록은 같은 지역 · 같은
+     * 요청 종류면 똑같으므로 앞에 두면 이어지는 요청이 시스템 프롬프트와 후보 목록까지 캐시를 쓴다.
      */
     public String userPrompt(AiPlanGenerationQuery query) {
         StringBuilder prompt = new StringBuilder();
-        prompt.append("여행 조건\n");
+        appendCandidates(prompt, query);
+
+        prompt.append("\n여행 조건\n");
         prompt.append("- 기간: ").append(query.startDate()).append(" ~ ").append(query.endDate())
             .append(" (총 ").append(resolveDayCount(query)).append("일)\n");
         if (query.budget() != null && !query.budget().isBlank()) {
@@ -190,12 +199,31 @@ public class AiPlanPromptFactory {
         appendWeatherSection(prompt, query);
         appendRegenerateSection(prompt, query);
 
-        /*
-          후보는 아이디가 아니라 번호로 싣는다 (#1128). 18자리 placeId 는 항목마다 6~9토큰이라 그대로 옮겨
-          쓰게 하면 그만큼 디코드가 늘고, 옮겨 적다 틀릴 자리도 생긴다. 번호는 safeCandidates() 순서의 1-based
-          인덱스이고 어댑터가 같은 목록에서 되돌린다 — 이 순서가 둘 사이의 계약이다.
-        */
-        prompt.append("\n후보 장소 (이 목록 안에서만 고르고, 줄 앞의 번호로 적을 것)\n");
+        if (isRegenerate(query)) {
+            // 재생성은 그날 하루만 출력시킨다 — "N일 일정을 만들어 주세요" 로 끝내면 위 절의 지시와 맞서 전체를 다시 쓴다.
+            prompt.append("\n위 조건으로 ").append(query.regenerateDay()).append("일차 하루 일정만 만들어 주세요.");
+        } else {
+            prompt.append("\n위 조건으로 ").append(resolveDayCount(query)).append("일 일정을 만들어 주세요.");
+        }
+        return prompt.toString();
+    }
+
+    /**
+     * 후보 목록 절. 후보는 아이디가 아니라 번호로 싣는다 (#1128) — 18자리 placeId 는 항목마다 6~9토큰이라 그대로
+     * 옮겨 쓰게 하면 그만큼 디코드가 늘고, 옮겨 적다 틀릴 자리도 생긴다. 번호는 safeCandidates() 순서의 1-based
+     * 인덱스이고 어댑터가 같은 목록에서 되돌린다 — 이 순서가 둘 사이의 계약이다.
+     *
+     * <p><b>줄을 짧게 둔다</b> (#1246) — 입력 처리가 생성 시간의 대부분이다.
+     * <ul>
+     *   <li><b>전체 주소 대신 {@code 권역 · 읍면동}.</b> 주소가 줄의 1/3 이었는데 모델이 쓰는 것은 어디쯤인지뿐이다.
+     *       권역(#1171)이 큰 구역을, 읍면동이 그 안의 위치를 준다. 도로명 · 번지는 쓸 곳이 없다</li>
+     *   <li><b>{@code 동반 가능} 은 머리에 한 번.</b> 후보는 동반 가능 검색으로 모으므로 거의 모든 줄이 같은 값이었다.
+     *       필수 포함 · 즐겨찾기로 들어온 다른 값({@code 부분 동반 가능} 등)만 줄에 남긴다</li>
+     * </ul>
+     */
+    private void appendCandidates(StringBuilder prompt, AiPlanGenerationQuery query) {
+        prompt.append("후보 장소 (이 목록 안에서만 고르고, 줄 앞의 번호로 적을 것. 동반 조건을 따로 적지 않은 후보는 ")
+            .append(PetAllowanceType.ALLOWED.getDisplayName()).append(")\n");
         List<PlaceCandidate> candidates = query.safeCandidates();
         for (int index = 0; index < candidates.size(); index++) {
             PlaceCandidate candidate = candidates.get(index);
@@ -207,8 +235,10 @@ public class AiPlanPromptFactory {
             }
             prompt.append(candidate.title())
                 .append(" | ").append(nullSafe(candidate.contentTypeName()))
-                .append(" | ").append(candidate.indoorText())
-                .append(" | 동반: ").append(nullSafe(candidate.petAllowanceName()));
+                .append(" | ").append(candidate.indoorText());
+            if (!PetAllowanceType.ALLOWED.getDisplayName().equals(candidate.petAllowanceName())) {
+                prompt.append(" | 동반: ").append(nullSafe(candidate.petAllowanceName()));
+            }
             if (candidate.allowedPetSizeName() != null && !candidate.allowedPetSizeName().isBlank()) {
                 prompt.append(" | 입장크기: ").append(candidate.allowedPetSizeName());
             }
@@ -218,25 +248,46 @@ public class AiPlanPromptFactory {
             if (candidate.sourceCategory() != null && !candidate.sourceCategory().isBlank()) {
                 prompt.append(" | 분류: ").append(candidate.sourceCategory());
             }
-            // 주소의 읍면 이름으로 동서를 가늠하라고 맡기지 않는다 — 규칙 2가 이 이름을 그대로 비교한다 (#1171).
-            JejuZone zone = JejuZone.of(candidate.lat(), candidate.lng());
-            if (zone != null) {
-                prompt.append(" | 권역: ").append(zone.getDisplayName());
-            }
-            if (candidate.addr() != null && !candidate.addr().isBlank()) {
-                prompt.append(" | ").append(candidate.addr());
-            }
+            appendWhere(prompt, candidate);
             prompt.append('\n');
         }
-
-        if (isRegenerate(query)) {
-            // 재생성은 그날 하루만 출력시킨다 — "N일 일정을 만들어 주세요" 로 끝내면 위 절의 지시와 맞서 전체를 다시 쓴다.
-            prompt.append("\n위 조건으로 ").append(query.regenerateDay()).append("일차 하루 일정만 만들어 주세요.");
-        } else {
-            prompt.append("\n위 조건으로 ").append(resolveDayCount(query)).append("일 일정을 만들어 주세요.");
-        }
-        return prompt.toString();
     }
+
+    /**
+     * 어디쯤인가 — {@code 권역 · 읍면동}. 주소의 읍면 이름으로 동서를 가늠하라고 맡기지 않는다 — 규칙 2가 권역 이름을
+     * 그대로 비교한다 (#1171). 제주 밖이면 권역 없이 읍면동만, 둘 다 없으면 싣지 않는다.
+     */
+    private static void appendWhere(StringBuilder prompt, PlaceCandidate candidate) {
+        JejuZone zone = JejuZone.of(candidate.lat(), candidate.lng());
+        String locality = localityOf(candidate.addr());
+        if (zone != null) {
+            prompt.append(" | 권역: ").append(zone.getDisplayName());
+            if (locality != null) {
+                prompt.append(" · ").append(locality);
+            }
+        } else if (locality != null) {
+            prompt.append(" | ").append(locality);
+        }
+    }
+
+    /**
+     * 주소에서 읍 · 면 · 동 이름을 꺼낸다 — {@code 제주특별자치도 제주시 한경면 노을해안로 1013-70} → {@code 한경면}.
+     * 도로명 주소처럼 읍면동이 없으면 null 이다(그때는 권역만 남는다).
+     */
+    static String localityOf(String addr) {
+        if (addr == null || addr.isBlank()) {
+            return null;
+        }
+        for (String token : addr.trim().split("\\s+")) {
+            if (token.length() >= 2 && LOCALITY_SUFFIX.matcher(token).find()) {
+                return token;
+            }
+        }
+        return null;
+    }
+
+    /** 읍 · 면 · 동으로 끝나는 행정 이름. {@code 동} 앞은 한글이어야 한다 — {@code 101동} 같은 건물 동은 아니다. */
+    private static final Pattern LOCALITY_SUFFIX = Pattern.compile("^[가-힣]+[읍면]$|^[가-힣]+[0-9]?동$");
 
     /** 하루 재생성인가. 워커가 regenerateDay 와 planOutline 을 함께 채운다 — 둘 중 하나만 있으면 전체 생성으로 본다. */
     private static boolean isRegenerate(AiPlanGenerationQuery query) {
