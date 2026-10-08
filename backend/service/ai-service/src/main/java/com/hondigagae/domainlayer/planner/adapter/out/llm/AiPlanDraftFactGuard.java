@@ -260,8 +260,11 @@ final class AiPlanDraftFactGuard {
      *
      * <p>장소 이름을 넣지 않는다 — 조사가 받침에 따라 갈려서(#233 의 {@code 애월코스트34은})
      * 이름 뒤에 붙일 말을 고를 수 없다. 이름은 바로 위 제목에 있다.
+     *
+     * <p>{@link AiPlanRepeatGuard} 가 반복 장소를 바꿔 넣을 때도 이 문구를 쓴다 (#1254) — 모델의 메모는 원래 장소를
+     * 두고 쓴 문장이다.
      */
-    private static String fallbackNote(PlaceCandidate place) {
+    static String fallbackNote(PlaceCandidate place) {
         if (place == null) {
             return null;
         }
