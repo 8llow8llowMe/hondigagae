@@ -15,9 +15,11 @@ import { type MapOffset, offsetCenter } from '@/lib/map/offset-center'
 import {
   clusterContent,
   focusMarkerContent,
+  PIN_NAME_MAX_LEVEL,
   type PinContent,
   pinContent,
 } from '@/lib/map/pin-content'
+import { type MapPinIcon, pinIconSvg } from '@/lib/map/pin-icons'
 import type { MapRouteSegment } from '@/lib/map/route'
 import { loadKakaoMaps, MapSdkError, type MapSdkFailure } from '@/lib/map/sdk'
 import { MAP_LAYER_Z, markerZIndex } from '@/lib/map/stacking'
@@ -185,6 +187,12 @@ export type MapPin = {
    * 않는다. **순서가 곧 그 핀의 신원**이고, 이름은 고르면 붙는다.
    */
   order?: number
+  /**
+   * 카테고리 아이콘(#1280). 주면 이름표 대신 **아이콘 원**으로 그린다. 무엇을 고를지는
+   * 장소 도메인이 정하고(`lib/place/pin-icon.ts`) 지도는 받은 값을 그리기만 한다.
+   * 없으면 예전 이름표 그대로다.
+   */
+  icon?: MapPinIcon
 }
 
 /**
@@ -623,6 +631,7 @@ export function MapCanvas({
           pinElement(
             first,
             first.id === selectedId,
+            level <= PIN_NAME_MAX_LEVEL,
             interactive ? () => selectRef.current?.(first.id) : null,
           )
 
@@ -639,8 +648,16 @@ export function MapCanvas({
           **고르지 않은 순번 핀도 원이라 같은 자리를 쓴다** (#743). 여기서 1 로 두면 선은
           좌표를 잇는데 원은 그 위에 떠서, 선이 핀 아래를 스쳐 지나가는 것처럼 보인다.
           고르면 이름표로 바뀌므로 그때는 다시 1 이다.
+
+          **아이콘 원 핀(#1280)도 원의 중심이 좌표다.** 이름 알약은 상자 밖에 매달려(CSS)
+          앵커를 옮기지 않는다.
         */
-        yAnchor: isCluster || (first.order !== undefined && first.id !== selectedId) ? 0.5 : 1,
+        yAnchor:
+          isCluster ||
+          first.icon !== undefined ||
+          (first.order !== undefined && first.id !== selectedId)
+            ? 0.5
+            : 1,
         /*
           **묶음 > 선택 핀 > 일반 핀.** 순서와 근거는 `lib/map/stacking.ts` 에 있다 —
           축이 둘 섞인 삼항을 여기 인라인으로 두었던 탓에 *"원이 통째로 덮여 누를 수 없는
@@ -967,8 +984,16 @@ export function MapCanvas({
  * 잠근다 — 이 함수는 `interactive` 와 `onClick` 이 **같은 사실을 두 번 말하지 않게** 묶는
  * 매듭이다. 둘이 어긋나면 `role="img"` 인 요소에 클릭 리스너가 붙는다.
  */
-function pinElement(pin: MapPin, selected: boolean, onClick: (() => void) | null): HTMLElement {
-  return markerElement(pinContent(pin, { selected, interactive: onClick !== null }), onClick)
+function pinElement(
+  pin: MapPin,
+  selected: boolean,
+  named: boolean,
+  onClick: (() => void) | null,
+): HTMLElement {
+  return markerElement(
+    pinContent({ ...pin, named }, { selected, interactive: onClick !== null }),
+    onClick,
+  )
 }
 
 /**
@@ -990,6 +1015,12 @@ function pinElement(pin: MapPin, selected: boolean, onClick: (() => void) | null
 function markerElement(content: PinContent, onClick: (() => void) | null): HTMLElement {
   const element = document.createElement(content.tag)
   element.className = content.className
+
+  /*
+    **원 핀의 아이콘은 고정 SVG 문자열이다** (#1280, `lib/map/pin-icons.ts`). 사용자 데이터(이름)는 아래
+    `textContent` 로만 들어간다 — HTML 로 들어가는 것은 이 상수뿐이다(`map-canvas-marker-wiring.test.ts`).
+  */
+  if (content.icon !== null) element.insertAdjacentHTML('afterbegin', pinIconSvg(content.icon))
 
   if (content.role !== null) element.setAttribute('role', content.role)
   if (content.ariaLabel !== null) element.setAttribute('aria-label', content.ariaLabel)
