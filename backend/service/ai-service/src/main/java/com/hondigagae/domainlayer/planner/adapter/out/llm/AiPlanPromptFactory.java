@@ -10,8 +10,10 @@ import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.application.model.RequestNoteConstraints;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import java.time.LocalDate;
-import java.util.List;
 import java.time.temporal.ChronoUnit;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
@@ -194,6 +196,7 @@ public class AiPlanPromptFactory {
         if (!query.safeFavoritePlaceIds().isEmpty()) {
             prompt.append("- 선호 장소: [선호] 표시가 붙은 장소는 조건(입장 제한·동선·날씨)이 맞으면 우선 배치할 것. 필수는 아님\n");
         }
+        appendZoneOrder(prompt, query);
 
         appendPetSection(prompt, query.safePetConditions(), PLAN_MULTI_PET_RULE);
         appendWeatherSection(prompt, query);
@@ -288,6 +291,44 @@ public class AiPlanPromptFactory {
 
     /** 읍 · 면 · 동으로 끝나는 행정 이름. {@code 동} 앞은 한글이어야 한다 — {@code 101동} 같은 건물 동은 아니다. */
     private static final Pattern LOCALITY_SUFFIX = Pattern.compile("^[가-힣]+[읍면]$|^[가-힣]+[0-9]?동$");
+
+    /**
+     * 일자별 권역 순서 제안 (#1257). 규칙 2의 "여러 날이면 섬을 한 방향으로 돈다" 만으로는 모델이 날짜 사이에 섬을
+     * 가로질렀다(dev 7일 북부 → 남서부 50.4km, 남동부 → 남서부 56.9km). 서버가 {@link JejuZone#aroundTheIsland} 로
+     * 순서를 먼저 정해 <b>제안</b>으로 싣는다 — 날씨 · 요청에 맞지 않으면 맞닿은 권역으로 바꿔도 된다.
+     *
+     * <p>싣지 않는 경우:
+     * <ul>
+     *   <li><b>하루짜리 · 하루 재생성</b> — 날짜 사이 이동이 없다(재생성은 기존 일정이 앞뒤 날을 정한다)</li>
+     *   <li><b>필수 포함 장소가 있다</b> — 사용자가 고른 곳이 제안한 권역 밖일 수 있다</li>
+     *   <li><b>후보가 6권역을 다 덮지 않는다</b> — 시군구를 지정했거나 제주 밖이면 돌 섬이 없다</li>
+     * </ul>
+     */
+    private void appendZoneOrder(StringBuilder prompt, AiPlanGenerationQuery query) {
+        int days = resolveDayCount(query);
+        if (days < 2 || isRegenerate(query) || !query.safePinnedPlaceIds().isEmpty()) {
+            return;
+        }
+        Set<JejuZone> covered = EnumSet.noneOf(JejuZone.class);
+        for (PlaceCandidate candidate : query.safeCandidates()) {
+            JejuZone zone = JejuZone.of(candidate.lat(), candidate.lng());
+            if (zone != null) {
+                covered.add(zone);
+            }
+        }
+        if (covered.size() < JejuZone.values().length) {
+            return;
+        }
+        List<JejuZone> order = JejuZone.aroundTheIsland(days);
+        prompt.append("- 권역 순서 제안: ");
+        for (int day = 0; day < order.size(); day++) {
+            if (day > 0) {
+                prompt.append(" → ");
+            }
+            prompt.append(dayLabel(day + 1)).append(' ').append(order.get(day).getDisplayName());
+        }
+        prompt.append(". 그날 장소와 숙소를 그 권역이나 맞닿은 권역에서 고를 것. 날씨 · 요청에 맞지 않으면 맞닿은 권역으로 바꿔도 됨\n");
+    }
 
     /** 하루 재생성인가. 워커가 regenerateDay 와 planOutline 을 함께 채운다 — 둘 중 하나만 있으면 전체 생성으로 본다. */
     private static boolean isRegenerate(AiPlanGenerationQuery query) {

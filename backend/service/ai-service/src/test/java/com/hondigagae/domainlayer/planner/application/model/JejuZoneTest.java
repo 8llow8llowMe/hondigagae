@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.planner.application.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -60,6 +61,27 @@ class JejuZoneTest {
             for (JejuZone right : JejuZone.values()) {
                 assertThat(left.adjacentTo(right)).as("%s-%s", left, right).isEqualTo(right.adjacentTo(left));
             }
+        }
+    }
+
+    @Test
+    @DisplayName("일자별 순서는 서쪽 해안을 내려가 동쪽 해안을 올라오고, 여섯 날을 넘으면 다시 돈다 (#1257)")
+    void aroundTheIsland() {
+        assertThat(JejuZone.aroundTheIsland(3))
+            .containsExactly(JejuZone.NORTH_WEST, JejuZone.SOUTH_WEST, JejuZone.SOUTH);
+        assertThat(JejuZone.aroundTheIsland(7)).containsExactly(
+            JejuZone.NORTH_WEST, JejuZone.SOUTH_WEST, JejuZone.SOUTH, JejuZone.SOUTH_EAST,
+            JejuZone.NORTH_EAST, JejuZone.NORTH, JejuZone.NORTH_WEST);
+        assertThat(JejuZone.aroundTheIsland(0)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("이웃한 날의 권역은 언제나 맞닿는다 — 한라산을 넘는 북부-남부가 없다")
+    void consecutiveDaysAreAdjacent() {
+        List<JejuZone> order = JejuZone.aroundTheIsland(13);
+        for (int day = 1; day < order.size(); day++) {
+            assertThat(order.get(day - 1).adjacentTo(order.get(day)))
+                .as("%d일차 %s → %d일차 %s", day, order.get(day - 1), day + 1, order.get(day)).isTrue();
         }
     }
 }

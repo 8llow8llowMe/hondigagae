@@ -15,7 +15,7 @@ import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 다른 날에 이미 나온 장소를 같은 종류의 가까운 미사용 후보로 바꾼다 (#1254).
+ * 다른 날 · 같은 날 앞에 이미 나온 장소를 같은 종류의 가까운 미사용 후보로 바꾼다 (#1254 · #1257).
  *
  * <p>프롬프트 규칙 11이 "같은 장소를 여러 날에 넣지 않는다" 고 하지만 모델은 어긴다 — dev 에서 3일 일정의 3일차가
  * 2일차의 중문색달해수욕장 · 애견카페왈 사계점을 그대로 되풀이했다(5번 생성 중 2번). #570 은 "무엇으로 메울지 어댑터가
@@ -68,7 +68,7 @@ final class AiPlanRepeatGuard {
             Set<Long> today = new HashSet<>();
             boolean changed = false;
             for (AiPlanDraftItem item : itemsOf(day)) {
-                if (!isRepeat(item, seen)) {
+                if (!isRepeat(item, seen, today)) {
                     items.add(item);
                     if (item.placeId() != null) {
                         today.add(item.placeId());
@@ -108,11 +108,15 @@ final class AiPlanRepeatGuard {
         return AiPlanDraft.builder().days(guarded).reasons(draft.reasons()).build();
     }
 
-    /** 앞선 날에 나온 숙박 아닌 장소인가. 같은 날 안의 되풀이는 모델이 순서를 뜻한 것일 수 있어 보지 않는다. */
-    private static boolean isRepeat(AiPlanDraftItem item, Set<Long> seenOnEarlierDays) {
+    /**
+     * 앞선 날이나 같은 날 앞 항목에 나온 숙박 아닌 장소인가. 처음(#1254)에는 같은 날 안의 되풀이를 "순서를 뜻했을 수
+     * 있다" 며 보지 않았는데, dev 7일 일정의 4일차가 {@code 숨비아일랜드 → 숨비아일랜드} 로 같은 카페를 연달아 넣었다
+     * (#1257) — 한 날에 같은 곳을 두 번 들르는 일정은 없다.
+     */
+    private static boolean isRepeat(AiPlanDraftItem item, Set<Long> seenOnEarlierDays, Set<Long> earlierToday) {
         return item.itemType() != PlanItemType.LODGING
             && item.placeId() != null
-            && seenOnEarlierDays.contains(item.placeId());
+            && (seenOnEarlierDays.contains(item.placeId()) || earlierToday.contains(item.placeId()));
     }
 
     /** 같은 종류에서 반복된 장소에 가장 가까운, 일정에 없는 후보. 거리 안에 없거나 좌표를 모르면 null 이다. */
