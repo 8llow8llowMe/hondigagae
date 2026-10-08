@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 public class JdbcPlaceMergeAdapter implements PlaceMergeCommandPort {
 
     private static final String SELECT_CANDIDATES_SQL = """
-        SELECT id, source, title, lat, lng
+        SELECT id, source, title, content_type_id, lat, lng
           FROM place
          WHERE merged_into_id IS NULL
            AND delisted_at IS NULL
@@ -99,6 +99,7 @@ public class JdbcPlaceMergeAdapter implements PlaceMergeCommandPort {
                 rs.getLong("id"),
                 rs.getString("source"),
                 rs.getString("title"),
+                rs.getString("content_type_id"),
                 rs.getBigDecimal("lat"),
                 rs.getBigDecimal("lng")),
             areaCode, areaCode);
