@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -238,8 +239,8 @@ class OllamaLlmAdapterTest {
     }
 
     @Test
-    @DisplayName("하루 재생성에서 여러 날을 냈는데 대상 일자가 없으면 아무 날도 남기지 않는다 — 고를 근거가 없다")
-    void regenerateWithoutTheTargetDayKeepsNothing() {
+    @DisplayName("하루 재생성에서 여러 날을 냈는데 대상 일자가 없으면 고를 근거가 없다 — 한 번 다시 부르고, 그래도 없으면 AIPLAN_022 다 (#1268)")
+    void regenerateWithoutTheTargetDayFailsAsEmptyPlan() {
         stubResponse("""
             {"days":[
               {"day":1,"items":[{"place":1,"note":"a"}],"lodging":null},
@@ -247,16 +248,19 @@ class OllamaLlmAdapterTest {
              "reasons":[]}
             """);
 
-        AiPlanDraft draft = adapter.generatePlanDraft(regenerateQuery(2, candidate(100L, "오설록"), candidate(200L, "사려니숲길")));
-
-        assertThat(draft.days()).isEmpty();
+        assertThatThrownBy(() -> adapter.generatePlanDraft(
+            regenerateQuery(2, candidate(100L, "오설록"), candidate(200L, "사려니숲길"))))
+            .isInstanceOf(AiPlanException.class)
+            .extracting(e -> ((AiPlanException) e).getErrorCode())
+            .isEqualTo(AiPlanErrorCode.LLM_EMPTY_PLAN);
+        verify(ollamaChatModel, times(2)).call(any(Prompt.class));
     }
 
     @Test
     @DisplayName("근거 이름은 서버가 코드로 채운다 — 모델이 적은 이름은 쓰지 않고, 모르는 코드는 일반 이름이다")
     void fillsReasonNamesFromCodes() {
         stubResponse("""
-            {"days":[{"day":1,"items":[],"lodging":null}],
+            {"days":[{"day":1,"items":[{"place":1,"note":"a"}],"lodging":null}],
              "reasons":[
                {"code":"PET_ALLOWED","name":"모델이 지은 이름","description":"모두 동반 가능이에요."},
                {"code":"rest_slot","description":"카페에서 쉬어요."},
@@ -273,7 +277,7 @@ class OllamaLlmAdapterTest {
     @DisplayName("근거는 사실 대조 뒤 3개까지만 남긴다 — 확인할 수 없어 빠질 근거가 자리를 차지하지 않는다")
     void keepsAtMostThreeReasonsAfterFactGuard() {
         stubResponse("""
-            {"days":[{"day":1,"items":[],"lodging":null}],
+            {"days":[{"day":1,"items":[{"place":1,"note":"a"}],"lodging":null}],
              "reasons":[
                {"code":"SHORT_DISTANCE","description":"이동 거리가 짧아요."},
                {"code":"PET_ALLOWED","description":"모두 동반 가능이에요."},
@@ -318,7 +322,7 @@ class OllamaLlmAdapterTest {
     void toleratesMarkdownFencedJson() {
         stubResponse("""
             ```json
-            {"days":[{"day":1,"items":[]}],"reasons":[]}
+            {"days":[{"day":1,"items":[{"place":1,"note":"a"}]}],"reasons":[]}
             ```
             """);
 
@@ -522,12 +526,12 @@ class OllamaLlmAdapterTest {
         ListAppender<ILoggingEvent> appender = attachAppender();
         stubResponse("""
             {"days":[
-              {"day":1,"items":[{"place":1,"note":"숙박"}],"lodging":1},
+              {"day":1,"items":[{"place":2,"note":"산책"},{"place":1,"note":"숙박"}],"lodging":1},
               {"day":2,"items":[{"place":1,"note":"숙박"}],"lodging":null}],
              "reasons":[]}
             """);
 
-        adapter.generatePlanDraft(query(lodging(100L, "제주 애월코스트34")));
+        adapter.generatePlanDraft(query(lodging(100L, "제주 애월코스트34"), candidate(200L, "애월한담공원")));
 
         assertThat(appender.list).noneMatch(event ->
             event.getFormattedMessage().contains("same place on multiple days"));
@@ -663,6 +667,67 @@ class OllamaLlmAdapterTest {
         assertThat(draft.reasons()).extracting(AiPlanDraftReason::code)
             .containsExactly("WEATHER_OK", "PET_ALLOWED");
         assertThat(draft.reasons().get(0).description()).isEqualTo("맑은 날이에요.");
+    }
+
+    @Test
+    @DisplayName("모든 날이 비면 한 번 다시 부르고 채워진 쪽을 낸다 — 빈 날과 원문 앞부분을 남긴다 (#1268)")
+    void retriesOnceWhenEveryDayIsEmpty() {
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        when(ollamaChatModel.call(any(Prompt.class))).thenReturn(
+            response("""
+                {"days":[{"day":1,"items":[],"lodging":null},{"day":2,"items":[],"lodging":null}],"reasons":[]}
+                """),
+            response("""
+                {"days":[{"day":1,"items":[{"place":1,"note":"a"}],"lodging":null},
+                         {"day":2,"items":[{"place":2,"note":"b"}],"lodging":null}],"reasons":[]}
+                """));
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록"), restaurant(200L, "N109")));
+
+        assertThat(draft.days()).extracting(day -> day.items().get(0).title()).containsExactly("오설록", "N109");
+        verify(ollamaChatModel, times(2)).call(any(Prompt.class));
+        assertThat(appender.list).anyMatch(event -> event.getFormattedMessage()
+            .contains("attempt=1 emptyDays=[1, 2] of=2")
+            && event.getFormattedMessage().contains("rawHead={\"days\""));
+    }
+
+    @Test
+    @DisplayName("다시 불러도 방문할 곳이 하루도 없으면 AIPLAN_022 다 — 숙소만 있는 초안도 빈 초안이다 (#1268)")
+    void failsAsEmptyPlanWhenTheRetryIsEmptyToo() {
+        when(ollamaChatModel.call(any(Prompt.class))).thenReturn(
+            response("""
+                {"days":[{"day":1,"items":[],"lodging":1},{"day":2,"items":[],"lodging":null}],"reasons":[]}
+                """),
+            response("""
+                {"days":[],"reasons":[{"code":"PET_ALLOWED","description":"모두 동반 가능이에요."}]}
+                """));
+
+        assertThatThrownBy(() -> adapter.generatePlanDraft(query(lodging(100L, "제주 애월코스트34"))))
+            .isInstanceOf(AiPlanException.class)
+            .extracting(e -> ((AiPlanException) e).getErrorCode())
+            .isEqualTo(AiPlanErrorCode.LLM_EMPTY_PLAN);
+        verify(ollamaChatModel, times(2)).call(any(Prompt.class));
+    }
+
+    @Test
+    @DisplayName("일부 날만 비면 다시 부르지 않고 그대로 낸다 — 빈 날은 화면이 안내하고 로그에 남긴다 (#1268)")
+    void keepsDraftWithSomeEmptyDaysWithoutRetry() {
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        stubResponse("""
+            {"days":[{"day":1,"items":[{"place":1,"note":"a"}],"lodging":null},{"day":2,"items":[],"lodging":null}],
+             "reasons":[]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+
+        assertThat(draft.days()).hasSize(2);
+        verify(ollamaChatModel).call(any(Prompt.class));
+        assertThat(appender.list).anyMatch(event ->
+            event.getFormattedMessage().contains("attempt=1 emptyDays=[2] of=2"));
+    }
+
+    private static ChatResponse response(String text) {
+        return new ChatResponse(List.of(new Generation(new AssistantMessage(text))));
     }
 
     private static final String ONE_ITEM_DRAFT = """
