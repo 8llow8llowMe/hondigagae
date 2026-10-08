@@ -28,33 +28,16 @@ describe('패널은 갈아끼우지 않고 슬라이드한다 (#531)', () => {
     expect(mapView).not.toMatch(/\{panelOpen \?[\s\S]{0,80}<div className="relative h-full">/)
   })
 
-  it('패널이 항상 마운트되고 닫히면 이름 있는 클래스로 밀려난다', () => {
-    expect(mapView).toContain('map-panel-width relative h-full transition-transform')
-    expect(mapView).toMatch(/!panelOpen && 'map-panel-collapsed'/)
-  })
-
   /*
-    **`calc()` 는 arbitrary value 로 못 쓴다** — Tailwind 가 조용히 무시할 수 있어
-    `eslint.config.mjs` 의 `no-restricted-syntax` 가 막는다. globals.css 의 이름 있는
-    클래스가 정본이고, 미는 거리는 **패널 폭 + 컨테이너 왼쪽 여백(`left-4`)** 이다 —
-    폭만큼만 밀면 오른쪽 끝 16px 이 지도 위에 걸친다.
+    #1232 — 래퍼째 **자기 폭만큼** 민다. 예전에는 왼쪽 여백 16 · 밖으로 튀어나온 접기 탭 24 · 그림자
+    번짐 16 을 더해 미느라 `calc()` 클래스(`.map-panel-collapsed`)가 필요했는데, 도킹하면서 셋 다 없어졌다.
   */
-  it('미는 거리가 globals.css 에 있고 왼쪽 여백까지 포함한다', () => {
-    expect(globals).toContain('.map-panel-collapsed')
-    expect(globals).toMatch(/translateX\(calc\(-100% - 3\.5rem\)\)/)
-  })
-
-  /*
-    **접기 탭까지 화면 밖으로 나가야 한다** (#1123). 탭은 패널 오른쪽 밖으로 24(`-right-6`)
-    튀어나와 있어, 여백 16 만 더해 밀면 접힌 뒤에도 x 0~24 에 남아 펼치기 버튼(16~60) 밑에
-    깔렸다 — 손잡이 `<` `>` 가 동시에 보인다. 미는 여분 = 여백 16 + 탭 24 + 그림자 번짐 16.
-  */
-  it('미는 여분이 왼쪽 여백 + 접기 탭 폭 + 그림자 번짐보다 작지 않다', () => {
-    const extraRem = Number(/translateX\(calc\(-100% - ([\d.]+)rem\)\)/.exec(globals)?.[1])
-    const tabPx = 24
-    expect(mapView).toContain('absolute top-0 -right-6 flex h-11 w-6')
-
-    expect(extraRem * 16).toBeGreaterThanOrEqual(16 + tabPx + 16)
+  it('패널이 항상 마운트되고 닫히면 래퍼째 자기 폭만큼 밀려난다', () => {
+    expect(mapView).toContain(
+      "'absolute inset-y-0 left-0 z-30 hidden transition-transform lg:block'",
+    )
+    expect(mapView).toContain("!panelOpen && '-translate-x-full'")
+    expect(globals).not.toContain('.map-panel-collapsed')
   })
 
   /*
@@ -65,17 +48,49 @@ describe('패널은 갈아끼우지 않고 슬라이드한다 (#531)', () => {
   it('닫힌 패널은 inert 라 포커스가 새지 않는다', () => {
     expect(mapView).toContain('inert={!panelOpen}')
   })
+})
 
-  /*
-    펼치기 버튼은 패널과 **형제**이고 자리가 고정이다 — 패널이 밀려나도 손잡이는 원래
-    자리에 남아 접기 전후로 같은 것으로 읽힌다. 열려 있는 동안에는 패널 아래 깔리므로
-    클릭과 탭 순서에서 함께 빠져야 한다.
-  */
-  it('펼치기 버튼은 열려 있는 동안 클릭도 탭도 받지 않는다', () => {
-    expect(mapView).toMatch(/panelOpen && 'pointer-events-none opacity-0'/)
-    expect(mapView).toContain('tabIndex={panelOpen ? -1 : undefined}')
+/*
+  #1232 D3 — 손잡이 하나. "패널 밖 오른쪽 위 접기 탭" 과 "접힌 뒤 좌상단 펼치기 버튼" 이 따로 놀아 손이
+  두 군데로 갔다. 손잡이는 래퍼의 오른쪽 끝(`left-full`) 세로 중앙이라 스택 폭을 따라 400 · 800 · 0 에 선다.
+*/
+describe('접기 · 펼치기 손잡이는 하나다 (#1232)', () => {
+  it('접기 버튼과 펼치기 버튼이 따로 있지 않다 — 한 버튼이 이름만 바꾼다', () => {
+    expect(mapView.match(/messages\.map\.expandPanel/g)).toHaveLength(2)
+    expect(mapView).toContain(
+      'aria-label={panelOpen ? messages.map.collapsePanel : messages.map.expandPanel}',
+    )
+    expect(mapView).toContain('onClick={() => setPanelOpen((open) => !open)}')
   })
 
+  it('스택 오른쪽 끝 세로 중앙에 서고 스택을 가리킨다', () => {
+    expect(mapView).toContain('absolute top-1/2 left-full')
+    expect(mapView).toContain('aria-expanded={panelOpen}')
+    expect(mapView).toContain('aria-controls={stackId}')
+    expect(mapView).toContain('id={stackId}')
+  })
+
+  /*
+    손잡이는 스택의 **형제**여야 한다 — 스택 안에 두면 접힌 동안 `inert` 에 같이 걸려 펼칠 길이 없다.
+    소스 순서로 확인한다: 스택이 닫힌 뒤(`</div>`)에 손잡이가 온다.
+  */
+  it('손잡이는 inert 스택 밖이다', () => {
+    const stack = mapView.indexOf('id={stackId}')
+    const handle = mapView.indexOf('aria-controls={stackId}')
+    expect(stack).toBeGreaterThan(-1)
+    expect(handle).toBeGreaterThan(stack)
+    // 스택 여는 태그부터 손잡이까지 사이에 `inert` 는 스택의 것 하나뿐이다
+    expect(mapView.slice(stack, handle).match(/inert=/g)).toHaveLength(1)
+  })
+
+  /* DESIGN.md 44px 하한 — 보이는 탭은 24 지만 누르는 자리는 `::before` 로 넓힌다 */
+  it('누르는 자리가 44 이상이다', () => {
+    expect(mapView).toContain('h-12 w-6')
+    expect(mapView).toContain('before:w-11')
+  })
+})
+
+describe('감속 설정 (#531)', () => {
   /*
     **`prefers-reduced-motion` 을 여기서 다시 적지 않는다.** `app/globals.css` 의 매체질의가
     모든 요소의 `transition-duration` 을 0.01ms 로 덮는다 — 컴포넌트마다 `motion-reduce:`

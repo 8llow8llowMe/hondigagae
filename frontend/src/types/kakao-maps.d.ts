@@ -34,6 +34,11 @@ export type KakaoMaps = {
   AbstractOverlay: new () => KakaoAbstractOverlay
   MarkerClusterer: new (options: KakaoClustererOptions) => KakaoClusterer
   Polyline: new (options: KakaoPolylineOptions) => KakaoPolyline
+  /** 축척 · 로고 막대의 자리 — `Map#setCopyrightPosition` 이 받는다 (#1232) */
+  CopyrightPosition: {
+    BOTTOMLEFT: KakaoCopyrightPosition
+    BOTTOMRIGHT: KakaoCopyrightPosition
+  }
   event: {
     addListener: (target: object, type: string, handler: (...args: never[]) => void) => void
     removeListener: (target: object, type: string, handler: (...args: never[]) => void) => void
@@ -104,7 +109,15 @@ export type KakaoMap = {
    * `setLevel` 은 이것과 무관하게 동작한다 — 카메라를 맞추는 것은 우리 코드다.
    */
   setZoomable: (zoomable: boolean) => void
+  /**
+   * 축척 · 로고 막대를 옮긴다 (#1232). **축척이 로고와 함께 옮겨진다** — 2026-10-08 실측.
+   * `reversed` 가 `true` 면 둘의 순서가 바뀐다(로고가 안쪽).
+   */
+  setCopyrightPosition: (position: KakaoCopyrightPosition, reversed?: boolean) => void
 }
+
+/** SDK 가 숫자 상수로 주는 불투명한 값이다 — `CopyrightPosition` 에서만 얻는다 */
+export type KakaoCopyrightPosition = number & { readonly __brand: 'KakaoCopyrightPosition' }
 
 export type KakaoMarkerImage = object
 

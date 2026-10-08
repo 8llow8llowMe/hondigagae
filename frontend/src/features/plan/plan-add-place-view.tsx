@@ -61,21 +61,10 @@ import type { PlaceFilters, PlaceSummary } from '@/types/place'
 const SHEET_MAX_TOP_INSET = 248
 
 /**
- * 떠 있는 머리 아래로 좌측 패널을 밀어 내리는 높이(px) — 이슈 #556.
+ * 머리 카드에 '다녀옴' 초기화 경고(#1066)가 설 때 위 `SHEET_MAX_TOP_INSET` 에 더하는 높이(px). 데스크톱은
+ * #1232 부터 머리가 패널 안이라 더할 곳이 없다.
  *
- * **1440 실측**: 머리 카드가 지도 기준 y=24 에서 시작해 높이 100(여백 12×2 + 뒤로가기 44 +
- * 사이 4 + 제목 26)이므로 바닥이 124 다. 카드 사이 12 를 더해 136.
- *
- * 카드 폭이 400 으로 못박혀 있어(`lg:w-100`) 제목이 접히지 않는다 — 그래서 이 높이가
- * 일자 번호와 무관하게 일정하다. `PlaceMapView` 는 머리의 **자리**는 갖지만(#1012 `head`)
- * 그 안에 무엇이 얼마나 높게 서는지는 모르므로 이 화면이 알려 준다.
- */
-const PANEL_TOP_INSET = 136
-
-/**
- * 머리 카드에 '다녀옴' 초기화 경고(#1066)가 설 때 위 두 상수에 더하는 높이(px).
- *
- * 그 줄은 **체크가 있는 날에만** 서서 늘 더하지 않는다 — 없는 날까지 늘리면 시트와 패널이
+ * 그 줄은 **체크가 있는 날에만** 서서 늘 더하지 않는다 — 없는 날까지 늘리면 시트가
  * 빈 자리만큼 내려앉는다.
  *
  * **26 은 실측이다** (2026-09-30, 캡션 18 + 위 여백 8): 머리 카드가 375·390 에서 54 → 80,
@@ -274,7 +263,7 @@ export function PlanAddPlaceView({
   const visitResetNotice = group.items.some((item) => item.visited)
     ? messages.plan.visitResetOnAddNotice
     : null
-  /** 지도 갈래 머리 카드가 그 경고만큼 커진 높이 — 시트 상한 · 패널 시작점이 함께 내려간다 */
+  /** 지도 갈래 머리 카드가 그 경고만큼 커진 높이 — 모바일 시트 상한이 함께 내려간다 */
   const headExtra = visitResetNotice === null ? 0 : VISIT_NOTICE_EXTRA
 
   const onAdd = (selected: PlaceSummary) =>
@@ -317,15 +306,11 @@ export function PlanAddPlaceView({
             */
             head={
               /*
-                **곡률은 16(`rounded-xl`)이다.** 옆 패널과 같은 값이고 §5 가 "떠 있는 것" 에 준
-                값이다 — L1 카드의 12 를 쓰면 지도 위에 누운 것처럼 보인다.
-
-                **폭은 `lg:w-100`(400) 이고 `.map-panel-width` 와 같은 값이다.** 그 클래스를
-                `lg:` 로 쓸 수 없다 — Tailwind 가 소유하지 않는 이름이라 variant 를 만들지
-                못하고, 붙여도 조용히 폭이 안 걸린다 (실측: 400 이어야 할 카드가 152 였다).
-                1024 미만은 폭을 잡지 않는다 — 거기서는 좌우 여백이 폭을 만든다.
+                **내용만 넘긴다** (#1232). 카드 모양(테두리 · 곡률 · 그림자 · 폭)은 `PlaceMapView` 가 자리에
+                맞게 입힌다 — 같은 머리가 모바일 · 접힌 데스크톱에서는 떠 있는 카드, 열린 데스크톱 패널에서는
+                맨 위 블록이다(지도패널-도킹-세부명세 D9).
               */
-              <div className="bg-bg border-border pointer-events-auto rounded-xl border p-3 shadow-lg lg:w-100">
+              <div>
                 {/*
                   **모바일은 뒤로가기가 제목 왼쪽 같은 줄이다** (#539) — 목록 갈래의 카드 머리와
                   같은 규약이라 두 보기가 같은 모양으로 읽힌다. `md` 이상은 제목 위로 돌아간다.
@@ -341,7 +326,7 @@ export function PlanAddPlaceView({
                 </div>
                 {/*
                   부제는 걷었지만 **이 경고는 남긴다** — 부제는 제목이 이미 한 말이고, 이것은
-                  담기 전에만 쓸모 있는 말이다. 카드가 한 줄 커지는 만큼 아래 두 상수도 함께
+                  담기 전에만 쓸모 있는 말이다. 카드가 한 줄 커지는 만큼 모바일 시트 상한도 함께
                   늘린다 (`VISIT_NOTICE_EXTRA`).
                 */}
                 {visitResetNotice !== null && (
@@ -360,7 +345,6 @@ export function PlanAddPlaceView({
             listHref={listHref}
             mapHref={mapHref}
             sheetMaxTopInset={SHEET_MAX_TOP_INSET + headExtra}
-            panelTopInset={PANEL_TOP_INSET + headExtra}
             mutedPlaceIds={addedPlaceIds}
             /*
               **그날 직전 장소에서 연다** (#1177). 예전에는 그날과 무관하게 제주시 기본 화면에

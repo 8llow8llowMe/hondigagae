@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 
 import type { ReactNode } from 'react'
@@ -97,7 +97,6 @@ export function PlaceMapView({
   mutedPlaceIds,
   renderListRow,
   sheetMaxTopInset,
-  panelTopInset,
   initialFocus,
   initialFocusName,
   preview = false,
@@ -167,14 +166,6 @@ export function PlaceMapView({
    * 800 에서 0, **640 에서 24px 덮음**(실측).
    */
   sheetMaxTopInset?: number | undefined
-  /**
-   * 데스크톱 좌측 패널의 위 여백(px). 주지 않으면 기본 24(`top-6`)다.
-   *
-   * **위에 떠 있는 것이 있는 화면이 자기 높이를 알려 준다** (#556). 담기 지도는 뒤로가기와
-   * 제목을 같은 기둥(`left-4`) 위에 띄우므로 패널이 그만큼 내려와야 겹치지 않는다 —
-   * `sheetMaxTopInset` 이 모바일 시트에 대해 하는 일과 같은 축이다.
-   */
-  panelTopInset?: number | undefined
   /**
    * **처음 열 자리** — 담기 화면이 그날 직전 장소를 넘긴다 (#1177, `addPlaceFocus`).
    *
@@ -265,6 +256,15 @@ export function PlaceMapView({
   const { selectedId, select: setSelectedId } = usePlacePreview(preview)
   const [sheetStop, setSheetStop] = useState<SheetStop>('mid')
   const [panelOpen, setPanelOpen] = useState(true)
+  /*
+    **미리보기를 열면 접힌 스택도 편다** (#1232). 미리보기는 도킹 스택 안이라, 접힌 채 핀을 고르면
+    화면 밖 `inert` 스택 안에 마운트돼 보이지도 닿지도 않는다(리뷰 지적). 예전에는 접힌 목록 옆에
+    홀로 섰다. 담기 지도(미리보기 꺼짐)는 고른다고 패널을 펴지 않는다 — 지금과 같다.
+  */
+  const selectPlace = (id: string | null) => {
+    setSelectedId(id)
+    if (preview && id !== null) setPanelOpen(true)
+  }
   const [failure, setFailure] = useState<MapSdkFailure | null>(null)
   /** 밖에서 지도 중심을 옮길 때만 값이 든다 (현재 위치 버튼) */
   const [center, setCenter] = useState<LatLng | null>(null)
@@ -276,21 +276,31 @@ export function PlaceMapView({
 
   /*
     **고른 핀을 미리보기에 덮이지 않는 자리로 옮긴다** (`MapCanvas` 의 `selectedOffset`).
-    1440 에서 목록 + 미리보기가 왼쪽 850px 남짓을 덮어 정중앙(720)이 미리보기 뒤였다. 모바일은
+    1440 에서 목록 + 미리보기가 왼쪽 800px 을 덮어(#1232 도킹) 정중앙(720)이 미리보기 뒤다. 모바일은
     미리보기 시트가 아래를 덮는다. **고르는 순간 실제 크기를 잰다** — 폭마다 배치가 갈리고
-    (`map-preview-beside`) 시트 높이는 내용만큼이다. 미리보기가 없으면(담기 지도 · 닫힘) 정중앙
+    (1280 부터 목록 옆) 시트 높이는 내용만큼이다. 미리보기가 없으면(담기 지도 · 닫힘) 정중앙
     그대로다 — 목록 패널만 있을 때의 동작은 이 이슈가 바꾸지 않는다.
   */
   const rootRef = useRef<HTMLDivElement>(null)
+  /** 손잡이의 `aria-controls` — 접는 대상인 데스크톱 스택 */
+  const stackId = useId()
   const previewPanelRef = useRef<HTMLDivElement>(null)
   const previewSheetRef = useRef<HTMLDivElement>(null)
   const selectedOffset = useCallback((): MapOffset | null => {
     const root = rootRef.current?.getBoundingClientRect()
     if (root === undefined) return null
 
-    // `display: none` 인 갈래는 크기가 0 이다 — 지금 폭에서 서 있는 쪽만 잰다
-    const panel = previewPanelRef.current?.getBoundingClientRect()
-    if (panel !== undefined && panel.width > 0) return { x: (panel.right - root.left) / 2, y: 0 }
+    /*
+      `display: none` 인 갈래는 크기가 0 이다 — 지금 폭에서 서 있는 쪽만 잰다.
+
+      **데스크톱은 `getBoundingClientRect` 가 아니라 배치 상자(`offsetLeft` · `offsetWidth`)로 잰다**
+      (#1232). 스택은 `transform` 으로 여닫혀서, 펴는 도중(고르면 스택을 편다 — `selectPlace`)에 재면
+      중간 프레임 값이 나온다. 배치 상자는 transform 을 모르므로 **다 펴진 자리**의 오른쪽 끝(400 · 800)이다.
+      스택은 지도 루트 왼쪽 끝(0)에 붙어 있다.
+    */
+    const panel = previewPanelRef.current
+    if (panel !== null && panel.offsetWidth > 0)
+      return { x: (panel.offsetLeft + panel.offsetWidth) / 2, y: 0 }
 
     /*
       모바일은 위아래가 다 덮인다 — 아래는 시트, 위는 검색 · 보기 전환(`MAP_TOP_CONTROLS_INSET`).
@@ -692,7 +702,7 @@ export function PlaceMapView({
       <MapCanvas
         pins={pins}
         selectedId={selectedId}
-        onSelect={setSelectedId}
+        onSelect={selectPlace}
         onBoundsChange={handleBounds}
         onCameraApplied={handleCameraApplied}
         camera={focusCamera}
@@ -701,6 +711,8 @@ export function PlaceMapView({
         selectedLevel={SELECTED_PLACE_MAP_LEVEL}
         selectedOffset={preview ? selectedOffset : undefined}
         focusMarker={focusMarker}
+        /* 왼쪽은 도킹 스택이 덮는다 — 카카오 로고 · 축척을 우하단으로 비킨다 (#1232 D5) */
+        copyrightPosition="right"
         onFailure={setFailure}
         className="h-full w-full"
       />
@@ -718,8 +730,12 @@ export function PlaceMapView({
         <div
           className={cn(
             'map-research-offset absolute inset-x-0 z-30 flex justify-center px-4',
-            // 1280 부터 미리보기가 목록 옆에 서면 지도 가운데가 그 뒤다 — 남은 지도의 가운데로 (#1227)
-            previewId !== null && panelOpen && 'map-research-beside-preview',
+            /*
+              **남은 지도의 가운데** (#1232 D4) — 도킹 스택이 왼쪽을 덮으므로 그 폭만큼 비킨다. 1280 부터
+              미리보기가 목록 옆에 서면 800, 그 아래는 미리보기가 목록 자리라 400 이다(#1227). 접히면 0.
+            */
+            panelOpen && 'lg:left-100',
+            previewId !== null && panelOpen && 'xl:left-200',
           )}
         >
           <button
@@ -734,15 +750,14 @@ export function PlaceMapView({
       )}
 
       {/*
-        ── 떠 있는 머리 — 좌측 패널과 **같은 기둥**이다 (#556, #1012 에서 호출부에서 옮겨 왔다)
+        ── 떠 있는 머리 (#556, #1012 에서 호출부에서 옮겨 왔다) — **모바일과 접힌 데스크톱**의 자리
 
-        **1440 열이 아니라 패널 기둥(`left-4`)에 붙인다.** 열에 맞추면 폭에 따라 그림이
-        갈린다 — 1440 이하에서는 `content-container` 가 전폭이라 결국 패널 위(x≈40)에
-        겹치고, 1920 에서는 x=561 이라 패널(16~416)과 145px 떨어져 지도 한복판에 카드가
-        혼자 뜬다. 기둥에 붙이면 1024~1920 어디서나 같은 그림이다.
+        **데스크톱에서 패널이 열려 있으면 머리는 패널 맨 위 블록이다** (#1232 D9). 패널을 접으면 머리도
+        함께 접히는데, 담기 화면의 `일정으로 돌아가기` 는 유일한 퇴로라 그동안만 여기 떠서 닿게 둔다.
 
-        **접히는 패널 안에 넣지 않는다.** 담기 화면의 `일정으로 돌아가기` 는 유일한 퇴로라
-        패널을 접는 순간 나갈 길이 사라진다.
+        **1440 열이 아니라 왼쪽 기둥(`left-4`)에 붙인다.** 열에 맞추면 폭에 따라 그림이
+        갈린다 — 1920 에서는 x=561 이라 지도 한복판에 카드가 혼자 뜬다. 기둥에 붙이면 1024~1920
+        어디서나 같은 그림이고, 접힌 패널이 펴질 자리와 같은 쪽이다.
 
         모바일은 오른쪽 토글 자리를 비운다(`end-32`). `pointer-events-none` 은 바깥 기둥이
         지도를 가로막지 않게 하는 것이고, 누르는 것만 되살린다.
@@ -761,8 +776,24 @@ export function PlaceMapView({
         따로 떠 있는 것으로 읽힌다.
       */}
       {hasHead && (
-        <div className="pointer-events-none absolute start-4 end-32 top-5 z-30 flex flex-col gap-2 lg:end-auto lg:top-6">
-          {head}
+        <div
+          className={cn(
+            'pointer-events-none absolute start-4 end-32 top-5 z-30 flex flex-col gap-2 lg:end-auto lg:top-6',
+            /*
+              **데스크톱은 열린 패널 맨 위가 머리 자리다** (#1232 D9). 패널을 접으면 머리도 함께 접히는데
+              머리는 담기 화면의 유일한 퇴로라(#556) 그동안만 여기 떠서 닿게 둔다 — 한 번에 하나만 보인다.
+            */
+            panelOpen && 'lg:hidden',
+          )}
+        >
+          {/*
+            **카드 모양은 자리가 정한다** (#1232). 같은 머리가 떠 있을 때는 카드, 패널 안에서는 맨 위
+            블록이다 — 호출부는 내용만 넘긴다. 곡률 16(`rounded-xl`)은 §5 가 "떠 있는 것" 에 준 값이고,
+            폭 `lg:w-100` 은 `.map-panel-width` 와 같은 400 이다(그 클래스는 `lg:` variant 를 못 만든다).
+          */}
+          <div className="bg-bg border-border pointer-events-auto rounded-xl border p-3 shadow-lg lg:w-100">
+            {head}
+          </div>
           {searchable && (
             <PlaceSearchField
               filters={filters}
@@ -794,8 +825,8 @@ export function PlaceMapView({
         현재 위치 버튼이 **토글 바로 아래**에 붙으므로 둘을 한 세로 스택으로 묶는다.
         따로 배치하면 토글 높이(44)를 두 곳에서 알아야 한다.
 
-        **좌측 패널(`left-4`)은 건드리지 않는다.** 그쪽은 목록 레일(인셋 40)과 원래부터
-        다른 값이고, 지도 가장자리에 붙는 것이 그 표면의 의도다.
+        **왼쪽 도킹 스택은 건드리지 않는다.** 그쪽은 목록 레일(인셋 40)과 원래부터
+        다른 값이고, 지도 가장자리에 붙는 것이 그 표면의 의도다 (#1232).
       */}
       <div className="pointer-events-none absolute inset-x-0 top-5 z-30 lg:top-6">
         <div className="content-container flex items-start justify-end gap-2 px-4 md:px-10">
@@ -836,84 +867,46 @@ export function PlaceMapView({
         </div>
       </div>
 
-      {/* ── 데스크톱: 좌측 400 고정 패널 ─────────────────────────────────── */}
+      {/* ── 데스크톱: 왼쪽에 붙은 패널 스택 (#1232) ───────────────────────── */}
       {/*
-        ── 여닫기는 **갈아끼우기가 아니라 슬라이드다** (#531)
+        **떠 있는 카드가 아니라 화면 왼쪽에 붙는다** (지도패널-도킹-세부명세 D2). 헤더 아래부터 바닥까지,
+        바깥 여백 0 · 각진 모서리 · 패널 사이 간격 0 — 목록 오른쪽 경계선이 둘을 가른다. 지도는 전폭
+        그대로이고 스택이 그 위에 얹힌다: 지도 폭을 줄이면 여닫을 때마다 `relayout` → `idle` → 재검색
+        권유가 떠서 #396 · #1143 의 "옮기지 않았는데 흔들리지 않는다" 가 깨진다.
 
-        예전에는 `panelOpen ? <패널> : <펼치기 버튼>` 으로 **서로 다른 DOM 이 교체**돼
-        트랜지션을 걸 대상이 아예 없었다 — 400px 패널이 한 프레임에 나타나고 사라졌다.
-        이제 패널은 **항상 마운트된 채** 왼쪽으로 밀려나고, 펼치기 버튼만 그 위에서
-        나타난다.
+        ── 여닫기는 **갈아끼우기가 아니라 슬라이드다** (#531). 스택은 항상 마운트된 채 래퍼째 자기 폭만큼
+        밀려난다. **`prefers-reduced-motion` 은 전역이 잡는다** (`app/globals.css` 매체질의). 닫힌 스택은
+        `inert` 다 — 화면 밖에 있을 뿐 DOM 에 남아, 그대로 두면 Tab 이 보이지 않는 행 수십 개를 지나간다.
 
-        **`prefers-reduced-motion` 은 전역이 잡는다** — `app/globals.css` 의 매체질의가
-        모든 요소의 `transition-duration` 을 0.01ms 로 덮으므로 여기에 `motion-reduce:`
-        변형을 따로 적지 않는다 (적으면 규칙이 두 군데가 된다).
-
-        **닫힌 패널은 `inert` 다.** 화면 밖으로 밀려났을 뿐 DOM 에는 남아 있어, 그대로
-        두면 Tab 이 보이지 않는 목록 수십 항목을 지나간다.
+        **손잡이는 래퍼의 오른쪽 끝(`left-full`)에 매단다** (D3). 래퍼 폭이 곧 스택 폭이라 목록만 400 ·
+        목록 + 미리보기 800 · 미리보기가 목록 자리인 1024~1279 의 400 을 따로 적지 않아도 되고, 래퍼를
+        `-100%` 밀면 손잡이가 정확히 x=0 에 남는다. 손잡이는 스택의 **형제**라 접혀도(`inert`) 포커스가 닿는다.
       */}
       <div
         className={cn(
-          // 상단은 보기 전환 토글과 **같은 높이**다 (lg 헤더의 `pt-6`) — 8px 어긋나면
-          // 지도 위에 뜬 두 표면이 서로 삐뚤어져 보인다
-          //
-          // 하단은 32 다. **카카오 축척·로고 막대가 지도 왼쪽 아래 20px 를 쓴다** —
-          // 16 이었을 때는 패널이 그 위에 바로 얹혀 축척이 눌려 보였다 (실측: 막대가
-          // 바닥에서 0~19px, 왼쪽 6px 부터 129px 폭). 32 면 13px 이 남는다.
-          'absolute bottom-8 left-4 z-30 hidden lg:block',
-          /*
-            **1024~1279 는 미리보기가 목록 자리를 쓴다** (#1227). 400 + 12 + 400 을 나란히 두면
-            지도가 300 남짓 남아 고른 핀 둘레가 안 보인다. `invisible` 이라 a11y 트리 · Tab 에서도
-            빠진다 — `inert` 를 폭마다 갈라 걸 수 없어서 CSS 로 감춘다. 목록 스크롤과 선택은 남는다.
-          */
-          previewId !== null && 'lg:max-xl:invisible',
-          // 기본 24. 위에 떠 있는 것이 있는 화면은 `panelTopInset` 으로 밀어 내린다 (#556)
-          panelTopInset === undefined && 'top-6',
+          'absolute inset-y-0 left-0 z-30 hidden transition-transform lg:block',
+          !panelOpen && '-translate-x-full',
         )}
-        style={panelTopInset === undefined ? undefined : { top: panelTopInset }}
       >
-        {/*
-          **펼치기 버튼은 패널과 형제이고 자리가 고정이다.** 패널이 밀려나도 이 버튼은
-          원래 자리(패널 좌상단)에 그대로 서서, 접기 전후로 손잡이가 같은 자리에 있다.
-          열려 있는 동안에는 패널 아래 깔리므로 `opacity-0` 과 함께 클릭도 막는다.
-        */}
-        <button
-          type="button"
-          onClick={() => setPanelOpen(true)}
-          aria-expanded={false}
-          aria-label={messages.map.expandPanel}
-          tabIndex={panelOpen ? -1 : undefined}
-          className={cn(
-            'bg-bg border-border text-fg-muted hover:text-fg focus-visible:ring-brand-500 absolute top-0 left-0 flex size-11 items-center justify-center rounded-xl border shadow-lg transition-opacity focus-visible:ring-2 focus-visible:outline-none',
-            panelOpen && 'pointer-events-none opacity-0',
-          )}
-        >
-          <ChevronRightIcon size={20} />
-        </button>
-
-        {/* 접기 탭이 패널 **밖으로** 튀어나오므로 여기서 자르지 않는다 */}
         <div
+          id={stackId}
           inert={!panelOpen}
-          className={cn(
-            'map-panel-width relative h-full transition-transform',
-            // 닫히면 자기 폭 + 왼쪽 여백(16) + 밖으로 튀어나온 접기 탭(24) + 그림자 번짐(16)만큼
-            // 민다 — 탭까지 화면 밖으로 나가야 펼치기 버튼과 겹치지 않는다 (#1123).
-            // `-translate-x-full`(폭만큼)로는 `left-4` 때문에 16px 조각이 남는다.
-            // 값이 `calc()` 라 globals.css 의 이름 있는 클래스다 (`.map-panel-collapsed`)
-            !panelOpen && 'map-panel-collapsed',
-          )}
+          // 그림자는 스택에 하나 — 접혀 있으면 x=0 에 회색 띠로 비친다 (#1123)
+          className={cn('relative flex h-full', panelOpen && 'map-dock-shadow')}
         >
-          {/*
-              **오른쪽 위만 각지다** (`rounded-tr-none`). 둥근 모서리에 탭을 붙이면 그
-              곡선만큼 지도가 초승달로 비쳐 탭이 떠 있는 것처럼 보인다. 그 자리는 탭이
-              덮는 자리이므로 각지게 두는 것이 맞다.
-            */}
-          <div className="bg-bg border-border flex h-full w-full flex-col overflow-hidden rounded-xl rounded-tr-none border shadow-lg">
-            {/*
-                **패널 머리에는 필터가 온다.** 예전에는 "지도에 보이는 곳 20" 이 제목으로
-                앉아 있었는데, 제목이 할 일이 없는 자리다 — 이 패널이 무엇인지는 안에 든
-                목록이 이미 말한다. 개수는 아래 캡션으로 내렸다.
-              */}
+          <div
+            className={cn(
+              'map-panel-width bg-bg border-border flex h-full flex-col overflow-hidden border-r',
+              /*
+                **1024~1279 는 미리보기가 목록 자리를 쓴다** (#1227). 400 + 400 이면 지도가 224 남는다.
+                `invisible` 이라 a11y 트리 · Tab 에서도 빠지고, 목록 스크롤과 선택은 남는다.
+              */
+              previewId !== null && 'lg:max-xl:invisible',
+            )}
+          >
+            {/* 담기 화면의 머리 — 열린 패널의 맨 위 블록이다 (D9). 접혀 있으면 떠 있는 기둥이 대신 그린다 */}
+            {hasHead && <div className="border-border border-b p-3">{head}</div>}
+
             {/*
               **검색이 패널 맨 위다** (#596) — 목록 갈래가 검색을 칩 위에 두는 것과 같은
               순서다. 검색어는 목록을 좁히는 **범위**이고 칩은 그 안의 축이다.
@@ -956,7 +949,7 @@ export function PlaceMapView({
                 <PlaceMapPanel
                   places={visible}
                   selectedId={selectedId}
-                  onSelect={setSelectedId}
+                  onSelect={selectPlace}
                   renderRowAction={renderRowAction}
                   renderRowNotice={renderRowNotice}
                 />
@@ -965,56 +958,46 @@ export function PlaceMapView({
           </div>
 
           {/*
-              ── 접기 탭 ──────────────────────────────────────────────────────
-
-              **패널 안이 아니라 밖에 붙는다.** 안쪽 머리에 두면 목록의 컨트롤처럼 읽혀서
-              "이 패널을 접는다" 로 보이지 않았고, 개수 줄과 자리를 다퉜다. 책갈피처럼
-              오른쪽 모서리에 물려 두면 손잡이로 읽힌다.
-
-              높이는 **닫혔을 때 펼치기 버튼이 서는 자리**와 같다(`top-0` · 44) — 접고
-              펴는 동작에서 손잡이가 제자리에 남아 있어야 같은 것으로 보인다.
-            */}
-          <button
-            type="button"
-            onClick={() => setPanelOpen(false)}
-            aria-expanded
-            aria-label={messages.map.collapsePanel}
-            title={messages.map.collapsePanel}
-            className="bg-bg border-border text-fg-muted hover:text-fg focus-visible:ring-brand-500 absolute top-0 -right-6 flex h-11 w-6 items-center justify-center rounded-r-lg border border-l-0 shadow-md focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
-          >
-            <ChevronLeftIcon size={16} />
-          </button>
-        </div>
-      </div>
-
-      {/*
-        ── 데스크톱 미리보기 (#1227) — 1280 부터 목록 옆, 그 아래는 목록 자리
-
-        목록 패널과 **같은 위아래 여백 · 같은 폭**이다(`top-6` · `bottom-8` · 400). 옆자리는
-        목록 400 + 간격 12 뒤다(`.map-preview-beside`). 목록을 접으면 그 자리로 당겨 온다.
-      */}
-      {previewId !== null && (
-        <div
-          ref={previewPanelRef}
-          className={cn(
-            'map-panel-width bg-bg border-border absolute top-6 bottom-8 left-4 z-30 hidden overflow-hidden rounded-xl border shadow-lg lg:block',
-            /*
-              1280 부터 목록이 열려 있으면 그 옆, 접혀 있으면 **펼치기 버튼 오른쪽**이다 — 버튼 자리
-              (16 · 44)에 서면 버튼을 덮어 목록으로 돌아갈 길이 닫기 하나가 된다 (리뷰 지적).
-            */
-            panelOpen ? 'map-preview-beside' : 'map-preview-after-handle',
+            ── 데스크톱 미리보기 (#1227) — 1280 부터 목록 **바로 옆**(흐름 안, 간격 0), 그 아래는 목록 자리
+            (`absolute left-0` — 래퍼 폭에 들지 않아 손잡이가 400 에 남는다).
+          */}
+          {previewId !== null && (
+            <div
+              ref={previewPanelRef}
+              className="map-panel-width bg-bg border-border absolute inset-y-0 left-0 overflow-hidden border-r xl:static"
+            >
+              <PlaceMapPreview
+                key={previewId}
+                placeId={previewId}
+                summary={previewSummary}
+                authed={authed}
+                variant="panel"
+                onClose={closePreview}
+              />
+            </div>
           )}
-        >
-          <PlaceMapPreview
-            key={previewId}
-            placeId={previewId}
-            summary={previewSummary}
-            authed={authed}
-            variant="panel"
-            onClose={closePreview}
-          />
         </div>
-      )}
+
+        {/*
+          ── 손잡이 하나 (D3) — 보이는 가장 오른쪽 패널의 오른쪽 가장자리, 세로 중앙
+
+          예전의 "패널 밖 오른쪽 위 접기 탭" 과 "접힌 뒤 좌상단 펼치기 버튼" 을 하나로 합쳤다 — 손이 두
+          군데로 갔다. **접는 대상은 스택 전체다** (D8, 네이버와 같다). 미리보기만 닫는 일은 그 머리의 ✕ 다.
+          보이는 탭은 24×48 이고 누르는 자리는 `::before` 로 44 까지 넓힌다(DESIGN.md 44px 하한 — `ViewToggle` 과 같은 수법).
+          세로 중앙은 지도 위 컨트롤(위: 보기 전환 · 내 위치, 아래: 재검색 · 축척)과 떨어져 있다.
+        */}
+        <button
+          type="button"
+          onClick={() => setPanelOpen((open) => !open)}
+          aria-expanded={panelOpen}
+          aria-controls={stackId}
+          aria-label={panelOpen ? messages.map.collapsePanel : messages.map.expandPanel}
+          title={panelOpen ? messages.map.collapsePanel : messages.map.expandPanel}
+          className="bg-bg border-border text-fg-muted hover:text-fg focus-visible:ring-brand-500 absolute top-1/2 left-full flex h-12 w-6 -translate-y-1/2 items-center justify-center rounded-r-md border border-l-0 shadow-md before:absolute before:inset-y-0 before:left-0 before:w-11 before:content-[''] focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
+        >
+          {panelOpen ? <ChevronLeftIcon size={16} /> : <ChevronRightIcon size={16} />}
+        </button>
+      </div>
 
       {/* ── 모바일: 하단 시트 3단 ────────────────────────────────────────── */}
       <MapSheet
@@ -1056,7 +1039,7 @@ export function PlaceMapView({
           <PlaceMapPanel
             places={visible}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={selectPlace}
             renderRowAction={renderRowAction}
             renderRowNotice={renderRowNotice}
           />

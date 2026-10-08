@@ -148,9 +148,10 @@ describe('지도 갈래의 떠 있는 머리 (#556)', () => {
 
   /*
     지도 보기에서도 `h1` 을 숨기지 않는다 — `/places` 지도는 전역 nav 로 나갈 수 있지만
-    이 화면의 퇴로는 `일정으로 돌아가기` 뿐이다. 접히는 패널 안에 넣을 수 없는 이유도 같다.
+    이 화면의 퇴로는 `일정으로 돌아가기` 뿐이다. 데스크톱 패널 안에 들어간 뒤(#1232)에도 접으면
+    떠 있는 카드로 돌아오는 이유가 같다.
   */
-  it('보이는 h1 과 돌아가기 링크가 떠 있는 카드 안에 있다', () => {
+  it('보이는 h1 과 돌아가기 링크가 머리(head) 안에 있다', () => {
     expect(mapBranch).toMatch(/<h1 className="text-title-2/)
     expect(mapBranch).not.toMatch(/<h1 className="[^"]*sr-only/)
     expect(mapBranch).toContain('<BackLink href={backHref}')
@@ -158,22 +159,22 @@ describe('지도 갈래의 떠 있는 머리 (#556)', () => {
   })
 
   /*
-    **패널과 같은 기둥·같은 곡률이다.** 1440 열에 맞추면 폭에 따라 "패널 위" 와 "지도
-    한복판" 으로 그림이 갈린다 (`place-map-view` 머리 기둥 주석).
-
-    **기둥은 #1012 부터 `PlaceMapView` 가 그린다** — 이 화면은 카드를 `head` 로 넘긴다.
+    **기둥은 #1012 부터 `PlaceMapView` 가 그린다** — 이 화면은 머리 내용을 `head` 로 넘긴다.
+    카드 모양은 #1232 부터 자리를 아는 `PlaceMapView` 가 입힌다.
     기둥 자리(`start-4 … lg:end-auto`)는 `place-map-search.test.ts` 가 잠근다.
   */
-  it('머리 카드를 PlaceMapView 의 head 로 넘기고 패널과 같은 곡률을 쓴다', () => {
+  it('머리를 PlaceMapView 의 head 로 내용만 넘긴다 — 카드 모양 · 패널 위 여백은 지도가 정한다', () => {
     expect(mapBranch).toContain('head={')
     // 자리를 스스로 띄우지 않는다 — 띄우면 폴백에서 목록을 덮고 모바일 검색 자리가 사라진다
     expect(mapBranch).not.toMatch(/className="[^"]*\babsolute\b/)
-    expect(mapBranch).toContain('rounded-xl')
-    // 폭 400 은 `.map-panel-width`(globals.css)와 같은 값이다 — 그 클래스는 `lg:` variant 를
-    // 만들 수 없어 Tailwind 유틸리티로 쓴다 (`plan-add-place-view` 주석)
-    expect(mapBranch).toContain('lg:w-100')
-    // 패널은 그만큼 내려온다 — 겹치면 둘 다 못 읽는다. 머리에 '다녀옴' 경고가 서면 그만큼 더 (#1066)
-    expect(mapBranch).toContain('panelTopInset={PANEL_TOP_INSET + headExtra}')
+    /*
+      #1232 D9 — 같은 머리가 모바일 · 접힌 데스크톱에서는 떠 있는 카드, 열린 데스크톱 패널에서는 맨 위
+      블록이다. 호출부가 카드를 입혀 넘기면 패널 안에서 카드 속 카드가 된다.
+    */
+    expect(mapBranch).not.toContain('shadow-lg')
+    expect(mapBranch).not.toContain('rounded-xl')
+    // 패널이 헤더 바로 아래부터 붙어 머리 아래로 밀어 내릴 일이 없다
+    expect(mapBranch).not.toContain('panelTopInset')
   })
 
   /*
