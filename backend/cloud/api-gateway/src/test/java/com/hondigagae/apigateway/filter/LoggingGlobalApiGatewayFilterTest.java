@@ -6,12 +6,17 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -24,7 +29,8 @@ import reactor.core.publisher.Mono;
  * 빠지면 Loki 를 볼 수 있는 사람이 곧 그 일정을 볼 수 있는 사람이 된다. 같은 필터가
  * {@code Authorization} 을 값 없이 존재 여부만 찍는 것과 같은 취지다.
  *
- * <p>실제로 나가는 로그 문자열을 본다 — 헬퍼만 따로 보면 "두 로그 중 한쪽에만 걸었다" 를 놓친다.
+ * <p>실제로 나가는 로그 문자열을 본다 — 헬퍼만 따로 보면 "두 로그 중 한쪽에만 걸었다" 를 놓친다. 마스킹 규칙 자체의 입력표는
+ * {@code ShareTokenLogMaskerTest} 에 있다.
  */
 class LoggingGlobalApiGatewayFilterTest {
 
@@ -107,10 +113,36 @@ class LoggingGlobalApiGatewayFilterTest {
         assertThat(rendered).doesNotContain("***");
     }
 
-    private String runFilterAndRenderLogs(String path) {
-        MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get(path).build());
+    /**
+     * 라우트는 디코딩·매개변수 제거한 세그먼트로 맞추므로 이 표기들도 공유 라우트를 타고 일정을 연다 (#1281).
+     * {@code MockServerHttpRequest.get(String)} 은 {@code %} 를 다시 인코딩하므로 원문 URI 를 그대로 넘긴다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/v1/shared-%70lans/", "/api/v1/shared-plans;x=1/", "/api/v1/%73hared-plans/"})
+    @DisplayName("표기만 바꾼 공유 경로도 요청·응답·오류응답 로그 어디에도 토큰이 남지 않는다")
+    void masksSharedPlanTokenInRewrittenPaths(String sharedPrefix) {
+        URI uri = URI.create("http://localhost:8000" + sharedPrefix + TOKEN + ";a=b/items?%74oken=" + TOKEN + "&trace=abc");
+        MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.method(HttpMethod.GET, uri).build());
 
-        filter.filter(exchange, ignored -> Mono.empty()).block();
+        String rendered = runFilterAndRenderLogs(exchange, HttpStatus.BAD_GATEWAY);
+
+        assertThat(rendered).doesNotContain(TOKEN);
+        assertThat(rendered).contains("[오류응답]");
+        assertThat(rendered).contains(sharedPrefix + "***/items");
+        assertThat(rendered).contains("trace=abc");
+    }
+
+    private String runFilterAndRenderLogs(String path) {
+        return runFilterAndRenderLogs(MockServerWebExchange.from(MockServerHttpRequest.get(path).build()), null);
+    }
+
+    private String runFilterAndRenderLogs(MockServerWebExchange exchange, HttpStatus responseStatus) {
+        filter.filter(exchange, ignored -> {
+            if (responseStatus != null) {
+                exchange.getResponse().setStatusCode(responseStatus);
+            }
+            return Mono.empty();
+        }).block();
 
         List<ILoggingEvent> events = appender.list;
         assertThat(events).as("요청 로그와 응답 로그가 모두 남아야 한다").hasSizeGreaterThanOrEqualTo(2);

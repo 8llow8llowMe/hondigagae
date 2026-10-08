@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  api-gateway 로그 출력 설정 (#1281). Boot 기본 콘솔 출력을 그대로 쓰고, 메시지와 스택트레이스만
+  공유 링크 토큰 변환기(ShareTokenMaskingConverter)로 감싼다.
+
+  왜: 공유 링크 토큰은 그 자체가 열람 권한인데, 프레임워크(Boot 오류 핸들러 500, HttpWebHandlerAdapter,
+  ExceptionHandlingWebHandler 체크포인트)가 요청 경로를 원문으로 찍고 그 줄에는 고칠 자리가 없다.
+  체크포인트는 스택트레이스의 Suppressed 아래에 나오므로 메시지만 가려서는 안 된다.
+
+  지킬 것
+  - CONSOLE_LOG_PATTERN 은 Boot 3.4.5 defaults.xml 기본값을 글자 그대로 옮기고 끝의 메시지·예외 부분만 감쌌다.
+    Boot 를 올리면 defaults.xml 과 다시 대조한다 (ShareTokenLogOutputTest 가 출력 모양이 같은지 본다).
+  - logging.pattern.console 은 이 서비스에서 먹지 않는다. 그 값으로 바꾸면 감싸기가 빠져 토큰이 새기 때문이다.
+    패턴을 바꾸려면 이 파일을 고치고 감싸기를 유지한다.
+  - 파일 로그(logging.file.name)는 쓰지 않는다. 저장소 어디에도 설정이 없고 로그는 콘솔로만 수집된다.
+    파일 로그를 켜려면 file-appender 도 같은 방식으로 감싼 뒤에 켠다. 이 파일이 있으면 그 설정만으로는 파일이 생기지 않는다.
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <conversionRule conversionWord="maskShareToken" class="com.hondigagae.apigateway.log.ShareTokenMaskingConverter"/>
+
+    <!--
+      한 줄 180자 안에 두려고 셋으로 나눠 잇는다. 나누는 자리에 공백을 두지 않는다 (logback 이 속성값 앞뒤를 trim 한다).
+      이어 붙인 결과는 Boot 기본 패턴에서 %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx} 를 %maskShareToken(...) 로 감싼 것과 글자가 같다.
+    -->
+    <property name="CONSOLE_LOG_HEAD" value="%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd'T'HH:mm:ss.SSSXXX}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}){} %clr(${PID:-}){magenta}"/>
+    <property name="CONSOLE_LOG_THREAD" value="%clr(--- %esb(){APPLICATION_NAME}%esb{APPLICATION_GROUP}[%15.15t] ${LOG_CORRELATION_PATTERN:-}){faint}"/>
+    <property name="CONSOLE_LOG_PATTERN"
+        value="${CONSOLE_LOG_HEAD} ${CONSOLE_LOG_THREAD}%clr(%-40.40logger{39}){cyan} %clr(:){faint} %maskShareToken(%m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx})"/>
+
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
