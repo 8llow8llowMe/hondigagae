@@ -31,6 +31,28 @@ public record Plan(
     String sourceAiJobId
 ) {
 
+    /**
+     * 일정 하나에 담을 수 있는 항목 수 상한 (#1243). <b>값은 여기 한 곳에만 둔다</b> — 요청 {@code @Size} ·
+     * 검증 문구 · 에러 문구 · Swagger 설명이 전부 이 상수를 읽는다. FE 계약이라 바꿀 때는 FE 와 맞춘다.
+     *
+     * <p>상한이 없으면 일정 상세가 tour-service 에 묻는 요약 질의 문자열이 항목 수만큼 길어진다. 산책 코스는
+     * 아이디가 19자리라 {@code walkCourseIds=<19자리>&} 한 개가 약 34바이트, Tomcat 기본 헤더 한도 8KB 에서
+     * <b>약 240개</b>에 깨지고, 그 실패는 요약 장애로 삼켜져 요약만 비는 조용한 품질 저하가 된다.
+     * 100 이면 산책 코스 약 3.4KB · 장소({@code placeIds=}, 약 29바이트) 약 2.9KB 로 한도 안이다.
+     * 하루 10곳 × 10일(AI 일정 생성의 최대 기간) 수준이다.
+     */
+    public static final int MAX_ITEMS = 100;
+
+    /**
+     * 항목 수가 {@code currentCount} 에서 {@code nextCount} 로 바뀌는 편집을 받아도 되는가 (#1243).
+     *
+     * <p>상한 안이면 받는다. 상한을 넘더라도 <b>늘지 않으면</b> 받는다 — 상한이 생기기 전에 이미 넘은
+     * 일정에서 줄이거나 순서만 고치는 편집까지 막으면 사용자가 그 일정을 상한 안으로 되돌릴 길이 없다.
+     */
+    public static boolean acceptsItemCount(int currentCount, int nextCount) {
+        return nextCount <= MAX_ITEMS || nextCount <= currentCount;
+    }
+
     public boolean isOwnedBy(long candidateMemberId) {
         return this.memberId == candidateMemberId;
     }

@@ -87,6 +87,7 @@ public class PlanCommandProcessor {
         Plan saved = planRepositoryPort.save(plan);
         planPetRepositoryPort.saveAll(toPets(saved.id(), petIds));
 
+        // 항목 수 상한(#1243)은 요청 @Size(PLAN_136)가 막는다 — 새 일정은 빈 채로 시작하므로 요청의 항목 수가 곧 일정의 항목 수다.
         if (!CollectionUtils.isEmpty(command.items())) {
             validateItemDays(saved, command.items());
             validateSequenceUniqueness(command.items());
@@ -105,6 +106,9 @@ public class PlanCommandProcessor {
      * <p><b>산책 코스도 같다</b> (#715). 저장 시 코스 존재 검증이 생겼지만 복제에는 걸지 않는다 —
      * 검증 없이 저장됐거나 원천에서 사라진 코스를 참조하는 옛 일정을 복제할 수 없게 되고, 그것은
      * 사용자가 고칠 수 없는 과거 자료 때문에 새 일정을 못 만드는 일이다.
+     *
+     * <p><b>항목 수 상한({@link Plan#MAX_ITEMS}, #1243)도 보지 않는다.</b> 원본 항목을 그대로 옮기므로 사본은
+     * 원본 수를 넘지 않는다 — 상한 전에 이미 넘은 원본의 사본도 받고, 그 사본을 늘리는 편집은 하루 교체가 막는다.
      *
      * <p>동행 반려견 필터({@link #resolveCopyPetIds})는 원격 호출이라 Facade 가 트랜잭션 밖에서 부른다.
      */
@@ -334,6 +338,10 @@ public class PlanCommandProcessor {
      * 특정 일차의 항목을 일괄 교체한다. (삭제 후 재삽입)
      *
      * <p>타깃 검증({@link #verifyItemTargets})은 원격 호출이라 Facade 가 트랜잭션 밖에서 먼저 한다.
+     *
+     * <p>일정 전체 항목 상한({@link Plan#MAX_ITEMS}, #1243)은 삭제 · 저장 <b>앞</b>에서 본다
+     * ({@link #validateItemLimit}). 하루 교체는 다른 날 항목에 더해지는 경로라 요청 {@code @Size} 만으로는
+     * 막히지 않는다.
      */
     @Transactional
     public void replaceDayItems(Plan plan, int day, List<PlanItemCommand> commands) {
@@ -353,8 +361,36 @@ public class PlanCommandProcessor {
             .toList();
 
         validateSequenceUniqueness(dayItems);
+        // 같은 일정의 다른 날을 동시에 교체하면 둘 다 "다른 날 + 새 목록" 을 옛 값으로 세어 상한을 넘긴다 — 요청 하나가
+        // 최대 100개를 더하므로 동시 3건이면 240(IN 절이 깨지는 선)도 넘는다. 일정 행을 먼저 잠가 교체를 일정 단위로
+        // 줄 세운다. 세는 조회보다 앞이어야 한다 — 이 트랜잭션의 첫 일관 읽기가 스냅숏을 잡으므로 잠금이 먼저여야
+        // 뒤 요청이 앞 요청의 커밋을 본다. 순서는 plan → plan_item 이라 기존 plan → plan_pet 잠금과 엇갈리지 않는다.
+        // (반환값은 쓰지 않는다. 대상 일정은 Facade 가 이미 확인했다)
+        planRepositoryPort.findActiveByIdForUpdate(plan.id());
+        validateItemLimit(plan, day, dayItems.size());
         planItemRepositoryPort.deleteByPlanIdAndDay(plan.id(), day);
         planItemRepositoryPort.saveAll(toItems(plan.id(), dayItems));
+    }
+
+    /**
+     * 하루 교체 뒤 일정 전체 항목 수가 상한을 넘는지 본다 (#1243). 교체될 그날의 옛 항목은 통째로 바뀌는 자리라
+     * 빼고 세고, 새 목록을 더한 것이 교체 뒤 수다 — 다른 날 60 + 새 목록 41 은 요청 하나로 보면 상한 안이지만
+     * 일정은 101 이 된다. 판정은 {@link Plan#acceptsItemCount} 하나다(상한 전에 이미 넘은 일정은 늘지 않으면 받는다).
+     *
+     * <p>세는 데 {@code findByPlanId} <b>한 번</b>을 쓴다 — 준비물 상한({@code PLAN_013})과 같은 관례다. count 전용
+     * 질의를 따로 두지 않는 것은, 교체될 그날 수와 전체 수가 둘 다 필요해 count 하나로는 모자라고, 행 수가 상한
+     * 언저리라 읽는 비용이 작으며, 이 교체의 응답(상세)도 곧바로 같은 일정의 항목 전체를 다시 읽기 때문이다.
+     *
+     * <p>호출하는 쪽({@link #replaceDayItems})이 일정 행을 먼저 잠근다 — 같은 일정의 다른 날을 동시에 교체해도
+     * 둘이 옛 값을 함께 세어 상한을 넘기지 않는다.
+     */
+    private void validateItemLimit(Plan plan, int day, int newDayItemCount) {
+        List<PlanItem> existing = planItemRepositoryPort.findByPlanId(plan.id());
+        int replacedCount = (int) existing.stream().filter(item -> item.day() == day).count();
+        int nextCount = existing.size() - replacedCount + newDayItemCount;
+        if (!Plan.acceptsItemCount(existing.size(), nextCount)) {
+            throw new PlanException(PlanErrorCode.PLAN_ITEM_LIMIT_EXCEEDED);
+        }
     }
 
     private void validateDateRange(LocalDate startDate, LocalDate endDate) {

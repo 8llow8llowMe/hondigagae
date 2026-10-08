@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.plan.application.exception;
 
+import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -51,6 +52,10 @@ public enum PlanErrorCode {
     // 다녀옴 표시 가드 (#983). PLAN_026 과 같은 선 — 판정은 Plan.hasStarted 하나, 당일부터 허용, 일정 상태는 보지 않는다.
     // 해제(visited=false)는 막지 않는다 — 가드 이전에 찍힌 표시나 일정을 미래로 옮긴 뒤 남은 표시를 풀 수 있어야 한다.
     PLAN_NOT_STARTED_VISIT("PLAN_027", "여행 시작일 전에는 다녀옴으로 표시할 수 없습니다.", HttpStatus.BAD_REQUEST),
+    // 일정 전체 항목 수 상한 (#1243). 하루 교체가 다른 날 항목에 더해져 넘을 때 던진다 — 한 요청만으로 넘는 것은
+    // 요청 검증(PLAN_136)이 먼저 막는다. 상한 전에 이미 넘은 일정은 늘리지 않는 편집(줄이기 · 같은 수)을 받는다.
+    // 숫자는 Plan.MAX_ITEMS 에서 온다 — 값을 바꾸면 문구도 함께 바뀐다.
+    PLAN_ITEM_LIMIT_EXCEEDED("PLAN_028", "일정에는 항목을 최대 " + Plan.MAX_ITEMS + "개까지 담을 수 있습니다.", HttpStatus.BAD_REQUEST),
     INVALID_REQUEST("PLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     // 프레임워크 공통 2종은 검증 대역 끝에 둔다 (coding-conventions §8-2). PLAN_115 가 petIds 필드 코드로
     // 쓰이면서 한 칸씩 밀렸고, 준비물 필드 코드가 PLAN_116~123 을 가져가면서 다시 밀었다.

@@ -1,5 +1,7 @@
 package com.hondigagae.domainlayer.plan.application.exception;
 
+import com.hondigagae.domainlayer.plan.domain.model.Plan;
+
 public final class PlanValidationMessage {
 
     // PLAN_101 은 petId 가 필수였을 때의 코드다. 다견 담기에서 petId 가 선택이 되면서 같은 자리에
@@ -38,6 +40,11 @@ public final class PlanValidationMessage {
     public static final String REVIEW_ITEM_COMMENT_LENGTH_INVALID = "PLAN_134:장소 한 줄 후기는 200자 이하만 가능합니다.";
     // AI 초안 담기 멱등 키(#970). 길이 초과와 형식 위반을 한 코드로 둔다 — 둘 다 "ai-service 가 준 jobId 가 아니다" 이다.
     public static final String SOURCE_AI_JOB_ID_INVALID = "PLAN_135:AI 일정 작업 식별자 형식이 올바르지 않습니다.";
+    // 일정 항목 수 상한 (#1243). 생성 요청의 items 와 하루 교체 요청의 items 가 함께 쓴다 — 같은 뜻의 필드라
+    // PET_IDS_SIZE_INVALID 처럼 코드 하나다. 하루 교체가 다른 날 항목에 더해져 넘는 것은 요청 하나로 알 수 없어
+    // 서비스 검증(PLAN_028)이 맡는다. 숫자는 Plan.MAX_ITEMS 에서 온다 — 정수 상수를 이은 문자열도 컴파일 상수라
+    // Bean Validation message 에 그대로 쓸 수 있다.
+    public static final String ITEMS_SIZE_INVALID = "PLAN_136:일정 항목은 최대 " + Plan.MAX_ITEMS + "개까지 담을 수 있습니다.";
 
     private PlanValidationMessage() {
     }
