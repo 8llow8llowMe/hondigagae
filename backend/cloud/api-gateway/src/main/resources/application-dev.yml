@@ -49,6 +49,13 @@ spring:
           uri: lb://${PLAN_SERVICE_APP_NAME}
           predicates:
             - Path=/api/v1/shared-plans/**
+          # 공유 링크 레이트 리밋 (#1244). 링크(토큰 해시)당 초당 2개 보충 · 버스트 20. 이유는 application-local.yml.
+          filters:
+            - name: SharedPlanRateLimit
+              args:
+                redis-rate-limiter.replenishRate: 2
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedTokens: 1
         - id: ai-service-ai-plans
           uri: lb://${AI_SERVICE_APP_NAME}
           predicates:
