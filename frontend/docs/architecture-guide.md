@@ -242,7 +242,7 @@ GET /places?... → 404                           →  EmptyState
   | `(main)/layout.tsx` · `(auth)` 레이아웃·페이지 · 전역 `not-found.tsx` | `app/error.tsx`         | 루트 레이아웃(폰트·`QueryProvider`). 셸은 없다            |
   | `app/layout.tsx`                                                      | `app/global-error.tsx`  | 아무것도 — 폴백이 `html`/`body`·전역 CSS 를 스스로 갖는다 |
 
-  **`app/error.tsx` 와 `global-error.tsx` 는 `AppShell` 을 그리지 않는다.** 클라이언트 경계는 세션을 읽을 수 없어 `authed` 를 모르고, 모르는 채 `false` 로 그리면 로그인한 사용자에게 로그아웃된 헤더가 뜬다 — 전역 404 가 거부한 그 모양이다. 대신 `(auth)` 셸과 같은 골격(브랜드 락업 + 회색 바닥 위 카드)이고, 셸이 없으므로 **홈으로 가는 버튼**을 `ErrorState` 의 `action` 슬롯에 둔다. 셸 안의 경계는 헤더가 그 일을 하므로 두지 않는다.
+  **`app/error.tsx` 와 `global-error.tsx` 는 `AppShell` 을 그리지 않는다.** 클라이언트 경계는 세션을 읽을 수 없어 `authed` 를 모르고, 모르는 채 `false` 로 그리면 로그인한 사용자에게 로그아웃된 헤더가 뜬다 — 전역 404 가 거부한 그 모양이다. 대신 #532 의 `(auth)` 셸이 쓰던 골격(브랜드 락업 + 회색 바닥 위 카드)이고, 셸이 없으므로 **홈으로 가는 버튼**을 `ErrorState` 의 `action` 슬롯에 둔다. 셸 안의 경계는 헤더가 그 일을 하므로 두지 않는다.
   `(auth)` 그룹에는 `error.tsx` 가 없어 인증 화면의 페이지 예외도 `app/error.tsx` 로 온다 — 그 그룹은 원래 nav 를 두지 않으므로(전역nav-세부명세 D0) 셸 없는 모양이 제자리다.
   **`global-error.tsx` 도 개발 모드에서 뜬다** (Next 15.2 부터, 오류 오버레이와 함께). 루트 레이아웃이 없어 `metadata` 가 조립되지 않으므로 탭 제목은 React `<title>` 로 직접 준다.
 
