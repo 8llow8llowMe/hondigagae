@@ -952,6 +952,7 @@ export function PlaceMapView({
                   onSelect={selectPlace}
                   renderRowAction={renderRowAction}
                   renderRowNotice={renderRowNotice}
+                  detailLink={!preview}
                 />
               )}
             </div>
@@ -1042,6 +1043,7 @@ export function PlaceMapView({
             onSelect={selectPlace}
             renderRowAction={renderRowAction}
             renderRowNotice={renderRowNotice}
+            detailLink={!preview}
           />
         )}
       </MapSheet>
