@@ -14,6 +14,7 @@ import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanEmergency
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanWeatherResponse;
 import com.hondigagae.domainlayer.plan.application.exception.PlanValidationMessage;
 import com.hondigagae.domainlayer.plan.application.port.in.PlanWebUseCase;
+import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.persistence.dto.SliceResponse;
 import com.hondigagae.security.common.dto.MemberLoginActive;
 import io.swagger.v3.oas.annotations.Operation;
@@ -54,7 +55,8 @@ public class PlanWebController {
             + "동행 반려견은 petIds(최대 5마리)로 보내고 첫 번째가 대표 반려견이 됩니다. petIds 가 없으면 petId 를, "
             + "둘 다 없으면 대표 반려견을 씁니다 — AI 일정 생성(POST /ai-plans)과 같은 규칙입니다.\n\n"
             + "**필수: 요청 바디의 areaCode, title, startDate, endDate.** petId·petIds·sigunguCode·budget·items 는 생략 가능하고, "
-            + "여행 기간(startDate~endDate)은 최대 30일입니다. items 를 보낼 때는 각 항목의 day·itemType·title 이 필수입니다.\n\n"
+            + "여행 기간(startDate~endDate)은 최대 30일입니다. items 를 보낼 때는 각 항목의 day·itemType·title 이 필수입니다. "
+            + "**일정 항목은 최대 " + Plan.MAX_ITEMS + "개**이고 넘으면 PLAN_136 400 입니다 — AI 초안 담기도 같은 상한입니다.\n\n"
             + "**AI 초안 담기는 멱등입니다.** sourceAiJobId(POST /ai-plans 가 준 jobId)를 함께 보내면, 같은 작업을 이미 담은 경우 "
             + "새 일정을 만들지 않고 **200 으로 먼저 담긴 일정**을 돌려줍니다(409 아님). 이때 이번 요청의 제목·항목·반려견은 반영하지 않습니다. "
             + "동시에 두 번 눌러도 일정은 하나입니다. 담은 일정을 삭제한 뒤 다시 담으면 새 일정이 생깁니다. "
@@ -183,6 +185,10 @@ public class PlanWebController {
         description = "해당 일차의 항목을 요청 본문 목록으로 교체합니다. 빈 목록을 보내면 해당 일차 항목이 모두 삭제됩니다.\n\n"
             + "**필수: planId, day (경로), 바디 items 각 항목의 itemType·title.** 항목의 day 는 경로 값으로 덮어쓰므로 바디에서 생략해도 되고, "
             + "경로의 day 가 일정 기간을 벗어나면 실패합니다. 같은 일차 안에서 sequence 가 겹치면 실패합니다.\n\n"
+            + "**일정 항목은 최대 " + Plan.MAX_ITEMS + "개입니다.** 한 날 목록이 " + Plan.MAX_ITEMS + "개를 넘으면 PLAN_136, "
+            + "다른 날 항목과 합친 교체 뒤 일정 전체가 " + Plan.MAX_ITEMS + "개를 넘으면 PLAN_028 (둘 다 400) 입니다. "
+            + "상한이 생기기 전에 이미 " + Plan.MAX_ITEMS + "개를 넘은 일정은 전체 수를 늘리지 않는 교체(줄이기·같은 수)만 받습니다. "
+            + "단 한 날 목록은 언제나 " + Plan.MAX_ITEMS + "개 이하여야 합니다(PLAN_136).\n\n"
             + "호출 예\n"
             + "- 1일차를 항목 하나로 교체: `PUT /api/v1/plans/1234567890123456789/days/1/items` "
             + "`{\"items\":[{\"sequence\":0,\"itemType\":\"PLACE\",\"targetId\":212481712381923328,\"title\":\"천지연폭포\"}]}`\n"

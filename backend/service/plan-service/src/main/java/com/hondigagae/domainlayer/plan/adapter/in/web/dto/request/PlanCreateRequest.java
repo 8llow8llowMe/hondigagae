@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.plan.adapter.in.web.dto.request;
 import com.hondigagae.domainlayer.plan.application.command.PlanCreateCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanItemCommand;
 import com.hondigagae.domainlayer.plan.application.exception.PlanValidationMessage;
+import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -60,8 +61,10 @@ public record PlanCreateRequest(
     @PositiveOrZero(message = PlanValidationMessage.BUDGET_NEGATIVE_INVALID)
     Integer budget,
 
-    @Schema(description = "생략 가능. 일정 항목 목록. 생략하면 항목 없는 일정으로 생성되고, 보낼 때는 각 항목의 day 가 필수입니다.")
+    @Schema(description = "생략 가능. 일정 항목 목록(최대 " + Plan.MAX_ITEMS + "개, 넘으면 PLAN_136). "
+        + "생략하면 항목 없는 일정으로 생성되고, 보낼 때는 각 항목의 day 가 필수입니다.")
     @Valid
+    @Size(max = Plan.MAX_ITEMS, message = PlanValidationMessage.ITEMS_SIZE_INVALID)
     List<PlanItemRequest> items,
 
     @Schema(description = "생략 가능. AI 일정 생성 작업 아이디(POST /ai-plans 가 준 jobId, UUID). AI 초안을 담을 때만 보냅니다. "
