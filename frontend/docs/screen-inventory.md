@@ -148,8 +148,9 @@
   ([#16](https://github.com/8llow8llowMe/hondigagae/issues/16) 반영) **그리고 화면에 붙였다**
   ([#112](https://github.com/8llow8llowMe/hondigagae/issues/112)). 목록(`PlaceItem`)과 **같은 매핑**이고
   `sourceName` 은 표시명(`문화정보원`)이다. `indoor` 의 `null` 은 "원천에 정보 없음" 이라
-  `false`(야외)와 다르게 다룬다 — 메타 줄에서 낱말을 빼고, 실내 필터를 가진 화면(목록 행·장소 상세)만
-  "실내 여부 미확인" 배지로 드러낸다. 조립은 `lib/place/meta.ts` 한 곳이다.
+  `false`(야외)와 다르게 다룬다 — 메타 줄에서 낱말을 빼고, 장소 상세 · 지도 미리보기만 "실내 여부 미확인"
+  배지로 드러낸다. **목록 행은 #1267 에서 그 배지를 뺐다** — 모르는 정보를 행마다 반복하면 잡음이고, 낱말이
+  빠지는 것으로 충분하다. 조립은 `lib/place/meta.ts` 한 곳이다.
 - **`sigunguCode` 는 여전히 상세 응답에 없다.** 목록 항목에만 있다 — #16 범위가 아니었다.
 - **영업 상태(`intro.open24` / `intro.openNow`)는 화면에 붙었지만 dev 데이터가 비어 있다**
   ([#294](https://github.com/8llow8llowMe/hondigagae/issues/294)). 장소 200곳 전수 조회
