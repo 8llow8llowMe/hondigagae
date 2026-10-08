@@ -62,7 +62,7 @@ function signupConsentPath(provider: string, returnTo: string): string {
  *
  * - **제목이 화면의 `h1` 이다** (`headingLevel={1}`). 이 화면에는 상태 말고 이름이 될 것이 없고,
  *   인증 셸은 `h1` 을 그리지 않는다. 다른 인증 화면 셋은 각자 `h1` 을 갖는다.
- * - **`flush` 다.** 인증 셸 카드(`px-4 py-6 md:px-5`)가 이미 여백을 갖는데 `EmptyState` 가
+ * - **`flush` 다.** 인증 셸 `main`(`px-4` · 데스크톱 카드 `md:px-5 md:py-6`)이 이미 여백을 갖는데 `EmptyState` 가
  *   `py-12` + `main` 인셋을 한 번 더 먹어 제목이 x=49 에 섰다(375 · 다른 인증 화면은 33).
  */
 export function OAuthCallbackStatus({

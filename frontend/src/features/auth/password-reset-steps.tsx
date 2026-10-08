@@ -1,7 +1,5 @@
 'use client'
 
-import Link from 'next/link'
-
 import { Button, ButtonLink } from '@/components/button'
 import { Field } from '@/components/field'
 import { FormFailure } from '@/components/form-failure'
@@ -74,7 +72,8 @@ export function PasswordResetEmailStep({
         onRetry={onRetry}
       />
 
-      <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email} required>
+      {/* 칸 하나뿐인 폼의 `*` 는 정보가 없다 — 로그인과 같은 규칙 (#1283 C5) */}
+      <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email}>
         <Input
           id="email"
           type="email"
@@ -153,7 +152,8 @@ export function PasswordResetCodeStep({
       {/* 이메일은 줄바꿈 기회가 없는 토큰이다 — 375px 폭에서 넘치지 않게 break-all */}
       <p className="text-body-2 text-fg-muted break-all">{email}</p>
 
-      <Field id="code" label={messages.auth.codeLabel} error={errors.fields.code} required>
+      {/* 이 단계의 두 칸은 둘 다 필수라 `*` 를 달지 않는다 (#1283 C5) */}
+      <Field id="code" label={messages.auth.codeLabel} error={errors.fields.code}>
         {/* 입력 중에 대문자화 · 공백 제거 — 가입 2단계와 같은 칸이다 (#1078) */}
         <VerificationCodeInput
           id="code"
@@ -191,7 +191,6 @@ export function PasswordResetCodeStep({
         label={messages.auth.newPasswordLabel}
         error={errors.fields.newPassword}
         hint={messages.form.passwordRule}
-        required
       >
         {/* 입력란 안 눈 토글 — 가입 3단계 · 마이페이지와 같은 `PasswordInput` 이다 (#1080) */}
         <PasswordInput
@@ -222,7 +221,8 @@ export function PasswordResetCodeStep({
  */
 export function PasswordResetDone() {
   return (
-    <div className="flex flex-col items-start">
+    // `data-reset-done` — 완료 전환 때 포커스가 찾아오는 자리다 (`PasswordResetView`, #1283)
+    <div data-reset-done="" className="flex flex-col items-start">
       {/* 이메일은 URL 이 아니라 넘겨주기로 간다 — 재설정 성공 시점에 넘겼다 (#1158) */}
       <ButtonLink href="/login" size="lg">
         {messages.auth.toLoginScreen}
@@ -253,32 +253,10 @@ export type PasswordResetHeadingProps = {
 export function PasswordResetHeading({ heading, description }: PasswordResetHeadingProps) {
   return (
     <div aria-live="polite" className="flex flex-col gap-1">
-      <p className="text-body-1 text-fg font-semibold">{heading}</p>
+      {/* 단계 질문이 본문의 큰 글자다 — 화면 이름은 상단바가 작게 든다 (#1283 C4) */}
+      {/* 보이는 가장 큰 제목이라 구조도 제목이다 — 화면 이름(상단바 `h1`) 아래 `h2` */}
+      <h2 className="text-title-1 text-fg font-bold">{heading}</h2>
       {description !== undefined && <p className="text-body-2 text-fg-muted">{description}</p>}
     </div>
-  )
-}
-
-/**
- * 1 · 2단계 아래 "로그인으로" (#1084 L3, 정본 D4).
- *
- * 비밀번호가 기억난 사람이나 잘못 들어온 사람에게 **브라우저 뒤로 가기 말고는 길이 없었다.**
- * 완료 화면에는 그리지 않는다 — 그 화면의 주 행동이 같은 목적지의 버튼이라 두 번 말하게 된다.
- *
- * **쿼리를 싣지 않는다.** 이메일은 URL 에 올리지 않고(D3, 예외는 완료 뒤 1회 이동뿐),
- * `returnTo` 는 재설정이 처음부터 이어받지 않는다(로그인-세부명세 D10).
- *
- * 누르는 자리는 `min-h-11` 로 44 다 — 로그인 화면의 "비밀번호 찾기" 와 같은 모양이다.
- */
-export function PasswordResetLoginLink() {
-  return (
-    <p className="flex justify-center">
-      <Link
-        href="/login"
-        className="text-body-2 text-fg-muted inline-flex min-h-11 items-center px-1 underline"
-      >
-        {messages.auth.toLoginScreen}
-      </Link>
-    </p>
   )
 }
