@@ -61,7 +61,7 @@
 | --- | --- |
 | POST·GET | `/api/v1/plans` | 생성은 `petIds`(최대 5, 첫 번째 = 대표) — ai-plans 와 같은 우선순위. `sourceAiJobId` 를 실으면 AI 초안 담기 멱등(이미 담았으면 200 + 기존 일정, #970). `petId` 필터 = 반려견별 히스토리(한 마리라도 동행이면 히트). 목록 항목은 `itemCount`(전체 항목 수, 빈 일정 0)를 싣는다 — 페이지 일정 id `in` 절 한 번 집계(#1242) |
 | GET·PUT·DELETE | `/api/v1/plans/{planId}` | 항목마다 장소 요약(주소·실내·대표 이미지·좌표) 포함. `petIds` 동행 목록 |
-| PUT | `/api/v1/plans/{planId}/days/{day}/items` |
+| PUT | `/api/v1/plans/{planId}/days/{day}/items` | 그날 항목 통째 교체. **일정 전체 항목 최대 100개**(`Plan.MAX_ITEMS`) — 생성 `items` 도 같은 상한(`PLAN_136`), 교체 뒤 전체가 넘으면 `PLAN_028`. 상한 전에 넘은 일정은 늘리지 않는 교체만 받는다 (#1243) |
 | GET | `/api/v1/plans/{planId}/weather` | 일자별 날씨 브리핑 + 비 오는 날 실내 대안. 여러 마리는 아이별 판정 → 가장 낮은 아이 기준(`basisPetId`·`petSuitabilities`) |
 | GET·POST·DELETE | `/api/v1/favorites/places[/{placeId}]` | 장소 즐겨찾기 (멱등, 회원당 100곳, GET {placeId} = 여부 확인, 목록 항목에 저장일 `savedAt`) |
 | PUT | `/api/v1/plans/{planId}/items/{planItemId}/visited` | 항목 방문 체크 (다녀옴) |
