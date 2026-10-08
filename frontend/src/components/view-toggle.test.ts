@@ -41,7 +41,7 @@ describe('ViewToggle — 갈 곳 하나만 말하는 글자 버튼 (#1125)', () 
 
     expect(markup.match(/<a /g)).toHaveLength(1)
     expect(anchorTag(markup)).toContain('href="/places?view=list"')
-    expect(markup).toContain(`>${messages.map.showList}</a>`)
+    expect(markup).toContain(`>${messages.map.showList}</span></a>`)
     expect(markup).not.toContain(messages.map.showMap)
   })
 
@@ -50,7 +50,7 @@ describe('ViewToggle — 갈 곳 하나만 말하는 글자 버튼 (#1125)', () 
 
     expect(markup.match(/<a /g)).toHaveLength(1)
     expect(anchorTag(markup)).toContain('href="/places"')
-    expect(markup).toContain(`>${messages.map.showMap}</a>`)
+    expect(markup).toContain(`>${messages.map.showMap}</span></a>`)
     expect(markup).not.toContain(messages.map.showList)
   })
 
@@ -144,5 +144,29 @@ describe('ViewToggle — 호출부의 크기 (#1125)', () => {
     expect(tags).toHaveLength(1)
     expect(tags[0]).not.toContain('size=')
     expect(tags[0]).not.toContain('className=')
+  })
+})
+
+/*
+  **모바일 지도 위(`md` 크기 · `md` 미만)는 아이콘만이다** (#1272, 사용자 결정 2026-10-08) — 같은 줄의
+  검색창이 그만큼 길어진다. 글자는 지우지 않고 `sr-only` 로 남긴다: 링크의 접근 이름이 그대로라
+  스크린리더 · e2e(`getByRole('link', { name: '목록 보기' })`)가 바뀌지 않는다.
+*/
+describe('ViewToggle — 모바일 지도 위는 아이콘만 (#1272)', () => {
+  it('md 는 md 미만에서 글자를 sr-only 로 숨기고 44 정사각이 된다', () => {
+    const markup = render()
+    const tokens = classTokens(markup)
+
+    expect(markup).toContain(`<span class="max-md:sr-only">${messages.map.showList}</span>`)
+    expect(tokens).toContain('max-md:w-11')
+    expect(tokens).toContain('max-md:px-0')
+    expect(tokens).toContain('justify-center')
+  })
+
+  it('sm(카드 제목 줄)은 어느 폭에서나 글자가 보인다', () => {
+    const markup = render({ size: 'sm', current: 'list' })
+
+    expect(markup).not.toContain('sr-only')
+    expect(markup).toContain(messages.map.showMap)
   })
 })

@@ -58,15 +58,31 @@ export function ViewToggle({
       className={cn(
         'bg-bg border-border text-fg hover:bg-band text-body-2 focus-visible:ring-brand-500 inline-flex shrink-0 items-center gap-1.5 rounded-lg border font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
         size === 'md'
-          ? // 지도 위에 뜬다 — 바로 아래 `내 위치` 와 같은 그림자를 컴포넌트가 갖는다 (component-guide §3)
-            'h-11 px-4 shadow-md'
+          ? /*
+              지도 위에 뜬다 — 바로 아래 `내 위치` 와 같은 그림자를 컴포넌트가 갖는다 (component-guide §3).
+              **`md` 미만은 44 정사각 아이콘이다** (#1272) — 같은 줄의 검색창이 그만큼 길어진다.
+            */
+            'h-11 justify-center px-4 shadow-md max-md:w-11 max-md:px-0'
           : // `::before` 는 패딩 상자 기준이라 36 − 테두리 2 = 34 에 6 씩 더해 46 이다 — `Chip` `sm` 과 같은 값
             "relative h-9 px-3 before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-['']",
         className,
       )}
     >
       <Icon size={size === 'md' ? 18 : 16} />
-      {toMap ? messages.map.showMap : messages.map.showList}
+      {/*
+        **모바일 지도 위(`md`)에서는 글자를 `sr-only` 로 남긴다** (#1272, 사용자 결정 2026-10-08). 지우지
+        않으므로 접근 이름은 그대로 `목록 보기` 다 — #1125 가 걷은 것은 "이름 없는 아이콘" 이었고, 여기는
+        이름이 있고 보이지만 않는다. 카드 제목 줄(`sm`)은 자리가 넉넉해 그대로 보인다.
+      */}
+      {size === 'md' ? (
+        <span className="max-md:sr-only">
+          {toMap ? messages.map.showMap : messages.map.showList}
+        </span>
+      ) : toMap ? (
+        messages.map.showMap
+      ) : (
+        messages.map.showList
+      )}
     </Link>
   )
 }
