@@ -52,6 +52,7 @@ import {
 } from '@/lib/map/viewport'
 import { visibleCountLabel } from '@/lib/map/visible-count'
 import { messages } from '@/lib/messages'
+import { placePinIcon } from '@/lib/place/pin-icon'
 import { mapEmptyCopy } from '@/lib/place/search-empty'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -494,6 +495,7 @@ export function PlaceMapView({
             않는다는 규약이 있다. 긴급 시설의 약국이 쓰던 표현을 그대로 재사용한다.
           */
         muted: mutedIds.has(place.placeId),
+        icon: placePinIcon(place),
       })),
     [visible, mutedIds],
   )

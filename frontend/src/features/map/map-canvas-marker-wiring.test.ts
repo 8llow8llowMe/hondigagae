@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { describe, expect, it } from 'vitest'
 
 import { readSourceWithoutComments } from '@/test/source'
@@ -83,5 +86,32 @@ describe('map-canvas.tsx — 기준점 마커 (#1223)', () => {
 
   it('장소 핀과 다른 배열이다 — 핀 effect 가 통째로 비울 때 함께 지워지면 깜빡인다', () => {
     expect(SOURCE).toContain('focusOverlayRef')
+  })
+})
+
+describe('원 핀 배선 (#1280)', () => {
+  /* 아이콘 마크업은 고정 문자열뿐이다 — 사용자 데이터가 HTML 로 들어가는 길을 만들지 않는다 */
+  it('HTML 을 붙이는 자리는 하나이고 pinIconSvg 의 결과만 붙인다', () => {
+    expect(occurrences('insertAdjacentHTML(')).toBe(1)
+    expect(SOURCE).toContain("insertAdjacentHTML('afterbegin', pinIconSvg(content.icon))")
+    expect(SOURCE).not.toContain('innerHTML')
+  })
+
+  it('이름 상시 표시는 level 로 정한다', () => {
+    expect(SOURCE).toContain('level <= PIN_NAME_MAX_LEVEL')
+  })
+
+  it('원 핀은 원 중심이 좌표다 — yAnchor 0.5', () => {
+    expect(SOURCE).toMatch(/first\.icon !== undefined/)
+  })
+})
+
+describe('장소 핀이 아이콘을 넘긴다 (#1280)', () => {
+  it('place-map-view 가 placePinIcon 으로 고른다', () => {
+    const view = readFileSync(
+      fileURLToPath(new URL('../place/place-map-view.tsx', import.meta.url)),
+      'utf8',
+    )
+    expect(view).toContain('icon: placePinIcon(place)')
   })
 })
