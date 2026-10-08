@@ -35,4 +35,12 @@ describe('placePinIcon — contentType.code 로 고른다 (#1280 D2-1)', () => {
   it('모르는 코드는 범용 핀이다 — 분류를 지어내지 않는다', () => {
     expect(placePinIcon(at('UNKNOWN_NEW_TYPE'))).toBe('pin')
   })
+
+  /* 평범한 객체 조회는 프로토타입 키(`constructor` 등)에서 `?? 'pin'` 을 지나친다 */
+  it.each(['constructor', 'toString', '__proto__', 'hasOwnProperty'])(
+    '프로토타입 키 %s 도 범용 핀이다',
+    (code) => {
+      expect(placePinIcon(at(code))).toBe('pin')
+    },
+  )
 })
