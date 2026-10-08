@@ -434,3 +434,29 @@ describe('토큰 대비 — tint 면 위에서 뒤집은 배지 (#709)', () => {
     expect(onWhite).toBeGreaterThan(onTint)
   })
 })
+
+/**
+ * 원 핀 · 묶음 테두리 (#1280). 카카오 땅 타일은 #F9F9F9 근처(2026-10-08 스크린샷 표본)라
+ * **가장 불리한 흰색**으로 잰다.
+ */
+describe('토큰 대비 — 지도 원 핀 · 묶음 (#1280)', () => {
+  it('흰 아이콘이 브랜드 원 위에서 3:1 이상이다', () => {
+    expect(contrastRatio(WHITE, token('--brand-600'))).toBeGreaterThanOrEqual(3)
+  })
+
+  it('브랜드 원 · 묶음 테두리가 흰 타일 위에서 3:1 이상이다', () => {
+    expect(contrastRatio(token('--brand-600'), WHITE)).toBeGreaterThanOrEqual(3)
+  })
+
+  it('묶음 숫자(--brand-700)가 흰 원 위에서 4.5:1 이상이다', () => {
+    expect(contrastRatio(token('--brand-700'), token('--bg'))).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('묶음 규칙이 실제로 브랜드 테두리 · 숫자를 쓴다', () => {
+    const css = readGlobalsCss()
+    const rule = /\n\.map-cluster\s*\{([\s\S]*?)\}/.exec(css)?.[1] ?? ''
+
+    expect(rule).toContain('border: 2px solid var(--brand-600)')
+    expect(rule).toContain('color: var(--brand-700)')
+  })
+})
