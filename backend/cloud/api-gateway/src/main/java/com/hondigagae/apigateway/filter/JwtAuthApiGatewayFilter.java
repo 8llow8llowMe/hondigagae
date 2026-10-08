@@ -95,9 +95,15 @@ public class JwtAuthApiGatewayFilter extends AbstractGatewayFilterFactory<Config
             .flatMap(revoked -> revoked ? Mono.error(new JwtException(JwtErrorCode.TOKEN_REVOKED)) : Mono.empty());
     }
 
+    /**
+     * 인증 스킴은 <b>대소문자를 가리지 않고</b> 읽는다 (#1261, RFC 7235). 하류 서비스(resource server 의
+     * {@code DefaultBearerTokenResolver})가 {@code bearer} · {@code BEARER} 도 인증하는데 여기서만 가리면,
+     * 소문자 스킴의 토큰을 "토큰 없음" 으로 보고 블랙리스트 확인을 건너뛴 채 넘긴다 — 로그아웃한 토큰이 남은 수명
+     * 동안 통했다. 두 쪽이 같은 요청을 같은 토큰으로 읽어야 게이트웨이의 폐기 판정이 하류 인증 앞에 선다.
+     */
     private String getJwtFrom(ServerHttpRequest request) {
         String bearerToken = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {
+        if (StringUtils.hasText(bearerToken) && bearerToken.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
             return bearerToken.substring(BEARER_PREFIX.length());
         }
         return null;
