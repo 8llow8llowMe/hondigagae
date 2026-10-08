@@ -333,6 +333,12 @@ CREATE TABLE plan_review_item (
 - **토큰**은 `SecureRandom` 32바이트를 URL-safe Base64(패딩 없음)로 옮긴 43자다. 평문 저장 + `uk_plan_share_link_token`.
   토큰 자체가 열람 권한이라 **게이트웨이 로그에서 마스킹한다** (`LoggingGlobalApiGatewayFilter`, `/api/v1/shared-plans/***`).
   마스킹이 없으면 Loki 를 볼 수 있는 사람이 곧 그 일정을 볼 수 있는 사람이 된다.
+- **공개 조회는 발급 형식(`[A-Za-z0-9_-]{43}`)이 아닌 토큰을 DB 를 보지 않고 `PLAN_023` 404 로 끊는다** (#1244,
+  `PlanShareLinkProcessor#isWellFormedToken` — 정규식은 `TOKEN_BYTES`·`TOKEN_ENCODER` 에서 나온다). 토큰 컬럼의
+  `utf8mb4_bin` 은 PAD SPACE 콜레이션이라 `WHERE token = 'T '` 가 `T` 행에 맞는다. 형식을 보지 않으면 뒤 공백만
+  덧붙인 표기가 같은 일정을 열고, 게이트웨이는 그 표기마다 다른 레이트 리밋 버킷을 줘서 링크당 한도가 무너진다.
+  없는 토큰과 응답을 가르지 않는다(존재 비노출). 게이트웨이 `SharedPlanTokenKeyResolver` 가 **같은 정규식**을 쓴다 —
+  한쪽만 바꾸면 정상 토큰이 malformed 버킷 하나로 몰린다.
 - **실패 코드는 둘로만 갈린다.** 없음·폐기·일정 소프트삭제·비공유 상태는 전부 `PLAN_023` 404 로 **같게** 답한다 —
   구분해 주면 토큰을 찍어 보는 쪽에 "이 토큰은 있었다" 를 흘린다. 만료만 `PLAN_024` 410 이다. 받은 사람이
   "새 링크를 달라" 고 말할 수 있어야 하기 때문이다.
@@ -396,6 +402,76 @@ CREATE TABLE plan_share_link (
 ) COMMENT = '여행 일정 읽기 전용 공유 링크';
 ```
 
+### 공개 경로 레이트 리밋 ([#1244](https://github.com/8llow8llowMe/hondigagae/issues/1244))
+
+공유 링크는 퍼지는 것이 정상 사용이라 크롤러·미리보기 봇이 같은 링크를 되풀이해 두드린다. 공개 조회 1건은
+plan-service 를 거쳐 tour-service 호출(최대 2회)로 **증폭**되고, tour-service 서킷이 열리면 로그인 사용자의 일정
+상세에서도 장소 요약이 빈다. 그래서 게이트웨이가 이 라우트에만 리밋을 건다.
+
+- **어디에** — api-gateway 의 `plan-service-shared-plans` 라우트에만 `SharedPlanRateLimit` 필터
+  (`SharedPlanRateLimitGatewayFilterFactory`)를 건다. 판정은 SCG `RedisRateLimiter`(Redis Lua 토큰 버킷)가 한다.
+  다른 라우트에는 없다 — `RateLimitRouteCoverageTest` 가 세 프로파일 yml 로 고정한다.
+  - **공유 링크 전용이다.** 키를 공유 토큰 전용 리졸버가 정하므로 다른 라우트에 걸면 키가 나오지 않아 **판정 없이
+    통과한다**(걸었다고 믿는 동안 아무것도 막지 않는다). 다른 라우트에 리밋이 필요하면 별도 리졸버·팩토리를 만든다.
+  - SCG 기본 `RequestRateLimiter` 필터 팩토리도 이 리졸버를 받아 자동 등록되지만 쓰지 않는다(거부가 빈 본문).
+    커버리지 테스트가 세 프로파일에서 그 사용을 막는다.
+- **키는 클라이언트 IP 가 아니라 공유 토큰으로 정한다** (`SharedPlanTokenKeyResolver`). 셋 중 하나다.
+  - 토큰 세그먼트가 없다 → 키 없음, **판정 없이 통과**(`/api/v1/shared-plans` 같은 요청 — plan-service 가 싼 4xx 로 끝낸다).
+  - 발급 형식(`[A-Za-z0-9_-]{43}`)이다 → `{infra.redis.key-prefix}:shared-plan:{SHA-256 앞 32 hex}`.
+  - 형식이 아니다 → 고정 키 `{infra.redis.key-prefix}:shared-plan:malformed`. **형식 위반 요청 전부가 버킷 하나**다 —
+    무작위·변형 토큰 플러드가 토큰마다 Redis 키를 만들지 않는다. 이 요청들은 plan-service 가 DB 조회 없이 404 로
+    끊으므로(위 "토큰" 항목) 버킷을 함께 써도 정상 사용자가 잃는 것이 없다.
+
+  근거는 아래와 같다.
+  - 공유 화면은 Next 서버 컴포넌트가 `BACKEND_API_URL` 로 부른다. **게이트웨이가 보는 클라이언트는 늘 Next 서버
+    하나**라, IP 키면 사이트 전체의 공유 트래픽이 버킷 하나를 나눠 써서 봇 하나가 모든 사용자를 막는다.
+  - 증폭은 **유효한 토큰**에서만 생기고 봇은 같은 링크를 반복한다. 링크 단위가 위협과 맞다.
+  - 토큰은 그 자체가 열람 권한이라 Redis 에는 **해시만** 남긴다. 원문은 키에도 로그에도 없다.
+  - **같은 링크는 표기를 바꿔도 같은 버킷이다 — 근거가 둘이다.** (1) 해시하는 값은 Spring 이 경로 변수로 읽는
+    토큰(퍼센트 디코딩, `;매개변수` 제거)이라 쿼리·뒤 슬래시·하위 경로·`%61bc` 같은 표기는 같은 키다. plan-service 도
+    같은 디코딩으로 읽는다. (2) 디코딩해도 남는 변형(뒤 공백 `%20` — PAD SPACE 로 같은 행이 열린다)은 형식 검사가
+    malformed 버킷으로 모으고, plan-service 는 **같은 정규식**으로 그 표기를 열지 않는다. 그래서 "해시 버킷을 받는
+    표기 = 일정을 여는 표기" 다.
+  - **로그 마스킹과 토큰을 고르는 방식이 다르다.** 리졸버는 Spring 의 경로 매칭(디코딩한 세그먼트)을 쓰고, 마스킹
+    (`LoggingGlobalApiGatewayFilter`)은 원문 문자열에서 리터럴 `indexOf("/api/v1/shared-plans/")` 로 찾는다. 그래서
+    마스킹은 `/api/v1/shared-%70lans/{token}` 이나 `/api/v1/shared-plans//{token}` 처럼 표기를 바꾼 요청의 토큰을
+    **가리지 못한다**(#627 부터 있던 공백 — 이 이슈 범위 밖이라 남긴다).
+  - **key-prefix 는 키 안에 있지만 키 앞머리가 아니다.** `RedisRateLimiter` 는 `infra.redis.key-prefix` 를 모르고 이
+    id 를 감싸 `request_rate_limiter.{<routeId>.<id>}.tokens|timestamp` 로 쓴다 — 실제 키는
+    `request_rate_limiter.{plan-service-shared-plans.<prefix>:shared-plan:…}.tokens` 다. id 에 접두어를 실어 dev Redis 를
+    함께 쓰는 다른 프로젝트와 겹치지 않게 했지만, **`SCAN <prefix>*` 정리나 접두어 기반 ACL 에는 걸리지 않는다.**
+    키는 TTL(20초)로 스스로 사라진다.
+- **한도는 링크당 replenishRate 2 · burstCapacity 20 · requestedTokens 1** — 세 프로파일 같은 값이고 env 로 빼지
+  않았다. 사람이 링크를 열고 몇 번 새로고침하는 정도는 버스트 20 안에 들어가고, 지속 반복은 초당 2건으로 눌린다.
+  키 TTL 은 SCG 가 `2 × burst / rate` = 20초로 건다.
+- **거부는 429 + 공통 봉투 `GATEWAY_001`** (`api-design-guide.md` §2-2). SCG 기본 `RequestRateLimiter` 는 거부가 빈
+  본문이라 쓰지 않는다. `X-RateLimit-Remaining`·`X-RateLimit-Replenish-Rate`·`X-RateLimit-Burst-Capacity`·
+  `X-RateLimit-Requested-Tokens` 를 허용·거부 양쪽에 싣는다.
+- **Redis 장애 시 통과(fail-open)** — `RedisRateLimiter` 기본 동작 그대로다. 오류를 ERROR 로그
+  (`Error calling rate limiter lua`)로 남기고 허용하며 `X-RateLimit-Remaining: -1` 을 싣는다. 리밋이 잠시 빠지는 것이
+  공유 화면 전체가 Redis 하나에 묶여 막히는 것보다 낫다. 별도 fail-closed 옵션은 두지 않는다. 실제 리미터를 닫힌
+  포트에 붙여 `RateLimitFailOpenTest` 가 고정한다(연결 거부라 로컬 실측 약 0.2초에 통과).
+  - 필터도 같은 쪽이다. 리미터가 오류 신호를 내거나 동기 예외를 던지면(라우트 한도 미설정 등) 통과시키고 WARN 한 줄
+    (`routeId`·키 해시만, 토큰 원문 없음)을 남긴다. 리밋의 고장이 공유 화면 전체의 500 이 되지 않는다.
+- **로그와 알림** — 거부는 **DEBUG** 로만 남긴다. 거부가 쏟아지는 것이 이 기능이 상정한 상황이라 요청마다 WARN 이면
+  로그가 같이 폭주한다. 요청 단위 기록은 `LoggingGlobalApiGatewayFilter` 의 `[오류응답] 상태코드=429` 로 충분하다.
+  반대로 **Redis 장애 때는 라이브러리가 요청마다 ERROR + 스택트레이스를 남긴다** — 공유 트래픽만큼 로그가 쏟아진다.
+  그래서 알림은 로그 건수가 아니라 메트릭으로 건다: 거부율은
+  `spring_cloud_gateway_requests_seconds_count{routeId="plan-service-shared-plans",httpStatusCode="429"}`
+  (SCG 게이트웨이 메트릭, 기본 켜짐), Redis 장애는 Redis 자체 모니터링으로.
+- **배선 주의** — redis-core 의 연결 팩토리 **선언 반환형이 `RedisConnectionFactory`** 라 부트의 리액티브 Redis
+  자동구성이 꺼지고, 연달아 SCG `GatewayRedisAutoConfiguration`(`@ConditionalOnBean(ReactiveRedisTemplate)`)도 꺼져
+  `RedisRateLimiter` 가 생기지 않는다. 게이트웨이가 `ReactiveStringRedisTemplate` 을 직접 올린다
+  (`ApiGatewayRateLimitConfig`). core 의 반환형은 서블릿 서비스들의 자동구성까지 바꾸므로 건드리지 않았다.
+  `RateLimitWiringTest` 가 실제 컨텍스트로 빈·라우트별 한도를 고정한다. 함께 켜지는 SCG 의
+  `reactiveRedisRouteDefinitionTemplate(ReactiveRedisConnectionFactory)`(쓰지 않는 빈)는 core 연결 팩토리 싱글턴이
+  먼저 만들어져 있어야 주입이 풀린다 — 생성 순서에 기대고 있고, 깨지면 기동 실패라 같은 테스트의 컨텍스트 로딩이 잡는다.
+- **`tour-service` 서킷 인스턴스는 나누지 않았다.** 공개 경로와 인증 경로가 부르는 하류는 같은 tour-service 다.
+  공개 쪽 부하가 tour-service 를 실제로 느리게 만들면 인스턴스를 나눠도 인증 경로의 호출은 같이 느려진다 —
+  나눠서 막히는 것은 "공개 쪽 실패 집계가 인증 쪽 서킷을 여는" 경우뿐이다. 증폭의 원천은 리밋이 누른다.
+  **재검토 조건**: 리밋 적용 뒤에도 tour-service 서킷 OPEN 이 공유 링크 트래픽 증가와 함께 관찰될 때,
+  공개 경로가 tour-service 의 다른 API 를 더 부르게 될 때, 한도를 크게 올려야 할 때.
+
 ### 남은 위험 (이 이슈로 닫히지 않는 것)
 
 게이트웨이 로그 마스킹은 **완결된 방어가 아니다.** 아래는 알고 남긴 것들이다.
@@ -404,11 +480,25 @@ CREATE TABLE plan_share_link (
   nginx 가 TLS 를 종료하고 `combined` 포맷의 `$request` 가 전체 경로를 남기므로 **로그 열람권만 있는 사람이
   토큰을 그대로 얻을 수 있다.** 링크 수명 30일이 그 잔여 위험의 상한이다. nginx `log_format` 치환은 인프라
   레포 몫이라 이 PR 밖이다.
-- **[보안 MEDIUM] 공개 경로가 인증 경로와 `tour-service` 서킷 인스턴스를 공유한다.** 공유 링크가 공개적으로
-  퍼지면(이 기능이 기대하는 정상 사용) 크롤러·미리보기 봇의 반복 요청이 tour-service 호출로 증폭되고, 서킷이
-  열리면 **로그인 사용자의 일정 상세에서도 장소 요약이 빈다**(500 은 아니다 — 요약 실패는 삼키는 규칙이다).
-  레이트 리밋이 저장소 전체에 없다. 후속 이슈에서 게이트웨이 `RequestRateLimiter` 를 이 라우트에만 거는 것을
-  먼저 본다 — 짧은 TTL 캐시는 폐기 즉시성을 해치므로 리밋이 먼저다.
+- **[보안 LOW] 링크 단위 리밋이라 링크 하나를 겨냥한 소진은 막지 못한다** (#1244 로 증폭은 눌렀다 — 위 절).
+  링크를 아는 봇이 버킷을 비우면 그 링크는 초당 2건만 열리고, 같은 링크를 연 정상 사용자도 `GATEWAY_001` 429 를
+  받는다. 피해는 그 링크 하나에 갇히고(다른 링크·로그인 경로는 무관) 주인이 링크를 회전(DELETE 후 POST)하면 새 버킷이다.
+  봇이 아니어도 같다 — 단톡방처럼 여럿이 같은 링크를 한꺼번에 열면 상한은 동시 20명 + 초당 2명이다(화면 한 번에
+  백엔드 1회 — 프론트 공유 페이지가 `cache()` 로 메타데이터와 본문 호출을 합친다). 이 상한이 실제로 문제가 되면 한도를
+  올린다. 짧은 TTL 응답 캐시는 폐기 즉시성을 해치므로 두지 않았다.
+- **[보안 LOW] 형식이 맞는 무작위 토큰 플러드는 리밋에 걸리지 않는다.** 형식 위반 요청은 malformed 버킷 하나로
+  모이지만, 43자 형식을 맞춘 무작위 토큰은 토큰마다 버킷이 따로라 매번 새 버킷이다. 그 요청은
+  `uk_plan_share_link_token` 단건 조회 뒤 `PLAN_023` 404 로 끝나 tour-service 로 증폭되지 않는다(싼 404). 출처 단위
+  제한은 앞단 nginx `limit_req` 몫이다(인프라 레포). Redis 에는 그런 토큰마다 키 2개가 20초 TTL 로 생겼다 사라진다.
+- **[운영 LOW] dev/prod Redis 의 `maxmemory-policy` 를 확인해야 한다.** `allkeys-*` 나 `volatile-lru` 면 리밋 키가
+  급증할 때 같은 Redis 의 다른 키(로그아웃 토큰 블랙리스트 등)가 밀려날 수 있다. 형식 위반 요청을 버킷 하나로 모아
+  키 폭증 경로를 줄였지만, 위 형식 맞춘 무작위 플러드는 여전히 키를 만든다. 인프라 레포에서 정책을 확인한다.
+- **검증 공백 — 실제 Redis 에서의 동작은 dev 배포 뒤에 실측한다.** 테스트는 Lua 스크립트를 실행하지 않는다(Redis 를
+  띄우지 않는다). 토큰 버킷 판정, TTL 20초, 키 모양(`request_rate_limiter.{plan-service-shared-plans.<prefix>:shared-plan:…}`)은
+  dev 에서 병렬 요청과 `redis-cli --scan` 으로 확인한다.
+- **[운영 MEDIUM] 운영 중 Redis 가 내려가거나 멈추면 공유 요청이 명령 타임아웃(현재 60초)만큼 매달린 뒤에야 통과한다.**
+  Lettuce 는 연결이 끊기면 재연결을 기다리며 명령을 쌓아 두기 때문이다 — 즉시 fail-open 되는 것은 처음부터 연결이
+  안 되는 경우(연결 거부)뿐이다. redis-core 변경이라 [#1253](https://github.com/8llow8llowMe/hondigagae/issues/1253) 으로 뗐다.
 - **[DB LOW] 보존/정리 정책이 없다.** 행을 지우지 않으므로 만료·미폐기 행이 쌓인다. 현실 규모에서는 무시할
   수준이지만(한 일정당 재발급 주기마다 1행) 정리 배치는 아직 없다. 정리 배치가 생기면 그때 `(expires_at)`
   인덱스가 필요해진다 — **지금 미리 만들지 않는다.**
