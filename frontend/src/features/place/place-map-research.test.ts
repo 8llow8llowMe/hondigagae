@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 /**
  * 장소 찾기 지도 보기의 **재검색 배선** — 이슈 #396 을 이 화면에도 들인 자리.
  *
@@ -100,13 +103,18 @@ describe('버튼은 /emergency 와 같은 컨트롤이다 (#396)', () => {
   )
 
   it('문구·자리가 두 화면에서 같다', () => {
-    expect(button).toContain('messages.map.researchHere')
     expect(button).toContain('map-research-offset')
-    expect(button).toContain('onClick={researchHere}')
+    expect(button).toContain('<ResearchHereButton onClick={researchHere} />')
 
-    // 같은 일을 하는 컨트롤이 화면마다 다르게 생기면 안 된다
-    expect(emergencyMapView).toContain('messages.map.researchHere')
+    // 같은 일을 하는 컨트롤이 화면마다 다르게 생기면 안 된다 — 같은 컴포넌트를 쓴다 (#1278)
+    expect(emergencyMapView).toContain('<ResearchHereButton ')
     expect(emergencyMapView).toContain('map-research-offset')
+    expect(
+      readFileSync(
+        fileURLToPath(new URL('../map/research-here-button.tsx', import.meta.url)),
+        'utf8',
+      ),
+    ).toContain('messages.map.researchHere')
     expect(messages.map.researchHere).toBe('이 지역에서 재검색')
   })
 

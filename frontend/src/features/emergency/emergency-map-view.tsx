@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
-import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from '@/components/icons'
+import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { MAP_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
 import { ViewToggle } from '@/components/view-toggle'
 import { EmergencyFilterBar } from '@/features/emergency/emergency-filter-bar'
@@ -28,6 +28,7 @@ import { PositionFallbackHead } from '@/features/emergency/position-fallback-hea
 import { useEmergencyBoard } from '@/features/emergency/use-emergency-board'
 import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
+import { ResearchHereButton } from '@/features/map/research-here-button'
 import { formatDistance } from '@/lib/format/distance'
 import { type LatLng, SELECTED_FACILITY_MAP_LEVEL, toLatLng } from '@/lib/geo/coord'
 import type { PositionResult } from '@/lib/geo/current-position'
@@ -571,7 +572,7 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
       />
 
       {/*
-        **"이 지역에서 재검색" — 지도 하단 중앙** (#396). 네이버·구글 지도가 쓰는 자리이고
+        **"이 지역에서 재검색" — 데스크톱은 지도 하단 중앙, `lg` 미만은 검색 줄 바로 아래** (#396 · #1278). 네이버·구글 지도가 쓰는 자리이고
         형태다. `/places` 처럼 자동으로 재조회하지 않는 이유는 PR #373 에 있다 — 거리 기준이
         모르는 사이에 바뀌면 안 된다. 재조회 시점을 사용자가 쥐면 그 우려가 "모르는 사이에"
         에서 "누른 뒤에" 로 내려온다.
@@ -580,25 +581,19 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         원형은 사진·아바타 몫이지만, 이것은 **면 위에 떠 있는 오버레이**라 아래 지도의
         사각 격자와 같은 모양이면 지도의 일부로 읽힌다.
 
-        세로 자리는 `.map-research-offset`(globals.css)이 갖는다 — 모바일 시트 최소 단계를
-        피해야 해서 그 계산이 CSS 에 있다.
+        세로 자리는 `.map-research-offset`(globals.css)이 갖는다 — 모바일은 시트에 가려지지 않게
+        위에 둔다(#1278).
       */}
       {offerResearch && bounds !== null && (
         <div
           className={cn(
-            'map-research-offset absolute inset-x-0 z-30 flex justify-center px-4',
+            // 데스크톱만 — `lg` 미만은 상단 컨트롤 묶음 맨 아래(위치 안내 아래)에 선다 (#1278)
+            'map-research-offset absolute inset-x-0 z-30 hidden justify-center px-4 lg:flex',
             // 남은 지도의 가운데 — 도킹 패널(400)이 왼쪽을 덮는다. 접히면 0 (#1232 D10)
             panelOpen && 'lg:left-100',
           )}
         >
-          <button
-            type="button"
-            onClick={() => board.researchAt(boundsCenter(bounds))}
-            className="text-body-2 bg-bg text-fg border-border hover:bg-band focus-visible:ring-brand-500 inline-flex h-11 max-w-full items-center gap-2 rounded-full border px-5 font-semibold whitespace-nowrap shadow-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
-          >
-            <SearchIcon size={16} />
-            {messages.map.researchHere}
-          </button>
+          <ResearchHereButton onClick={() => board.researchAt(boundsCenter(bounds))} />
         </div>
       )}
 
@@ -658,6 +653,16 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
             <div className="bg-bg border-border pointer-events-auto max-w-md rounded-lg border px-3 py-2 shadow-md">
               <PositionNotice reason={board.fallback} onRetry={board.locate} />
             </div>
+          </div>
+        )}
+
+        {/*
+          **`lg` 미만의 재검색은 묶음 맨 아래 — 위치 안내보다도 아래다** (#1278). 고정 좌표로 두면 이 안내와
+          겹쳤다(실측). 하단에 두면 시트 중간 · 최대 단계에 가려졌다.
+        */}
+        {offerResearch && bounds !== null && (
+          <div className="flex justify-center px-4 pt-2 lg:hidden">
+            <ResearchHereButton onClick={() => board.researchAt(boundsCenter(bounds))} />
           </div>
         )}
       </div>
