@@ -2,6 +2,7 @@ import { expect, type Page, test } from '@playwright/test'
 
 import { messages } from '../src/lib/messages'
 import { VIEWPORTS } from './helpers/layout'
+import { mapFallbackReady } from './helpers/map-fallback'
 
 /**
  * 돌아가기가 제목 줄로 들어간다 — 이슈 #539.
@@ -43,6 +44,12 @@ const SCREENS = [
     path: `/plans/${PLAN}/days/1/add`,
     label: messages.plan.addPlaceBack,
     title: 'h1',
+    /*
+      지도 갈래다 — e2e 에는 카카오 키가 없어 하이드레이션 뒤 **SDK 실패 폴백으로 갈아끼운다**.
+      교체 전에 재면 떨어져 나갈 머리를 잰다(`mapFallbackReady` 머리주석). #1232 부터 지도 갈래가 머리를
+      두 벌(떠 있는 기둥 · 도킹 패널) 그려 교체가 더 크고, CI 에서 null 상자 · 14px 어긋남으로 떨어졌다.
+    */
+    mapFallback: true,
   },
   {
     name: 'emergency',
@@ -88,16 +95,18 @@ async function open(
   path: string,
   size: (typeof VIEWPORTS)[keyof typeof VIEWPORTS],
   titleSelector: string,
+  mapFallback = false,
 ): Promise<void> {
   await page.setViewportSize(size)
   await page.goto(path)
+  if (mapFallback) await mapFallbackReady(page)
   await page.locator(titleSelector).first().waitFor()
 }
 
 for (const screen of SCREENS) {
   test.describe(`돌아가기 — 제목 줄 · ${screen.name} (#539)`, () => {
     test('모바일에서 제목 왼쪽, 같은 줄에 선다', async ({ page }) => {
-      await open(page, screen.path, VIEWPORTS.mobile, screen.title)
+      await open(page, screen.path, VIEWPORTS.mobile, screen.title, 'mapFallback' in screen)
       const { back, title } = await boxes(page, screen.label, screen.title)
 
       expect(overlapsVertically(back, title)).toBe(true)
@@ -110,7 +119,7 @@ for (const screen of SCREENS) {
       44px 를 내는지 유닛은 알지 못한다.
     */
     test('모바일 터치 영역이 44x44 이상이다', async ({ page }) => {
-      await open(page, screen.path, VIEWPORTS.mobile, screen.title)
+      await open(page, screen.path, VIEWPORTS.mobile, screen.title, 'mapFallback' in screen)
       const { back } = await boxes(page, screen.label, screen.title)
 
       expect(back.width).toBeGreaterThanOrEqual(44)
@@ -124,7 +133,7 @@ for (const screen of SCREENS) {
       arbitrary value 룰이 막는다.
     */
     test('모바일에서 아이콘 중심이 제목 첫 줄 중심에 선다', async ({ page }) => {
-      await open(page, screen.path, VIEWPORTS.mobile, screen.title)
+      await open(page, screen.path, VIEWPORTS.mobile, screen.title, 'mapFallback' in screen)
       const { back } = await boxes(page, screen.label, screen.title)
 
       // 제목의 **첫 줄** 중심 — 두 줄이 되어도 첫 줄 기준이어야 한다
@@ -145,7 +154,7 @@ for (const screen of SCREENS) {
     for (const size of ['tablet', 'desktop'] as const) {
       /** **데스크톱은 지금 그대로다.** #539 가 바꾸기로 한 것은 모바일뿐이다. */
       test(`${size} 에서는 제목 위에 선다 — 텍스트 링크 그대로`, async ({ page }) => {
-        await open(page, screen.path, VIEWPORTS[size], screen.title)
+        await open(page, screen.path, VIEWPORTS[size], screen.title, 'mapFallback' in screen)
         const { back, title } = await boxes(page, screen.label, screen.title)
 
         expect(overlapsVertically(back, title)).toBe(false)
@@ -161,7 +170,7 @@ for (const screen of SCREENS) {
       test(`${size} 에서 링크 상자가 글자 폭에 머문다 — 빈 곳을 눌러 뒤로 가지 않는다`, async ({
         page,
       }) => {
-        await open(page, screen.path, VIEWPORTS[size], screen.title)
+        await open(page, screen.path, VIEWPORTS[size], screen.title, 'mapFallback' in screen)
         const { back, title } = await boxes(page, screen.label, screen.title)
 
         expect(back.width).toBeLessThan(title.width)
@@ -176,7 +185,7 @@ for (const screen of SCREENS) {
     */
     for (const size of ['mobile', 'tablet', 'desktop'] as const) {
       test(`${size} 에서 접근성 이름이 같다`, async ({ page }) => {
-        await open(page, screen.path, VIEWPORTS[size], screen.title)
+        await open(page, screen.path, VIEWPORTS[size], screen.title, 'mapFallback' in screen)
 
         /*
           **`.first()` 가 필요하다.** `regenerate` 는 차단 상태에서 헤더 뒤로가기와 본문
