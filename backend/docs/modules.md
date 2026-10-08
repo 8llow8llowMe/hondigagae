@@ -159,6 +159,10 @@ Duration 을 적는다. 지금 적은 곳은 **api-gateway 뿐**이다(`1s` · `
     돈다** (#1253). 전에는 Netty 이벤트 루프 위에서 불러, Redis 가 먹통인 동안 그 루프의 다른 요청(공개 API 포함)까지 최대
     60초 멈췄다. Redis 를 읽지 못하면 연결 실패든 명령 타임아웃(`infra.redis.command-timeout: 1s`)이든 같은 규칙이다 —
     기본 fail-closed 503 `SECURITY_008`, `jwt.blacklist-fail-open` 이면 통과. 전에는 명령 타임아웃이 500 으로 샜다
+  - 인증 스킴은 **대소문자를 가리지 않고** 읽는다 (#1261, RFC 7235). 하류 resource server(`DefaultBearerTokenResolver`)가
+    `bearer` · `BEARER` 도 인증하므로 게이트웨이만 가리면 소문자 스킴 토큰을 "토큰 없음" 으로 보고 블랙리스트 확인을
+    건너뛰어, 로그아웃한 토큰이 남은 수명 동안 통했다. 두 쪽 해석이 같은지는 `JwtAuthApiGatewayFilterTest` 가 하류
+    정규식을 옮겨 잠근다 — 의존성을 올리면 그 정규식과 다시 대조한다
 - CORS 공통 처리
 - **레이트 리밋** — 공유 링크 공개 라우트(`plan-service-shared-plans`)에만 `SharedPlanRateLimit` 필터를 건다 (#1244).
   공유 토큰 전용이라 다른 라우트에 걸면 판정 없이 통과한다. 키는 공유 토큰의 SHA-256 해시(링크 단위, 발급 형식이
