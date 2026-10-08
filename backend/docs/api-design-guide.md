@@ -102,6 +102,24 @@
 **토큰이 없는 요청은 거부하지 않는다.** 게이트웨이는 그대로 통과시키고 인증 판정은 서비스가
 한다 — 공개 API(`/places` 등)가 미로그인으로도 200 이어야 하기 때문이다.
 
+**레이트 리밋 거부도 같은 봉투다** (이슈 [#1244](https://github.com/8llow8llowMe/hondigagae/issues/1244)). 지금은 공유 링크
+공개 경로(`GET /api/v1/shared-plans/{token}`)에만 걸려 있고, 한도를 넘으면 `429` + `GATEWAY_001` 이다.
+
+- **게이트웨이 고유 사유는 `GATEWAY_00x` 다** (`GatewayErrorCode`). 서비스에 대응이 없는 사유라 `SECURITY_00x` 사본인
+  `JwtErrorCode` 에 섞지 않는다.
+- **SCG 기본 `RequestRateLimiter` 를 쓰지 않는다.** 거부를 **빈 본문**의 429 로 끝내 봉투 계약을 깬다. 판정은 같은
+  `RedisRateLimiter` 에 맡기고 거부 응답만 봉투로 쓰는 `SharedPlanRateLimit` 필터(`SharedPlanRateLimitGatewayFilterFactory`)를
+  건다 — `RateLimitRouteCoverageTest` 가 세 프로파일에서 기본 필터가 없음을 고정한다. 이 필터는 공유 토큰 전용 키
+  리졸버에 묶여 있어 **다른 라우트에 걸면 판정 없이 통과한다** — 다른 경로의 리밋은 별도 리졸버·팩토리로 만든다.
+- 허용·거부 모두 `X-RateLimit-Remaining`·`X-RateLimit-Replenish-Rate`·`X-RateLimit-Burst-Capacity`·`X-RateLimit-Requested-Tokens`
+  헤더를 싣는다. Redis 장애로 판정을 못 하면 통과시키고 `X-RateLimit-Remaining` 이 `-1` 이다.
+
+```json
+// 공유 링크 하나에 요청이 몰려 게이트웨이가 거부한 응답
+{"dataHeader":{"success":false,"resultCode":"GATEWAY_001",
+  "resultMessage":"요청이 너무 많습니다. 잠시 후 다시 시도해주세요.","fieldErrors":null},"dataBody":null}
+```
+
 ## 3. Controller 스타일
 
 - 다른 레이어를 직접 호출하지 않고 `WebUseCase`만 호출한다.

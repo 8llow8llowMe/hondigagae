@@ -137,6 +137,12 @@ yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 �
   컨트롤러가 새 접두어를 열면 셋 다 고쳐야 하며, `GatewayRouteCoverageTest` 가 컨트롤러 `@RequestMapping` 접두어 ⊆ 라우트를 검사한다
 - JWT 유효성 1차 검증 (서비스 내부 인가는 각 서비스)
 - CORS 공통 처리
+- **레이트 리밋** — 공유 링크 공개 라우트(`plan-service-shared-plans`)에만 `SharedPlanRateLimit` 필터를 건다 (#1244).
+  공유 토큰 전용이라 다른 라우트에 걸면 판정 없이 통과한다. 키는 공유 토큰의 SHA-256 해시(링크 단위, 발급 형식이
+  아닌 토큰은 고정 키 하나), 한도는 링크당 초당 2 · 버스트 20, 거부는 429 + `GATEWAY_001` 봉투, Redis 장애 시 통과(fail-open). 판정은 SCG `RedisRateLimiter` 이고, 그 자동구성이 서도록 게이트웨이가
+  `ReactiveStringRedisTemplate` 을 직접 올린다 — redis-core 의 연결 팩토리 선언 반환형이 `RedisConnectionFactory` 라
+  리액티브 자동구성이 저절로 켜지지 않는다(`ApiGatewayRateLimitConfig`). 근거·잔여 위험은 `services/plan-service.md`
+  "공개 경로 레이트 리밋"
 
 ---
 

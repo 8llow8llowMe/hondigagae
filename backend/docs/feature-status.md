@@ -13,7 +13,7 @@
 | plan-service | `plan` | 구현 (날씨 브리핑·후기 v1 포함) |
 | ai-service | `planner` | 구현 (Spring AI + 로컬 LLM(Ollama), 기본값은 스텁) |
 | batch-service | `placeimport`, `congestionimport` | 구현 |
-| api-gateway / service-discovery | — | 구현 |
+| api-gateway / service-discovery | — | 구현 (공유 링크 공개 경로 레이트 리밋 포함, #1244) |
 
 ## 구현된 API
 
@@ -67,6 +67,7 @@
 | PUT | `/api/v1/plans/{planId}/items/{planItemId}/visited` | 항목 방문 체크 (다녀옴) |
 | GET | `/api/v1/plans/{planId}/emergency` | 일자별 방문 장소 주변 동물병원·약국 브리핑 |
 | GET·POST·PUT | `/api/v1/plans/{planId}/reviews` | 완료된 일정당 후기 하나. 전체 만족도 + 방문 장소별 한 줄. 사진·공개 없음 |
+| GET | `/api/v1/shared-plans/{token}` | 공유 링크로 일정 열기 (**비인증**). 게이트웨이가 링크(토큰 해시)당 초당 2 · 버스트 20 으로 제한 — 넘으면 429 `GATEWAY_001`, Redis 장애 시 통과 (#1244) |
 
 일정의 소유권은 이 서비스에 있다. ai-service 는 제안만 하고 저장·확정은 여기서만 일어난다.
 
