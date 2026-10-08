@@ -164,18 +164,8 @@ String resolveAffectedScope(Map<String, String> config, List<String> changedFile
         return 'none'
     }
 
-    String servicePrefix = "${config.fsPath}/"
-    // 파이프라인 정의 변경은 '이 잡의' 파일에만 반응한다.
-    // 'Jenkinsfile' 프리픽스 하나로 두면 백엔드 파이프라인 파일 변경에도 프론트 잡이 CI 를 돌게 된다.
-    List<String> pipelinePrefixes = [
-        'Jenkinsfile.frontend-common.groovy',
-        "Jenkinsfile-frontend-${config.serviceName}".toString()
-    ]
-
-    List<String> ownMatched = changedFiles.findAll { path -> path.startsWith(servicePrefix) }
-    List<String> pipelineMatched = changedFiles.findAll { path ->
-        pipelinePrefixes.any { prefix -> path.startsWith(prefix) }
-    }
+    List<String> ownMatched = changedFiles.findAll { path -> isOwnScopePath(config, path) }
+    List<String> pipelineMatched = changedFiles.findAll { path -> isPipelineScopePath(config, path) }
 
     if (ownMatched) {
         echo "이 서비스에 영향 있는 변경 ${ownMatched.size()}건: ${ownMatched.take(10).join(', ')}${ownMatched.size() > 10 ? ' ...' : ''}"
@@ -188,6 +178,23 @@ String resolveAffectedScope(Map<String, String> config, List<String> changedFile
 
     echo "변경 파일 ${changedFiles.size()}건 중 ${config.serviceName} 관련 변경이 없어 빌드/배포를 건너뜁니다."
     return 'none'
+}
+
+// frontend/ 하위(실제 코드)인가.
+// 변경 감지(resolveAffectedScope)와 머지 빌드의 라벨 수집(resolveScopedCommitsSincePreviousSuccess)이
+// 같은 판단을 써야 둘이 어긋나지 않습니다.
+boolean isOwnScopePath(Map<String, String> config, String path) {
+    return path.startsWith("${config.fsPath}/".toString())
+}
+
+// 이 잡의 파이프라인 정의 파일인가.
+// 'Jenkinsfile' 프리픽스 하나로 두면 백엔드 파이프라인 파일 변경에도 프론트 잡이 CI 를 돌게 된다.
+boolean isPipelineScopePath(Map<String, String> config, String path) {
+    List<String> pipelinePrefixes = [
+        'Jenkinsfile.frontend-common.groovy',
+        "Jenkinsfile-frontend-${config.serviceName}".toString()
+    ]
+    return pipelinePrefixes.any { prefix -> path.startsWith(prefix) }
 }
 
 // origin remote URL에서 GitHub owner/repo 슬러그를 뽑아냅니다. 판단 불가 시 빈 문자열을 반환합니다.
@@ -299,6 +306,113 @@ Map<String, Object> resolveDeployLabelContext(Map<String, String> ctx) {
         echo "PR 라벨 조회에 실패했습니다: ${e.message}"
         return [resolved: 'false', reason: 'API_ERROR', labels: []]
     }
+}
+
+// 머지 빌드의 배포 라벨을 모읍니다 (#1269).
+//
+// HEAD 커밋에 연결된 PR 하나만 보면 연달아 머지한 앞 PR 의 라벨을 놓칩니다. 같은 브랜치의 대기 빌드는
+// 하나로 합쳐져 마지막 커밋에서만 돌고, 그 PR 에 이 서비스 라벨이 없으면 "라벨 미지정 - 생략" 으로 끝납니다.
+// 생략도 성공 빌드라 이전 성공 커밋이 앞으로 당겨져, 앞 PR 의 변경은 다음 빌드의 변경 목록에서도 빠집니다.
+// 실제 사고: #1258(ai-service) 10초 뒤 #1259 를, #1262(ai-service) 12초 뒤 #1263 을 머지해 ai-service 가
+// 두 번 다 배포되지 않았습니다.
+//
+// 그래서 이전 성공 커밋 이후 이 잡의 범위에 닿은 커밋마다, 이 브랜치로 머지된 PR 을 찾아 라벨을 합칩니다.
+// 라벨의 뜻은 그대로입니다 — 범위에 닿은 어느 PR 도 이 서비스 라벨을 달지 않았으면 배포하지 않습니다.
+// 범위 커밋을 잡지 못하면(첫 빌드, 이전 성공 커밋 유실 등) 전처럼 HEAD 커밋의 PR 로 판단합니다.
+Map<String, Object> resolveMergedDeployLabelContext(Map<String, String> config, Map<String, String> ctx) {
+    List<String> commits = resolveScopedCommitsSincePreviousSuccess(config)
+    if (!commits) {
+        return resolveDeployLabelContext(ctx)
+    }
+
+    String credentialId = params.GITHUB_APP_CREDENTIAL_ID?.trim()
+    if (!credentialId) {
+        return [resolved: 'false', reason: 'NO_CREDENTIAL', labels: []]
+    }
+
+    try {
+        String slug = resolveRepositorySlug()
+        if (!slug) {
+            return [resolved: 'false', reason: 'NO_REPOSITORY_SLUG', labels: []]
+        }
+
+        String baseBranch = ctx.effectiveTargetBranch ?: env.BRANCH_NAME
+        List<String> labels = []
+        List<String> seenPullRequests = []
+        for (String sha : commits) {
+            def associated = readJSON text: githubApiGet("repos/${slug}/commits/${sha}/pulls", credentialId)
+            // 이 브랜치로 머지된 PR 만 셉니다. 열린 PR 이나 다른 브랜치로 간 PR 의 라벨은 이 배포를 정한 적이 없습니다.
+            // JSON null 은 JSONNull 객체라 참·거짓으로 가르지 않고 문자열로 비교합니다.
+            def merged = null
+            associated?.each { candidate ->
+                String mergedAt = candidate?.merged_at?.toString()
+                if (merged == null && mergedAt && mergedAt != 'null' && candidate?.base?.ref?.toString() == baseBranch) {
+                    merged = candidate
+                }
+            }
+            if (merged == null) {
+                echo "커밋 ${sha.take(8)}에 ${baseBranch}로 머지된 PR이 없습니다. (직접 push 이거나 열린 PR)"
+                continue
+            }
+
+            String number = merged.number.toString()
+            if (seenPullRequests.contains(number)) {
+                continue
+            }
+            seenPullRequests.add(number)
+
+            List<String> prLabels = []
+            merged.labels?.each { label ->
+                String name = label?.name?.toString()
+                if (name) {
+                    prLabels.add(name)
+                    if (!labels.contains(name)) {
+                        labels.add(name)
+                    }
+                }
+            }
+            echo "PR #${number} 라벨: ${prLabels ? prLabels.join(', ') : '없음'} (커밋 ${sha.take(8)})"
+        }
+
+        echo "이전 성공 빌드 이후 이 서비스에 닿은 PR ${seenPullRequests.size()}건의 라벨: ${labels ? labels.join(', ') : '없음'}"
+        return [resolved: 'true', reason: '', labels: labels]
+    } catch (Exception e) {
+        echo "PR 라벨 조회에 실패했습니다: ${e.message}"
+        return [resolved: 'false', reason: 'API_ERROR', labels: []]
+    }
+}
+
+// 이전 성공 빌드 이후 이 잡의 범위(자기 경로 · 공용 코드 · 자기 파이프라인 파일)에 닿은 커밋을 최신순으로 돌려줍니다.
+// 판단할 수 없으면 빈 목록입니다. GitHub API 호출 수를 묶으려고 최근 30개까지만 봅니다.
+List<String> resolveScopedCommitsSincePreviousSuccess(Map<String, String> config) {
+    String previous = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT?.trim()
+    if (!previous) {
+        return []
+    }
+    if (sh(returnStatus: true, script: "git cat-file -e ${previous}^{commit}") != 0) {
+        echo "이전 성공 커밋(${previous})을 찾을 수 없어 HEAD 커밋의 PR 라벨로 판단합니다."
+        return []
+    }
+
+    // 커밋 줄은 '@@' 로 시작해 파일 경로 줄과 가릅니다.
+    String output = sh(returnStdout: true, script: "git log --format=@@%H --name-only ${previous}..HEAD").trim()
+    List<String> commits = []
+    String current = ''
+    for (String line : output.split('\n')) {
+        String path = line.trim()
+        if (path.startsWith('@@')) {
+            current = path.substring(2)
+        } else if (path && current && !commits.contains(current)
+            && (isOwnScopePath(config, path) || isPipelineScopePath(config, path))) {
+            commits.add(current)
+        }
+    }
+
+    if (commits.size() > 30) {
+        echo "이 서비스에 닿은 커밋 ${commits.size()}건 중 최근 30건의 PR 라벨만 봅니다."
+        return commits.take(30)
+    }
+    return commits
 }
 
 // 라벨을 기준으로 이 서비스를 배포할지 판단합니다.
@@ -645,7 +759,7 @@ void run(Map<String, Object> config) {
                     ctx.serviceAffected = 'true'
                     ctx.deployLabelAllowed = 'true'
                 } else if (ctx.deployEnv in ['dev', 'prod'] && ctx.serviceAffected == 'true' && ctx.isPullRequest != 'true') {
-                    Map<String, Object> labelContext = resolveDeployLabelContext(ctx)
+                    Map<String, Object> labelContext = resolveMergedDeployLabelContext(config, ctx)
                     ctx.deployLabelAllowed = isServiceDeployAllowedByLabels(config, labelContext) ? 'true' : 'false'
                 } else {
                     // PR 빌드와 배포 대상이 아닌 브랜치는 어차피 배포하지 않으므로 라벨을 조회하지 않습니다.
