@@ -65,6 +65,41 @@ describe('ThumbnailTile — 크기 기준', () => {
   })
 })
 
+/*
+  #1276 — 장소 행의 원본은 3:2(`firstImage2` 150×100 · `firstImage` 940×627)라 정사각 96 은 가로 1/3 을
+  잘랐다. 넓은 칸에서만 144×96 으로 넓힌다 — 좁은 칸(80)은 제목 폭이 먼저라 정사각 그대로다.
+*/
+describe('ThumbnailTile — 넓은 칸 모양 (#1276)', () => {
+  it('기본은 넓어져도 정사각이다 (일정 · 즐겨찾기 행)', () => {
+    const cls = tileClass(render({ sizeBasis: 'container' }))
+
+    expect(cls).toContain('@lg:size-24')
+    expect(cls).not.toContain('@lg:w-36')
+  })
+
+  it('landscape 면 넓은 칸에서 3:2(144×96)이고 좁은 칸은 80 정사각 그대로다', () => {
+    const cls = tileClass(render({ sizeBasis: 'container', wideShape: 'landscape' }))
+
+    expect(cls).toContain('size-20')
+    expect(cls).toContain('@lg:h-24')
+    expect(cls).toContain('@lg:w-36')
+    expect(cls).not.toContain('@lg:size-24')
+  })
+
+  it('뷰포트 기준도 같은 규칙이다', () => {
+    const cls = tileClass(render({ wideShape: 'landscape' }))
+
+    expect(cls).toMatch(/(^| )lg:h-24( |$)/)
+    expect(cls).toMatch(/(^| )lg:w-36( |$)/)
+  })
+
+  it('사진 sizes 가 넓은 칸 폭(144)을 말한다', () => {
+    const html = render({ src: '/a.jpg', sizeBasis: 'container', wideShape: 'landscape' })
+
+    expect(html).toContain('144px')
+  })
+})
+
 describe('ThumbnailTile — 순번 칩 (#856)', () => {
   function chip(html: string) {
     return /<span aria-hidden="true" class="([^"]*)">3<\/span>/.exec(html)?.[1] ?? ''

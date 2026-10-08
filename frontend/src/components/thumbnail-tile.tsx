@@ -26,6 +26,12 @@ export type ThumbnailTileProps = {
    * 좁은 자리에 같은 행이 들어간다 (`place-row.tsx` · `@lg`). 나머지는 화면 기준이다.
    */
   sizeBasis?: 'viewport' | 'container'
+  /**
+   * 넓은 칸의 모양 (#1276). `square`(기본) = 96 정사각, `landscape` = 144×96(3:2). **좁은 칸(80)은
+   * 언제나 정사각이다** — 그 자리는 제목 폭이 먼저다. 장소 행만 `landscape` 다: 원본이 3:2
+   * (`firstImage2` 150×100 · `firstImage` 940×627)라 정사각 96 은 가로 1/3 을 잘랐다.
+   */
+  wideShape?: 'square' | 'landscape'
   /** 타일 전체를 뒤로 물린다 — 다녀온 항목(`plan-item-row.tsx`). 칩까지 함께 물러난다 */
   dimmed?: boolean
   /** 첫 화면 행이면 사진을 바로 받는다 (`lib/image/loading.ts`, #1132). 기본은 지연 로드 */
@@ -33,7 +39,19 @@ export type ThumbnailTileProps = {
 }
 
 /**
- * 목록 행의 썸네일 타일 — 80px, 넓으면 96px (#1151).
+ * 넓은 칸 크기 클래스 — `기준 × 모양`. **문자열 그대로 둔다** — Tailwind 가 소스에서 찾아 생성한다.
+ * `component-guide.md` §11 의 `Record<Union, string>` 맵이다.
+ */
+const WIDE_CLASS: Record<'viewport' | 'container', Record<'square' | 'landscape', string>> = {
+  viewport: { square: 'lg:size-24', landscape: 'lg:h-24 lg:w-36' },
+  container: { square: '@lg:size-24', landscape: '@lg:h-24 @lg:w-36' },
+}
+
+/** 넓은 칸의 사진 폭 — `sizes` 가 실제 표시 폭을 말해야 한다 */
+const WIDE_PX: Record<'square' | 'landscape', number> = { square: 96, landscape: 144 }
+
+/**
+ * 목록 행의 썸네일 타일 — 80px, 넓으면 96px(정사각) 또는 144×96(3:2, #1276) (#1151).
  *
  * **다섯 행이 손으로 복제하던 것을 하나로 모았다** — 장소 · 즐겨찾기 · 일정 상세 · 공유 일정 ·
  * AI 초안. 복제는 이미 어긋나 있었다: 공유 일정 행은 #842(유형 일러스트)와 #856(흰 원형 칩)을
@@ -55,6 +73,7 @@ export function ThumbnailTile({
   emptyLabel,
   ordinal,
   sizeBasis = 'viewport',
+  wideShape = 'square',
   dimmed = false,
   priority = false,
 }: ThumbnailTileProps) {
@@ -62,8 +81,7 @@ export function ThumbnailTile({
     <div
       className={cn(
         'bg-band relative size-20 shrink-0 overflow-hidden rounded-md',
-        // 두 클래스를 문자열 그대로 둔다 — Tailwind 가 소스에서 찾아 생성한다
-        sizeBasis === 'container' ? '@lg:size-24' : 'lg:size-24',
+        WIDE_CLASS[sizeBasis][wideShape],
         // 이것만으로 전달하지 않는다 — 호출부가 배지 · 낱말로 같은 사실을 말한다 (DESIGN.md §7)
         dimmed && 'opacity-60',
       )}
@@ -73,7 +91,7 @@ export function ThumbnailTile({
           src={src}
           alt=""
           fill
-          sizes="(min-width: 1024px) 96px, 80px"
+          sizes={`(min-width: 1024px) ${WIDE_PX[wideShape]}px, 80px`}
           className="object-cover"
           {...imageLoadingProps(priority)}
         />

@@ -23,7 +23,7 @@ import type { PlaceSummary } from '@/types/place'
  * 값이 하나로 고정될 수 없다. 기본값을 `card` 로 두는 것은 3a 가 정본이기 때문이고,
  * 카드 밖 사용처가 스스로 밝히게 한다.
  *
- * 썸네일 80(모바일) / 96(데스크톱) · radius 8. **사진이 null 이어도 같은
+ * 썸네일 80 정사각(좁은 칸) / 144×96 3:2(넓은 칸, #1276) · radius 8. **사진이 null 이어도 같은
  * 크기의 "이미지 없음" 타일을 남긴다** — 행 높이가 흔들리면 목록을 훑을 수 없다.
  * (장소 상세의 `PhotoGallery` 는 반대다. 0장이면 섹션을 아예 렌더하지 않는다.)
  *
@@ -64,7 +64,7 @@ export function PlaceRow({
  *
  * 지도 좌측 패널은 데스크톱이지만 폭이 400px 이다. 뷰포트 breakpoint(`lg:`)는 그 칸 폭을 모른다 —
  * 그렇게 두었을 때 우측 배지 열이 서서 제목이 한 글자로 잘렸다(#240, 실측 `테…`). 그래서 썸네일
- * 크기 · 간격(`@lg:size-24` · `@lg:gap-5`)은 소비처가 연 `@container` 기준이다.
+ * 크기 · 간격(`@lg:w-36 @lg:h-24` · `@lg:gap-5`)은 소비처가 연 `@container` 기준이다.
  *
  * **우측 배지 열은 #1267 에서 걷었다.** 칩이 동반 판정 하나라 따로 열을 둘 까닭이 없어졌다 — 그
  * 열(#553 의 `@xl` · 176)이 1024 1열 목록에서 제목 폭을 262 로 묶고 있었다.
@@ -126,6 +126,8 @@ export function PlaceRowContent({
         illustration={illustration}
         emptyLabel={messages.place.noImage}
         sizeBasis="container"
+        // 넓은 칸은 3:2 — 원본 비율이다. 좁은 칸(지도 패널 · 모바일)은 80 정사각 그대로 (#1276)
+        wideShape="landscape"
         priority={priority}
       />
 
