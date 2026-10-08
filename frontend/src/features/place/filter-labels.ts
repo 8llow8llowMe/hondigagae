@@ -1,3 +1,4 @@
+import { CAFE_SOURCE_CATEGORY, isCafePlace } from '@/lib/place/cafe'
 import type { ContentTypeCode, PetAllowanceCode, PlaceFilters } from '@/types/place'
 
 /**
@@ -60,8 +61,6 @@ export const CONTENT_TYPE_FILTER_ORDER = [
  */
 export type PlaceKind = ContentTypeCode | 'CAFE'
 
-const CAFE_SOURCE_CATEGORY = '카페'
-
 /** 화면 순서 — 유형 순서 그대로에 카페를 **음식점 바로 뒤**에 끼운다 (먹을 곳 묶음) */
 export const PLACE_KIND_FILTER_ORDER: readonly PlaceKind[] = CONTENT_TYPE_FILTER_ORDER.flatMap(
   (code): PlaceKind[] => (code === 'RESTAURANT' ? [code, 'CAFE'] : [code]),
@@ -87,9 +86,8 @@ export function placeTypeLabel(place: {
   contentType: { code: string; name: string }
   sourceCategory: string | null
 }): string {
-  if (place.contentType.code === 'RESTAURANT' && place.sourceCategory === CAFE_SOURCE_CATEGORY) {
-    return place.sourceCategory
-  }
+  // 판정은 `isCafePlace` 하나 — 지도 핀 아이콘(#1280)과 갈리지 않게
+  if (isCafePlace(place) && place.sourceCategory !== null) return place.sourceCategory
   return place.contentType.name
 }
 
