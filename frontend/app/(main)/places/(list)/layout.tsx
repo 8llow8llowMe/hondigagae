@@ -1,4 +1,4 @@
-import { type ReactNode,Suspense } from 'react'
+import { type ReactNode, Suspense } from 'react'
 
 import { RememberPlacesHref } from '@/features/place/remember-places-href'
 
