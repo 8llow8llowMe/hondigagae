@@ -39,6 +39,10 @@ spring:
 
 `health`, `info`, `prometheus` 만 연다. 나머지 actuator endpoint 는 노출하지 않는다.
 
+로그는 Boot 기본 콘솔 출력 하나다(파일 로그 설정 없음). **api-gateway 만 `logback-spring.xml` 을 두고** 콘솔 출력 단계에서
+공유 링크 토큰을 가린다 — Boot 기본 패턴 그대로에 메시지·스택트레이스만 변환기로 감쌌다 (#1281, `services/plan-service.md`).
+그래서 게이트웨이에서는 `logging.pattern.console`·`logging.file.name` 이 먹지 않는다.
+
 ## Prometheus target 등록
 
 공유 인프라의 `monitoring/prometheus/targets/` 에 파일을 추가한다.
