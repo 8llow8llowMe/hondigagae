@@ -21,8 +21,8 @@ export type MapPinIcon =
   | 'pin'
 
 const PATHS: Record<MapPinIcon, string> = {
-  // 산 두 봉우리
-  landscape: '<path d="M3 19l6-9 4 5 2-3 6 7z"/>',
+  // 산 두 봉우리 — 세로 8–17 로 격자 가운데에 앉힌다(10–19 는 원 안에서 아래로 처져 보였다)
+  landscape: '<path d="M3 17l6-9 4 5 2-3 6 7z"/>',
   // 수저
   utensils: '<path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M16 3c-1.7 0-3 2-3 5s1.3 4 3 4v9"/>',
   // 커피잔
@@ -34,9 +34,9 @@ const PATHS: Record<MapPinIcon, string> = {
   museum: '<path d="M3 9l9-5 9 5M5 9v9M9.5 9v9M14.5 9v9M19 9v9M3 20h18"/>',
   // 깃발
   flag: '<path d="M6 21V4M6 4h11l-2 4 2 4H6"/>',
-  // 발자국 두 개
+  // 신발 자국 두 개 — 발바닥 + 뒤꿈치. 타원 둘이면 14px 에서 `0 0` 으로 읽혔다(#1280 실측)
   footprints:
-    '<path d="M8 13c-1.7 0-3-1.8-3-4.5S6.3 4 8 4s3 1.8 3 4.5S9.7 13 8 13zM6.5 16h3M16 20c-1.7 0-3-1.8-3-4.5S14.3 11 16 11s3 1.8 3 4.5S17.7 20 16 20z"/>',
+    '<path d="M7 2c2 0 3.5 2 3.5 4.5S9 10 9 12H5c0-2-1.5-3-1.5-5.5S5 2 7 2zM5 14.5h4a2 2 0 0 1-4 0zM17 7c2 0 3.5 2 3.5 4.5S19 15 19 17h-4c0-2-1.5-3-1.5-5.5S15 7 17 7zM15 19.5h4a2 2 0 0 1-4 0z"/>',
   // 자전거
   bike: '<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l4-7h5l3 7M10 9l3 7M9 6h3"/>',
   // 쇼핑백
