@@ -27,7 +27,7 @@ import { messages } from '@/lib/messages'
  * `LoginFormFields` 와 같은 자리다.
  *
  * **단계 표시는 여기 없다** (#1083). 제목 바로 아래 — 화면 단위 동의 블록보다 위 — 에
- * 서야 해서 `SignupHeading`(`signup-parts.tsx`)이 그린다.
+ * 서야 해서 `SignupStepHeading`(`signup-parts.tsx`)이 그린다.
  */
 
 export type EmailStepProps = {

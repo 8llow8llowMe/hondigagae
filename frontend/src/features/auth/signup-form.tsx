@@ -583,9 +583,17 @@ export function SignupForm({
     />
   )
 
-  /** 2 · 3단계의 `←` — 이메일부터 다시. 코드 · 쿨다운을 비운다("이메일 다시 입력" 과 같다) */
+  /**
+   * 2 · 3단계의 `←` — 이메일부터 다시. 코드 · 쿨다운을 비운다("이메일 다시 입력" 과 같다).
+   * **입력한 프로필도 버린다** — 이메일이 바뀌면 다른 계정이다(D14 · D4 의 409 처리와 같은 판단).
+   * 남겨 두면 다른 이메일로 인증한 뒤 앞 계정용 비밀번호 · 이름이 채워진 채 3단계가 열린다.
+   * 동의(`consent`)는 계정이 아니라 사람의 것이라 남긴다.
+   */
   const backToEmail = () => {
     codeForm.reset()
+    profileForm.reset()
+    setConsentErrors(NO_FORM_ERRORS)
+    setProfileErrorStatus(null)
     setCooldownStartedAt(null)
     setCodeErrorStatus(null)
     setStep('email')
