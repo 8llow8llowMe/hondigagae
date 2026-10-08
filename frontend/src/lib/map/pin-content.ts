@@ -19,7 +19,15 @@
  */
 
 import { clusterMarkerLabel, clusterMarkerText } from '@/lib/map/cluster'
+import type { MapPinIcon } from '@/lib/map/pin-icons'
 import { messages } from '@/lib/messages'
+
+/**
+ * 원 핀의 이름 알약이 **상시** 서는 가장 먼 줌 — 카카오 level 6(500m 축척, #1280 D1).
+ * 그보다 멀면 원만 서고, 이름은 선택 · 호버 · 포커스 때만 연다. 섬 전체(level 10 근처)에서 이름
+ * 20개가 서로 덮던 것을 걷는다.
+ */
+export const PIN_NAME_MAX_LEVEL = 6
 
 /** 이 판단이 쓰는 필드만. `MapPin` 이 구조적으로 대입된다 */
 export type PinContentInput = {
@@ -30,6 +38,13 @@ export type PinContentInput = {
   muted?: boolean
   /** 동선의 순번(#743). 있으면 고르기 전까지 숫자 원이다 */
   order?: number
+  /**
+   * 카테고리 아이콘(#1280). 있으면 **원 갈래**다 — 이름표 대신 아이콘 원, 이름은 옆 알약. 고르는 일은
+   * 장소 도메인(`lib/place/pin-icon.ts`)이 한다. 없으면 예전 이름표(긴급 시설 · 정적 핀)
+   */
+  icon?: MapPinIcon
+  /** 이름 알약을 상시 연다 — `level ≤ PIN_NAME_MAX_LEVEL`. 선택 · 호버 · 포커스는 이것과 별개로 연다 */
+  named?: boolean
 }
 
 export type PinContent = {
@@ -44,6 +59,8 @@ export type PinContent = {
   ariaLabel: string | null
   /** **버튼일 때만 값이 있다.** 누를 수 없는 것의 눌림 상태는 거짓말이다 */
   ariaPressed: boolean | null
+  /** 원 갈래의 카테고리 아이콘(#1280). 원 갈래만 값이 있고 나머지는 `null` */
+  icon: MapPinIcon | null
 }
 
 export function pinContent(
@@ -71,11 +88,32 @@ export function pinContent(
       text: String(pin.order),
       label: null,
       ariaLabel: `${String(pin.order)}. ${pin.title}`,
+      icon: null,
     }
   }
 
   const caption = pin.caption ?? null
   const name = selected && caption !== null ? `${pin.title} · ${caption}` : pin.title
+
+  if (pin.icon !== undefined) {
+    return {
+      ...base,
+      className: classNames(
+        [
+          'map-pin-dot',
+          (pin.named === true || selected) && 'map-pin-dot-named',
+          selected && 'map-pin-dot-selected',
+          pin.muted === true && 'map-pin-dot-muted',
+        ],
+        interactive,
+      ),
+      icon: pin.icon,
+      text: null,
+      // **이름이 숨어 있어도 이 글자가 버튼의 접근 이름이다** — CSS 는 시각적으로만 숨긴다
+      label: name,
+      ariaLabel: interactive ? null : name,
+    }
+  }
 
   return {
     ...base,
@@ -91,6 +129,7 @@ export function pinContent(
       갈래에서만 붙인다 (그쪽은 안쪽 텍스트가 가려져 이것이 유일한 이름이다).
     */
     ariaLabel: interactive ? null : name,
+    icon: null,
   }
 }
 
@@ -131,6 +170,7 @@ export function clusterContent(count: number): PinContent {
      * 누르면 지도가 확대되고 그 묶음은 사라진다 — 눌린 채로 남는 상태가 없다.
      */
     ariaPressed: null,
+    icon: null,
   }
 }
 
@@ -163,5 +203,6 @@ export function focusMarkerContent(name: string): PinContent {
     label,
     ariaLabel: messages.map.focusMarkerLabel.replace('{name}', name),
     ariaPressed: null,
+    icon: null,
   }
 }

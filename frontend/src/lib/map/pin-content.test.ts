@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { clusterContent, focusMarkerContent, pinContent } from '@/lib/map/pin-content'
+import {
+  clusterContent,
+  focusMarkerContent,
+  PIN_NAME_MAX_LEVEL,
+  pinContent,
+} from '@/lib/map/pin-content'
 import { messages } from '@/lib/messages'
 
 /**
@@ -207,5 +212,74 @@ describe('focusMarkerContent — 기준점 마커 (#1223)', () => {
 
   it('보조기기 이름도 같은 말이다', () => {
     expect(content.ariaLabel).toBe(messages.map.focusMarkerLabel.replace('{name}', '카멜리아힐'))
+  })
+})
+
+describe('pinContent — 카테고리 아이콘 원 (#1280)', () => {
+  const dot = { title: '사라봉공원', icon: 'landscape' as const }
+  const on = { selected: false, interactive: true }
+
+  it('아이콘이 있으면 원 갈래다 — 예전 이름표 클래스를 쓰지 않는다', () => {
+    const content = pinContent(dot, on)
+
+    expect(content.icon).toBe('landscape')
+    expect(content.className.split(' ')).toContain('map-pin-dot')
+    expect(content.className.split(' ')).not.toContain('map-pin')
+  })
+
+  it('이름은 숨어 있어도 늘 장소명이다 — 버튼의 접근 이름이 된다', () => {
+    const content = pinContent(dot, on)
+
+    expect(content.label).toBe('사라봉공원')
+    expect(content.ariaLabel).toBeNull()
+    expect(content.className.split(' ')).not.toContain('map-pin-dot-named')
+  })
+
+  it('named 면 이름을 상시 연다', () => {
+    expect(pinContent({ ...dot, named: true }, on).className.split(' ')).toContain(
+      'map-pin-dot-named',
+    )
+  })
+
+  it('선택되면 줌과 상관없이 이름을 열고 캡션을 붙인다', () => {
+    const content = pinContent({ ...dot, caption: '480m' }, { selected: true, interactive: true })
+    const classes = content.className.split(' ')
+
+    expect(classes).toEqual(
+      expect.arrayContaining(['map-pin-dot', 'map-pin-dot-named', 'map-pin-dot-selected']),
+    )
+    expect(classes).not.toContain('map-pin-selected')
+    expect(content.label).toBe('사라봉공원 · 480m')
+    expect(content.ariaPressed).toBe(true)
+  })
+
+  it('흐림은 원 전용 수식어다 — map-pin-muted 의 이름표 규칙이 새지 않는다', () => {
+    const classes = pinContent({ ...dot, muted: true }, on).className.split(' ')
+
+    expect(classes).toContain('map-pin-dot-muted')
+    expect(classes).not.toContain('map-pin-muted')
+  })
+
+  it('아이콘이 없는 핀은 예전 이름표 그대로다 — 긴급 시설 핀이 바뀌지 않는다', () => {
+    const content = pinContent({ title: '제주동물병원', caption: '1.2km' }, on)
+
+    expect(content.icon).toBeNull()
+    expect(content.className).toBe('map-pin')
+  })
+
+  it('순번이 있으면 아이콘보다 순번이 먼저다', () => {
+    const content = pinContent({ ...dot, order: 2 }, on)
+
+    expect(content.className.split(' ')).toContain('map-pin-order')
+    expect(content.icon).toBeNull()
+  })
+
+  it('묶음 · 기준점 서술자도 icon 필드를 낸다(null)', () => {
+    expect(clusterContent(3).icon).toBeNull()
+    expect(focusMarkerContent('수월봉').icon).toBeNull()
+  })
+
+  it('이름이 서는 줌은 level 6 이하다', () => {
+    expect(PIN_NAME_MAX_LEVEL).toBe(6)
   })
 })
