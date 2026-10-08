@@ -34,6 +34,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -140,8 +141,32 @@ public class OllamaLlmAdapter implements AiLlmPort {
             throw new AiPlanException(AiPlanErrorCode.NO_PLACE_CANDIDATES);
         }
 
+        AiPlanDraft draft = draftOnce(query, candidates, 1);
+        if (hasVisitItem(draft)) {
+            return draft;
+        }
+        /*
+         * 모든 날이 비었다 (#1268) — 한 번만 다시 부른다. dev 에서 3일 일정이 출력 144토큰 · 경고 0건으로
+         * 세 날 모두 비어 "완료" 된 적이 있다. 형식은 맞고 번호도 틀리지 않았으니 모델이 그 회차에 비워 낸
+         * 것이고, 같은 조건으로 다시 부르면 대개 채워진다. 파싱 실패를 다시 부르지 않는 것과 갈리는 자리는
+         * ai-service.md "빈 초안은 한 번 다시 부른다" 에 있다. 다시 불러 생긴 예외(타임아웃 · 붐빔)는 그대로
+         * 올린다 — 첫 회차에 남길 것이 없다.
+         */
+        AiPlanDraft retried = draftOnce(query, candidates, 2);
+        if (hasVisitItem(retried)) {
+            return retried;
+        }
+        throw new AiPlanException(AiPlanErrorCode.LLM_EMPTY_PLAN);
+    }
+
+    /**
+     * 모델을 한 번 부르고 가드를 모두 거친 초안을 낸다. 빈 날이 있으면 응답 원문 앞부분과 함께 남긴다 — 왜
+     * 비었는지는 원문만 말해 준다.
+     */
+    private AiPlanDraft draftOnce(AiPlanGenerationQuery query, List<PlaceCandidate> candidates, int attempt) {
         ChatResponse response = request(query);
-        LlmPlanDraftResponse draft = extractDraft(response);
+        String text = extractText(response);
+        LlmPlanDraftResponse draft = convertDraft(response, text);
         AiPlanDraft domain = toDomain(draft, query);
         // 번호 → 후보(아이디 · 이름 · 종류) 다음이 사실 대조다. 종류가 정해진 뒤라야 숙박을 가를 수 있다 (#975).
         AiPlanDraft guarded = new AiPlanDraftFactGuard(indexById(candidates), aiPlanPromptFactory.resolveDayCount(query),
@@ -150,7 +175,40 @@ public class OllamaLlmAdapter implements AiLlmPort {
         AiPlanDraft deduped = new AiPlanRepeatGuard(candidates).apply(guarded);
         // 동선 대조는 사실 대조 뒤다 — 마지막 날 숙박이 빠진 뒤라야 그날을 숙소를 옮길 밤으로 보지 않는다 (#1171).
         AiPlanDraft routed = AiPlanRouteGuard.of(query).apply(deduped);
-        return limitReasons(routed);
+        AiPlanDraft limited = limitReasons(routed);
+        warnOnEmptyDays(limited, query, response, text, attempt);
+        return limited;
+    }
+
+    /** 방문 항목(장소 · 식사)이 하나라도 있는가. 숙소만 있는 초안은 일정이 아니다. */
+    private static boolean hasVisitItem(AiPlanDraft draft) {
+        return safeList(draft.days()).stream().anyMatch(OllamaLlmAdapter::hasVisitItem);
+    }
+
+    private static boolean hasVisitItem(AiPlanDraftDay day) {
+        return safeList(day.items()).stream().anyMatch(item ->
+            item.itemType() == PlanItemType.PLACE || item.itemType() == PlanItemType.MEAL);
+    }
+
+    /**
+     * 방문 항목이 없는 날을 남긴다 — 빠진 날도 센다. 전부 비면 다시 부르기 직전이고, 일부만 비면 초안을 그대로
+     * 내고 화면이 그날을 안내한다(#1270). 어느 쪽이든 원문이 있어야 원인을 가른다.
+     */
+    private void warnOnEmptyDays(AiPlanDraft draft, AiPlanGenerationQuery query, ChatResponse response, String text,
+                                 int attempt) {
+        List<Integer> expectedDays = query.regenerateDay() != null
+            ? List.of(query.regenerateDay())
+            : IntStream.rangeClosed(1, aiPlanPromptFactory.resolveDayCount(query)).boxed().toList();
+        Set<Integer> madeDays = safeList(draft.days()).stream()
+            .filter(OllamaLlmAdapter::hasVisitItem)
+            .map(AiPlanDraftDay::day)
+            .collect(Collectors.toSet());
+        List<Integer> emptyDays = expectedDays.stream().filter(day -> !madeDays.contains(day)).toList();
+        if (emptyDays.isEmpty()) {
+            return;
+        }
+        log.warn("AI plan draft has days without a visit item attempt={} emptyDays={} of={} finishReason={} rawHead={}",
+            attempt, emptyDays, expectedDays.size(), finishReasonOf(response), head(text));
     }
 
     /**
@@ -315,8 +373,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
      *
      * <p>본문이 비는 지점(응답 자체/결과/텍스트)을 구분해 남긴다 — 원인 추적이 갈라지는 자리다.
      */
-    private LlmPlanDraftResponse extractDraft(ChatResponse response) {
-        String text = extractText(response);
+    private LlmPlanDraftResponse convertDraft(ChatResponse response, String text) {
         try {
             return outputConverter.convert(text);
         } catch (RuntimeException exception) {
@@ -711,7 +768,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
         });
     }
 
-    private <T> List<T> safeList(List<T> values) {
+    private static <T> List<T> safeList(List<T> values) {
         return values == null ? List.of() : values;
     }
 }

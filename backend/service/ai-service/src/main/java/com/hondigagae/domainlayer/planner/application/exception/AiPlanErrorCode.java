@@ -41,6 +41,10 @@ public enum AiPlanErrorCode {
     // 사용자가 할 일은 "조건을 줄인다" 가 아니라 "조건 그대로 잠시 뒤 다시 누른다" 다.
     LLM_BUSY("AIPLAN_021", "지금 AI 일정 생성 요청이 몰려 있습니다. 조건은 그대로 두고 잠시 후 다시 시도해 주세요.",
         HttpStatus.SERVICE_UNAVAILABLE),
+    // 형식은 맞는데 두 번 불러도 방문할 곳이 하루도 없다 (#1268). 조건 탓이 아니라 모델이 그 회차에 비워 낸
+    // 것이라 할 일은 AIPLAN_021 과 같은 "조건 그대로 다시" 다. 해석 실패(AIPLAN_010)와는 원인도 로그도 다르다.
+    LLM_EMPTY_PLAN("AIPLAN_022", "AI가 이번에는 일정을 채우지 못했습니다. 조건은 그대로 두고 다시 시도해 주세요.",
+        HttpStatus.INTERNAL_SERVER_ERROR),
 
     // 요청 검증(Bean Validation) 전용 코드 — 1xx 대역.
     INVALID_REQUEST("AIPLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
