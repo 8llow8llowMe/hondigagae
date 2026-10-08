@@ -117,6 +117,8 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
             searchable
             listHref={listHref}
             mapHref={mapHref}
+            // 지도를 못 띄우면 이 목록 보기로 옮긴다 (#1289)
+            fallbackHref={listHref}
             /* 고른 장소를 미리보기로 보이고 `?place=` 에 남긴다 (#1227) — 담기 지도는 켜지 않는다 */
             preview
           />

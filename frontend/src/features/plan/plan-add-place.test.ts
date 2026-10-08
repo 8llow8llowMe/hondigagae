@@ -294,13 +294,13 @@ describe('행과 그 행을 담는 목록이 같은 인셋에 선다 (#451)', ()
     expect(shell).not.toContain('inset=')
   })
 
-  it('지도 폴백의 행은 inset="main" 을 되돌려 받는다 — 그 목록은 카드가 아니다', () => {
-    const fallback = /renderListRow=\{\(place\) => \([\s\S]*?<PlanAddPlaceRow\b[\s\S]*?\/>/.exec(
-      code,
-    )?.[0]
-
-    expect(fallback).toBeDefined()
-    expect(fallback).toContain('inset="main"')
+  /*
+    #1289 — 지도가 실패하면 축소판 폴백(행을 `renderListRow` 로 넘기던 자리)을 그리지 않고 **담기 목록 보기로
+    옮긴다.** 그쪽 행은 카드 안이라 기본 인셋 그대로다.
+  */
+  it('지도가 실패하면 담기 목록 보기로 옮긴다 — 축소판 폴백 행을 넘기지 않는다', () => {
+    expect(code).toContain('fallbackHref={listHref}')
+    expect(code).not.toContain('renderListRow=')
   })
 
   /*

@@ -15,7 +15,7 @@ import { ViewToggle } from '@/components/view-toggle'
 import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
 import { ResearchHereButton } from '@/features/map/research-here-button'
-import { PlaceListSection, type PlaceListSectionProps } from '@/features/place/place-list-section'
+import { useMapFailureFallback } from '@/features/map/use-map-failure-fallback'
 import { PlaceMapFilterBar } from '@/features/place/place-map-filter-bar'
 import { PlaceMapPanel } from '@/features/place/place-map-panel'
 import { PlaceMapPreview } from '@/features/place/place-map-preview'
@@ -25,7 +25,7 @@ import { useNearbyPlaces } from '@/features/place/use-nearby-places'
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { usePlaceList } from '@/features/place/use-place-list'
 import { usePlacePreview } from '@/features/place/use-place-preview'
-import { ApiError, isRetriable, toErrorStatus } from '@/lib/api/error'
+import { isRetriable } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
 import { type LatLng, SELECTED_PLACE_MAP_LEVEL } from '@/lib/geo/coord'
 import { getCurrentPosition, getPositionIfGranted, offersLocate } from '@/lib/geo/current-position'
@@ -54,7 +54,6 @@ import { visibleCountLabel } from '@/lib/map/visible-count'
 import { messages } from '@/lib/messages'
 import { placePinIcon } from '@/lib/place/pin-icon'
 import { mapEmptyCopy } from '@/lib/place/search-empty'
-import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceFilters, PlaceSummary } from '@/types/place'
 
@@ -94,10 +93,10 @@ export function PlaceMapView({
   head,
   listHref,
   mapHref,
+  fallbackHref,
   renderRowAction,
   renderRowNotice,
   mutedPlaceIds,
-  renderListRow,
   sheetMaxTopInset,
   initialFocus,
   initialFocusName,
@@ -148,14 +147,18 @@ export function PlaceMapView({
    */
   listHref?: string | undefined
   mapHref?: string | undefined
+  /**
+   * **지도를 못 띄우면 갈 목록 보기** (#1289). SDK 가 실패하면 안내 화면 대신 이 주소로 옮기고 토스트로
+   * 이유를 말한다(`useMapFailureFallback`). 토글 주소(`listHref`)와 따로 받는 이유: 헤더가 토글을 갖는
+   * 담기 화면은 `listHref` 를 주지 않는다 — 그래도 실패하면 갈 목록은 있어야 한다.
+   */
+  fallbackHref: string
   /** 패널·시트 행의 액션 열. 담기 버튼이 여기 온다 */
   renderRowAction?: ((place: PlaceSummary) => ReactNode) | undefined
   /** 행 아래 전폭 줄. 담기 실패 알림이 여기 온다 */
   renderRowNotice?: ((place: PlaceSummary) => ReactNode) | undefined
   /** 핀 톤을 낮출 장소들. 담기 화면은 "이미 담은 곳" 을 넘긴다 */
   mutedPlaceIds?: ReadonlySet<string> | undefined
-  /** SDK 실패 폴백의 행. 주지 않으면 상세로 가는 기본 행이다 */
-  renderListRow?: PlaceListSectionProps['renderRow'] | undefined
   /**
    * 모바일 시트를 끝까지 올렸을 때 비워 둘 상단 높이(px).
    *
@@ -268,6 +271,8 @@ export function PlaceMapView({
     if (preview && id !== null) setPanelOpen(true)
   }
   const [failure, setFailure] = useState<MapSdkFailure | null>(null)
+  // 실패하면 목록 보기로 옮긴다 — 안내 화면을 그리지 않는다 (#1289)
+  useMapFailureFallback(failure, fallbackHref)
   /** 밖에서 지도 중심을 옮길 때만 값이 든다 (현재 위치 버튼) */
   const [center, setCenter] = useState<LatLng | null>(null)
   /**
@@ -573,77 +578,12 @@ export function PlaceMapView({
     setResearched(true)
   }, [bounds])
 
-  // ── SDK 실패 → 목록으로 되돌리고 안내 한 줄 ──────────────────────────────
-  if (failure !== null) {
-    return (
-      /*
-        **바닥을 탭바만큼 비운다.** 폴백 목록은 부모의 고정 높이 껍데기(`map-canvas-height`)를
-        넘쳐 흐르는데, 그 상태에서는 `main` 의 탭바 여백이 먹지 않는다(실측 `margin-block-end`
-        0px). 375×812 담기 화면에서 마지막 행의 `담기` 버튼이 44px 중 **21px 만 남았다** —
-        탭바에 반이 먹힌 것이라 하한 규칙과 무관하게 눌리지 않는다. **폴백 갈래에만 건다** — 지도가 정상으로 뜨는
-        갈래는 시트가 `fixed` 라 이 문제가 없고, 거기 걸면 지도 높이만 줄어든다.
-      */
-      <div className="pb-tabbar">
-        {/*
-          **머리가 정상 흐름이다** (#1012). 지도가 없으니 띄울 바탕도 없다 — 지도 갈래처럼
-          `absolute` 로 두면 안내 줄과 첫 행을 덮는다(실측: 375 에서 첫 행 사진 위, 1440 에서
-          안내 줄 전체). 인셋은 아래 안내 줄·목록과 같은 `main` 이다.
-        */}
-        {hasHead && <div className={cn('pt-5 pb-3', INSET_CLASS.main)}>{head}</div>}
-
-        {/* 안내 한 줄 — 배너(링크형)가 아니다. 갈 곳이 없고 알릴 사실만 있다 */}
-        <p
-          role="status"
-          className="text-caption text-fg-muted bg-bg-sunken border-border border-b px-4 py-3 font-medium md:px-10"
-        >
-          {failureMessage(failure)}
-        </p>
-
-        {/*
-          **폴백에도 검색이 남는다** (#596). 이 갈래에는 필터 칩도 `초기화` 도 없어
-          (`onResetFilters` 가 no-op 다), 검색을 빼면 `?keyword=` 를 달고 들어온 사용자가
-          그것을 지울 길이 화면에서 사라진다. 카카오 키 도메인이 안 맞을 때 **항상** 오는
-          경로라 예외가 아니다.
-
-          카드 없는 페이지라 인셋은 위 안내 줄·아래 목록과 같은 `main` 이다.
-        */}
-        {searchable && (
-          <PlaceSearchField
-            filters={filters}
-            id="place-keyword-fallback"
-            className={cn('flex items-start gap-2 py-3', INSET_CLASS.main)}
-          />
-        )}
-
-        <PlaceListSection
-          /*
-            폴백 목록은 카드가 아니라 페이지 위다 — 카드 인셋 20 을 쓰면 위 안내 줄(40)과
-            어긋난다. 카드가 없으니 `headingLevel` 도 기본값 `2` 그대로 둔다 (#456①).
-          */
-          inset="main"
-          /*
-            **기준점 지도면 주변 조회 결과(거리순)다** (#1177 검토). 카카오 키 도메인이 등록되지 않은
-            환경은 늘 이 폴백이라, 첫 장만 그리면 기준점이 통째로 무시됐다. `/places` 는 폴백에서
-            재검색을 할 수 없어 `places` 가 곧 `listPlaces` 다 — 동작이 같다.
-          */
-          places={places}
-          loading={listQuery.isPending}
-          errorStatus={toErrorStatus(listQuery.error)}
-          errorMessage={
-            listQuery.error instanceof ApiError ? listQuery.error.rawMessage : undefined
-          }
-          /* 0건이면 무엇으로 찾았는지 되돌려 준다 — 목록 갈래가 같은 prop 을 넘긴다 */
-          keyword={filters.keyword}
-          hasNext={listQuery.data?.pages.at(-1)?.hasNext ?? false}
-          loadingMore={listQuery.isFetchingNextPage}
-          onLoadMore={() => void listQuery.fetchNextPage()}
-          onRetry={() => void listQuery.refetch()}
-          onResetFilters={() => undefined}
-          {...(renderListRow === undefined ? {} : { renderRow: renderListRow })}
-        />
-      </div>
-    )
-  }
+  /*
+    ── SDK 실패 → 목록 보기로 옮기는 중 (#1289) ──────────────────────────────
+    이동은 `useMapFailureFallback` 이 한다. 예전에는 여기서 안내 한 줄 + 축소판 목록을 그렸는데, 그 목록은
+    필터 칩 · 레일 · 초기화가 없어 진짜 목록 보기보다 못했다. 옮기는 한 순간은 아무것도 그리지 않는다.
+  */
+  if (failure !== null) return null
 
   /*
     **지도가 조회 자리에서 벗어났으면 "지도에 보이는" 이라고 말하지 않는다.** 목록은
@@ -1077,10 +1017,4 @@ export function PlaceMapView({
       )}
     </div>
   )
-}
-
-function failureMessage(reason: MapSdkFailure): string {
-  if (reason === 'no-key') return messages.map.errorNoKey
-  if (reason === 'unsupported') return messages.map.errorUnsupported
-  return messages.map.errorScript
 }

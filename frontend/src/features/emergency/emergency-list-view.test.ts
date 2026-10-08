@@ -249,50 +249,24 @@ describe('목록 갈래는 3층 표면이다 (#460)', () => {
   그것이고(보드가 두 벌이 되면 위치를 두 번 묻는다), 그 갈래에는 레일도 카드도 없다 —
   카카오 키 도메인이 안 맞을 때 **항상** 오는 경로라 예외가 아니다 (공통명세 E0 · E5).
 */
-describe('폴백 갈래는 레일도 카드도 얻지 않는다 (#419 · #460)', () => {
-  const fallback = mapView.slice(
-    mapView.indexOf('if (failure !== null)'),
-    mapView.indexOf('const hideViewportClaim'),
-  )
-
+/*
+  #1289 — SDK 가 실패하면 지도 자리에 축소판(안내 줄 + 위치 안내 + 검색 + 칩 + 보드)을 다시 세우지 않고 **목록
+  보기로 보낸다.** 예전 #419 · #460 · #584 가 그 축소판에 지켜 두던 것(레일 없음 · 페이지 인셋 · 검색 남김)은
+  목록 보기가 이미 갖고 있다 — 두 벌을 맞춰 두던 이유가 사라졌다.
+*/
+describe('SDK 실패는 목록 보기로 옮긴다 (#1289)', () => {
   it('EmergencyBoardSection 은 grid 를 갖지 않는다', () => {
     expect(block(listView, 'EmergencyBoardSection')).not.toContain('rail-layout')
   })
 
-  it('폴백은 Canvas 도 Surface 도 그리지 않는다', () => {
-    expect(fallback).not.toContain('<Canvas')
-    expect(fallback).not.toContain('<Surface')
+  it('실패하면 목록 주소로 옮기는 훅을 부른다', () => {
+    expect(mapView).toContain('useMapFailureFallback(failure, listHref)')
   })
 
-  /* 카드가 아니므로 페이지 값 40 — 안내 줄(`md:px-10`)과 같은 축이어야 세로선이 맞는다 */
-  it('폴백의 목록과 칩은 inset="main" 을 받고, 칩의 선은 divider 가 긋는다', () => {
-    expect(fallback).toMatch(/<EmergencyBoardSection board=\{board\} inset="main" \/>/)
-    expect(fallback).toMatch(/<EmergencyFilterChips[\s\S]*?inset="main"[\s\S]*?divider/)
-    // 색 토큰은 className 으로 넘기지 않는다 (component-guide §3)
-    expect(fallback).not.toMatch(/<EmergencyFilterChips[\s\S]*?className="[^"]*border/)
-  })
-
-  /*
-    **폴백에도 검색이 남는다** (#584). 이 갈래는 목록 갈래를 통째로 대체하므로, 검색을
-    빼면 `?keyword=` 를 달고 들어온 사용자가 그것을 지울 방법이 없다 —
-    `EmergencyFilterChips` 에는 `초기화` 가 없고 0건일 때의 완화 버튼뿐이다.
-  */
-  it('폴백에 검색이 남고 lg:hidden 이 아니다', () => {
-    const search = fallback.indexOf('<EmergencySearchField')
-    expect(search).toBeGreaterThan(-1)
-
-    const tag = fallback.slice(search, fallback.indexOf('/>', search))
-    expect(tag).not.toContain('lg:hidden')
-    // 카드 없는 페이지라 인셋은 칩·목록과 같은 `main` 이다
-    expect(tag).toContain('INSET_CLASS.main')
-  })
-
-  /* 폴백에는 레일이 없다 — 칩을 lg 에서 숨기면 데스크톱이 필터를 통째로 잃는다 */
-  it('폴백의 칩은 lg:hidden 이 아니다', () => {
-    const chips = fallback.slice(fallback.indexOf('<EmergencyFilterChips'))
-    const tag = chips.slice(0, chips.indexOf('/>'))
-
-    expect(tag).not.toContain('lg:hidden')
+  it('실패 갈래는 아무것도 그리지 않는다 — 축소판 목록 · 안내 줄이 없다', () => {
+    expect(mapView).toContain('if (failure !== null) return null')
+    expect(mapView).not.toContain('failureMessage(')
+    expect(mapView).not.toContain('<EmergencyBoardSection')
   })
 })
 
