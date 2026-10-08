@@ -204,3 +204,60 @@ describe('EmergencyMapView — 시트 최대 단계의 윗변 (#901 D2)', () => 
     expect(code.slice(open, close)).toContain('maxTopInset={MAP_TOP_CONTROLS_INSET}')
   })
 })
+
+/*
+  #1232 D10 — `/places` 와 같은 도킹 패널 · 손잡이 · 움직임 (`지도패널-도킹-세부명세.md`).
+  두 지도 화면의 모양이 갈리면 안 된다(#353 · #396 과 같은 이유).
+*/
+describe('EmergencyMapView — 도킹 패널 (#1232 D10)', () => {
+  const source = readFileSync(
+    fileURLToPath(new URL('./emergency-map-view.tsx', import.meta.url)),
+    'utf8',
+  )
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+  it('패널이 지도 루트 왼쪽 위아래 끝에 붙는다 — 떠 있는 카드가 아니다', () => {
+    expect(code).toContain("'absolute inset-y-0 left-0 z-30 hidden transition-transform lg:block'")
+    expect(code).not.toMatch(/top-6 bottom-8 left-4/)
+    expect(code).not.toContain('rounded-tr-none')
+  })
+
+  /* 예전에는 `panelOpen ? <패널> : <펼치기 버튼>` 으로 DOM 을 갈아 끼웠다 — 트랜지션을 걸 대상이 없었다 */
+  it('갈아끼우지 않고 슬라이드한다 — 닫힌 패널은 inert 다', () => {
+    expect(code).not.toMatch(/\{panelOpen \? \(/)
+    expect(code).toContain("!panelOpen && '-translate-x-full'")
+    expect(code).toContain('inert={!panelOpen}')
+  })
+
+  it('손잡이는 하나이고 패널 밖(형제)에서 패널을 가리킨다', () => {
+    expect(code.match(/messages\.map\.expandPanel/g)).toHaveLength(2)
+    expect(code).toContain('absolute top-1/2 left-full')
+    expect(code).toContain('aria-controls={stackId}')
+    const stack = code.indexOf('id={stackId}')
+    const handle = code.indexOf('aria-controls={stackId}')
+    expect(handle).toBeGreaterThan(stack)
+    /*
+      **스택 `div` 가 손잡이 앞에서 닫혀야 한다** — `inert=` 개수만 세면 손잡이를 스택 안(닫는 태그 앞)으로
+      옮겨도 통과한다(리뷰 지적). 스택 여는 `<div` 부터 손잡이까지 여닫는 태그 수가 같으면 닫힌 뒤다.
+    */
+    const between = code.slice(code.lastIndexOf('<div', stack), handle)
+    expect(between.match(/<div\b/g)?.length).toBe(between.match(/<\/div>/g)?.length)
+    expect(code).toContain('before:w-11')
+  })
+
+  it('고른 시설 · 재검색 알약 · 카카오 로고가 패널을 비킨다', () => {
+    expect(code).toContain('selectedOffset={selectedOffset}')
+    expect(code).toContain('return panelOpen && width > 0 ? { x: width / 2, y: 0 } : null')
+    expect(code).toContain("panelOpen && 'lg:left-100'")
+    expect(code).toContain('copyrightPosition="right"')
+  })
+
+  /* 고른 행에만 전화 · 길찾기가 붙는다 — 접힌 채 고르면 그 행동이 화면 밖 inert 안에 있었다 */
+  it('시설을 고르면 접힌 패널을 편다', () => {
+    const select = code.slice(
+      code.indexOf('const handleSelect'),
+      code.indexOf('if (failure !== null)'),
+    )
+    expect(select).toContain('setPanelOpen(true)')
+  })
+})

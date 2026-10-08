@@ -79,8 +79,12 @@ describe('접기 · 펼치기 손잡이는 하나다 (#1232)', () => {
     const handle = mapView.indexOf('aria-controls={stackId}')
     expect(stack).toBeGreaterThan(-1)
     expect(handle).toBeGreaterThan(stack)
-    // 스택 여는 태그부터 손잡이까지 사이에 `inert` 는 스택의 것 하나뿐이다
-    expect(mapView.slice(stack, handle).match(/inert=/g)).toHaveLength(1)
+    /*
+      **스택 `div` 가 손잡이 앞에서 닫혀야 한다** — `inert=` 개수만 세면 손잡이를 스택 안(닫는 태그 앞)으로
+      옮겨도 통과한다(리뷰 지적). 스택 여는 `<div` 부터 손잡이까지 여닫는 태그 수가 같으면 닫힌 뒤다.
+    */
+    const between = mapView.slice(mapView.lastIndexOf('<div', stack), handle)
+    expect(between.match(/<div\b/g)?.length).toBe(between.match(/<\/div>/g)?.length)
   })
 
   /* DESIGN.md 44px 하한 — 보이는 탭은 24 지만 누르는 자리는 `::before` 로 넓힌다 */
