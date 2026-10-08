@@ -119,6 +119,10 @@ Redis 는 dev 에서 BossPickSeoul dev 와 같은 `redis-node1`(192.168.0.11:637
 붙는다. `REDIS_MODE=sentinel` 은 compose 가 `REDIS_MASTER_NAME` / `REDIS_SENTINEL_NODES` 를
 넘겨야 살고, 둘 중 하나가 비면 기동 시점에 어떤 env 를 넣어야 하는지 적힌 예외로 죽는다.
 
+Redis 명령·연결 타임아웃(`infra.redis.command-timeout` · `connect-timeout`, #1253)은 **env 가 아니라 yml 고정값**이라
+Vault 에 넣을 키가 없다. 게이트웨이만 세 프로파일에 `1s` · `2s` 를 적었고, 나머지 서비스는 비워 Lettuce 기본
+(명령 60초 · 연결 10초)을 쓴다. 바꾸려면 해당 서비스의 `application-{env}.yml` 을 고쳐 배포한다 — 이유는 `modules.md` redis-core 절.
+
 ## DB 스키마 준비
 
 MySQL 은 BossPickSeoul 과 같은 인스턴스(main-server `192.168.0.11:3306`)를 쓰고, 스키마와 계정만
@@ -230,6 +234,7 @@ curl -s "http://{host}:7000/api/v1/emergencies/facilities?lat=33.4996&lng=126.53
 | 기동 직후 jwtDecoder NPE | Resource Server 키 prefix 오타 | `app.security.jwt.resource.access-key` 확인 |
 | Eureka 에 안 뜸 | `SERVICE_DISCOVERY_HOSTNAME` 이 사설 IP | discovery **컨테이너명**으로 지정 |
 | 게이트웨이 503 | 대상 서비스 미기동 또는 Eureka 등록 전 | Eureka 앱 목록 먼저 확인 |
+| 토큰 실은 요청만 503 `SECURITY_008` | 게이트웨이가 Redis 블랙리스트를 못 읽음 (#1253, 기본 fail-closed) | 게이트웨이 로그 `errorType=` 이 연결 실패인지 `QueryTimeoutException`(1초 무응답)인지 `RedisSystemException`(LOADING · READONLY 등 오류 응답)인지 본다 |
 | 게이트웨이가 엉뚱한 서비스로 보냄 | `*_APP_NAME` 이 등록명과 불일치 | Eureka UI 의 등록명과 대조 |
 | 배포 단계에서 `.env.runtime` key missing | Vault secret 에 키 누락 | `.env.example` 과 대조 |
 | batch 컨테이너가 안 뜸 | `BATCH_DATA_DIR` 미설정 | 배포 호스트에 디렉터리를 만들고 Vault 에 경로 기입 (디렉터리만 있으면 되고 CSV 는 없어도 된다) |

@@ -496,9 +496,20 @@ plan-service 를 거쳐 tour-service 호출(최대 2회)로 **증폭**되고, to
 - **검증 공백 — 실제 Redis 에서의 동작은 dev 배포 뒤에 실측한다.** 테스트는 Lua 스크립트를 실행하지 않는다(Redis 를
   띄우지 않는다). 토큰 버킷 판정, TTL 20초, 키 모양(`request_rate_limiter.{plan-service-shared-plans.<prefix>:shared-plan:…}`)은
   dev 에서 병렬 요청과 `redis-cli --scan` 으로 확인한다.
-- **[운영 MEDIUM] 운영 중 Redis 가 내려가거나 멈추면 공유 요청이 명령 타임아웃(현재 60초)만큼 매달린 뒤에야 통과한다.**
-  Lettuce 는 연결이 끊기면 재연결을 기다리며 명령을 쌓아 두기 때문이다 — 즉시 fail-open 되는 것은 처음부터 연결이
-  안 되는 경우(연결 거부)뿐이다. redis-core 변경이라 [#1253](https://github.com/8llow8llowMe/hondigagae/issues/1253) 으로 뗐다.
+- **[운영 — #1253 으로 닫힘] 운영 중 Redis 가 내려가거나 멈추면 공유 요청은 명령 타임아웃(1초) 뒤에 통과한다.**
+  이 항목은 처음에 "명령 타임아웃(60초)만큼 매달린 뒤 통과" 라고 적었는데 실제는 더 나빴다 — Lettuce 기본은
+  리액티브 명령에 타임아웃이 **아예 없어**(`TimeoutOptions` 꺼짐 — 60초는 동기 호출에만 걸린다), 재연결을 기다리며 쌓인
+  리밋 판정이 끝나지 않아 **fail-open 이 일어나지 않았다.** [#1253](https://github.com/8llow8llowMe/hondigagae/issues/1253)
+  으로 게이트웨이가 `infra.redis.command-timeout: 1s` 와 명령 타임아웃 감시를 켜, 쌓인 명령도 1초 뒤 실패하고
+  `RedisRateLimiter` 가 통과시킨다(`RedisCommandTimeoutBehaviorTest` 가 가짜 Redis 로, `RateLimitWiringTest` 가 실제 yml
+  바인딩으로 고정). 즉시 통과하는 것은 여전히 연결 거부뿐이다.
+- **[운영 LOW] 기동 시점부터 Redis 가 먹통(패킷 드롭)이면 첫 연결 시도가 줄을 선다.** `LettuceConnectionFactory` 는
+  동기·리액티브 공유 연결을 **팩토리 락 하나** 아래에서 처음 맺고, 한 번의 시도가 연결 타임아웃(2초) + 핸드셰이크
+  (명령 타임아웃 1초)까지 걸린다. 그동안 블랙리스트 확인과 리밋 판정이 그 락에서 차례로 기다린다. 이 락을 잡는 셋 —
+  블랙리스트 확인 · 리밋 판정(#1253) · 액추에이터 Redis 헬스(부트가 블로킹 지표를 그렇게 감싼다) — 이 모두
+  `boundedElastic` 에서 돌아 **이벤트 루프는 이 락을 기다리지 않는다.** 그래서 둘과 무관한 요청(토큰 없는 공개 API)은
+  멈추지 않지만, 공유 요청과 토큰을 실은 요청은 그만큼 늦고 `boundedElastic` 상한(코어 × 10)을 넘으면 큐에서 기다린다.
+  한 번 맺어진 연결은 Lettuce 가 같은 연결로 재연결하므로, 운영 중 장애는 이 경로가 아니라 위 명령 타임아웃 경로를 탄다.
 - **[DB LOW] 보존/정리 정책이 없다.** 행을 지우지 않으므로 만료·미폐기 행이 쌓인다. 현실 규모에서는 무시할
   수준이지만(한 일정당 재발급 주기마다 1행) 정리 배치는 아직 없다. 정리 배치가 생기면 그때 `(expires_at)`
   인덱스가 필요해진다 — **지금 미리 만들지 않는다.**
