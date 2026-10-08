@@ -711,9 +711,9 @@ export function MapCanvas({
       position: new maps.LatLng(coord.lat, coord.lng),
       content: markerElement(focusMarkerContent(focusMarker.name), null),
       /*
-        **점 아래에 선다** (`yAnchor: 0`). 장소 이름표는 아래 끝이 점을 가리키므로(`yAnchor: 1`) 점
-        **위**를 쓴다 — 기준점은 대개 그날 담은 장소라 같은 좌표에 그 장소의 핀도 선다. 같은 쪽에
-        두면 서로 덮어 둘 중 하나를 못 읽는다. 위아래로 나눠 둘 다 남긴다.
+        **점 아래에 선다** (`yAnchor: 0`). 장소 핀은 좌표에 중심을 둔 원이라(`yAnchor: 0.5`, #1280)
+        기준점(대개 앞 일정 항목)과 같은 좌표에 원이 겹쳐 선다. 원이 위층이므로 이름표는 CSS
+        (`.map-pin-focus` 의 `translateY`)로 가장 큰 원의 아랫변 밖까지 내려 둘 다 읽히게 한다.
       */
       yAnchor: 0,
       zIndex: MAP_LAYER_Z.focus,
