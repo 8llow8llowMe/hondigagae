@@ -197,4 +197,28 @@ export const mapMessages = {
    * 이 줄이 없으면 사용자는 몇 곳이 빠졌는지 알 길이 없다.
    */
   routeOmitted: '{n}곳은 위치를 알 수 없어 지도에 없어요',
+
+  // ── 병원 · 약국 함께 보기 (#1286) ──────────────────────────────────────
+
+  /**
+   * 장소 찾기 지도의 토글 — 글자 · 접근 이름 · `title` 이 모두 이것이다. **켬 · 끔에 따라 바꾸지 않는다** —
+   * 상태는 `aria-pressed` 가 말한다(`지도시설토글-세부명세.md` D4-1).
+   */
+  facilityToggle: '병원·약국',
+  /** 숨은 상태 알림(`role="status"`) — 켜고 받는 동안 */
+  facilityLoading: '병원·약국을 불러오는 중이에요',
+  /** `{n}` 치환. 숨은 상태 알림 — 켜고 받아 온 직후 */
+  facilityShown: '병원·약국 {n}곳을 지도에 표시했어요',
+  /** `{n}` 치환. 토글 아래 안내 카드 — 응답이 `size` 상한에서 잘렸을 때(`countsAreComplete`) */
+  facilityTruncated: '병원·약국이 많아 {n}곳만 지도에 표시했어요',
+  /** 토글 아래 안내 카드 — 실패. 토스트로 흘리지 않는다(다시 시도할 자리가 남아야 한다) */
+  facilityLoadFailed: '병원·약국을 불러오지 못했어요',
+  /**
+   * `{n}` 치환 — 시설 묶음(사각)의 **접근성 이름**. `{n}` 은 보이는 글자(`99+` 포함)다(`clusterMarkerLabel`).
+   * 장소 묶음(`clusterCount`)과 갈라야 숫자가 무엇을 세는지 보조기기에도 드러난다.
+   */
+  facilityClusterCount: '이 지역 병원·약국 {n}곳',
+  /** 시설 요약 `section` 의 접근 이름 — 장소 미리보기 자리에 선다 */
+  facilitySummaryLabel: '병원·약국 요약',
+  facilitySummaryClose: '요약 닫기',
 } as const

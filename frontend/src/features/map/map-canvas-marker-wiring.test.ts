@@ -115,3 +115,21 @@ describe('장소 핀이 아이콘을 넘긴다 (#1280)', () => {
     expect(view).toContain('icon: placePinIcon(place)')
   })
 })
+
+describe('모양별 묶음 (#1286 D2-3)', () => {
+  it('모양마다 clusterForLevel 을 따로 부른다 — 한 묶음 숫자는 한 종류만 센다', () => {
+    expect(SOURCE).toContain('MAP_PIN_SHAPES.flatMap((shape) =>')
+    expect(SOURCE).toMatch(/positioned\.filter\(\(input\) => pinShape\(input\.item\) === shape\)/)
+    expect(occurrences('clusterForLevel(')).toBe(1)
+  })
+
+  it('사각 묶음도 같은 통로(clusterContent → markerElement)를 거친다', () => {
+    expect(SOURCE).toMatch(
+      /markerElement\(\s*clusterContent\(\s*group\.items\.length,\s*group\.shape,/,
+    )
+  })
+
+  it('쌓임 순서에 모양을 넘긴다', () => {
+    expect(SOURCE).toContain('shape: group.shape })')
+  })
+})

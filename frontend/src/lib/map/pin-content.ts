@@ -29,6 +29,27 @@ import { messages } from '@/lib/messages'
  */
 export const PIN_NAME_MAX_LEVEL = 6
 
+/**
+ * 지도 층의 모양 (#1286 D7-1) — 원(장소) · 사각(시설). **아이콘과 다른 축이다**: 아이콘은 "무엇", 모양은
+ * "어느 층" 이다. 아이콘 키로 사각을 추론하면 사각 아이콘이 늘 때마다 그 표가 같이 늘어야 한다. 지도는 이
+ * 낱말만 알고 시설을 모른다(`component-guide.md` §9).
+ */
+export type MapPinShape = 'circle' | 'square'
+
+export const MAP_PIN_SHAPES: readonly MapPinShape[] = ['circle', 'square']
+
+/**
+ * 이 핀이 실제로 어느 모양으로 서는가. **`square` 는 아이콘이 있을 때만 뜻이 있다** — 아이콘 없는 핀(예전
+ * 이름표 · 순번 원)은 `shape` 를 무시하고 원 층이다. 묶음 나누기(`map-canvas.tsx`)와 쌓임(`markerZIndex`)이
+ * 이 한 판정을 함께 쓴다 — 갈리면 사각으로 그려진 핀이 원 묶음에 접힌다.
+ */
+export function pinShape(pin: {
+  icon?: MapPinIcon | undefined
+  shape?: MapPinShape | undefined
+}): MapPinShape {
+  return pin.icon !== undefined && pin.shape === 'square' ? 'square' : 'circle'
+}
+
 /** 이 판단이 쓰는 필드만. `MapPin` 이 구조적으로 대입된다 */
 export type PinContentInput = {
   title: string
@@ -43,6 +64,11 @@ export type PinContentInput = {
    * 장소 도메인(`lib/place/pin-icon.ts`)이 한다. 없으면 예전 이름표(긴급 시설 · 정적 핀)
    */
   icon?: MapPinIcon
+  /**
+   * 모양 (#1286). `square` 면 아이콘 갈래가 **둥근 사각**이 된다 — 시설 층. 아이콘이 없으면 무시한다
+   * (`pinShape`). 이름 알약 · 숨김 · 흐림 · 정적 규칙은 원 핀 클래스에서 그대로 물려받는다.
+   */
+  shape?: MapPinShape
   /** 이름 알약을 상시 연다 — `level ≤ PIN_NAME_MAX_LEVEL`. 선택 · 호버 · 포커스는 이것과 별개로 연다 */
   named?: boolean
 }
@@ -101,6 +127,8 @@ export function pinContent(
       className: classNames(
         [
           'map-pin-dot',
+          // 수식어 하나를 얹는다 — 원 핀 규칙을 물려받고 치수 · 모서리만 덮는다 (globals.css)
+          pinShape(pin) === 'square' && 'map-pin-dot-square',
           (pin.named === true || selected) && 'map-pin-dot-named',
           selected && 'map-pin-dot-selected',
           pin.muted === true && 'map-pin-dot-muted',
@@ -154,17 +182,26 @@ export function pinContent(
  * 같은 타입으로 맞추면 applier 가 하나로 합쳐지고, 그 applier 가 이미 `pin-content.test.ts`
  * 로 잠긴 규칙(태그·역할·이름·글자)을 묶음에도 그대로 적용한다.
  */
-export function clusterContent(count: number): PinContent {
+export function clusterContent(
+  count: number,
+  /**
+   * 접힌 핀의 모양 (#1286 D2-3). 사각 핀이 접히면 **사각 묶음**이다 — 핀과 묶음이 같은 모양 문법을 쓴다.
+   * 숫자만 다른 같은 원 둘이 나란히 서면 `12` 가 장소인지 병원인지 화면만 보고 모른다.
+   */
+  shape: MapPinShape = 'circle',
+  /** 접근 이름의 문구 틀 (`clusterMarkerLabel`). 주지 않으면 장소 묶음 문구다 */
+  template?: string,
+): PinContent {
   return {
     /** 누르면 그 구역으로 확대한다 — 늘 할 일이 있으므로 늘 버튼이다 */
     tag: 'button',
     /** 버튼은 `role` 을 덮어쓰지 않는다. `role="img"` 는 누를 것이 없는 핀의 것이다 (#789) */
     role: null,
-    className: 'map-cluster',
+    className: shape === 'square' ? 'map-cluster map-cluster-square' : 'map-cluster',
     text: clusterMarkerText(count),
     /** 이름표 `span` 이 없다 — 원 안에 들어가는 것은 숫자뿐이다 */
     label: null,
-    ariaLabel: clusterMarkerLabel(count),
+    ariaLabel: clusterMarkerLabel(count, template),
     /**
      * **토글이 아니다.** 핀은 고름/안 고름이 있어 `aria-pressed` 를 말하지만, 묶음을
      * 누르면 지도가 확대되고 그 묶음은 사라진다 — 눌린 채로 남는 상태가 없다.

@@ -15,9 +15,12 @@ import { type MapOffset, offsetCenter } from '@/lib/map/offset-center'
 import {
   clusterContent,
   focusMarkerContent,
+  MAP_PIN_SHAPES,
+  type MapPinShape,
   PIN_NAME_MAX_LEVEL,
   type PinContent,
   pinContent,
+  pinShape,
 } from '@/lib/map/pin-content'
 import { type MapPinIcon, pinIconSvg } from '@/lib/map/pin-icons'
 import type { MapRouteSegment } from '@/lib/map/route'
@@ -193,6 +196,12 @@ export type MapPin = {
    * 없으면 예전 이름표 그대로다.
    */
   icon?: MapPinIcon
+  /**
+   * 모양 (#1286). `square` 면 아이콘 원 대신 **둥근 사각**이고, 묶음도 사각 묶음으로 **따로** 접힌다 — 한
+   * 묶음 숫자는 한 종류만 센다. 무엇을 사각으로 그릴지는 호출부 도메인이 정한다(`lib/emergency/facility-pin.ts`).
+   * 아이콘이 없으면 무시한다(`pinShape`).
+   */
+  shape?: MapPinShape
 }
 
 /**
@@ -246,6 +255,7 @@ export function MapCanvas({
   selectedLevel,
   selectedOffset,
   focusMarker,
+  squareClusterLabel,
   copyrightPosition = 'left',
   onFailure,
   className,
@@ -375,6 +385,11 @@ export function MapCanvas({
    * **호출부는 참조를 안정적으로 넘긴다** (`useMemo`) — 이 값이 바뀌면 오버레이를 지우고 다시 그린다.
    */
   focusMarker?: { lat: number; lng: number; name: string } | null
+  /**
+   * 사각 묶음의 접근 이름 문구 틀 (#1286) — `{n}` 자리에 보이는 숫자가 들어간다. 사각 핀을 그리는 화면이
+   * 무엇을 세는지 넘긴다(`이 지역 병원·약국 {n}곳`). 주지 않으면 원 묶음과 같은 `이 지역 {n}곳` 이다.
+   */
+  squareClusterLabel?: string | undefined
   /**
    * 카카오 축척 · 로고 막대의 자리 (#1232). 기본은 SDK 그대로 좌하단이다.
    *
@@ -580,11 +595,23 @@ export function MapCanvas({
     */
     const ordered = pins.some((pin) => pin.order !== undefined)
 
-    const groups = clusterForLevel(positioned, ordered ? null : level)
+    /*
+      **모양별로 따로 접는다** (#1286 D1-1). 장소 원과 시설 사각을 한 격자에 넣으면 묶음 숫자가 둘을 함께
+      세어 `12` 가 무엇을 세는지 흐려진다. 겹침은 묶음끼리 합치지 않고 쌓임 순서(`markerZIndex`)로 푼다.
+      판정은 `pinShape` 하나다 — 그리는 모양(`pinContent`)과 접는 모양이 갈리면 사각이 원 묶음에 접힌다.
+    */
+    const groups = MAP_PIN_SHAPES.flatMap((shape) =>
+      clusterForLevel(
+        positioned.filter((input) => pinShape(input.item) === shape),
+        ordered ? null : level,
+      ).map((group) => ({ ...group, shape })),
+    )
     const created: KakaoCustomOverlay[] = []
 
     for (const group of groups) {
       const isCluster = group.items.length > 1
+      // 사각 묶음만 호출부의 문구 틀을 쓴다 — 원 묶음은 늘 `이 지역 {n}곳` 이다
+      const clusterLabel = group.shape === 'square' ? squareClusterLabel : undefined
       const first = group.items[0]
       if (first === undefined) continue
 
@@ -594,7 +621,7 @@ export function MapCanvas({
             `clusterElement` 가 따로 있어 `textContent` 와 `aria-label` 을 직접 꽂았고,
             그 배선은 어느 테스트도 보지 않았다.
           */
-          markerElement(clusterContent(group.items.length), () => {
+          markerElement(clusterContent(group.items.length, group.shape, clusterLabel), () => {
             /*
               묶음을 누르면 그 구역으로 확대한다 (아트보드 05).
 
@@ -664,7 +691,7 @@ export function MapCanvas({
           묶음이 된다"* 는 근거를 적어 두고도 **선택 핀 축만 빠뜨린 채** 살아남았다
           (#671 A-1). 순수 함수로 빼서 `stacking.test.ts` 가 부등식을 잠근다.
         */
-        zIndex: markerZIndex({ isCluster, selected: first.id === selectedId }),
+        zIndex: markerZIndex({ isCluster, selected: first.id === selectedId, shape: group.shape }),
         /*
           **고를 것이 없는 핀은 클릭을 받지 않는다** (#789). `clickable: true` 인
           오버레이는 자기 위에서 난 포인터 이벤트를 지도에 넘기지 않는데, 단일 핀
@@ -690,7 +717,7 @@ export function MapCanvas({
     }
 
     overlaysRef.current = created
-  }, [pins, selectedId, status, level, interactive])
+  }, [pins, selectedId, status, level, interactive, squareClusterLabel])
 
   // ── 기준점 마커 (#1223) ─────────────────────────────────────────────────────
   useEffect(() => {

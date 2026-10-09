@@ -26,6 +26,7 @@ import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
 import { ResearchHereButton } from '@/features/map/research-here-button'
 import { useMapFailureFallback } from '@/features/map/use-map-failure-fallback'
+import { toFacilityPin } from '@/lib/emergency/facility-pin'
 import { formatDistance } from '@/lib/format/distance'
 import { type LatLng, SELECTED_FACILITY_MAP_LEVEL, toLatLng } from '@/lib/geo/coord'
 import type { PositionResult } from '@/lib/geo/current-position'
@@ -276,15 +277,17 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
 
   const pins: MapPin[] = useMemo(
     () =>
-      visible.map((entry) => ({
-        id: entry.facilityId,
-        title: entry.name,
-        lat: entry.lat,
-        lng: entry.lng,
-        caption: board.showDistance ? formatDistance(entry.distanceMeters) : null,
-        // 약국은 글자 톤을 낮춘다 — 등급 색을 마커에 쓰지 않는다
-        muted: entry.facilityType.code === 'ANIMAL_PHARMACY',
-      })),
+      /*
+        **시설은 둥근 사각이다** (#1286 D7-2) — `/places` 의 병원 · 약국 층과 같은 모양이라 한 서비스에서 같은
+        것은 같은 모양이다. 병원 십자 · 약국 알약 + 낮춤 채움은 `toFacilityPin` 이 정한다 — 등급 색을 마커에
+        쓰지 않는다. 선택 모델은 그대로 `facilityId` 이고, 거리 캡션도 그대로다.
+      */
+      visible.map((entry) =>
+        toFacilityPin(entry, {
+          id: entry.facilityId,
+          caption: board.showDistance ? formatDistance(entry.distanceMeters) : null,
+        }),
+      ),
     [visible, board.showDistance],
   )
 
@@ -499,6 +502,8 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         /* 고르면 도로가 읽히는 단계까지 확대한다 — `/places` 보다 한 단계 깊다 */
         selectedLevel={SELECTED_FACILITY_MAP_LEVEL}
         selectedOffset={selectedOffset}
+        /* 시설뿐인 지도라 묶음도 사각이다 (#1286 D8-2) — 무엇을 세는지 이름이 말한다 */
+        squareClusterLabel={messages.map.facilityClusterCount}
         /* 왼쪽은 도킹 패널이 덮는다 — 카카오 로고 · 축척을 우하단으로 비킨다 (#1232 D5) */
         copyrightPosition="right"
         onFailure={setFailure}

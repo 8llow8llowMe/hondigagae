@@ -290,7 +290,15 @@ export function clusterMarkerText(count: number): string {
  * 상한을 `99` 로 내리면서(#671 D-1) **접히는 구간이 훨씬 흔해졌다.** 화면 글자가 근사값이
  * 되는 자리가 늘어난 만큼, 정확한 값을 가진 채널이 여기 하나뿐이라는 점이 더 중요해졌다.
  */
-export function clusterMarkerLabel(count: number): string {
+export function clusterMarkerLabel(
+  count: number,
+  /**
+   * 문구 틀 — `{n}` 자리에 보이는 글자가 들어간다. 기본은 장소 묶음(`이 지역 {n}곳`)이고, 시설 묶음은
+   * `이 지역 병원·약국 {n}곳` 을 넘긴다 (#1286 D2-3). **무엇을 세는지는 틀이 말하고, 몇인지는 늘 이 함수가
+   * 채운다** — 틀을 받아도 보이는 글자를 이름에 담는 규칙(아래)은 그대로다.
+   */
+  template: string = messages.map.clusterCount,
+): string {
   /*
     **보이는 글자를 그대로 넣는다 — `String(count)` 가 아니다** (#671 D-1).
 
@@ -306,7 +314,7 @@ export function clusterMarkerLabel(count: number): string {
     사용자가 볼 수 없는 수를 스크린리더에만 주면 두 사람이 다른 화면을 읽게 되고,
     정확한 수는 눌러서 확대하면 마커가 갈라지며 드러난다.
   */
-  return messages.map.clusterCount.replace('{n}', clusterMarkerText(count))
+  return template.replace('{n}', clusterMarkerText(count))
 }
 
 function averageCoord(coords: LatLng[]): LatLng {

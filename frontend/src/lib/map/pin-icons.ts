@@ -6,7 +6,7 @@
  * 마크업에 섞이지 않는다(이름은 `textContent`).
  *
  * **키는 모양이다** — 지도 층은 장소 분류를 모른다. 어느 장소를 어느 모양으로 그릴지는
- * `lib/place/pin-icon.ts` 가 정한다. 결은 `components/icons` 와 같다(24 · 선 1.5 · `currentColor`).
+ * `lib/place/pin-icon.ts` 가, 어느 시설을 어느 모양으로 그릴지는 `lib/emergency/facility-pin.ts` 가 정한다. 결은 `components/icons` 와 같다(24 · 선 1.5 · `currentColor`).
  */
 export type MapPinIcon =
   | 'landscape'
@@ -19,6 +19,8 @@ export type MapPinIcon =
   | 'bike'
   | 'bag'
   | 'pin'
+  | 'cross'
+  | 'pill'
 
 const PATHS: Record<MapPinIcon, string> = {
   // 산 두 봉우리 — 세로 8–17 로 격자 가운데에 앉힌다(10–19 는 원 안에서 아래로 처져 보였다)
@@ -43,6 +45,14 @@ const PATHS: Record<MapPinIcon, string> = {
   bag: '<path d="M5 8h14l-1 12H6zM9 8V6a3 3 0 0 1 6 0v2"/>',
   // 범용 — `components/icons` 의 PinIcon 과 같은 그림
   pin: '<path d="M12 21s6.5-5.6 6.5-10.5A6.5 6.5 0 0 0 5.5 10.5C5.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.5"/>',
+  /*
+    동물병원 — **채운 십자** (#1286 D2-2). 선 1.5 십자는 14px 에서 0.9px 이라 사라진다 — 굵은 더하기를
+    면으로 칠한다. 바깥 `<svg>` 의 `stroke` 를 이 도형만 끈다.
+  */
+  cross:
+    '<path fill="currentColor" stroke="none" d="M9.5 4h5v5.5H20v5h-5.5V20h-5v-5.5H4v-5h5.5z"/>',
+  // 동물약국 — 45° 기운 캡슐 + 가운데 가름선 (#1286 D2-2)
+  pill: '<g transform="rotate(-45 12 12)"><path d="M7 8.5h10a3.5 3.5 0 0 1 0 7H7a3.5 3.5 0 0 1 0-7zM12 8.5v7"/></g>',
 }
 
 export const MAP_PIN_ICONS = Object.keys(PATHS) as readonly MapPinIcon[]

@@ -460,3 +460,28 @@ describe('토큰 대비 — 지도 원 핀 · 묶음 (#1280)', () => {
     expect(rule).toContain('color: var(--brand-700)')
   })
 })
+
+/*
+  시설 사각 · 장소 지도 토글 (#1286 D6). 장소 ↔ 시설은 모양(원 ↔ 사각), 병원 ↔ 약국은 아이콘(십자 ↔ 알약)이
+  가르고 채움 명도는 덧붙이는 신호다 — 그래도 아이콘이 채움 위에서 읽혀야 한다(비텍스트 3:1).
+*/
+describe('토큰 대비 — 시설 사각 · 병원·약국 토글 (#1286)', () => {
+  it('흰 십자가 병원 사각(--brand-600) 위에서 3:1 이상이다', () => {
+    expect(contrastRatio(WHITE, token('--brand-600'))).toBeGreaterThanOrEqual(3)
+  })
+
+  it('흰 알약이 약국 사각(--fg-subtle) 위에서 3:1 이상이다', () => {
+    expect(contrastRatio(WHITE, token('--fg-subtle'))).toBeGreaterThanOrEqual(3)
+  })
+
+  it('켬 토글 글자(--fg-inverse)가 반전 면(--fg) 위에서 4.5:1 이상이다', () => {
+    expect(contrastRatio(token('--fg-inverse'), token('--fg'))).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('약국 낮춤 채움 규칙이 실제로 --fg-subtle 을 쓴다', () => {
+    const css = readGlobalsCss()
+    const rule = /\n\.map-pin-dot-muted\s*\{([\s\S]*?)\}/.exec(css)?.[1] ?? ''
+
+    expect(rule).toContain('background: var(--fg-subtle)')
+  })
+})
