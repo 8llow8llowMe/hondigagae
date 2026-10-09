@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
 
 import { BottomSheet } from '@/components/bottom-sheet'
 import { SignupConsentFields } from '@/features/auth/signup-consent-fields'
@@ -27,7 +27,12 @@ import { messages } from '@/lib/messages'
  * 시트를 닫았다 다시 열어도 켠 항목이 남는다.
  *
  * `action` 은 시트 바닥의 실행 자리다 — 이메일은 `동의하고 인증코드 받기` 버튼, 소셜은 제공자
- * 하나만 그린 `SocialLoginButtons`(#707 의 소셜 동의 화면과 같은 배치)다.
+ * 하나만 그린 `SocialLoginButtons`(#707 의 소셜 동의 화면과 같은 배치)다. **`BottomSheet` 의
+ * `footer`(하단 고정)에 둔다** (#1295) — 스크롤 영역 안에 두면 낮은 기기에서 동의 네 줄에 밀려 실행
+ * 버튼이 화면 밖으로 나간다.
+ *
+ * **Tab 을 시트 안에 가둔다** (#1295, D15) — `aria-modal="true"` 인데 Tab 이 뒤쪽 상단바 `←` 로
+ * 빠졌다. 닫을 때 돌아갈 자리는 `triggerRef` 로 받는다(없으면 열기 직전의 활성 요소).
  */
 export function SignupConsentSheet({
   open,
@@ -37,6 +42,7 @@ export function SignupConsentSheet({
   onConsentChange,
   onConsentAllChange,
   action,
+  triggerRef,
 }: {
   open: boolean
   onClose: () => void
@@ -45,9 +51,18 @@ export function SignupConsentSheet({
   onConsentChange: (key: SignupConsentKey, checked: boolean) => void
   onConsentAllChange: (checked: boolean) => void
   action: ReactNode
+  /** 닫을 때 포커스가 돌아갈 자리 — `BottomSheet.triggerRef` */
+  triggerRef?: RefObject<HTMLElement | null>
 }) {
   return (
-    <BottomSheet open={open} onClose={onClose} title={messages.auth.consentSheetTitle}>
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      title={messages.auth.consentSheetTitle}
+      footer={action}
+      trapFocus
+      {...(triggerRef !== undefined ? { triggerRef } : {})}
+    >
       <div className="flex flex-col gap-4 px-4 pt-1 pb-5">
         <SignupConsentFields
           consent={consent}
@@ -55,7 +70,6 @@ export function SignupConsentSheet({
           onConsentChange={onConsentChange}
           onConsentAllChange={onConsentAllChange}
         />
-        {action}
       </div>
     </BottomSheet>
   )

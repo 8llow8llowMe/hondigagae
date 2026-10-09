@@ -26,6 +26,7 @@ export function fieldHintId(id: string): string {
  *   오류 id 하나만 잇는다 — 둘 다 이으면 화면에 없는 안내까지 겹쳐 읽힌다
  * - hint 만 있으면 hint id
  * - 둘 다 없으면 `undefined` — 없는 id 를 가리키는 `aria-describedby` 를 걸지 않는다
+ * - `extra` 가 있으면 위 결과 뒤에 덧붙인다 (#1295)
  *
  * 그리는 조건과 가리키는 조건을 따로 쓰면 언젠가 어긋난다. `Field` 의 렌더가 이 결과의
  * `hintShown` · `errorShown` 만 보는 이유다.
@@ -34,18 +35,22 @@ export function fieldDescription({
   id,
   hint,
   error,
+  extra,
 }: {
   id: string
   hint: string | undefined
   error: string | undefined
+  /** 칸 바깥 문단의 id (#1295). 자기 안내 · 오류 **뒤에** 덧붙인다 — `FieldProps.extraDescribedBy` */
+  extra?: string | undefined
 }): { hintShown: boolean; errorShown: boolean; describedBy: string | undefined } {
-  if (error !== undefined) {
-    return { hintShown: false, errorShown: true, describedBy: fieldErrorId(id) }
+  const own =
+    error !== undefined ? fieldErrorId(id) : hint !== undefined ? fieldHintId(id) : undefined
+  const describedBy = [own, extra].filter((part) => part !== undefined).join(' ')
+  return {
+    hintShown: error === undefined && hint !== undefined,
+    errorShown: error !== undefined,
+    describedBy: describedBy === '' ? undefined : describedBy,
   }
-  if (hint !== undefined) {
-    return { hintShown: true, errorShown: false, describedBy: fieldHintId(id) }
-  }
-  return { hintShown: false, errorShown: false, describedBy: undefined }
 }
 
 export type FieldProps = {
@@ -55,6 +60,15 @@ export type FieldProps = {
   error?: string | undefined
   hint?: string | undefined
   required?: boolean
+  /**
+   * 칸이 **함께 가리킬 칸 바깥 문단**의 id (#1295). 안내 · 오류 id 뒤에 붙는다 — 고칠 정보가 먼저 읽힌다.
+   *
+   * 가입 단계의 첫 칸이 "3단계 중 N단계"(sr-only)를 가리키는 것이 첫 사용처다. 단계 전환 때 포커스가
+   * 곧장 그 칸으로 가서, 칸이 문단을 참조하지 않으면 단계가 낭독되지 않는다(회원가입-세부명세 D15).
+   * 입력 쪽 `aria-describedby` 는 `Field` 가 정해 내려주므로(#1100) 사용처가 입력에 직접 달 수 없다 —
+   * 그래서 여기서 받는다.
+   */
+  extraDescribedBy?: string | undefined
   children: ReactNode
   className?: string
 }
@@ -75,10 +89,16 @@ export function Field({
   error,
   hint,
   required = false,
+  extraDescribedBy,
   children,
   className,
 }: FieldProps) {
-  const { hintShown, errorShown, describedBy } = fieldDescription({ id, hint, error })
+  const { hintShown, errorShown, describedBy } = fieldDescription({
+    id,
+    hint,
+    error,
+    extra: extraDescribedBy,
+  })
 
   return (
     <div className={cn('flex flex-col gap-1', className)}>

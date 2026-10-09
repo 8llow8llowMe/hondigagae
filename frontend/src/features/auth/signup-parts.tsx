@@ -17,6 +17,16 @@ export const SIGNUP_STEP_COUNT = 3
 
 export type SignupStep = 1 | 2 | 3
 
+/**
+ * "3단계 중 N단계"(sr-only) 문단의 id (#1295, 회원가입-세부명세 D15).
+ *
+ * 단계 전환 때 포커스가 곧장 새 단계의 첫 칸으로 간다(D6). 보이는 단계 글자가 진행 바로 바뀌어
+ * 이 문단이 유일한 단서인데, 포커스가 지나가지 않아 읽히지 않았다. **각 단계의 첫 칸**이
+ * `aria-describedby` 로 이 id 를 가리킨다(`signup-steps.tsx`). 한 화면에 단계 제목은 하나뿐이라
+ * 고정 id 로 충분하다.
+ */
+export const SIGNUP_STEP_STATUS_ID = 'signup-step-status'
+
 /* 진행 바 채움 — 임의 값(`w-[33%]`) 대신 스케일의 분수 클래스 (component-guide.md §11 `Record`) */
 const PROGRESS_WIDTH: Record<SignupStep, string> = { 1: 'w-1/3', 2: 'w-2/3', 3: 'w-full' }
 
@@ -45,7 +55,9 @@ export function SignupStepHeading({ step, heading, description }: SignupStepHead
       </div>
       <div className="flex flex-col gap-1">
         <h1 className="text-title-1 text-fg font-bold">{heading}</h1>
-        <p className="sr-only">{messages.auth.stepOf(step, SIGNUP_STEP_COUNT)}</p>
+        <p id={SIGNUP_STEP_STATUS_ID} className="sr-only">
+          {messages.auth.stepOf(step, SIGNUP_STEP_COUNT)}
+        </p>
         {description !== undefined && <p className="text-body-2 text-fg-muted">{description}</p>}
       </div>
     </div>

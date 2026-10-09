@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useRef } from 'react'
+import { type ReactNode, type RefObject, useRef } from 'react'
 
 import { toBody } from '@/lib/ui/body-portal'
 import { useOverlay } from '@/lib/ui/overlay'
@@ -25,6 +25,8 @@ export function BottomSheet({
   children,
   /** 시트 하단에 고정되는 주요 액션. 라벨에 결과를 쓴다 */
   footer,
+  trapFocus = false,
+  triggerRef,
   className,
 }: {
   open: boolean
@@ -33,10 +35,30 @@ export function BottomSheet({
   onBack?: () => void
   children: ReactNode
   footer?: ReactNode
+  /**
+   * Tab · Shift+Tab 을 시트 안에서 순환시킨다 (#1295). **기본은 끈다** — `useOverlay` 의 같은 옵션을
+   * 그대로 넘긴다. 이 컴포넌트는 담기 · 필터 · 지역 · 로그인 안내 시트가 함께 쓰므로 기본을 바꾸면
+   * 그 시트들의 키보드 동작이 같이 움직인다. **필요한 시트만 켠다** — 첫 사용처는 가입 약관 시트다
+   * (`aria-modal="true"` 인데 Tab 이 뒤쪽 상단바 `←` 로 빠졌다).
+   */
+  trapFocus?: boolean
+  /**
+   * 닫을 때 포커스가 돌아갈 자리 (#1295). 없으면 열기 직전의 활성 요소로 돌아간다(`useOverlay`).
+   *
+   * **제출 응답이 시트를 연 경우**에 넘긴다 — 그때 열기 직전의 활성 요소는 제출 중 `disabled` 가 된
+   * 버튼을 잃은 `BODY` 다. `current` 는 **닫히는 순간** 읽히므로 `onClose` 안에서 채워도 된다.
+   */
+  triggerRef?: RefObject<HTMLElement | null>
   className?: string
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
-  useOverlay({ open, onClose, containerRef: panelRef })
+  useOverlay({
+    open,
+    onClose,
+    containerRef: panelRef,
+    trapFocus,
+    ...(triggerRef !== undefined ? { triggerRef } : {}),
+  })
 
   if (!open) return null
 
@@ -105,7 +127,10 @@ export function BottomSheet({
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
 
         {footer !== undefined && (
-          <div className="border-border bg-bg border-t px-4 py-3">{footer}</div>
+          // `data-sheet-footer` — 실행 자리가 스크롤 영역 밖(하단 고정)에 섰는지 마크업으로 잰다 (#1295)
+          <div data-sheet-footer="" className="border-border bg-bg border-t px-4 py-3">
+            {footer}
+          </div>
         )}
       </div>
     </div>,

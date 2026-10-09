@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   SIGNUP_STEP_COUNT,
+  SIGNUP_STEP_STATUS_ID,
   SignupConsentAction,
   SignupEmailSummary,
   SignupLoginPrompt,
@@ -37,10 +38,23 @@ describe('SignupStepHeading — 진행 바 + 단계 질문 (#1284)', () => {
       const markup = render(step)
 
       expect(markup).toContain(
-        `<p class="sr-only">${messages.auth.stepOf(step, SIGNUP_STEP_COUNT)}</p>`,
+        `<p id="${SIGNUP_STEP_STATUS_ID}" class="sr-only">${messages.auth.stepOf(step, SIGNUP_STEP_COUNT)}</p>`,
       )
       expect(markup.indexOf('</h1>')).toBeLessThan(markup.indexOf('sr-only'))
     }
+  })
+
+  /*
+    #1295 N4 — 단계 전환 때 포커스가 곧장 첫 칸으로 가서 이 문단이 읽히지 않았다. 칸의
+    `aria-describedby` 가 가리킬 수 있게 id 를 단다 (`signup-steps.test.ts` 가 칸 쪽을 본다).
+  */
+  it('단계 문구에 칸이 가리킬 id 가 있다', () => {
+    expect(SIGNUP_STEP_STATUS_ID).toBe('signup-step-status')
+    expect(render(2)).toMatch(
+      new RegExp(
+        `<p id="${SIGNUP_STEP_STATUS_ID}"[^>]*>${messages.auth.stepOf(2, SIGNUP_STEP_COUNT)}</p>`,
+      ),
+    )
   })
 
   it('바의 채움이 단계를 따른다', () => {

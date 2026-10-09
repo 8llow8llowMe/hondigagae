@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
+import { SIGNUP_STEP_STATUS_ID } from '@/features/auth/signup-parts'
 import { CodeStep, EmailStep, ProfileStep } from '@/features/auth/signup-steps'
 import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
@@ -662,5 +663,81 @@ describe('가입 단계 — 필수 표시(*)를 그리지 않는다 (#1284)', ()
       }),
     )
     expect(markup).not.toMatch(REQUIRED_MARK)
+  })
+})
+
+/*
+  #1295 N4 — 단계 전환 때 포커스가 곧장 새 단계의 첫 칸으로 간다(D6). 보이는 단계 글자가 없어
+  "3단계 중 N단계"(sr-only)가 유일한 단서인데, 칸이 그 문단을 가리키지 않아 낭독되지 않았다.
+  **첫 칸만** 가리킨다 — 단계 안에서 칸을 옮길 때마다 단계를 다시 읽히면 소음이다.
+
+  여는 태그 범위로 좁혀 단언한다 — 마크업 전체에서 id 를 찾으면 다른 칸이 가리켜도 통과한다.
+*/
+describe('가입 단계 — 첫 칸이 단계 문구를 가리킨다 (#1295)', () => {
+  const base = {
+    errors: NO_FORM_ERRORS,
+    errorStatus: null,
+    submitting: false,
+    onValueChange: noop,
+    onSubmit: noop,
+    onRetry: noop,
+  }
+
+  function describedByOf(markup: string, id: string): string[] {
+    const tag = new RegExp(`<input[^>]*\\bid="${id}"[^>]*>`).exec(markup)?.[0]
+    if (tag === undefined) throw new Error(`id="${id}" 인 입력 요소가 없다`)
+    return (/aria-describedby="([^"]*)"/.exec(tag)?.[1] ?? '').split(' ').filter(Boolean)
+  }
+
+  it('1단계 이메일 칸', () => {
+    const markup = renderToStaticMarkup(
+      createElement(EmailStep, { ...base, values: { email: '' } }),
+    )
+
+    expect(describedByOf(markup, 'email')).toEqual([SIGNUP_STEP_STATUS_ID])
+  })
+
+  it('1단계 이메일 칸 — 오류가 있으면 오류가 먼저, 단계 문구가 뒤다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(EmailStep, {
+        ...base,
+        values: { email: '' },
+        errors: { fields: { email: '이메일을 입력해주세요.' }, form: null },
+      }),
+    )
+
+    expect(describedByOf(markup, 'email')).toEqual(['email-error', SIGNUP_STEP_STATUS_ID])
+  })
+
+  it('2단계 코드 칸', () => {
+    const markup = renderToStaticMarkup(
+      createElement(CodeStep, {
+        ...base,
+        email: 'a@b.c',
+        values: { code: '' },
+        cooldownSeconds: 0,
+        resending: false,
+        onResend: noop,
+        onChangeEmail: noop,
+      }),
+    )
+
+    expect(describedByOf(markup, 'code')).toEqual([SIGNUP_STEP_STATUS_ID])
+  })
+
+  it('3단계 비밀번호 칸은 규칙 안내와 합쳐 가리키고, 나머지 칸은 가리키지 않는다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(ProfileStep, {
+        ...base,
+        email: 'a@b.c',
+        values: { password: '', name: '', nickname: '' },
+        duplicateEmail: null,
+        returnTo: '/',
+      }),
+    )
+
+    expect(describedByOf(markup, 'password')).toEqual(['password-hint', SIGNUP_STEP_STATUS_ID])
+    expect(describedByOf(markup, 'name')).not.toContain(SIGNUP_STEP_STATUS_ID)
+    expect(describedByOf(markup, 'nickname')).not.toContain(SIGNUP_STEP_STATUS_ID)
   })
 })
