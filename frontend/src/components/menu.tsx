@@ -37,6 +37,11 @@ type MenuItemBase = {
   /** 파괴적 항목. 목록의 마지막에 둔다 */
   destructive?: boolean
   disabled?: boolean
+  /**
+   * 지금 화면 — `aria-current="page"` + 600 (#1300). 지도 아일랜드 알약의 `≡` 가 메뉴 셋을 이 안에 접을 때
+   * 띠 헤더의 활성 표시(배경 · 굵기 · `aria-current`)가 메뉴 안에서도 남아야 한다. 이동 항목에만 뜻이 있다.
+   */
+  current?: boolean
 }
 
 export type MenuItem = MenuItemBase &
@@ -99,6 +104,7 @@ export function Menu({
           'disabled:cursor-not-allowed disabled:opacity-50',
           // 파괴적 항목은 마지막 + danger-900 (가이드 §5-2)
           item.destructive === true ? 'text-danger-900' : 'text-fg',
+          item.current === true && 'font-semibold',
           // 파괴적 항목 위에 선을 그어 손이 미끄러지는 것을 막는다
           item.destructive === true && 'border-border mt-1 border-t',
         )
@@ -110,6 +116,7 @@ export function Menu({
               key={item.label}
               href={item.href}
               role="menuitem"
+              aria-current={item.current === true ? 'page' : undefined}
               onClick={onClose}
               className={itemClass}
             >

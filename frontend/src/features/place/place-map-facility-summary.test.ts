@@ -85,7 +85,27 @@ describe('PlaceMapFacilitySummary', () => {
     expect(summary(facility(), 'sheet')).not.toContain(`${messages.map.previewBackToList}</button>`)
   })
 
-  it('/emergency 로 가는 링크가 없다 (D8-3)', () => {
-    expect(summary(facility())).not.toContain('href="/emergency')
-  })
+  /*
+    #1300 D1-2 — #1286 D8-3("요약에서 `/emergency` 링크 두지 않음")을 대체한다. 알약에서 `병원 · 약국` 링크가 빠져
+    이 링크가 지도에서 `/emergency` 로 가는 길이다. 정규 주소(= 목록 보기)로 보내고 고른 시설은 넘기지 않는다.
+  */
+  it.each(['panel', 'sheet'] as const)(
+    '본문 맨 아래 주변 병원·약국 더 보기 → /emergency 링크 하나다 — %s',
+    (variant) => {
+      const markup = summary(facility({ tel: null }), variant)
+      const links = [...markup.matchAll(/<a [^>]*href="\/emergency[^"]*"[^>]*>([\s\S]*?)<\/a>/g)]
+
+      expect(links).toHaveLength(1)
+      expect(links[0]?.[0]).toContain('href="/emergency"')
+      expect(links[0]?.[1]).toContain(messages.map.facilityMoreNearby)
+      // 화살표는 아이콘(aria-hidden)이다 — `→` 글자는 스크린리더가 읽는다
+      expect(links[0]?.[1]).not.toContain('→')
+      expect(links[0]?.[1]).toContain('<svg')
+      expect(/class="([^"]*)"/.exec(links[0]?.[0] ?? '')?.[1]?.split(/\s+/)).toContain('min-h-11')
+      // 전화 없음 안내 다음, 맨 아래다
+      expect(markup.indexOf(messages.map.previewCallUnavailable)).toBeLessThan(
+        markup.indexOf(messages.map.facilityMoreNearby),
+      )
+    },
+  )
 })

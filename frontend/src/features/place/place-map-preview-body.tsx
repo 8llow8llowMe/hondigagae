@@ -228,6 +228,12 @@ export function PlaceMapPreviewBody({
 /**
  * 머리 줄 — (1024~1279) `‹ 목록` · 닫기. **상세로 가는 길은 여기 없다** (#1230).
  * `‹ 목록` 은 `xl` 에서 사라진다 — 1280 부터는 목록이 옆에 그대로 있다. 시트(모바일)에도 없다.
+ *
+ * **패널은 지도 아일랜드의 머리 64 다** (#1300 D1-2). 미리보기 칸이 y 0 부터 서고, 이 줄이 높이 64 · 세로 가운데라
+ * `‹ 목록` · ✕(44)의 중심 y 32 가 로고(위 8 · 높이 48) 중심과 같다 — 예전 빈 띠 64 + 머리 60 두 줄을 한 줄로 합쳐
+ * 사진이 60 올라온다. 1024–1279 는 로고가 이 줄 왼쪽 위에 떠 있으므로(셸 `IslandHeader`, `fixed`) 그 자리를
+ * 비운다 — 안쪽 8 + 빈 자리 124 + 간격 4 라 `‹ 목록` 이 x 136 에서 시작한다(로고 링크 오른쪽 122 + 14). 136 은
+ * §4 간격 스케일 밖이라 패딩이 아니라 **폭**(`w-31`)으로 비운다. 시트(모바일)는 예전 그대로다.
  */
 export function PreviewTopBar({
   variant,
@@ -248,8 +254,17 @@ export function PreviewTopBar({
   closeLabel?: string
 }) {
   return (
-    // 아래 `pb-2` — 닫기(44)의 호버 배경이 바로 밑 사진에 붙지 않게 띄운다 (#1264)
-    <div className="flex shrink-0 items-center gap-1 px-2 pt-2 pb-2">
+    <div
+      className={
+        variant === 'panel'
+          ? 'flex h-16 shrink-0 items-center gap-1 px-2'
+          : // 아래 `pb-2` — 닫기(44)의 호버 배경이 바로 밑 사진에 붙지 않게 띄운다 (#1264)
+            'flex shrink-0 items-center gap-1 px-2 pt-2 pb-2'
+      }
+    >
+      {/* 1024–1279 로고 자리 — 위 주석. 1280 부터는 `‹ 목록` 이 없고 ✕ 만 오른쪽이다 */}
+      {variant === 'panel' && <span aria-hidden className="hidden w-31 shrink-0 lg:max-xl:block" />}
+
       {variant === 'panel' && (
         <button
           type="button"

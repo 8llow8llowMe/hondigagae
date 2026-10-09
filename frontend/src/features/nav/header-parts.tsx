@@ -9,12 +9,13 @@ import { HeaderAboutLink } from '@/features/nav/header-about-link'
 import { PetSwitcherSlot } from '@/features/nav/pet-switcher-slot'
 
 /**
- * 헤더 두 벌(`GlobalHeader` 띠 · `IslandHeader` 알약, #1287)이 **같이 쓰는 조각**이다.
+ * 헤더 조각 — 로고는 헤더 두 벌(`GlobalHeader` 띠 · `IslandHeader` 알약, #1287)이 **같이 쓰고**, 오른쪽 묶음
+ * (`HeaderActions`)은 **띠 헤더 전용**이다.
  *
- * 지도 아일랜드 헤더의 조건은 "로고 · 메뉴 이름 · 순서 · 로그인 버튼 모양 **동일**" 이다
- * (`docs/features/place/지도-아일랜드헤더-세부명세.md` D1-1). 두 헤더가 마크업을 따로 가지면
- * 한쪽만 고쳐지는 날 그 조건이 조용히 깨진다 — 그래서 **구조로** 지킨다. 메뉴는 원래부터
- * `NavLinks` 하나라 여기 없다.
+ * #1287 은 "로고 · 메뉴 이름 · 순서 · 로그인 버튼 모양 **동일**" 을 조건으로 두 헤더가 오른쪽 묶음까지 같은
+ * 조각을 쓰게 했다. #1300 이 그 조건을 풀었다 — 알약은 메뉴 셋 + 계정 하나이고(`island-header.tsx`),
+ * 스위처 · `서비스 소개` · `병원 · 약국` · `회원가입` 은 띠 헤더에만 남는다
+ * (`docs/features/place/지도-아일랜드알약-정리-세부명세.md` D1-1).
  *
  * **서버 컴포넌트다.** 활성 판정 · 스위처 조회는 client 자식(`HeaderAboutLink` ·
  * `PetSwitcherSlot` · `AccountMenu`)이 맡는다.
@@ -95,8 +96,8 @@ export function HeaderActions({ authed }: { authed: boolean }) {
         글자는 경보로 읽힌다. `aria-label` 은 보이는 글자와 같은 문자열이라 음성 제어가
         보이는 그대로 부를 수 있다(WCAG 2.5.3).
 
-        **지도 아일랜드 알약에서도 둔다** (#1287 D8-2 결정 A). 바로 아래 `병원·약국` 토글(#1286)과
-        이름이 닮았지만, 이 링크는 지도에서 `/emergency` 로 가는 유일한 길이다.
+        **지도 아일랜드 알약에는 없다** (#1300). 바로 아래 `병원·약국` 층 토글(#1286)과 같은 아이콘 · 다른
+        동작이라 헷갈렸다 — 지도에서 `/emergency` 로 가는 길은 시설 요약의 `주변 병원·약국 더 보기` 가 맡는다.
       */}
       <Link
         href="/emergency"

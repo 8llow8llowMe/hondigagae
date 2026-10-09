@@ -103,3 +103,21 @@ describe('Menu — 항목 계약 (가이드 §5-2)', () => {
     expect(markup).toContain('aria-label="내 정보"')
   })
 })
+
+/* 지도 아일랜드 `≡` 가 메뉴 셋을 접을 때 지금 화면 표시가 메뉴 안에서도 남는다 (#1300 D1-2) */
+describe('Menu — 지금 화면 (current)', () => {
+  it('current 항목 여는 태그에만 aria-current="page" · font-semibold 가 붙는다', () => {
+    const markup = render([
+      { label: '장소 찾기', href: '/places', current: true },
+      { label: '여행 일정', href: '/plans' },
+    ])
+    const tags = [...markup.matchAll(/<a [^>]*>/g)].map((m) => m[0])
+
+    expect(tags).toHaveLength(2)
+    expect(tags[0]).toContain('aria-current="page"')
+    expect(tags[0]).toMatch(/class="[^"]*\bfont-semibold\b/)
+    expect(tags[0]).not.toMatch(/class="[^"]*\bfont-medium\b/)
+    expect(tags[1]).not.toContain('aria-current')
+    expect(tags[1]).not.toMatch(/class="[^"]*\bfont-semibold\b/)
+  })
+})

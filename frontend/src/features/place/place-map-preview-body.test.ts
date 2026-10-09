@@ -446,7 +446,40 @@ describe('PlaceMapPreviewBody — 틀 (#1264)', () => {
     expect(render()).toContain('relative min-h-0 flex-1 overflow-y-auto')
   })
 
-  it('닫기 줄 아래를 띄운다 — 닫기 호버 배경이 사진에 붙지 않는다', () => {
-    expect(render()).toContain('px-2 pt-2 pb-2')
+  /** 머리 줄 — 닫기 버튼(첫 `aria-label` 닫기)을 품은 바로 위 여는 `<div>` */
+  function topBarTag(html: string): string {
+    const close = html.indexOf(`aria-label="${messages.map.previewClose}"`)
+    const tags = [...html.slice(0, close).matchAll(/<div [^>]*>/g)].map((m) => m[0])
+    return tags.at(-1) ?? ''
+  }
+
+  it('시트 머리 줄은 예전 그대로 닫기 줄 아래를 띄운다 — 닫기 호버 배경이 사진에 붙지 않는다', () => {
+    expect(topBarTag(render({ variant: 'sheet' }))).toBe(
+      '<div class="flex shrink-0 items-center gap-1 px-2 pt-2 pb-2">',
+    )
+  })
+
+  /*
+    #1300 D1-2 — 패널 머리 줄이 지도 아일랜드의 머리 64 다. 높이 64 · 세로 가운데라 ✕(44) 중심 y 32 = 로고 중심이다.
+    위아래 패딩이 끼면 중심이 어긋난다.
+  */
+  it('패널 머리 줄은 높이 64 · 세로 가운데이고 위아래 패딩이 없다', () => {
+    const classes = /class="([^"]*)"/.exec(topBarTag(render()))?.[1]?.split(/\s+/) ?? []
+
+    expect(classes).toEqual(expect.arrayContaining(['h-16', 'items-center', 'px-2']))
+    expect(classes.filter((name) => /^(pt|pb|py)-/.test(name))).toEqual([])
+  })
+
+  /* 1024–1279 는 로고(x 16–122)가 머리 줄 왼쪽 위에 떠 있다 — ‹ 목록 이 x 136 에서 시작하게 그 자리를 비운다 */
+  it('패널은 ‹ 목록 앞에 1024–1279 에서만 서는 로고 자리(124)를 비운다 — 시트에는 없다', () => {
+    const html = render()
+    const spacer =
+      /<span aria-hidden="true" class="([^"]*)"><\/span>/.exec(html)?.[1]?.split(/\s+/) ?? []
+
+    expect(spacer).toEqual(
+      expect.arrayContaining(['hidden', 'w-31', 'shrink-0', 'lg:max-xl:block']),
+    )
+    expect(html.indexOf('w-31')).toBeLessThan(html.indexOf(messages.map.previewBackToList))
+    expect(render({ variant: 'sheet' })).not.toContain('w-31')
   })
 })

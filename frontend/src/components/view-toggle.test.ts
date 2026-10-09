@@ -143,7 +143,17 @@ describe('ViewToggle — 호출부의 크기 (#1125)', () => {
 
     expect(tags).toHaveLength(1)
     expect(tags[0]).not.toContain('size=')
-    expect(tags[0]).not.toContain('className=')
+    /*
+      `className` 은 레이아웃만 — 지도 아일랜드(#1300)는 1024 이상에서 숨긴다(패널 `크게 보기` 가 대신한다).
+      그 밖의 클래스(그림자 · 색 · 곡률)로 덮지 않는다.
+    */
+    const literals = [
+      ...(/className=\{([^}]*)\}/.exec(tags[0] ?? '')?.[1] ?? '').matchAll(/'([^']*)'/g),
+    ]
+      .flatMap((m) => (m[1] ?? '').split(/\s+/))
+      .filter((name) => name !== '')
+    expect(tags[0]).not.toMatch(/className="/)
+    for (const name of literals) expect(name).toMatch(/^(?:md:|lg:)?hidden$/)
   })
 })
 

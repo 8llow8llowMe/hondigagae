@@ -2251,26 +2251,93 @@ body:has(.map-canvas-height) .site-footer {
 }
 
 /*
-  지도 아일랜드 헤더 — 이슈 #1287 (`docs/features/place/지도-아일랜드헤더-세부명세.md` D3-2).
+  지도 아일랜드 헤더 — 이슈 #1287 · #1300 (`docs/features/place/지도-아일랜드헤더-세부명세.md` D3-2,
+  `docs/features/place/지도-아일랜드알약-정리-세부명세.md` D3-2).
 
   **`/places` 지도 보기에서는 흰 헤더 띠를 걷고 지도를 화면 맨 위까지 깐다.** 헤더는 지도 위에 뜨는
   알약(`IslandHeader`)이 된다. 셸이 헤더 두 벌을 함께 그리고 **지도 쪽이 자기 성질(`.map-island`)로
   고른다** — 위 푸터 규칙(#399)과 같은 축이다. `/places` 의 목록 · 지도는 같은 라우트의 `?view=`
   쿼리라 레이아웃 · prop 으로는 가를 수 없고, 클라이언트에서 가르면 첫 페인트가 띠 → 알약으로 바뀐다.
 
-  숨은 쪽은 `display: none` 이라 접근성 트리에서도 빠진다 — 화면의 `banner` 는 늘 하나다.
+  **768 미만은 알약이 없다** (#1300 D1-1) — 검색창이 맨 위(y 8)다. 띠도 알약도 서지 않아 그 폭의
+  `banner` 는 0 이다(D6 — 받아들인 결정). 숨은 쪽은 `display: none` 이라 접근성 트리에서도 빠진다.
   `:has()` 를 못 읽는 브라우저는 띠가 남고 지도가 그 아래로 넘친다 — 푸터 규칙과 같은 전제(D5).
 */
 .island-header {
   display: none;
+  /* 지도 왼쪽 경계 — 기본(패널 접힘 · 768–1023)은 0 이고 로고 상자(148)가 왼쪽을 막는다 */
+  --island-map-left: 0px;
 }
 
 body:has(.map-island) .global-header {
   display: none;
 }
 
-body:has(.map-island) .island-header {
-  display: block;
+@media (width >= 48rem) {
+  body:has(.map-island) .island-header {
+    display: block;
+  }
+}
+
+/*
+  **알약을 지도 영역에 가둔다** (#1300 D1-2). 지도 루트의 `data-dock`(패널 여닫힘) · `data-preview`(미리보기 ·
+  시설 요약 열림)를 읽어 도킹 스택의 오른쪽 끝을 준다 — 목록 400, 1280 부터 미리보기가 목록 옆이면 800.
+  1024–1279 의 미리보기는 목록 자리라 400 그대로다. JS 측정이 없어 서버 렌더 첫 페인트부터 맞다.
+*/
+@media (width >= 64rem) {
+  body:has(.map-island[data-dock='open']) .island-header {
+    --island-map-left: 400px;
+  }
+}
+
+@media (width >= 80rem) {
+  body:has(.map-island[data-dock='open'][data-preview='open']) .island-header {
+    --island-map-left: 800px;
+  }
+}
+
+/*
+  알약의 **허용 상자** — 왼쪽 = `max(지도 왼쪽 경계, 로고 상자 오른쪽 148) + 16`, 오른쪽 = 콘텐츠 열 오른쪽 − 40
+  (목록 보기 띠 헤더의 계정 · 지도 조작 카드와 같은 x, #412). 알약은 이 안에서 오른쪽 정렬이라 도킹을 여닫아도
+  움직이지 않는다 — 상자의 왼쪽만 바뀐다. `100%` 는 `fixed` 의 기준(뷰포트) 폭이다.
+
+  `148` = 로고 알약 상자 오른쪽 끝(왼쪽 16 + 좌우 12 · 테두리 1 + 락업 106). 로고 락업이 바뀌면 함께 고친다
+  (`styles/map-island.test.ts` 가 소스로 묶는다).
+
+  **컨테이너다** — 아래 `@container island-bar` 가 이 상자의 폭으로 메뉴 셋 ↔ `≡` 를 가른다. `container-type` 은
+  `fixed` 자손의 기준 상자가 되므로 로고를 이 안에 두지 않는다(`island-header.tsx`).
+*/
+.island-bar {
+  position: fixed;
+  top: 8px;
+  container: island-bar / inline-size;
+  inset-inline-start: calc(max(var(--island-map-left), 148px) + 16px);
+  inset-inline-end: max(40px, calc((100% - var(--content-max)) / 2 + 40px));
+}
+
+.island-menu-collapsed {
+  display: none;
+}
+
+/*
+  **`≡` 로 접는 기준 = 비로그인 알약 실측 폭** (#1300 D1-2 · D7-6). 폭은 도킹 상태 · 뷰포트 둘의 함수라 미디어
+  쿼리로는 못 짚는다. 실측(헤드리스 Chromium, 2026-10-09 — 1440 · 1280 · 1024 같은 값): 기본 글자 크기에서
+  **358.5px** 이고, 뿌리 글자 크기를 키우면 여백(rem)만 자란다 — 글자는 px 토큰이다 — 112.5 % 375.7 · 125 % 393 ·
+  150 % 427.5. 그래서 기준을 **`221px + 8.625rem`**(고정 몫 + rem 몫)으로 적는다: 16px 에서 359, 24px 에서 428.
+  px 하나로 적으면 글자 크기를 150 % 로 둔 사람의 1280 미리보기 열림(허용 상자 424)에서 알약이 3px 넘친다.
+
+  가장 좁은 허용 상자(1280 미리보기 열림 424)에서도 기본 크기 65 가 남아 지금 폭들에서는 서지 않는다 — `≡` 는
+  글자 크기 확대 · 글꼴 대체에서만 서는 **안전망**이다. 브라우저 확대(Ctrl +)는 CSS 폭 자체가 줄어 더 좁은
+  배치(1024 · 태블릿)로 내려가므로 이 기준에 닿지 않는다. 메뉴 이름 · 계정 모양이 바뀌면 다시 잰다.
+*/
+@container island-bar (width < calc(221px + 8.625rem)) {
+  .island-menu-full {
+    display: none;
+  }
+
+  .island-menu-collapsed {
+    display: block;
+  }
 }
 
 /*
@@ -2288,18 +2355,44 @@ body:has(.map-island) .island-header {
 }
 
 /*
-  모바일 미리보기 시트 상한 — `.map-preview-sheet` 의 136 이 아일랜드에서는 120 이다
-  (`MAP_ISLAND_TOP_CONTROLS_INSET` = 위 8 + 알약 48 + 간격 12 + 검색 44 + 여유 8, `map-sheet.tsx`).
+  **지도 위 조작 줄 바닥 + 여유** — 시트 `max` 윗변 · 모바일 미리보기 시트 상한 · 고른 핀 세로 보정이 이 값 하나를
+  읽는다(#1300 D1-2). 폭에 따라 갈리므로 JS 상수 둘을 `matchMedia` 로 고르지 않는다 — 하이드레이션 불일치 · 회전
+  때 어긋난다. CSS 가 폭을 알고 JS(`place-map-view.tsx` 의 핀 보정)는 계산된 값을 읽는다.
+
+  - **60** (<768) = 위 8 + 검색 44 + 여유 8 — 알약이 없다
+  - **120** (≥768) = 위 8 + 알약 48 + 간격 12 + 검색 · 보기 전환 44 + 여유 8
+
+  `map-sheet.render.test.ts` 가 두 유도를 이 값과 대조한다.
 */
+.map-island {
+  --map-island-inset: 60px;
+}
+
+@media (width >= 48rem) {
+  .map-island {
+    --map-island-inset: 120px;
+  }
+}
+
 .map-island .map-preview-sheet {
-  max-height: max(45dvh, calc(100dvh - 120px - var(--map-sheet-tabbar)));
+  max-height: max(45dvh, calc(100dvh - var(--map-island-inset) - var(--map-sheet-tabbar)));
 }
 
 /*
-  ≥1024 · 패널 접힘 — **로고 알약.** 로고는 도킹 스택 맨 위 64 띠 위에 서는데, 패널을 접으면 띠가
-  스택과 함께 밀려나 로고가 지도 위에 맨몸으로 남는다. 자리(왼쪽 16 · 위 8 · 높이 48)는 그대로 두고
-  바탕만 알약이 된다 — 메뉴 알약과 같은 면 · 테두리 · 그림자, 좌우 12(D1-2).
+  **로고 알약** — 768–1023 은 늘, ≥1024 는 패널이 접혔을 때(#1287 D1-2 · #1300 D2-1). 로고는 도킹 스택의 목록 칸
+  64 띠 위에 서는데, 띠가 없는 폭(768–1023)이나 패널을 접어 띠가 밀려나면 로고가 지도 위에 맨몸으로 남는다.
+  자리(왼쪽 16 · 위 8 · 높이 48)는 그대로 두고 바탕만 알약이 된다 — 메뉴 알약과 같은 면 · 테두리 · 그림자, 좌우 12.
 */
+@media (width >= 48rem) and (width < 64rem) {
+  body:has(.map-island) .island-logo {
+    padding-inline: 12px;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-md);
+  }
+}
+
 @media (width >= 64rem) {
   body:has(.map-island[data-dock='closed']) .island-logo {
     padding-inline: 12px;
@@ -2308,6 +2401,17 @@ body:has(.map-island) .island-header {
     border-radius: var(--radius-full);
     box-shadow: var(--shadow-md);
   }
+}
+
+/*
+  지도 도구 캡션 — 지도 우측 아이콘 묶음 카드의 칸 글자(`병원·약국`) **전용** (#1300 D1-2, DESIGN.md §3-2).
+  48 칸 안쪽 46 에 `병원·약국` 이 들어가는 크기가 10px 이다(11px 은 1px 남짓 남아 버린다). §3-2 스케일 밖 값이라
+  유틸리티를 만들지 않고 이 이름 하나로만 쓴다 — 다른 자리에 쓰지 않는다.
+*/
+.map-tool-caption {
+  font-size: 10px;
+  line-height: 12px;
+  font-weight: 600;
 }
 
 /*

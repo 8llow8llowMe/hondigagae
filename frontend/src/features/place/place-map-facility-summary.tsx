@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import Link from 'next/link'
 
+import { ChevronRightIcon } from '@/components/icons'
 import { CallButton, DirectionsLink, FacilityRowContent } from '@/features/emergency/facility-row'
 import { type PlaceMapPreviewVariant, PreviewTopBar } from '@/features/place/place-map-preview-body'
 import { messages } from '@/lib/messages'
@@ -12,7 +14,12 @@ import type { NearbyFacilityItem } from '@/types/emergency'
  *
  * **`/emergency` 지도 패널의 고른 행과 같은 조각을 쓴다** (`FacilityRowContent` · `CallButton` ·
  * `DirectionsLink`) — 두 화면의 시설 표현이 갈리지 않게. 페이지를 옮기지 않는다: 필터 · 재검색 영역 · 패널
- * 접힘이 그대로 남는다. `/emergency` 로 가는 링크는 두지 않는다(D8-3).
+ * 접힘이 그대로 남는다.
+ *
+ * **본문 맨 아래 `주변 병원·약국 더 보기` → `/emergency`** (#1300 D1-2 — #1286 D8-3 을 대체). 지도 아일랜드 알약에서
+ * `병원 · 약국` 링크가 빠져 이 링크가 지도에서 `/emergency` 로 가는 길이다. `/emergency` 의 정규 주소(= 목록 보기)로
+ * 보낸다 — "더 보기" 는 거리 · 영업 비교이고 그 화면의 기본이 목록인 이유와 같다(`긴급시설-목록우선-세부명세.md`
+ * E-1). 고른 시설은 넘기지 않는다 — 그 화면의 선택은 URL 이 아니라 화면 상태다.
  *
  * - **거리를 쓰지 않는다** — 조회 중심이 제주시청이라 `distanceMeters` 는 사용자와 무관하다(D3-1)
  * - `openNow: null` 은 닫힘이 아니라 확인 필요다 — `FacilityRowContent` 가 이미 점선으로 그린다
@@ -91,6 +98,14 @@ export function PlaceMapFacilitySummary({
             {messages.map.previewCallUnavailable}
           </p>
         )}
+
+        <Link
+          href="/emergency"
+          className="text-link hover:text-link-hover focus-visible:ring-brand-500 text-body-2 inline-flex min-h-11 items-center gap-1 self-start rounded-sm font-semibold break-keep focus-visible:ring-2 focus-visible:outline-none"
+        >
+          {messages.map.facilityMoreNearby}
+          <ChevronRightIcon size={16} />
+        </Link>
       </div>
     </section>
   )

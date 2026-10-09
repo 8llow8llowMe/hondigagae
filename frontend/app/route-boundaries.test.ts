@@ -251,12 +251,24 @@ describe('로딩 골격 — 완료 화면과 같은 자리', () => {
     const classes = (/class="([^"]*)"/.exec(root)?.[1] ?? '').split(/\s+/)
     expect(classes).toContain('map-canvas-height')
     expect(classes).toContain('map-island')
-    // 조작 줄은 알약 아래 y 68 — 헤더 띠가 있는 지도의 top-5 가 아니다
+    // 미리보기가 없다 — 알약 허용 상자가 목록 폭(400)만 비킨다 (#1300)
+    expect(root).toContain('data-dock="open"')
+    expect(root).not.toContain('data-preview')
+    // 조작 줄은 <768 y 8 · ≥768 알약 아래 y 68 (#1300 D3-4) — 헤더 띠가 있는 지도의 top-5 가 아니다
     const controls =
       /<div [^>]*class="(pointer-events-none absolute inset-x-0[^"]*)"/.exec(markup)?.[1] ?? ''
-    expect(controls.split(/\s+/)).toContain('top-17')
+    expect(controls.split(/\s+/)).toEqual(expect.arrayContaining(['top-2', 'md:top-17']))
     expect(markup).not.toMatch(/class="[^"]*\btop-5\b/)
+    // 지도 도구 카드 자리 — 칸 하나(1 + 48 + 1). 첫 페인트에는 병원·약국 칸만 선다
+    expect(markup).toMatch(/class="[^"]*\bh-12\.5 w-12 rounded-lg\b/)
+    // 로고 띠 · 그 아래 시작은 목록 칸의 것이다 — 스택에 pt-16 이 없다
+    expect(markup).not.toMatch(/class="[^"]*\bpt-16\b/)
+    expect(markup.indexOf('map-panel-width')).toBeLessThan(markup.indexOf('h-16 shrink-0 border-b'))
     expect(markup).toContain('aria-label="장소 목록"')
+    // 시트 상한은 아일랜드 변수다 — 골격은 `mid` 로 서므로 소스로 본다
+    expect(code('src/features/place/place-map-skeleton.tsx')).toContain(
+      'maxTopInset={MAP_ISLAND_INSET_VAR}',
+    )
   })
 
   it('장소 지도 — 목록 대기 중에는 빈 상태가 아니라 같은 행 골격이다', () => {

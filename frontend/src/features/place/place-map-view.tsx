@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 
 import type { ReactNode } from 'react'
 
@@ -11,7 +12,7 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import {
-  MAP_ISLAND_TOP_CONTROLS_INSET,
+  MAP_ISLAND_INSET_VAR,
   MAP_TOP_CONTROLS_INSET,
   MapSheet,
   type SheetStop,
@@ -20,6 +21,7 @@ import { Skeleton } from '@/components/skeleton'
 import { ViewToggle } from '@/components/view-toggle'
 import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
+import { MapToolCard } from '@/features/map/map-tool-card'
 import { ResearchHereButton } from '@/features/map/research-here-button'
 import { useMapFailureFallback } from '@/features/map/use-map-failure-fallback'
 import { facilityLayerStatus } from '@/features/place/facility-layer-status'
@@ -232,10 +234,11 @@ export function PlaceMapView({
    * **지도 아일랜드** — 흰 헤더 띠를 걷고 지도를 화면 맨 위까지 깐다 (#1287, `지도-아일랜드헤더-세부명세.md`).
    * `/places` 만 켠다.
    *
-   * 켜면 루트가 `map-island` · `data-dock` 을 단다 — 셸의 `body:has(.map-island)` 규칙이 그것을 읽어
-   * 띠 헤더를 알약(`IslandHeader`)으로 바꾸고 지도 높이에서 헤더 몫을 뺀다(`app/globals.css`). 조작 줄은
-   * 알약 아래 모든 폭 y 68(`top-17`), 도킹 스택은 맨 위 64 를 로고 띠로 비우고, 시트 상한 · 고른 핀
-   * 보정이 `MAP_ISLAND_TOP_CONTROLS_INSET`(120)이다.
+   * 켜면 루트가 `map-island` · `data-dock` · `data-preview` 를 단다 — 셸의 `body:has(.map-island)` 규칙이 그것을
+   * 읽어 띠 헤더를 알약(`IslandHeader`)으로 바꾸고, 알약을 지도 영역 안에 가두고(#1300), 지도 높이에서 헤더 몫을
+   * 뺀다(`app/globals.css`). 조작 줄은 <768 y 8(알약 없음) · ≥768 y 68, 목록 칸은 맨 위 64 를 로고 띠로 비우고
+   * 미리보기 칸은 y 0 부터다. 시트 상한 · 고른 핀 보정은 CSS 변수 `--map-island-inset`(60 / 120)이다.
+   * 우측 조작은 아이콘 묶음 카드(`MapToolCard`)이고 데스크톱 `목록 보기` 는 패널 개수 줄 `크게 보기` 가 맡는다.
    *
    * **끄면 한 글자도 다르지 않다** — 담기 지도(`fill`)는 켜지 않는다. 담기의 머리 카드가 로고 띠 ·
    * 로고 알약과 자리가 겹쳐 따로 설계한다(명세 D7-3). `fill` 과 함께 켜지 않는다.
@@ -429,16 +432,18 @@ export function PlaceMapView({
   const rootRef = useRef<HTMLDivElement>(null)
   /**
    * 지도 위 조작 줄 바닥 + 여유 — 시트 `max` 윗변 · 고른 핀 세로 보정이 함께 쓴다. 뷰포트 위에서 잰 값이다.
-   * 헤더 띠가 있는 지도는 136, 아일랜드는 120 (`map-sheet.tsx` 의 유도표).
+   * 헤더 띠가 있는 지도는 136(`map-sheet.tsx` 의 유도표). **아일랜드는 CSS 변수**다 — 알약이 768 이상에만 서서
+   * 바닥이 폭으로 갈린다(60 / 120, `.map-island` 규칙). 시트에는 변수를 그대로 넘기고, 핀 보정은 계산된 값을 읽는다.
    */
-  const controlsInset = island ? MAP_ISLAND_TOP_CONTROLS_INSET : MAP_TOP_CONTROLS_INSET
+  const controlsInset = island ? MAP_ISLAND_INSET_VAR : MAP_TOP_CONTROLS_INSET
   /** 손잡이의 `aria-controls` — 접는 대상인 데스크톱 스택 */
   const stackId = useId()
   const previewPanelRef = useRef<HTMLDivElement>(null)
   const previewSheetRef = useRef<HTMLDivElement>(null)
   const selectedOffset = useCallback((): MapOffset | null => {
-    const root = rootRef.current?.getBoundingClientRect()
-    if (root === undefined) return null
+    const rootElement = rootRef.current
+    if (rootElement === null) return null
+    const root = rootElement.getBoundingClientRect()
 
     /*
       `display: none` 인 갈래는 크기가 0 이다 — 지금 폭에서 서 있는 쪽만 잰다.
@@ -458,8 +463,13 @@ export function PlaceMapView({
     */
     const sheet = previewSheetRef.current?.getBoundingClientRect()
     if (sheet !== undefined && sheet.height > 0) {
-      // `controlsInset` 은 뷰포트 위에서 잰 값이다(헤더 포함) — `root.top` 에 더하지 않는다
-      const top = Math.max(root.top, controlsInset)
+      // 아일랜드는 지금 폭의 `--map-island-inset` 계산값(px)을 읽는다 — 읽지 못하면 지도 윗변까지만 비킨다
+      const inset =
+        typeof controlsInset === 'number'
+          ? controlsInset
+          : Number.parseFloat(getComputedStyle(rootElement).getPropertyValue('--map-island-inset'))
+      // 뷰포트 위에서 잰 값이다(헤더 포함) — `root.top` 에 더하지 않는다
+      const top = Math.max(root.top, Number.isFinite(inset) ? inset : 0)
       if (sheet.top <= top) return null
       return { x: 0, y: (top + sheet.top) / 2 - (root.top + root.bottom) / 2 }
     }
@@ -810,8 +820,10 @@ export function PlaceMapView({
     <div
       ref={rootRef}
       className={cn('relative', fill ? 'h-full' : 'map-canvas-height', island && 'map-island')}
-      /* 아일랜드의 로고 알약(≥1024, 패널 접힘)이 이 값을 읽는다 — `app/globals.css` */
+      /* 아일랜드의 로고 알약(≥1024, 패널 접힘) · 알약 허용 상자 왼쪽(400)이 이 값을 읽는다 — `app/globals.css` */
       data-dock={island ? (panelOpen ? 'open' : 'closed') : undefined}
+      /* 미리보기 · 시설 요약이 열리면 ≥1280 에서 도킹 스택이 800 이 된다 — 알약 허용 상자가 그만큼 비킨다(#1300) */
+      data-preview={island && docked ? 'open' : undefined}
     >
       {/* 지도가 바탕이다. 데스크톱은 좌측 패널이 그 위에 얹힌다 (아트보드 05) */}
       <MapCanvas
@@ -943,10 +955,10 @@ export function PlaceMapView({
         className={cn(
           'pointer-events-none absolute inset-x-0 z-30',
           /*
-            **아일랜드는 알약(위 8 · 높이 48) 아래 12 — 모든 폭 y 68** (#1287 D2-1). 헤더 띠가 있는 지도는
-            띠 아래 20 · 24 다.
+            **아일랜드는 768 이상 알약(위 8 · 높이 48) 아래 12 = y 68, 그 아래는 알약이 없어 y 8** (#1300 D2-1).
+            헤더 띠가 있는 지도는 띠 아래 20 · 24 다.
           */
-          island ? 'top-17' : 'top-5 lg:top-6',
+          island ? 'top-2 md:top-17' : 'top-5 lg:top-6',
         )}
       >
         <div className="content-container flex items-start justify-end gap-2 px-4 md:px-10">
@@ -977,25 +989,42 @@ export function PlaceMapView({
             {/*
               **폭에 따라 두 벌을 두지 않는다** (#240). 갈 곳 하나만 말하는 글자 버튼이다
               (#1125) — 예전 아이콘 두 칸이 `title` 툴팁으로 메우던 이름을 글자가 직접 말한다.
-              높이 44 는 같은 줄의 검색 · 아래 `내 위치` 와 맞춘 값이다.
-            */}
-            {showToggle && <ViewToggle current="map" listHref={listHref} mapHref={mapHref} />}
+              높이 44 는 같은 줄의 검색과 맞춘 값이다.
 
-            {/*
-              **병원 · 약국 토글은 `목록 보기` 아래 · `내 위치` 위다** (#1286 D4-1). `내 위치` 는 늦게 나타나므로
-              (`locatable`) 그 아래에 두면 토글이 한 박자 뒤에 밀린다.
+              **아일랜드 1024 이상은 두지 않는다** (#1300 D1-2) — 목록이 옆에 보이는데 `목록 보기` 가 떠 있었다. 패널
+              개수 줄의 `크게 보기` 가 같은 주소로 간다. 768–1023 은 패널이 없어 글자 버튼 그대로, <768 은 아이콘이다.
             */}
-            {facilityLayer && (
-              <PlaceMapFacilityToggle
-                ref={facilityToggleRef}
-                on={facilityOn}
-                status={facilityStatus}
-                onToggle={toggleFacilityLayer}
+            {showToggle && (
+              <ViewToggle
+                current="map"
+                listHref={listHref}
+                mapHref={mapHref}
+                className={island ? 'lg:hidden' : ''}
               />
             )}
 
-            {/* 제주 밖·거부·미지원이면 렌더하지 않는다 — 눌러도 같은 답이다 */}
-            {locatable && <MapLocateButton onLocate={locate} />}
+            {/*
+              **아일랜드 · 시설 층은 아이콘 묶음 카드 하나다** (#1300 D1-2) — `병원·약국` 층 칸 · `내 위치` 칸. 지도 위
+              상태를 바꾸는 것만 담는다(목록 아이콘은 다른 화면으로 가는 링크라 위에 따로 선다). `내 위치` 는 늦게
+              나타나므로(`locatable`) 아래 칸이다 — 위에 두면 층 칸이 한 박자 뒤에 밀린다.
+              **끄면(담기 지도) 예전 그대로** 혼자 뜨는 44 버튼이다.
+            */}
+            {island || facilityLayer ? (
+              <MapToolCard>
+                {facilityLayer && (
+                  <PlaceMapFacilityToggle
+                    ref={facilityToggleRef}
+                    on={facilityOn}
+                    status={facilityStatus}
+                    onToggle={toggleFacilityLayer}
+                  />
+                )}
+                {/* 제주 밖·거부·미지원이면 렌더하지 않는다 — 눌러도 같은 답이다 */}
+                {locatable && <MapLocateButton onLocate={locate} variant="cell" />}
+              </MapToolCard>
+            ) : (
+              locatable && <MapLocateButton onLocate={locate} />
+            )}
           </div>
         </div>
 
@@ -1049,24 +1078,8 @@ export function PlaceMapView({
           id={stackId}
           inert={!panelOpen}
           // 그림자는 스택에 하나 — 접혀 있으면 x=0 에 회색 띠로 비친다 (#1123)
-          className={cn(
-            'relative flex h-full',
-            panelOpen && 'map-dock-shadow',
-            // 아일랜드는 맨 위 64 가 로고 띠다 — 목록 · 미리보기 · 시설 요약 본문은 그 아래(y 64)부터
-            island && 'pt-16',
-          )}
+          className={cn('relative flex h-full', panelOpen && 'map-dock-shadow')}
         >
-          {/*
-            **로고 띠** (#1287 D1-2) — 스택 폭 전체, 맨 위 64. 로고는 셸의 `IslandHeader` 가 `fixed` 로 이
-            위에 세운다(배너 안 DOM 그대로). 띠가 패널 본문의 시작점을 예전 헤더 아래와 같은 y 64 로 지킨다.
-            1024~1279 에서 미리보기가 목록 자리를 써 목록이 `invisible` 이 돼도 띠는 스택의 것이라 남는다.
-          */}
-          {island && (
-            <div
-              aria-hidden
-              className="bg-bg border-border absolute inset-x-0 top-0 h-16 border-b"
-            />
-          )}
           <div
             className={cn(
               'map-panel-width bg-bg border-border flex h-full flex-col overflow-hidden border-r',
@@ -1077,6 +1090,13 @@ export function PlaceMapView({
               docked && 'lg:max-xl:invisible',
             )}
           >
+            {/*
+              **로고 띠** (#1287 D1-2 → #1300 D1-2) — **목록 칸 폭만**, 맨 위 64. 로고는 셸의 `IslandHeader` 가
+              `fixed` 로 이 위에 세운다(배너 안 DOM 그대로). 미리보기 · 시설 요약 칸은 y 0 부터 서서 자기 머리 64 에
+              `‹ 목록` · ✕ 를 둔다 — 띠가 스택 전폭이면 그 머리를 덮는다.
+            */}
+            {island && <div aria-hidden className="border-border h-16 shrink-0 border-b" />}
+
             {/* 담기 화면의 머리 — 열린 패널의 맨 위 블록이다 (D9). 접혀 있으면 떠 있는 기둥이 대신 그린다 */}
             {hasHead && <div className="border-border border-b p-3">{head}</div>}
 
@@ -1107,9 +1127,32 @@ export function PlaceMapView({
               안의 `div` 는 HTML 이 허락하지 않아 하이드레이션이 깨진다. 담기 지도가 기준점으로
               열리면 서버 렌더 시점에 주변 조회가 대기 중이라 이 갈래가 처음으로 서버에서 그려졌다.
             */}
-            <div className="text-caption text-fg-muted border-border bg-bg-sunken border-b px-4 py-2 font-medium">
-              {listPending ? <Skeleton className="h-4.5 w-20" /> : countLine}
-            </div>
+            {/*
+              **아일랜드는 개수 줄 오른쪽에 `크게 보기`** (#1300 D1-2) — 지도 위 `목록 보기` 를 대신해 같은 주소
+              (`listHref`)로 간다. 링크가 44 를 갖도록 줄이 35 → 44(`min-h-11`)다. 앞의 숨은 `목록` 으로 접근 이름이
+              `목록 크게 보기` 가 된다 — 보이는 글자가 이름 안에 든다(WCAG 2.5.3). 담기 지도는 예전 그대로다.
+            */}
+            {island ? (
+              <div className="text-caption text-fg-muted border-border bg-bg-sunken flex min-h-11 items-center justify-between gap-2 border-b ps-4 pe-2 font-medium">
+                <div className="min-w-0 truncate">
+                  {listPending ? <Skeleton className="h-4.5 w-20" /> : countLine}
+                </div>
+                {listHref !== undefined && (
+                  <Link
+                    href={listHref}
+                    className="text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex min-h-11 shrink-0 items-center gap-1 rounded-sm px-2 font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                  >
+                    <span className="sr-only">{`${messages.map.expandListPrefix} `}</span>
+                    {messages.map.expandList}
+                    <ChevronRightIcon size={16} />
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <div className="text-caption text-fg-muted border-border bg-bg-sunken border-b px-4 py-2 font-medium">
+                {listPending ? <Skeleton className="h-4.5 w-20" /> : countLine}
+              </div>
+            )}
 
             {/* `tabIndex={-1}` — Tab 정류장이 아니다. 시설 요약 `‹ 목록` 이 행이 없을 때 포커스를 놓는 자리다 */}
             <div
@@ -1143,11 +1186,11 @@ export function PlaceMapView({
           {docked && (
             <div
               ref={previewPanelRef}
-              className={cn(
-                'map-panel-width bg-bg border-border absolute left-0 overflow-hidden border-r xl:static',
-                // 1024~1279 의 목록 자리도 로고 띠 아래에서 시작한다 — 1280 부터는 흐름 안이라 스택 `pt-16` 을 따른다
-                island ? 'top-16 bottom-0' : 'inset-y-0',
-              )}
+              /*
+                **y 0 부터다** (#1300 D1-2) — 아일랜드에서도 머리 64(`PreviewTopBar` panel)가 `‹ 목록` · ✕ 를 로고와 같은
+                높이에 둔다. 1024~1279 는 목록 자리(`absolute`), 1280 부터는 흐름 안이다.
+              */
+              className="map-panel-width bg-bg border-border absolute inset-y-0 left-0 overflow-hidden border-r xl:static"
             >
               {/* 같은 칸을 번갈아 쓴다 — 동시에 하나만 골라져 있어 겹치지 않는다 (#1286 D4-3) */}
               {selectedFacility !== null ? (

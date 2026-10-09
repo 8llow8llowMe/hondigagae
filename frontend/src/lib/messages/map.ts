@@ -221,4 +221,22 @@ export const mapMessages = {
   /** 시설 요약 `section` 의 접근 이름 — 장소 미리보기 자리에 선다 */
   facilitySummaryLabel: '병원·약국 요약',
   facilitySummaryClose: '요약 닫기',
+  /**
+   * 시설 요약 맨 아래 글자 링크 → `/emergency`(#1300 D1-2). 뒤에 `ChevronRightIcon` 을 붙인다 — `→` 글자는
+   * 쓰지 않는다(스크린리더가 "오른쪽 화살표" 로 읽는다).
+   */
+  facilityMoreNearby: '주변 병원·약국 더 보기',
+
+  // ── 지도 아일랜드 (#1300) ──────────────────────────────────────────────
+
+  /**
+   * 데스크톱 패널 개수 줄 오른쪽 링크 — 목록 보기로 간다(`listHref`). 앞에 `sr-only` `expandListPrefix` 를 붙여
+   * 접근 이름이 `목록 크게 보기` 가 된다 — 보이는 글자가 이름 안에 든다(WCAG 2.5.3).
+   */
+  expandList: '크게 보기',
+  expandListPrefix: '목록',
+  /** 알약이 좁을 때 메뉴 셋을 접는 `≡` 버튼의 접근 이름 · `title` */
+  islandMenuOpen: '메뉴 열기',
+  /** 같은 `≡` 가 여는 `Menu` 의 `aria-label` */
+  islandMenuLabel: '주요 메뉴',
 } as const

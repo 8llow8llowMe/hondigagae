@@ -168,17 +168,19 @@ describe('머리가 있는 화면의 검색 자리 (#1012)', () => {
 })
 
 /*
-  **조작 줄의 세로 자리는 두 갈래다** — 이슈 #1287 (`지도-아일랜드헤더-세부명세.md` D2-1 · D3-3).
+  **조작 줄의 세로 자리는 두 갈래다** — 이슈 #1287 → #1300 (`지도-아일랜드알약-정리-세부명세.md` D2-1 · D3-3).
 
-  `/places` 지도(아일랜드)는 흰 헤더 띠가 없고 알약(위 8 · 높이 48) 아래 12 — **모든 폭 y 68**(`top-17`)이다.
+  `/places` 지도(아일랜드)는 흰 헤더 띠가 없다. 768 이상은 알약(위 8 · 높이 48) 아래 12 — **y 68**(`md:top-17`),
+  그 아래는 알약이 없어 검색이 맨 위 **y 8**(`top-2`)이다.
   헤더 띠가 있는 지도(담기)는 띠 아래 20 · 24(`top-5 lg:top-6`) 그대로다 — 끄면 한 글자도 다르지 않다.
 */
-describe('조작 줄의 세로 자리 (#1287)', () => {
+describe('조작 줄의 세로 자리 (#1287 · #1300)', () => {
   const rowStart = mapView.indexOf("'pointer-events-none absolute inset-x-0 z-30'")
   const row = mapView.slice(rowStart, mapView.indexOf(')}', rowStart))
 
-  it('아일랜드 갈래는 모든 폭 top-17(68) 이다 — lg 에서 갈리지 않는다', () => {
-    expect(row).toContain("island ? 'top-17' : 'top-5 lg:top-6'")
+  it('아일랜드 갈래는 <768 top-2(8) · ≥768 top-17(68) 이다 — lg 에서 갈리지 않는다', () => {
+    expect(row).toContain("island ? 'top-2 md:top-17' : 'top-5 lg:top-6'")
+    expect(row).not.toMatch(/island \? '[^']*lg:/)
   })
 
   it('기본 갈래(헤더 띠가 있는 지도)는 top-5 · lg:top-6 그대로다', () => {
