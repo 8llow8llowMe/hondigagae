@@ -27,7 +27,9 @@ describe('PlaceFilterPetSync — 첫 로드에 URL 을 고치지 않는다', () 
 
   it('직전 · 다음이 둘 다 있고 다를 때만 맞춘다 (`changedPet`)', () => {
     expect(code).toContain('changedPet(previousPetId.current, pet)')
-    expect(code).toContain('if (next === null) return')
+    // 바뀜이 아니면 기록 이동 갈래로만 빠지고, 바뀜일 때만 새 반려견 값으로 맞춘다
+    expect(code).toContain('if (next === null) {')
+    expect(code).toContain('petSizeFiltersAfterPetChange(filters, next)')
   })
 
   it('이동은 usePlaceFilterNav 경유다 · 열린 미리보기를 닫지 않는다 — router.replace 를 직접 부르지 않는다', () => {
@@ -35,6 +37,25 @@ describe('PlaceFilterPetSync — 첫 로드에 URL 을 고치지 않는다', () 
     expect(code).toContain('apply(nextFilters, { keepPreview: true })')
     expect(code).not.toContain('useRouter')
     expect(code).not.toContain('router.replace')
+  })
+})
+
+describe('PlaceFilterPetSync — 기록 이동 뒤 다시 맞춤 (#1301 리뷰)', () => {
+  it('popstate 를 듣고, 조건이 이동 전과 달라진 뒤에 판단한다', () => {
+    expect(code).toContain("window.addEventListener('popstate', onPop)")
+    expect(code).toContain('poppedFrom.current !== null && poppedFrom.current !== filtersKey')
+  })
+
+  it('바꾼 적이 있을 때만 — 바뀜을 기록하는 줄이 A → B 갈래 안에 있다', () => {
+    const gate = code.indexOf('if (next === null) {')
+    const mark = code.indexOf('changedThisMount.current = true')
+    expect(gate).toBeGreaterThan(-1)
+    expect(mark).toBeGreaterThan(gate)
+    expect(code).toContain('changedThisMount: changedThisMount.current,')
+  })
+
+  it('다시 맞출 때도 replace(usePlaceFilterNav) 이고 미리보기를 닫지 않는다', () => {
+    expect(code).toContain('apply(again, { keepPreview: true })')
   })
 })
 
