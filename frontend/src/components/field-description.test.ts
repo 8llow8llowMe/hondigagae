@@ -85,6 +85,49 @@ describe('fieldDescription', () => {
   })
 })
 
+describe('fieldDescription — 칸 바깥 문단을 덧붙인다 (#1295)', () => {
+  /*
+    가입 단계의 첫 칸이 "3단계 중 N단계"(sr-only)를 가리킨다. 단계 전환 때 포커스가 곧장 그 칸으로
+    가서, 칸이 이 문단을 참조하지 않으면 단계가 낭독되지 않는다 (회원가입-세부명세 D15).
+  */
+  it('자기 설명 뒤에 덧붙인다 — 안내 · 오류가 먼저 읽힌다', () => {
+    expect(
+      fieldDescription({ id: 'password', hint: HINT, error: undefined, extra: 'step' }).describedBy,
+    ).toBe('password-hint step')
+    expect(
+      fieldDescription({ id: 'password', hint: HINT, error: ERROR, extra: 'step' }).describedBy,
+    ).toBe('password-error step')
+  })
+
+  it('자기 설명이 없으면 덧붙인 것 하나다', () => {
+    expect(
+      fieldDescription({ id: 'email', hint: undefined, error: undefined, extra: 'step' })
+        .describedBy,
+    ).toBe('step')
+  })
+
+  it('덧붙일 것이 없으면 예전 그대로다', () => {
+    expect(
+      fieldDescription({ id: 'email', hint: undefined, error: undefined, extra: undefined })
+        .describedBy,
+    ).toBeUndefined()
+  })
+
+  it('Field 의 extraDescribedBy 가 입력란까지 내려간다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(Field, {
+        id: 'password',
+        label: '비밀번호',
+        hint: HINT,
+        extraDescribedBy: 'signup-step-status',
+        children: input(false),
+      }),
+    )
+
+    expect(describedByOf(markup, 'password')).toBe(`${fieldHintId('password')} signup-step-status`)
+  })
+})
+
 describe('Field · Input — aria-describedby (#1100)', () => {
   it('정상 상태면 hint 를 hint id 로 렌더하고 입력란이 그것을 가리킨다', () => {
     const markup = renderField({ hint: HINT }, input(false))

@@ -36,6 +36,7 @@ import { codeStepAfterResend, type ResendOutcome } from '@/lib/form/code-step-af
 import { remainingSeconds } from '@/lib/form/cooldown'
 import { apiErrorToFormErrors, type FormErrors, NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { formErrorsAfterEdit } from '@/lib/form/form-failure-display'
+import { returnFocusTarget } from '@/lib/form/return-focus'
 import {
   focusResendResult,
   focusSubmitFailure,
@@ -126,6 +127,12 @@ export function SignupForm({
     null 이면 닫혀 있다.
   */
   const [consentSheet, setConsentSheet] = useState<'sendCode' | 'signup' | null>(null)
+  /*
+    약관 시트를 **닫을 때** 포커스가 돌아갈 자리 (#1295 N2, 회원가입-세부명세 D15). `BottomSheet` 의
+    `triggerRef` 로 넘기고 `current` 는 닫히는 순간에 채운다(`handleConsentSheetClose`). `null` 이면
+    `useOverlay` 가 예전대로 열기 직전의 활성 요소로 돌아간다.
+  */
+  const consentReturnFocusRef = useRef<HTMLElement | null>(null)
 
   // 필드로 좁혀지지 않는 5xx·무응답을 단계별로 구분한다 — LoginFormFields 와 같은 패턴
   const [emailErrorStatus, setEmailErrorStatus] = useState<number | null>(null)
@@ -495,6 +502,8 @@ export function SignupForm({
   /** 시트의 실행 버튼 — 닫고 하려던 일을 잇는다 */
   const handleConsentConfirm = useCallback(() => {
     const purpose = consentSheet
+    // 포커스는 이어지는 제출의 결과(단계 전환 · 실패 포커스 effect)가 정한다 — 복귀 자리를 따로 두지 않는다
+    consentReturnFocusRef.current = null
     setConsentSheet(null)
     if (purpose === 'sendCode') void emailForm.submit()
     if (purpose === 'signup') handleProfileSubmit()
@@ -552,6 +561,23 @@ export function SignupForm({
     )
   }, [profileForm.submitCount])
 
+  /**
+   * 시트를 동의 없이 닫는다 — Esc · 바깥 누름 (#1295 N2).
+   *
+   * **3단계에서 뜬 시트는 첫 오류 칸 → `가입하기` 로 돌아간다.** 서버가 동의를 거부해 다시 띄운 시트는
+   * 제출 응답이 연 것이라, 열린 순간의 활성 요소가 `BODY` 였다(제출 중 `가입하기` 가 `disabled`).
+   * 그대로 두면 닫은 뒤 `BODY` 로 떨어지고, 프로필 실패 포커스 effect 는 동의 오류가 있어 비켜 서
+   * 있다(#1078 이 실측한 그 자리). 1단계 시트는 `인증코드 받기` 를 누른 채 열려 그 버튼으로 잘 돌아가므로
+   * 예전대로 둔다.
+   */
+  const handleConsentSheetClose = () => {
+    consentReturnFocusRef.current =
+      consentSheet === 'signup'
+        ? returnFocusTarget<HTMLElement>(containerRef.current, profileStepErrors)
+        : null
+    setConsentSheet(null)
+  }
+
   /*
     **약관 시트** (#1284). 동의 블록은 더 이상 단계 위에 서지 않는다 — 첫 발송 전과 서버 거부 때만
     시트로 뜬다(`SignupConsentSheet` 머리주석). 시트는 body 포털이라 어느 단계 아래 두어도 같다.
@@ -559,7 +585,8 @@ export function SignupForm({
   const consentSheetElement = (
     <SignupConsentSheet
       open={consentSheet !== null}
-      onClose={() => setConsentSheet(null)}
+      onClose={handleConsentSheetClose}
+      triggerRef={consentReturnFocusRef}
       consent={consent}
       errors={consentErrors}
       onConsentChange={handleConsentChange}

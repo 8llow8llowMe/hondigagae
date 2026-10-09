@@ -9,7 +9,7 @@ import { FormNotice } from '@/components/form-notice'
 import { Input } from '@/components/input'
 import { PasswordInput } from '@/components/password-input'
 import type { CodeValues, EmailValues, SignupProfileValues } from '@/features/auth/schemas'
-import { SignupEmailSummary } from '@/features/auth/signup-parts'
+import { SIGNUP_STEP_STATUS_ID, SignupEmailSummary } from '@/features/auth/signup-parts'
 import { VerificationCodeInput } from '@/features/auth/verification-code-input'
 import { handOffLoginEmail } from '@/lib/auth/login-email-handoff'
 import type { FormErrors } from '@/lib/form/field-errors'
@@ -77,7 +77,13 @@ export function EmailStep({
       />
 
       {/* 칸 하나뿐인 폼의 `*` 는 정보가 없다 — 로그인 · 재설정과 같은 규칙 (#1283 C5 → #1284) */}
-      <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email}>
+      {/* 첫 칸이 단계 문구를 가리킨다 — 단계 전환 포커스가 곧장 여기로 온다 (#1295, D15) */}
+      <Field
+        id="email"
+        label={messages.auth.emailLabel}
+        error={errors.fields.email}
+        extraDescribedBy={SIGNUP_STEP_STATUS_ID}
+      >
         <Input
           id="email"
           type="email"
@@ -159,7 +165,12 @@ export function CodeStep({
       />
 
       {/* 칸 하나뿐인 단계라 `*` 를 달지 않는다 (#1284) */}
-      <Field id="code" label={messages.auth.codeLabel} error={errors.fields.code}>
+      <Field
+        id="code"
+        label={messages.auth.codeLabel}
+        error={errors.fields.code}
+        extraDescribedBy={SIGNUP_STEP_STATUS_ID}
+      >
         {/* 입력 중에 대문자화 · 공백 제거 — 재설정 2단계와 같은 칸이다 (#1078) */}
         <VerificationCodeInput
           id="code"
@@ -269,6 +280,7 @@ export function ProfileStep({
         label={messages.auth.passwordLabel}
         error={errors.fields.password}
         hint={messages.form.passwordRule}
+        extraDescribedBy={SIGNUP_STEP_STATUS_ID}
       >
         <PasswordInput
           id="password"
