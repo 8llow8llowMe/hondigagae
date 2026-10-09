@@ -100,11 +100,12 @@ describe('PlaceMapView — 기준점 지도의 실패 갈래 (#1177)', () => {
 */
 describe('PlaceMapView — 장소 미리보기 (#1227)', () => {
   it('1024~1279 는 미리보기가 목록 자리를 쓴다 — 목록은 invisible (a11y · Tab 에서도 빠진다)', () => {
-    expect(code).toContain("previewId !== null && 'lg:max-xl:invisible'")
+    // 시설 요약(#1286)도 같은 칸을 쓴다 — `docked` = 장소 미리보기 또는 시설 요약
+    expect(code).toContain("docked && 'lg:max-xl:invisible'")
   })
 
   it('모바일 목록 시트는 언마운트하지 않고 숨긴다 — 닫으면 스크롤 · 단계가 그대로 돌아온다', () => {
-    expect(code).toContain("className={cn(previewId !== null && 'hidden')}")
+    expect(code).toContain("className={cn(docked && 'hidden')}")
   })
 
   it('패널 · 시트 둘 다 key={previewId} 로 마운트한다 — 장소를 바꾸면 상태가 새로 시작한다', () => {
@@ -151,7 +152,7 @@ describe('PlaceMapView — 도킹 스택 (#1232)', () => {
 
   it('재검색 알약은 남은 지도의 가운데다 — 목록 400 · 1280 부터 미리보기까지 800 · 접히면 0', () => {
     expect(code).toContain("panelOpen && 'lg:left-100'")
-    expect(code).toContain("previewId !== null && panelOpen && 'xl:left-200'")
+    expect(code).toContain("docked && panelOpen && 'xl:left-200'")
   })
 
   it('카카오 축척 · 로고를 우하단으로 비킨다 — 도킹 스택이 좌하단 로고를 덮는다', () => {
@@ -176,7 +177,10 @@ describe('PlaceMapView — 도킹 스택 (#1232)', () => {
   /* 리뷰 지적 — 미리보기가 스택 안이라 접힌 채 고르면 화면 밖 inert 에 마운트됐다 */
   it('미리보기를 열면 접힌 스택을 편다 — 목록 · 시트 · 핀 모두 같은 길이다', () => {
     expect(code).toContain('if (preview && id !== null) setPanelOpen(true)')
-    expect(code.match(/onSelect=\{selectPlace\}/g)).toHaveLength(3)
+    // 지도는 장소 · 시설을 가르는 `selectOnMap` 을 거쳐 장소면 `selectPlace` 로 간다 (#1286)
+    expect(code.match(/onSelect=\{selectPlace\}/g)).toHaveLength(2)
+    expect(code).toContain('onSelect={selectOnMap}')
+    expect(code).toMatch(/if \(picked === null\) selectPlace\(id\)/)
     expect(code).not.toContain('onSelect={setSelectedId}')
   })
 
@@ -187,5 +191,79 @@ describe('PlaceMapView — 도킹 스택 (#1232)', () => {
 
   it('패널 위 여백을 호출부가 정하지 않는다 — 패널이 헤더 바로 아래부터다', () => {
     expect(code).not.toContain('panelTopInset')
+  })
+})
+
+/*
+  #1286 — 병원 · 약국 함께 보기. 조회 · 상태 판정은 `facility-layer.test.ts` · `facility-layer-status.test.ts` 가
+  잰다 — 여기서는 화면이 그 조각을 어디에 꽂는지만 본다.
+*/
+describe('PlaceMapView — 병원 · 약국 층 (#1286)', () => {
+  it('기본은 꺼짐이다 — 담기 지도는 토글이 없다', () => {
+    expect(code).toContain('facilityLayer = false,')
+    expect(code).toContain('const [facilityOn, setFacilityOn] = useState(false)')
+    expect(code).toContain('const layerOn = facilityLayer && facilityOn')
+    expect(code).toContain('useFacilityLayer(layerOn)')
+  })
+
+  it('/places 만 켠다', () => {
+    const page = readFileSync(
+      fileURLToPath(new URL('../../../app/(main)/places/(list)/page.tsx', import.meta.url)),
+      'utf8',
+    )
+    const plan = readFileSync(
+      fileURLToPath(new URL('../plan/plan-add-place-view.tsx', import.meta.url)),
+      'utf8',
+    )
+
+    expect(page).toMatch(/<PlaceMapView[\s\S]*?\bfacilityLayer\b[\s\S]*?\/>/)
+    expect(plan).not.toContain('facilityLayer')
+  })
+
+  it('미리보기 자리 조건에 시설이 들어간다 — 같은 칸 · 같은 시트를 번갈아 쓴다', () => {
+    expect(code).toContain('const docked = previewId !== null || facilityId !== null')
+    expect(code).toContain("docked && 'lg:max-xl:invisible'")
+    expect(code).toContain("className={cn(docked && 'hidden')}")
+    expect(code.match(/\{docked && \(/g)?.length).toBe(2)
+    expect(code.match(/<PlaceMapFacilitySummary/g)?.length).toBe(2)
+  })
+
+  it('시설을 고르면 장소 미리보기가 없다 — 동시에 하나만', () => {
+    expect(code).toContain('const previewId = preview && facilityId === null ? selectedId : null')
+    expect(code).toContain(
+      'selectedId={facilityId !== null ? facilityPinId(facilityId) : selectedId}',
+    )
+  })
+
+  it('장소를 고르면 시설 선택을 비운다', () => {
+    const selectPlace = /const selectPlace = [\s\S]*?\n {2}\}/.exec(code)?.[0] ?? ''
+
+    expect(selectPlace).toContain('setPickedFacilityId(null)')
+  })
+
+  it('포커스 되돌림 effect 는 시설로 갈아탈 때 건너뛴다', () => {
+    const effect =
+      /const lastPreviewRef[\s\S]*?\}, \[preview, selectedId, facilityId\]\)/.exec(code)?.[0] ?? ''
+
+    expect(effect).toContain('if (facilityId !== null) return')
+  })
+
+  it('요약을 닫으면 포커스를 토글로 돌려준다', () => {
+    expect(code).toContain('facilityToggleRef.current?.focus()')
+    expect(code).toContain('ref={facilityToggleRef}')
+  })
+
+  it('토글은 목록 보기 아래 · 내 위치 위다', () => {
+    const viewToggle = code.indexOf('<ViewToggle current="map"')
+    const facility = code.indexOf('<PlaceMapFacilityToggle')
+    const locate = code.indexOf('<MapLocateButton')
+
+    expect(viewToggle).toBeGreaterThan(-1)
+    expect(facility).toBeGreaterThan(viewToggle)
+    expect(locate).toBeGreaterThan(facility)
+  })
+
+  it('시설 묶음의 이름 틀을 넘긴다', () => {
+    expect(code).toContain('squareClusterLabel={messages.map.facilityClusterCount}')
   })
 })

@@ -121,6 +121,8 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
             fallbackHref={listHref}
             /* 고른 장소를 미리보기로 보이고 `?place=` 에 남긴다 (#1227) — 담기 지도는 켜지 않는다 */
             preview
+            /* 병원 · 약국 함께 보기 토글 (#1286) — 누르기 전에는 시설 조회가 나가지 않는다 */
+            facilityLayer
           />
         </HydrationBoundary>
       </main>
