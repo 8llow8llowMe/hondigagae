@@ -59,7 +59,10 @@ export function HeaderLogo() {
 export function HeaderActions({ authed }: { authed: boolean }) {
   return (
     <div className="flex shrink-0 items-center gap-2">
-      {/* 모바일 헤더의 스위처. 데스크톱은 홈 프로필 카드가 맡는다 */}
+      {/*
+        반려견 스위처 — **모든 폭**이다 (#1065 가 홈 프로필의 ▾ 를 걷으며 이쪽에 맡겼다). 폭 조건이 없다.
+        지도 보기는 띠 헤더가 걷혀(#1300) 필터 줄 칩(`PetSwitcher variant="chip"`)이 같은 일을 한다 (#1301)
+      */}
       {authed && <PetSwitcherSlot />}
 
       {/*

@@ -208,8 +208,8 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
       'src/components/bottom-sheet.tsx',
       // 다이얼로그 표면은 Modal 이 소유한다 — ConfirmModal 은 그림자를 직접 그리지 않는다
       'src/components/modal.tsx',
-      // 반려견 스위처 드롭다운 — Menu 와 같은 팝오버다
-      'src/features/nav/pet-switcher.tsx',
+      // 반려견 스위처 드롭다운 — Menu 와 같은 팝오버다. 헤더 · 지도 필터 줄 칩이 함께 쓰는 패널로 떼어 냈다 (#1301)
+      'src/features/nav/pet-switcher-menu.tsx',
       // 홈 프로필 카드의 반려견 전환 팝오버
       'src/features/home/profile-card.tsx',
       // 헤더 계정 팝오버
