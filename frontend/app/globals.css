@@ -2249,3 +2249,74 @@ body:has(.map-canvas-height) .site-footer {
     display: none;
   }
 }
+
+/*
+  지도 아일랜드 헤더 — 이슈 #1287 (`docs/features/place/지도-아일랜드헤더-세부명세.md` D3-2).
+
+  **`/places` 지도 보기에서는 흰 헤더 띠를 걷고 지도를 화면 맨 위까지 깐다.** 헤더는 지도 위에 뜨는
+  알약(`IslandHeader`)이 된다. 셸이 헤더 두 벌을 함께 그리고 **지도 쪽이 자기 성질(`.map-island`)로
+  고른다** — 위 푸터 규칙(#399)과 같은 축이다. `/places` 의 목록 · 지도는 같은 라우트의 `?view=`
+  쿼리라 레이아웃 · prop 으로는 가를 수 없고, 클라이언트에서 가르면 첫 페인트가 띠 → 알약으로 바뀐다.
+
+  숨은 쪽은 `display: none` 이라 접근성 트리에서도 빠진다 — 화면의 `banner` 는 늘 하나다.
+  `:has()` 를 못 읽는 브라우저는 띠가 남고 지도가 그 아래로 넘친다 — 푸터 규칙과 같은 전제(D5).
+*/
+.island-header {
+  display: none;
+}
+
+body:has(.map-island) .global-header {
+  display: none;
+}
+
+body:has(.map-island) .island-header {
+  display: block;
+}
+
+/*
+  헤더 몫을 빼지 않는다 — 지도 윗변이 y 0 이다. 탭바(<768)만 뺀다.
+  `.map-canvas-height` 와 함께 달리므로 두 클래스로 특정도를 올려 위 규칙을 이긴다.
+*/
+.map-canvas-height.map-island {
+  height: calc(100dvh - var(--tabbar-h));
+}
+
+@media (width >= 48rem) {
+  .map-canvas-height.map-island {
+    height: 100dvh;
+  }
+}
+
+/*
+  모바일 미리보기 시트 상한 — `.map-preview-sheet` 의 136 이 아일랜드에서는 120 이다
+  (`MAP_ISLAND_TOP_CONTROLS_INSET` = 위 8 + 알약 48 + 간격 12 + 검색 44 + 여유 8, `map-sheet.tsx`).
+*/
+.map-island .map-preview-sheet {
+  max-height: max(45dvh, calc(100dvh - 120px - var(--map-sheet-tabbar)));
+}
+
+/*
+  ≥1024 · 패널 접힘 — **로고 알약.** 로고는 도킹 스택 맨 위 64 띠 위에 서는데, 패널을 접으면 띠가
+  스택과 함께 밀려나 로고가 지도 위에 맨몸으로 남는다. 자리(왼쪽 16 · 위 8 · 높이 48)는 그대로 두고
+  바탕만 알약이 된다 — 메뉴 알약과 같은 면 · 테두리 · 그림자, 좌우 12(D1-2).
+*/
+@media (width >= 64rem) {
+  body:has(.map-island[data-dock='closed']) .island-logo {
+    padding-inline: 12px;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+/*
+  오프라인 띠 — 아일랜드에서는 **화면 맨 위 `fixed`** 다(D1-2). 흐름 안 `sticky` 로 두면 지도를 밀어
+  화면에 스크롤이 생긴다. 알약과 같은 `z-40` 이고 DOM 이 뒤라 위에 덮인다.
+*/
+body:has(.map-island) .offline-banner {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  z-index: 40;
+}

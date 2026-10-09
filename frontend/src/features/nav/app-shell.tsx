@@ -1,4 +1,5 @@
 import { GlobalHeader } from '@/features/nav/global-header'
+import { IslandHeader } from '@/features/nav/island-header'
 import { MobileTabBar } from '@/features/nav/mobile-tab-bar'
 import { OfflineBanner } from '@/features/nav/offline-banner'
 import { SiteFooter } from '@/features/nav/site-footer'
@@ -58,6 +59,13 @@ export function AppShell({ authed, children }: { authed: boolean; children: Reac
       */}
       <div className="flex min-h-dvh flex-col">
         <GlobalHeader authed={authed} />
+        {/*
+          **지도 아일랜드 헤더** (#1287) — 기본 `display: none` 이고, 지도 루트가 `map-island` 를 달면
+          `body:has(.map-island)` 규칙이 위 띠를 걷고 이것을 세운다(`app/globals.css`). `/places` 의 목록 ·
+          지도는 같은 라우트의 쿼리라 여기서 prop 으로 가를 수 없다. **배너는 셸에 있어야 배너다** — 페이지
+          (`<main>` 안)가 그리면 `banner` 랜드마크가 아니게 되고 스킵 링크가 건너뛰지 못한다(명세 D1-2 ③).
+        */}
+        <IslandHeader authed={authed} />
         {/* 끊기면 헤더 아래 띠 한 줄 (#912) — 온라인이면 높이 0 인 라이브 영역만 남는다 */}
         <OfflineBanner />
 

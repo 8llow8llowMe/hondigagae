@@ -10,7 +10,12 @@ import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
-import { MAP_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
+import {
+  MAP_ISLAND_TOP_CONTROLS_INSET,
+  MAP_TOP_CONTROLS_INSET,
+  MapSheet,
+  type SheetStop,
+} from '@/components/map-sheet'
 import { Skeleton } from '@/components/skeleton'
 import { ViewToggle } from '@/components/view-toggle'
 import type { MapPin } from '@/features/map/map-canvas'
@@ -117,6 +122,7 @@ export function PlaceMapView({
   initialFocusName,
   preview = false,
   facilityLayer = false,
+  island = false,
 }: {
   filters: PlaceFilters
   /** 미로그인이면 반려견 목록을 조회하지 않는다 — 필터의 크기 축이 빠진다 (#200) */
@@ -222,6 +228,19 @@ export function PlaceMapView({
    * 지도 뷰 첫 화면은 별도 조회 금지). 시설 요약은 미리보기 자리를 쓰므로 `preview` 와 함께 켠다.
    */
   facilityLayer?: boolean | undefined
+  /**
+   * **지도 아일랜드** — 흰 헤더 띠를 걷고 지도를 화면 맨 위까지 깐다 (#1287, `지도-아일랜드헤더-세부명세.md`).
+   * `/places` 만 켠다.
+   *
+   * 켜면 루트가 `map-island` · `data-dock` 을 단다 — 셸의 `body:has(.map-island)` 규칙이 그것을 읽어
+   * 띠 헤더를 알약(`IslandHeader`)으로 바꾸고 지도 높이에서 헤더 몫을 뺀다(`app/globals.css`). 조작 줄은
+   * 알약 아래 모든 폭 y 68(`top-17`), 도킹 스택은 맨 위 64 를 로고 띠로 비우고, 시트 상한 · 고른 핀
+   * 보정이 `MAP_ISLAND_TOP_CONTROLS_INSET`(120)이다.
+   *
+   * **끄면 한 글자도 다르지 않다** — 담기 지도(`fill`)는 켜지 않는다. 담기의 머리 카드가 로고 띠 ·
+   * 로고 알약과 자리가 겹쳐 따로 설계한다(명세 D7-3). `fill` 과 함께 켜지 않는다.
+   */
+  island?: boolean | undefined
 }) {
   /*
     **`undefined` 만이 아니라 `null`·`false` 도 "머리 없음" 이다** (#1012 검토). 호출부가
@@ -408,6 +427,11 @@ export function PlaceMapView({
     그대로다 — 목록 패널만 있을 때의 동작은 이 이슈가 바꾸지 않는다.
   */
   const rootRef = useRef<HTMLDivElement>(null)
+  /**
+   * 지도 위 조작 줄 바닥 + 여유 — 시트 `max` 윗변 · 고른 핀 세로 보정이 함께 쓴다. 뷰포트 위에서 잰 값이다.
+   * 헤더 띠가 있는 지도는 136, 아일랜드는 120 (`map-sheet.tsx` 의 유도표).
+   */
+  const controlsInset = island ? MAP_ISLAND_TOP_CONTROLS_INSET : MAP_TOP_CONTROLS_INSET
   /** 손잡이의 `aria-controls` — 접는 대상인 데스크톱 스택 */
   const stackId = useId()
   const previewPanelRef = useRef<HTMLDivElement>(null)
@@ -434,14 +458,14 @@ export function PlaceMapView({
     */
     const sheet = previewSheetRef.current?.getBoundingClientRect()
     if (sheet !== undefined && sheet.height > 0) {
-      // `MAP_TOP_CONTROLS_INSET` 은 뷰포트 위에서 잰 값이다(헤더 포함) — `root.top` 에 더하지 않는다
-      const top = Math.max(root.top, MAP_TOP_CONTROLS_INSET)
+      // `controlsInset` 은 뷰포트 위에서 잰 값이다(헤더 포함) — `root.top` 에 더하지 않는다
+      const top = Math.max(root.top, controlsInset)
       if (sheet.top <= top) return null
       return { x: 0, y: (top + sheet.top) / 2 - (root.top + root.bottom) / 2 }
     }
 
     return null
-  }, [])
+  }, [controlsInset])
 
   /*
     **닫으면 포커스를 고른 행으로 돌려준다** (WCAG 2.4.3). ✕ 가 언마운트되면 포커스가 `body` 로
@@ -783,7 +807,12 @@ export function PlaceMapView({
         그 높이만큼 넘쳐 지도 화면에 세로 스크롤이 난다. `fill` 이면 부모가 정한 높이를
         채우고, 아니면 예전처럼 스스로 뷰포트를 채운다 — `/places` 는 픽셀이 같다.
       */
-    <div ref={rootRef} className={cn('relative', fill ? 'h-full' : 'map-canvas-height')}>
+    <div
+      ref={rootRef}
+      className={cn('relative', fill ? 'h-full' : 'map-canvas-height', island && 'map-island')}
+      /* 아일랜드의 로고 알약(≥1024, 패널 접힘)이 이 값을 읽는다 — `app/globals.css` */
+      data-dock={island ? (panelOpen ? 'open' : 'closed') : undefined}
+    >
       {/* 지도가 바탕이다. 데스크톱은 좌측 패널이 그 위에 얹힌다 (아트보드 05) */}
       <MapCanvas
         pins={mapPins}
@@ -910,7 +939,16 @@ export function PlaceMapView({
         **왼쪽 도킹 스택은 건드리지 않는다.** 그쪽은 목록 레일(인셋 40)과 원래부터
         다른 값이고, 지도 가장자리에 붙는 것이 그 표면의 의도다 (#1232).
       */}
-      <div className="pointer-events-none absolute inset-x-0 top-5 z-30 lg:top-6">
+      <div
+        className={cn(
+          'pointer-events-none absolute inset-x-0 z-30',
+          /*
+            **아일랜드는 알약(위 8 · 높이 48) 아래 12 — 모든 폭 y 68** (#1287 D2-1). 헤더 띠가 있는 지도는
+            띠 아래 20 · 24 다.
+          */
+          island ? 'top-17' : 'top-5 lg:top-6',
+        )}
+      >
         <div className="content-container flex items-start justify-end gap-2 px-4 md:px-10">
           {/*
             **검색은 토글 왼쪽, 1024 미만에서만** (#596). 그 위는 좌측 패널 머리가 같은
@@ -1011,8 +1049,24 @@ export function PlaceMapView({
           id={stackId}
           inert={!panelOpen}
           // 그림자는 스택에 하나 — 접혀 있으면 x=0 에 회색 띠로 비친다 (#1123)
-          className={cn('relative flex h-full', panelOpen && 'map-dock-shadow')}
+          className={cn(
+            'relative flex h-full',
+            panelOpen && 'map-dock-shadow',
+            // 아일랜드는 맨 위 64 가 로고 띠다 — 목록 · 미리보기 · 시설 요약 본문은 그 아래(y 64)부터
+            island && 'pt-16',
+          )}
         >
+          {/*
+            **로고 띠** (#1287 D1-2) — 스택 폭 전체, 맨 위 64. 로고는 셸의 `IslandHeader` 가 `fixed` 로 이
+            위에 세운다(배너 안 DOM 그대로). 띠가 패널 본문의 시작점을 예전 헤더 아래와 같은 y 64 로 지킨다.
+            1024~1279 에서 미리보기가 목록 자리를 써 목록이 `invisible` 이 돼도 띠는 스택의 것이라 남는다.
+          */}
+          {island && (
+            <div
+              aria-hidden
+              className="bg-bg border-border absolute inset-x-0 top-0 h-16 border-b"
+            />
+          )}
           <div
             className={cn(
               'map-panel-width bg-bg border-border flex h-full flex-col overflow-hidden border-r',
@@ -1089,7 +1143,11 @@ export function PlaceMapView({
           {docked && (
             <div
               ref={previewPanelRef}
-              className="map-panel-width bg-bg border-border absolute inset-y-0 left-0 overflow-hidden border-r xl:static"
+              className={cn(
+                'map-panel-width bg-bg border-border absolute left-0 overflow-hidden border-r xl:static',
+                // 1024~1279 의 목록 자리도 로고 띠 아래에서 시작한다 — 1280 부터는 흐름 안이라 스택 `pt-16` 을 따른다
+                island ? 'top-16 bottom-0' : 'inset-y-0',
+              )}
             >
               {/* 같은 칸을 번갈아 쓴다 — 동시에 하나만 골라져 있어 겹치지 않는다 (#1286 D4-3) */}
               {selectedFacility !== null ? (
@@ -1163,7 +1221,7 @@ export function PlaceMapView({
           비율이라 **짧은 기기일수록 검색·보기 전환을 더 덮었다** — 640 실측 24px.
           `/emergency` 와 같은 값을 쓴다: 두 화면의 상단 컨트롤이 같은 자리·같은 크기다.
         */
-        maxTopInset={sheetMaxTopInset ?? MAP_TOP_CONTROLS_INSET}
+        maxTopInset={sheetMaxTopInset ?? controlsInset}
       >
         {listPending ? (
           <PlaceMapRowsSkeleton />

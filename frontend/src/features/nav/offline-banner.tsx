@@ -16,6 +16,11 @@ import { cn } from '@/lib/utils/cn'
  * 사실이다 — 목록을 내려 둔 채 끊기면 맨 위 띠는 보이지 않는다. `top-14 md:top-16` 은
  * 헤더 높이(`--header-h` 56/64)와 같은 값이고, `z-30` 은 헤더(`z-40`) 바로 아래다.
  *
+ * **지도 아일랜드에서는 화면 맨 위 `fixed` 다** (#1287 D1-2). 거기엔 흐름 안 헤더가 없고, 흐름 안에
+ * 두면 지도를 밀어 화면에 스크롤이 생긴다. `body:has(.map-island) .offline-banner` 가 자리를 바꾼다
+ * (`app/globals.css`) — 알약(`z-40`)과 같은 층이고 DOM 이 뒤라 위에 덮인다. 끊긴 동안은 메뉴 이동
+ * 자체가 실패하므로 알약을 덮어도 잃는 것이 없다.
+ *
  * **반전 띠(`bg-fg` · `text-fg-inverse`)다 — 경보색이 아니다.** 이슈는 "warning 톤" 을
  * 적었지만 저장소에 경고 토큰이 없고, `--metric-*` 은 **등급** 스케일이라(DESIGN.md §2-3)
  * 연결 상태에 쓰면 판정처럼 읽힌다. danger 는 장애처럼 읽힌다. 반전 띠는 "화면 밖의 사정" 을
@@ -28,7 +33,7 @@ export function OfflineBanner() {
 /** 표시만 — node 환경에서 렌더해 잰다 (`testing-guide.md` §1) */
 export function OfflineBannerView({ offline }: { offline: boolean }) {
   return (
-    <div role="status" className="sticky top-14 z-30 md:top-16">
+    <div role="status" className="offline-banner sticky top-14 z-30 md:top-16">
       {offline && (
         <p
           className={cn(

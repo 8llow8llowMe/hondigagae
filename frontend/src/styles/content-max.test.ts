@@ -123,6 +123,26 @@ describe('콘텐츠 컨테이너 — 헤더 (#376)', () => {
   })
 })
 
+/*
+  #1287 — 지도 아일랜드 알약은 **콘텐츠 열의 오른쪽 끝**에 매단다. 지도 조작 줄(#412)과 같은 기준이라
+  1920 에서 알약 · 조작 줄 오른쪽 끝이 같은 x(1640)에 선다. 뷰포트 끝을 잡으면 243px 벌어진다.
+*/
+describe('콘텐츠 컨테이너 — 지도 아일랜드 알약 (#1287)', () => {
+  const island = repoSource('src/features/nav/island-header.tsx')
+
+  it('알약 열이 content-container 를 쓰고 인셋을 INSET_CLASS.main 으로 참조한다', () => {
+    expect(island).toContain("'content-container")
+    expect(island).toContain('INSET_CLASS.main')
+  })
+
+  it('바(<header>)는 캡하지 않는다 — 전폭 fixed 줄 안에서 열만 캡한다', () => {
+    const barClasses = island.match(/<header className="([^"]*)"/)?.[1]
+
+    expect(barClasses).toBeDefined()
+    expect(barClasses).not.toContain('content-container')
+  })
+})
+
 describe('콘텐츠 컨테이너 — 레일 밖 형제 (#376)', () => {
   it('장소 상세의 폐업 안내가 컨테이너에 가입한다', () => {
     const section = repoSource('src/features/place/place-detail-section.tsx')

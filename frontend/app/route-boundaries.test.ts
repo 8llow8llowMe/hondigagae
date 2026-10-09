@@ -246,6 +246,14 @@ describe('로딩 골격 — 완료 화면과 같은 자리', () => {
 
     expect(markup).toContain('map-canvas-height')
     expect(markup).toContain('map-panel-width')
+    // 늘 아일랜드 모양이다 (#1287 D3-3) — 골격부터 헤더가 알약이어야 골격 → 본 화면 사이에 헤더가 바뀌지 않는다
+    const root = /^<div [^>]*>/.exec(markup)?.[0] ?? ''
+    const classes = (/class="([^"]*)"/.exec(root)?.[1] ?? '').split(/\s+/)
+    expect(classes).toContain('map-canvas-height')
+    expect(classes).toContain('map-island')
+    // 조작 줄은 알약 아래 y 68 — 헤더 띠가 있는 지도의 top-5 가 아니다
+    expect(markup).toContain('top-17')
+    expect(markup).not.toMatch(/class="[^"]*\btop-5\b/)
     expect(markup).toContain('aria-label="장소 목록"')
   })
 
