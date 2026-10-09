@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { MAP_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
+import { MAP_ISLAND_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
 import { Skeleton } from '@/components/skeleton'
 import { cn } from '@/lib/utils/cn'
 
@@ -78,6 +78,10 @@ function FilterBarSkeleton() {
  * - 모바일 — `MapSheet` 를 **그대로** 쓴다(`mid`). 머리 높이(그래버 · 필터 102 · 개수 42)가
  *   시트 자신의 것이라 두 벌로 두면 갈린다
  *
+ * **늘 아일랜드 모양이다** (#1287 D3-3) — 이 골격은 `/places` 지도 보기 전용이라 루트가 `map-island` 를
+ * 달고, 조작 줄 y 68 · 스택 맨 위 64 로고 띠 · 시트 상한 120 이 `PlaceMapView island` 와 같다. 골격부터
+ * 헤더가 알약이어야 골격 → 본 화면 사이에 헤더 · 패널 자리가 바뀌지 않는다(#1232 D6 과 같은 이유).
+ *
  * **client component 인 이유는 시트 하나다** — `MapSheet` 가 단계 상태를 받는다. 골격을
  * 보는 동안 단계를 바꿔도 해가 없으므로 실제 상태를 준다.
  */
@@ -85,11 +89,11 @@ export function PlaceMapSkeleton() {
   const [stop, setStop] = useState<SheetStop>('mid')
 
   return (
-    <div aria-busy className="map-canvas-height relative">
+    <div aria-busy data-dock="open" className="map-canvas-height map-island relative">
       <div aria-hidden className="bg-bg-sunken size-full" />
 
       {/* 우상단 — `PlaceMapView` 의 떠 있는 컨트롤 줄과 같은 칸 */}
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-5 z-30 lg:top-6">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-17 z-30">
         <div className="content-container flex items-start justify-end gap-2 px-4 md:px-10">
           <div className="flex max-w-md min-w-0 flex-1 gap-2 lg:hidden">
             <Skeleton className="h-11 min-w-0 flex-1 rounded-md" />
@@ -104,7 +108,9 @@ export function PlaceMapSkeleton() {
         카드가 하이드레이션 뒤 붙은 패널로 바뀌면 그 자체가 레이아웃 이동이다. 손잡이는 그리지 않는다 —
         누를 수 없는 골격이고, 자리는 패널 오른쪽 끝이라 이동을 만들지 않는다.
       */}
-      <div className="map-dock-shadow absolute inset-y-0 left-0 z-30 hidden lg:block">
+      <div className="map-dock-shadow absolute inset-y-0 left-0 z-30 hidden pt-16 lg:block">
+        {/* 로고 띠 — 로고는 셸의 `IslandHeader` 가 이 위에 세운다 */}
+        <div aria-hidden className="bg-bg border-border absolute inset-x-0 top-0 h-16 border-b" />
         <div className="map-panel-width bg-bg border-border flex h-full flex-col overflow-hidden border-r">
           <div aria-hidden className="border-border flex gap-2 border-b px-3 py-2">
             <Skeleton className="h-11 min-w-0 flex-1 rounded-md" />
@@ -129,7 +135,7 @@ export function PlaceMapSkeleton() {
         onStopChange={setStop}
         toolbar={<FilterBarSkeleton />}
         header={<Skeleton className="h-4.5 w-20" />}
-        maxTopInset={MAP_TOP_CONTROLS_INSET}
+        maxTopInset={MAP_ISLAND_TOP_CONTROLS_INSET}
       >
         <PlaceMapRowsSkeleton />
       </MapSheet>

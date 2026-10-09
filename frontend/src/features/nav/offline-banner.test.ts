@@ -28,6 +28,8 @@ describe('OfflineBannerView', () => {
     const root = markup.slice(0, markup.indexOf('>') + 1)
 
     expect(root).toContain('sticky top-14 z-30 md:top-16')
+    // 지도 아일랜드(#1287)가 자리를 바꿀 때 읽는 훅 — `body:has(.map-island) .offline-banner`
+    expect(root).toContain('offline-banner')
     // 헤더의 높이·z 와 짝이다 — 한쪽만 바뀌면 띠가 헤더 밑으로 숨거나 틈이 난다
     const header = readSourceWithoutComments('src/features/nav/global-header.tsx')
     expect(header).toContain('sticky top-0 z-40 box-border h-14')

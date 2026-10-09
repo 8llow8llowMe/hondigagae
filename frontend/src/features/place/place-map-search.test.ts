@@ -17,9 +17,12 @@ const mapView = source('src/features/place/place-map-view.tsx')
 const listPage = source('app/(main)/places/(list)/page.tsx')
 const addPlaceView = source('src/features/plan/plan-add-place-view.tsx')
 
-/** 지도 위 떠 있는 줄 — 좌측 패널(`map-panel-width`)이 시작되기 전까지 */
+/**
+ * 지도 위 떠 있는 줄 — 좌측 패널(`map-panel-width`)이 시작되기 전까지.
+ * 세로 자리(`top-5 lg:top-6` · 아일랜드 `top-17`)는 갈래라 앵커에 넣지 않는다 — 아래 `조작 줄의 세로 자리`가 잰다.
+ */
 const overlay = mapView.slice(
-  mapView.indexOf('pointer-events-none absolute inset-x-0 top-5'),
+  mapView.indexOf("'pointer-events-none absolute inset-x-0 z-30'"),
   mapView.indexOf('map-panel-width'),
 )
 const panel = mapView.slice(mapView.indexOf('map-panel-width'))
@@ -161,5 +164,35 @@ describe('머리가 있는 화면의 검색 자리 (#1012)', () => {
     expect(mapView).toContain(
       'const hasHead = head !== undefined && head !== null && head !== false',
     )
+  })
+})
+
+/*
+  **조작 줄의 세로 자리는 두 갈래다** — 이슈 #1287 (`지도-아일랜드헤더-세부명세.md` D2-1 · D3-3).
+
+  `/places` 지도(아일랜드)는 흰 헤더 띠가 없고 알약(위 8 · 높이 48) 아래 12 — **모든 폭 y 68**(`top-17`)이다.
+  헤더 띠가 있는 지도(담기)는 띠 아래 20 · 24(`top-5 lg:top-6`) 그대로다 — 끄면 한 글자도 다르지 않다.
+*/
+describe('조작 줄의 세로 자리 (#1287)', () => {
+  const rowStart = mapView.indexOf("'pointer-events-none absolute inset-x-0 z-30'")
+  const row = mapView.slice(rowStart, mapView.indexOf(')}', rowStart))
+
+  it('아일랜드 갈래는 모든 폭 top-17(68) 이다 — lg 에서 갈리지 않는다', () => {
+    expect(row).toContain("island ? 'top-17' : 'top-5 lg:top-6'")
+  })
+
+  it('기본 갈래(헤더 띠가 있는 지도)는 top-5 · lg:top-6 그대로다', () => {
+    expect(row).toMatch(/: 'top-5 lg:top-6'/)
+  })
+
+  it('/places 만 아일랜드를 켜고 담기 지도는 켜지 않는다', () => {
+    const tag = listPage.slice(
+      listPage.indexOf('<PlaceMapView'),
+      listPage.indexOf('/>', listPage.indexOf('<PlaceMapView')),
+    )
+    expect(tag).toMatch(/\bisland\b/)
+
+    // 담기 화면 코드(주석 제외) 어디에도 `island` 가 없다 — 머리 카드가 로고 띠와 자리가 겹친다(명세 D7-3)
+    expect(addPlaceView).not.toMatch(/\bisland\b/)
   })
 })

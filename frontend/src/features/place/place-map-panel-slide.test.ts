@@ -84,7 +84,11 @@ describe('접기 · 펼치기 손잡이는 하나다 (#1232)', () => {
       옮겨도 통과한다(리뷰 지적). 스택 여는 `<div` 부터 손잡이까지 여닫는 태그 수가 같으면 닫힌 뒤다.
     */
     const between = mapView.slice(mapView.lastIndexOf('<div', stack), handle)
-    expect(between.match(/<div\b/g)?.length).toBe(between.match(/<\/div>/g)?.length)
+    // 스스로 닫는 `<div … />`(아일랜드 로고 띠, #1287)는 짝 태그가 없다 — 여닫는 수에서 뺀다
+    const selfClosing = between.match(/<div\b[^>]*\/>/g)?.length ?? 0
+    expect((between.match(/<div\b/g)?.length ?? 0) - selfClosing).toBe(
+      between.match(/<\/div>/g)?.length,
+    )
   })
 
   /* DESIGN.md 44px 하한 — 보이는 탭은 24 지만 누르는 자리는 `::before` 로 넓힌다 */

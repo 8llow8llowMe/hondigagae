@@ -75,7 +75,7 @@ describe('앱 셸 — 세로 뼈대', () => {
     const skeleton = source.indexOf('flex min-h-dvh flex-col')
     const closing = source.indexOf('</div>', source.indexOf('<SiteFooter />'))
 
-    for (const inside of ['<GlobalHeader', 'id="main"', '<SiteFooter />']) {
+    for (const inside of ['<GlobalHeader', '<IslandHeader', 'id="main"', '<SiteFooter />']) {
       const at = source.indexOf(inside)
       expect(at).toBeGreaterThan(skeleton)
       expect(at).toBeLessThan(closing)
@@ -83,6 +83,20 @@ describe('앱 셸 — 세로 뼈대', () => {
 
     // 탭바가 열 안에 들어가면 `fixed` 인데도 자리를 한 번 더 차지한다
     expect(source.indexOf('<MobileTabBar')).toBeGreaterThan(closing)
+  })
+
+  /*
+    **헤더 두 벌이 셸에 있다** (#1287). 지도 아일랜드 알약은 띠 바로 다음, 오프라인 띠 · 본문 앞이다 —
+    `<main>` 밖이어야 `banner` 랜드마크이고 스킵 링크가 건너뛴다. 둘 중 하나만 보이는 것은 CSS 가 정한다.
+  */
+  it('셸 순서가 띠 헤더 → 아일랜드 헤더 → 오프라인 띠 → 본문이다', () => {
+    const source = readSourceWithoutComments(SHELL)
+    const order = ['<GlobalHeader', '<IslandHeader', '<OfflineBanner', 'id="main"'].map((tag) =>
+      source.indexOf(tag),
+    )
+
+    expect(order[0]).toBeGreaterThan(-1)
+    expect(order).toEqual([...order].sort((a, b) => a - b))
   })
 
   it('본문 래퍼가 남는 높이를 먹고 Canvas 에 넘긴다', () => {

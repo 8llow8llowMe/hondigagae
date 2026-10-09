@@ -170,3 +170,18 @@ describe('GlobalHeader — 서비스 소개 링크 (#964)', () => {
     expect(openAnchor(render(false, '/places'), isAbout)).not.toContain('aria-current')
   })
 })
+
+/*
+  **지도 아일랜드에서 걷히는 훅** (#1287). `body:has(.map-island) .global-header` 가 이 띠를 `display: none`
+  으로 걷는다 — 클래스를 빠뜨리면 지도 위에 띠와 알약이 함께 선다.
+*/
+describe('GlobalHeader — 아일랜드 훅 클래스 (#1287)', () => {
+  it('<header> 가 global-header 를 달고 띠 모양(sticky · 56/64 · border-b)은 그대로다', () => {
+    const open = /<header [^>]*>/.exec(render(false))?.[0]
+    const classes = classList(open)
+
+    expect(classes.has('global-header')).toBe(true)
+    for (const name of ['sticky', 'top-0', 'z-40', 'h-14', 'md:h-16', 'border-b', 'bg-bg'])
+      expect(classes.has(name)).toBe(true)
+  })
+})

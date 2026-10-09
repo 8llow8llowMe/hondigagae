@@ -123,6 +123,8 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
             preview
             /* 병원 · 약국 함께 보기 토글 (#1286) — 누르기 전에는 시설 조회가 나가지 않는다 */
             facilityLayer
+            /* 지도 아일랜드 — 흰 헤더 띠 대신 지도 위 알약 (#1287) */
+            island
           />
         </HydrationBoundary>
       </main>

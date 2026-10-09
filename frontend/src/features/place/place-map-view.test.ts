@@ -19,11 +19,14 @@ const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''
   자기 플로팅 컨트롤을 더 덮었다 — 812 에서 2px 여유, 800 에서 0, **640 에서 24px 덮음**.
 */
 describe('PlaceMapView — 시트 최대 단계의 윗변 (#901 D2)', () => {
-  it('호출부가 주지 않으면 MAP_TOP_CONTROLS_INSET 로 떨어진다 — 85dvh 가 아니다', () => {
+  it('호출부가 주지 않으면 지도 위 컨트롤 기준(136 · 아일랜드 120)으로 떨어진다 — 85dvh 가 아니다', () => {
     // `<MapSheet` 의 여는 태그 안에 `toolbar={<PlaceMapFilterBar … />}` 가 들어 있어
     // 첫 `>` 로 자르면 태그가 중간에서 끊긴다 — 문자열 자체가 충분히 고유하다
-    expect(code).toContain('maxTopInset={sheetMaxTopInset ?? MAP_TOP_CONTROLS_INSET}')
-    expect(code).toContain('import { MAP_TOP_CONTROLS_INSET, MapSheet')
+    expect(code).toContain('maxTopInset={sheetMaxTopInset ?? controlsInset}')
+    // 아일랜드(#1287)만 120 이고, 끄면 예전 136 그대로다
+    expect(code).toContain(
+      'const controlsInset = island ? MAP_ISLAND_TOP_CONTROLS_INSET : MAP_TOP_CONTROLS_INSET',
+    )
   })
 
   /** 담기 화면(#370)이 자기 헤더 높이를 알려 주는 길은 그대로 남는다 */
@@ -118,17 +121,21 @@ describe('PlaceMapView — 장소 미리보기 (#1227)', () => {
   */
   it('미리보기는 스택 안에서 1280 부터 흐름에 들고 그 아래는 목록 자리에 겹친다', () => {
     expect(code).toContain(
-      'map-panel-width bg-bg border-border absolute inset-y-0 left-0 overflow-hidden border-r xl:static',
+      'map-panel-width bg-bg border-border absolute left-0 overflow-hidden border-r xl:static',
     )
+    // 1024~1279 의 목록 자리 — 아일랜드는 로고 띠 아래(top-16)부터, 아니면 위아래 끝까지 (#1287)
+    expect(code).toContain("island ? 'top-16 bottom-0' : 'inset-y-0'")
   })
 
   it('담기 지도(미리보기 꺼짐)는 정중앙 카메라 그대로다', () => {
     expect(code).toContain('selectedOffset={preview ? selectedOffset : undefined}')
   })
 
-  it('모바일 위 경계는 뷰포트 기준 136 이다 — root.top 에 더하지 않는다 (헤더 이중 차감)', () => {
-    expect(code).toContain('Math.max(root.top, MAP_TOP_CONTROLS_INSET)')
-    expect(code).not.toContain('root.top + MAP_TOP_CONTROLS_INSET')
+  it('모바일 위 경계는 뷰포트 기준 136(아일랜드 120)이다 — root.top 에 더하지 않는다 (헤더 이중 차감)', () => {
+    expect(code).toContain('Math.max(root.top, controlsInset)')
+    expect(code).not.toContain('root.top + controlsInset')
+    // prop 이 바뀌면 다시 잰다 — 빈 의존성이면 첫 값에 얼어붙는다
+    expect(code).toContain('}, [controlsInset])')
   })
 })
 
@@ -297,5 +304,47 @@ describe('PlaceMapView — 병원 · 약국 층 (#1286)', () => {
     expect(back).not.toContain('facilityToggleRef')
     expect(code).toContain('onBackToList={backToListFromFacility}')
     expect(code).toContain('ref={listRegionRef}')
+  })
+})
+
+/*
+  #1287 — 지도 아일랜드 (`docs/features/place/지도-아일랜드헤더-세부명세.md` D3-3). 셸의
+  `body:has(.map-island)` 규칙이 루트의 `map-island` 를 읽어 헤더 띠를 알약으로 바꾼다 — 빠뜨리면 띠가 남는다.
+*/
+describe('PlaceMapView — 지도 아일랜드 (#1287)', () => {
+  const rootStart = code.indexOf('ref={rootRef}')
+  const root = code.slice(code.lastIndexOf('<div', rootStart), code.indexOf('>', rootStart) + 1)
+
+  it('기본은 꺼짐이다', () => {
+    expect(code).toMatch(/island = false/)
+  })
+
+  it('켜면 루트가 map-island 와 data-dock(패널 여닫힘)을 단다 — 끄면 data-dock 이 없다', () => {
+    expect(root).toContain("island && 'map-island'")
+    expect(root).toContain("data-dock={island ? (panelOpen ? 'open' : 'closed') : undefined}")
+    // 지도 높이는 그대로 `.map-canvas-height` 가 진다 — 푸터 규칙(#399)이 그것을 읽는다
+    expect(root).toContain("fill ? 'h-full' : 'map-canvas-height'")
+  })
+
+  it('스택 맨 위 64 로고 띠 — 아일랜드에서만, 장식 면이고 본문은 그 아래(pt-16)부터다', () => {
+    expect(code).toContain("island && 'pt-16'")
+    const band = code.slice(code.indexOf('{island && (\n            <div'))
+    const tag = band.slice(0, band.indexOf('/>'))
+    expect(tag).toContain('aria-hidden')
+    expect(tag).toContain('absolute inset-x-0 top-0 h-16 border-b')
+    expect(tag).toContain('bg-bg')
+  })
+
+  it('로고 띠는 스택(id={stackId}) 안 맨 앞이다 — 접으면 스택과 함께 밀려난다', () => {
+    const stack = code.indexOf('id={stackId}')
+    const band = code.indexOf('{island && (\n            <div')
+    const list = code.indexOf("'map-panel-width bg-bg border-border flex h-full")
+    expect(band).toBeGreaterThan(stack)
+    expect(band).toBeLessThan(list)
+  })
+
+  it('조작 줄 · 시트 · 핀 보정이 아일랜드 값(top-17 · MAP_ISLAND_TOP_CONTROLS_INSET)을 쓴다', () => {
+    expect(code).toContain("island ? 'top-17' : 'top-5 lg:top-6'")
+    expect(code.match(/\bcontrolsInset\b/g)?.length).toBeGreaterThanOrEqual(4)
   })
 })

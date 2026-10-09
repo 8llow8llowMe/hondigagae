@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import {
+  MAP_ISLAND_TOP_CONTROLS_INSET,
   MAP_TOP_CONTROLS_INSET,
   MapSheet,
   SHEET_STOPS,
@@ -185,6 +186,33 @@ describe('MAP_TOP_CONTROLS_INSET — 지도 위 컨트롤을 비켜 간다 (#901
     expect(markup).not.toContain('85dvh')
   })
 })
+
+/**
+ * #1287 — **지도 아일랜드**(`/places`)의 `max` 윗변. 헤더 띠가 없고 조작 줄이 알약 아래 모든 폭 y 68 이라
+ * 폭으로 갈리는 값이 없다 (`지도-아일랜드헤더-세부명세.md` D2-1).
+ */
+describe('MAP_ISLAND_TOP_CONTROLS_INSET — 아일랜드 지도 위 컨트롤을 비켜 간다 (#1287)', () => {
+  it('위 8 + 알약 48 + 간격 12 + 검색 44 + 여유 8 이다', () => {
+    expect(MAP_ISLAND_TOP_CONTROLS_INSET).toBe(8 + 48 + 12 + 44 + 8)
+  })
+
+  it('미리보기 시트 상한(CSS)이 같은 값을 쓴다 — 한쪽만 바뀌면 두 시트의 윗변이 갈린다', () => {
+    const css = readGlobalsCss()
+    const rule = /\.map-island \.map-preview-sheet\s*\{[^}]*\}/.exec(css)?.[0]
+
+    expect(rule).toBeDefined()
+    expect(rule).toContain(`${String(MAP_ISLAND_TOP_CONTROLS_INSET)}px`)
+  })
+
+  it('헤더 띠가 있는 지도(136)는 그대로다 — /emergency · 담기가 계속 쓴다', () => {
+    expect(MAP_TOP_CONTROLS_INSET).toBe(136)
+    expect(css136()).toContain('136px')
+  })
+})
+
+function css136() {
+  return /^\.map-preview-sheet\s*\{[^}]*\}/m.exec(readGlobalsCss())?.[0] ?? ''
+}
 
 /**
  * #901 **D3** — 잡을 곳이 그래버 한 줄(세로 16px)뿐이라 *"어딜 잡고 올려야 하는지"* 가

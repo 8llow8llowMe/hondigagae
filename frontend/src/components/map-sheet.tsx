@@ -38,7 +38,7 @@ const STOP_RATIO: Record<SheetStop, number> = { min: 0.2, mid: 0.45, max: 0.85 }
 const DRAG_THRESHOLD_PX = 24
 
 /**
- * **지도 위 플로팅 컨트롤을 비켜 가는 `maxTopInset`** — 이슈
+ * **헤더 띠가 있는 지도**의 플로팅 컨트롤을 비켜 가는 `maxTopInset` — 이슈
  * [#901](https://github.com/8llow8llowMe/hondigagae/issues/901) **D2**.
  *
  * 지도 화면 둘(`/places` · `/emergency`)은 검색·보기 전환을 지도 위에 띄운다. 그 바닥은
@@ -57,6 +57,22 @@ const DRAG_THRESHOLD_PX = 24
  * 고 적어 둔 바로 그 함정을 지도 화면도 px 로 피한다 — 담기 화면이 이미 쓰던 길이다.
  */
 export const MAP_TOP_CONTROLS_INSET = 136
+
+/**
+ * **지도 아일랜드**의 플로팅 컨트롤을 비켜 가는 `maxTopInset` — 이슈 #1287
+ * (`docs/features/place/지도-아일랜드헤더-세부명세.md` D2-1).
+ *
+ * `/places` 지도 보기는 흰 헤더 띠가 없고 지도가 y 0 부터다. 헤더는 지도 위 알약이고, 조작 줄이
+ * 그 아래 모든 폭에서 같은 y 68 에 선다 — 폭으로 갈리는 값이 없다.
+ *
+ * | 위 | 알약 | 간격 | 검색 · 보기 전환 | 여유 | 합 |
+ * | ---: | ---: | ---: | ---: | ---: | ---: |
+ * | 8 | 48 | 12 | 44 | 8 | **120** |
+ *
+ * `.map-island .map-preview-sheet`(`app/globals.css`)가 같은 `120px` 을 쓴다. 136 은 `/emergency` ·
+ * 담기 지도가 계속 쓴다 — 그 화면들이 옮겨지면(명세 D7-3) 136 이 사라진다.
+ */
+export const MAP_ISLAND_TOP_CONTROLS_INSET = 120
 
 /**
  * 여기서 시작한 제스처는 드래그로 치지 않는다 — **입력칸과 표식(`data-sheet-no-drag`)뿐이다.**
