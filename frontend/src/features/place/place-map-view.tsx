@@ -30,6 +30,7 @@ import {
   pickedFacility,
   placeTakesOverFacility,
 } from '@/features/place/facility-selection'
+import { PlaceFilterPetSync } from '@/features/place/place-filter-pet-sync'
 import { PlaceMapFacilitySummary } from '@/features/place/place-map-facility-summary'
 import {
   hasFacilityNotice,
@@ -825,6 +826,11 @@ export function PlaceMapView({
       /* 미리보기 · 시설 요약이 열리면 ≥1280 에서 도킹 스택이 800 이 된다 — 알약 허용 상자가 그만큼 비킨다(#1300) */
       data-preview={island && docked ? 'open' : undefined}
     >
+      {/*
+        반려견이 바뀌면 체구 필터 URL 을 맞춘다 (#1301 D1-2 ②) — 필터 바가 패널 · 시트 두 곳에 서므로 그쪽이 아니라
+        보기마다 한 번인 이 자리에 둔다. `/places` 지도 · 담기 지도가 함께 쓴다
+      */}
+      <PlaceFilterPetSync filters={filters} authed={authed} />
       {/* 지도가 바탕이다. 데스크톱은 좌측 패널이 그 위에 얹힌다 (아트보드 05) */}
       <MapCanvas
         pins={mapPins}

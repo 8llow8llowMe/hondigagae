@@ -10,6 +10,7 @@ import { ErrorState } from '@/components/error-state'
 import { Surface, SurfaceStack } from '@/components/surface'
 import { ViewToggle } from '@/components/view-toggle'
 import { PlaceFilterChips } from '@/features/place/place-filter-chips'
+import { PlaceFilterPetSync } from '@/features/place/place-filter-pet-sync'
 import { PlaceListSection } from '@/features/place/place-list-section'
 import { PlaceMapView } from '@/features/place/place-map-view'
 import { PlaceSearchField } from '@/features/place/place-search-field'
@@ -403,6 +404,8 @@ export function PlanAddPlaceView({
         <>
           <PlaceSearchField filters={filters} />
           <PlaceFilterChips filters={filters} authed className="lg:hidden" />
+          {/* 반려견이 바뀌면 체구 필터 URL 을 맞춘다 (#1301 D1-2 ②) — 지도 갈래는 `PlaceMapView` 가 맡는다 */}
+          <PlaceFilterPetSync filters={filters} authed />
         </>
       }
     >

@@ -67,3 +67,23 @@ describe('placeFilterHref — 담기 화면 경로 (#1012)', () => {
     expect(PLAN_ADD_DEFAULT_VIEW).toBe(PLACES_DEFAULT_VIEW)
   })
 })
+
+/**
+ * 고른 장소(`?place=`)는 필터 링크에 기본으로 실리지 않는다 — 필터를 바꾸면 미리보기가 닫힌다(#1227).
+ * 반려견을 바꿔 체구 필터를 맞출 때만 남긴다 (장소-반려견칩-세부명세 D1-2, #1301).
+ */
+describe('placeFilterHref — 미리보기 (#1301)', () => {
+  const large: PlaceFilters = { ...DEFAULT_PLACE_FILTERS, petSizeType: 'LARGE' }
+
+  it('previewId 를 주지 않으면 place 를 싣지 않는다', () => {
+    expect(placeFilterHref('/places', large, 'map')).toBe('/places?petSizeType=LARGE')
+  })
+
+  it('previewId 를 주면 place 를 남긴다 — 보기 · 조건과 함께', () => {
+    const href = placeFilterHref('/places', large, 'map', '212481712381923329')
+
+    expect(href).toContain('petSizeType=LARGE')
+    expect(href).toContain('place=212481712381923329')
+    expect(href).not.toContain('view=')
+  })
+})

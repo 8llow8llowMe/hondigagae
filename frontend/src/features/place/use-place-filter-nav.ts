@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import { DEFAULT_PLACE_FILTERS, toPlaceFilterQuery } from '@/lib/url/place-filters'
+import { placePreviewHref, readPlacePreview } from '@/lib/url/place-preview'
 import {
   parseViewMode,
   PLACES_DEFAULT_VIEW,
@@ -14,9 +15,19 @@ import type { PlaceFilters } from '@/types/place'
 /**
  * 필터가 바뀐 뒤의 주소. **훅에서 떼어 둔 순수 함수다** — 회귀가 난 곳이 조립 규칙이라
  * 라우터 없이 그것만 고정할 수 있어야 한다 (docs/testing-guide.md §1).
+ *
+ * **고른 장소(`?place=`)는 기본으로 싣지 않는다** — 필터를 바꾸면 미리보기가 닫힌다(`place-preview.ts`, 결과가
+ * 바뀌는 순간이라 의도). `previewId` 를 주면 남긴다: 반려견을 바꿔 체구 필터를 맞출 때는 사용자가 판정을 보러
+ * 바꾼 것이라 미리보기를 닫지 않는다 (장소-반려견칩-세부명세 D1-2, #1301).
  */
-export function placeFilterHref(pathname: string, filters: PlaceFilters, view: ViewMode): string {
-  return viewModeHref(pathname, toPlaceFilterQuery(filters), view, PLACES_DEFAULT_VIEW)
+export function placeFilterHref(
+  pathname: string,
+  filters: PlaceFilters,
+  view: ViewMode,
+  previewId: string | null = null,
+): string {
+  const href = viewModeHref(pathname, toPlaceFilterQuery(filters), view, PLACES_DEFAULT_VIEW)
+  return previewId === null ? href : placePreviewHref(href, previewId)
 }
 
 /**
@@ -37,7 +48,8 @@ export function placeFilterHref(pathname: string, filters: PlaceFilters, view: V
  * **`reset` 도 `view` 를 지킨다.** 초기화가 바꾸는 것은 조건이지 보고 있는 화면이 아니다.
  */
 export function usePlaceFilterNav(): {
-  apply: (next: PlaceFilters) => void
+  /** `keepPreview` — 열린 미리보기(`?place=`)를 닫지 않는다. 반려견 체구 필터 맞춤만 쓴다 (#1301) */
+  apply: (next: PlaceFilters, options?: { keepPreview?: boolean }) => void
   reset: () => void
 } {
   const router = useRouter()
@@ -46,12 +58,18 @@ export function usePlaceFilterNav(): {
 
   const view = parseViewMode(searchParams, PLACES_DEFAULT_VIEW)
 
-  function go(filters: PlaceFilters) {
-    router.replace(placeFilterHref(pathname, filters, view), { scroll: false })
+  function go(filters: PlaceFilters, previewId: string | null = null) {
+    router.replace(placeFilterHref(pathname, filters, view, previewId), { scroll: false })
   }
 
   return {
-    apply: go,
+    apply: (next, options) =>
+      go(
+        next,
+        options?.keepPreview === true
+          ? readPlacePreview(new URLSearchParams(searchParams.toString()))
+          : null,
+      ),
     reset: () => go(DEFAULT_PLACE_FILTERS),
   }
 }

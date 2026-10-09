@@ -5,6 +5,7 @@ import { Canvas, Surface, SurfaceStack } from '@/components/surface'
 import { ViewToggle } from '@/components/view-toggle'
 import { filterSummaryLine } from '@/features/place/filter-summary-line'
 import { PlaceFilterChips } from '@/features/place/place-filter-chips'
+import { PlaceFilterPetSync } from '@/features/place/place-filter-pet-sync'
 import { PlaceFilterRail } from '@/features/place/place-filter-rail'
 import { PlaceListView } from '@/features/place/place-list-view'
 import { PlaceMapView } from '@/features/place/place-map-view'
@@ -157,6 +158,12 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
         `aria-hidden` 으로 보이는 제목을 접근성 트리에서 빼 이름이 두 번 들리지 않게 한다.
       */}
       <h1 className="sr-only">{messages.place.pageTitle}</h1>
+
+      {/*
+        반려견이 바뀌면(띠 헤더 스위처 · 삭제 폴백) 체구 필터 URL 을 맞춘다 (#1301 D1-2 ②). 레일 · 칩 둘 다 체구
+        필터를 그리므로 그쪽이 아니라 보기에 한 번. 지도 갈래는 `PlaceMapView` 가 자기 것을 둔다
+      */}
+      <PlaceFilterPetSync filters={filters} authed={authed} />
 
       {/*
         **`aside` 다 — `complementary` 랜드마크** (#472). 레일은 목록을 좁히는 도구이고
