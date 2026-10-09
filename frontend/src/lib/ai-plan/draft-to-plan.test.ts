@@ -348,3 +348,40 @@ describe('draftToPlanPayload — 고른 지역을 저장까지 옮긴다 (#251)'
     expect('sigunguCode' in result).toBe(false)
   })
 })
+
+/**
+ * 빈 날을 담는다 (#1270). **일자는 항목이 아니라 기간에서 나온다** — `POST /plans` 에 일자
+ * 목록이 없고, 일정 상세는 `startDate`~`endDate` 로 일자 칸을 만든다(`groupItemsByDay`).
+ * 그래서 빈 날을 따로 다루지 않아도 그날은 일정에 남고, 일정 화면에서 그날을 다시 만들 수 있다.
+ */
+describe('draftToPlanPayload — 빈 날 (#1270)', () => {
+  it('항목이 없는 날은 항목을 싣지 않지만 기간은 그대로다 — 그날 칸은 일정에 남는다', () => {
+    const result = payload(
+      [
+        { day: 1, items: [item()] },
+        { day: 2, items: [] },
+        { day: 3, items: [item({ placeId: '3' })] },
+      ],
+      { totalDays: 3 },
+    )
+
+    expect(result.items?.map((entry) => entry.day)).toEqual([1, 3])
+    expect(result.startDate).toBe(snapshot.startDate)
+    expect(result.endDate).toBe(snapshot.endDate)
+  })
+
+  /** 화면은 숙소뿐인 날을 "빈 날" 로 안내하지만 숙소 행을 감추지 않는다 — 담기도 싣는다 */
+  it('숙소만 있는 날은 숙소를 그대로 싣는다', () => {
+    const result = payload(
+      [
+        { day: 1, items: [item()] },
+        { day: 2, items: [item({ itemType: 'LODGING', placeId: '9', title: '협재 펫 스테이' })] },
+      ],
+      { totalDays: 2 },
+    )
+
+    expect(result.items).toContainEqual(
+      expect.objectContaining({ day: 2, sequence: 0, itemType: 'LODGING', targetId: '9' }),
+    )
+  })
+})

@@ -50,3 +50,22 @@ export function isShortenablePeriodTimeout(
 
   return typeof totalDays === 'number' && totalDays > 1
 }
+
+/** 두 번 불러도 방문할 곳이 하루도 없는 초안 — 백엔드 `AiPlanErrorCode.LLM_EMPTY_PLAN` (#1268) */
+export const LLM_EMPTY_PLAN = 'AIPLAN_022'
+
+/**
+ * 빈 초안 실패에 "같은 조건으로 다시" 를 권할 수 있는가 — #1270.
+ *
+ * **원인이 조건이 아니다.** 서버가 빈 초안을 한 번 다시 부르고도 비어야 이 코드가 나는데,
+ * dev 실측으로 같은 조건의 바로 앞 실행은 채워졌다 — 그 회차의 모델 선택이다(백엔드
+ * `ai-service.md` "빈 초안은 한 번 다시 부른다"). 서버 문구도 "조건은 그대로 두고 다시
+ * 시도해 주세요" 라 **조건을 바꾸라는 쪽으로 읽히지 않게** 화면이 그 말을 받쳐 준다.
+ *
+ * 조건이 따로 필요 없다 — 이 코드면 늘 같은 말이 맞다. 다른 실패 코드에는 붙이지 않는다:
+ * 후보가 없거나(`AIPLAN_012`) 시간이 넘친(`AIPLAN_006`) 실패에 같은 조건을 권하면 똑같이
+ * 실패한다.
+ */
+export function isEmptyPlanFailure(errorCode: string | null | undefined): boolean {
+  return errorCode === LLM_EMPTY_PLAN
+}

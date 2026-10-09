@@ -25,6 +25,7 @@ import { PlanDayRegenerateConfirm } from '@/features/plan/plan-day-regenerate-co
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { planKeys } from '@/features/plan/queries'
 import { usePlanDetail } from '@/features/plan/use-plan-detail'
+import { isEmptyPlanFailure } from '@/lib/ai-plan/failure-hint'
 import { isJobFailed, jobStepProgress } from '@/lib/ai-plan/job'
 import {
   dayRegenerateBlock,
@@ -528,6 +529,14 @@ function RegenerateJob({
           */
           title={messages.plan.regenerateDayFailedTitle}
           errorMessage={job?.errorMessage ?? null}
+          /*
+            **빈 응답(`AIPLAN_022`)에만 단서를 단다** (#1270). 생성 화면의 문구(`같은 조건으로
+            다시 시도…`)는 여기 없는 버튼을 가리키므로 이 화면의 말로 바꿔 쓴다. 지역(`012`) ·
+            기간(`006`) 단서는 붙이지 않는다 — 재생성은 일정의 지역 · 기간을 그대로 싣는다.
+          */
+          hint={
+            isEmptyPlanFailure(job?.errorCode) ? messages.plan.regenerateDayEmptyPlanHint : null
+          }
           conditionSummary={null}
           onRetry={null}
           retrying={false}
