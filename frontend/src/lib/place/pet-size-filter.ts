@@ -49,3 +49,28 @@ export function changedPet(previousPetId: string | null, next: Pet | null): Pet 
 
   return next.petId === previousPetId ? null : next
 }
+
+/**
+ * 뒤로 · 앞으로 가기로 URL 이 바뀐 뒤 체구 필터를 다시 맞출 값 — 없으면 `null` (#1301 리뷰).
+ *
+ * 반려견을 바꾸면 맞춤이 지금 칸을 `replace` 로 고치지만 **이전 칸은 고칠 수 없다** — 뒤로 가면 옛 반려견의 체구
+ * 값이 돌아와 칩(`지금 초코`)과 결과(소형견 기준)가 어긋난다. 그래서 기록 이동 뒤에 한 번 더 본다.
+ *
+ * **이번 마운트에서 반려견을 바꾼 적이 있을 때만이다.** 바꾼 적이 없는 세션의 기록 칸은 사용자가 고른 조건이거나
+ * 공유 링크로 들어온 조건이라 고치지 않는다 — 첫 로드에 URL 을 고치지 않는 것(`changedPet`)과 같은 판단이다.
+ */
+export function petSizeFiltersAfterHistory({
+  changedThisMount,
+  popped,
+  filters,
+  pet,
+}: {
+  changedThisMount: boolean
+  popped: boolean
+  filters: PlaceFilters
+  pet: Pet | null
+}): PlaceFilters | null {
+  if (!changedThisMount || !popped || pet === null) return null
+
+  return petSizeFiltersAfterPetChange(filters, pet)
+}
