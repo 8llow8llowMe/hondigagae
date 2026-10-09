@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test'
 
 import { messages } from '../src/lib/messages'
 import { denyGeolocation } from './helpers/geolocation'
-import { mapFallbackReady } from './helpers/map-fallback'
+import { leftMapView, mapFailedToList } from './helpers/map-fallback'
 
 /**
  * 병원·약국 이름·주소 검색 — 이슈 #584.
@@ -197,11 +197,10 @@ test.describe('병원·약국 검색 (#584)', () => {
  * **`?view=map` 을 명시한다** (#639). 기본 보기가 목록이 되면서 `/emergency` 만으로는
  * 지도 갈래에 닿지 않는다 — 생략하면 이 describe 가 통째로 목록 갈래를 재게 된다.
  *
- * **`MOCK_API=true` 라 카카오 SDK 는 뜨지 않는다** — e2e 환경에서 `/emergency` 의 지도
- * 갈래는 SDK 실패 폴백으로 떨어진다. 그 갈래에도 검색이 남아야 한다는 것 자체가 #584 의
- * 결정 하나라(`EmergencyFilterChips` 에는 `초기화` 가 없어 검색어를 지울 길이 없어진다),
- * 여기서 재는 것이 곧 그 결정이다. 실제 SDK 위 오버레이 자리는 소스 단언이 잠근다
- * (`emergency-list-view.test.ts` — 지도 갈래는 검색을 두 자리에 둔다).
+ * **`MOCK_API=true` 라 카카오 SDK 는 뜨지 않는다** — #1289 부터 SDK 가 실패하면 **목록 보기로
+ * 옮겨진다**(`helpers/map-fallback.ts`). 그래서 이 절이 재는 것은 **지도 갈래로 들어온 검색 · 필터
+ * 조건이 옮겨진 목록까지 따라오고, 거기서 검색이 도는가** 다. 실제 SDK 위 오버레이 자리는 소스 단언이
+ * 잠근다(`emergency-list-view.test.ts` — 지도 갈래는 검색을 두 자리에 둔다).
  */
 test.describe('지도 갈래 검색 (#584)', () => {
   test('지도 갈래에도 검색이 있고 URL 의 검색어를 들고 있다', async ({ page }) => {
@@ -210,41 +209,40 @@ test.describe('지도 갈래 검색 (#584)', () => {
     await expect(page.getByRole('searchbox', { name: SEARCH }).first()).toHaveValue(BY_NAME)
   })
 
-  test('지도 갈래에서 검색하면 URL 에 실리고 목록이 좁혀진다', async ({ page }) => {
+  /*
+    **옮겨진 뒤에 친다.** 옮기기 전 지도 갈래의 입력에 채우면 그 값은 새 입력에 덮이고 엔터는 떨어져 나간
+    노드로 간다(`helpers/map-fallback.ts`). 개수는 옮긴 목록(`#emergency-list`)에서 센다 — 위 목록 갈래
+    절과 같은 `rows`.
+  */
+  test('지도를 못 띄우면 목록으로 옮겨지고, 필터가 따라오며 거기서 검색이 좁힌다', async ({
+    page,
+  }) => {
     await page.goto(`/emergency?view=map&${OPEN_FILTER}`)
+    await mapFailedToList(page, leftMapView)
 
-    /*
-      **폴백이 자리를 잡은 뒤에 친다.** 교체 전 입력에 채우면 그 값이 새 입력에 덮이고
-      엔터는 떨어져 나간 노드로 간다 — `role="status"` 로 기다리던 것이 **지도 갈래의
-      "지도를 불러오는 중"** 에 붙어 교체 전에 풀렸다 (`helpers/map-fallback.ts` 가 근거).
-    */
-    await mapFallbackReady(page)
+    await expect(page).toHaveURL(new RegExp(OPEN_FILTER))
 
-    /*
-      **폴백에는 `#emergency-list` 가 없다** — 그 갈래는 카드(`SurfaceStack`)를 쓰지
-      않는다. 그래도 역할로 세는 이유는 같다: 골격이 `aria-hidden` 이라 걸리지 않는다.
-    */
-    const visible = page.getByRole('main').getByRole('listitem')
-    const before = await visible.count()
-    expect(before).toBeGreaterThan(1)
+    const list = rows(page)
+    await expect(list.first()).toBeVisible()
+    expect(await list.count()).toBeGreaterThan(1)
 
-    const box = page.getByRole('searchbox', { name: SEARCH }).first()
+    const box = page.getByRole('searchbox', { name: SEARCH })
     await box.fill(BY_NAME)
     await box.press('Enter')
 
     await expect(page).toHaveURL(new RegExp(`keyword=${encodeURIComponent(BY_NAME)}`))
-    await expect(visible).toHaveCount(1)
+    await expect(list).toHaveCount(1)
   })
 
   /*
-    **폴백에는 보기 토글이 없다** — 그래서 검색어를 지울 길이 `초기화` 도 아닌 이 입력
-    하나뿐이다. 비우고 제출하면 조건이 풀려야 한다 (`normalizeKeyword` 가 빈 값을 `null` 로).
+    **옮겨도 검색어가 따라와야 한다** — 잃으면 지도에서 건 검색이 목록으로 튕기는 순간 사라진다. 따라온
+    검색어를 비우고 제출하면 풀린다(`normalizeKeyword` 가 빈 값을 `null` 로).
   */
-  test('검색창을 비우고 제출하면 검색어가 풀린다', async ({ page }) => {
+  test('옮겨진 목록이 검색어를 들고 있고, 비우고 제출하면 풀린다', async ({ page }) => {
     await page.goto(`/emergency?view=map&keyword=${encodeURIComponent(BY_NAME)}`)
-    await mapFallbackReady(page)
+    await mapFailedToList(page, leftMapView)
 
-    const box = page.getByRole('searchbox', { name: SEARCH }).first()
+    const box = page.getByRole('searchbox', { name: SEARCH })
     await expect(box).toHaveValue(BY_NAME)
 
     await box.fill('')

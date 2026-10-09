@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { mapFallbackReady } from './helpers/map-fallback'
+import { hasListView, mapFailedToList } from './helpers/map-fallback'
 
 /**
  * 장소 이름·주소 검색 — 이슈 #431 (계약은 #421).
@@ -99,11 +99,10 @@ test.describe('장소 검색 (#431)', () => {
  * **지도에서 검색어가 걸린 것을 알 방법이 없다**는 것이라, 잴 것도 그것이다: `?keyword=`
  * 를 달고 들어오면 화면이 그 글자를 되돌려 주는가, 그리고 지우는 길이 있는가.
  *
- * **`MOCK_API=true` 라 카카오 SDK 는 뜨지 않는다** — e2e 에서 `/places` 지도 갈래는 SDK
- * 실패 폴백으로 떨어진다. 그 갈래에 검색이 남아야 한다는 것 자체가 #596 의 결정 하나라
- * (폴백에는 필터 칩도 `초기화` 도 없어 검색어를 지울 길이 사라진다), 여기서 재는 것이 곧
- * 그 결정이다. 실제 SDK 위 오버레이·패널 자리는 소스 단언이 잠근다
- * (`src/features/place/place-map-search.test.ts`).
+ * **`MOCK_API=true` 라 카카오 SDK 는 뜨지 않는다** — #1289 부터 SDK 가 실패하면 **목록 보기로
+ * 옮겨진다**(`helpers/map-fallback.ts`). 그래서 이 절이 재는 것은 **지도 갈래로 들어온 검색 조건이
+ * 옮겨진 목록 보기까지 따라오고, 거기서 검색이 도는가** 다. 실제 SDK 위 오버레이 · 패널의 검색 자리는
+ * 소스 단언이 잠근다(`src/features/place/place-map-search.test.ts`).
  */
 test.describe('지도 보기 검색 (#596)', () => {
   test('지도 갈래에도 검색이 있고 URL 의 검색어를 들고 있다', async ({ page }) => {
@@ -124,24 +123,21 @@ test.describe('지도 보기 검색 (#596)', () => {
     `keyword` 를 물고 BFF 를 다시 친다. 개수가 달라졌다면 왕복이 돈 것이다. 목록 갈래가
     위에서 쓰는 방식과 같다 (`not.toHaveCount(before)`).
   */
-  test('지도 갈래에서 제출하면 keyword 가 URL 에 실리고 목록이 좁혀진다', async ({ page }) => {
+  /*
+    **옮겨진 뒤에 친다.** 옮기기 전 지도 갈래의 입력에 채우면 그 값은 새 입력에 덮이고 엔터는 떨어져
+    나간 노드로 간다(`helpers/map-fallback.ts`). 개수도 옮긴 뒤의 목록(`#place-list`)에서 센다.
+  */
+  test('지도를 못 띄우면 목록 보기로 옮겨지고, 거기서 제출하면 목록이 좁혀진다', async ({
+    page,
+  }) => {
     await page.goto('/places')
+    await mapFailedToList(page, hasListView)
 
-    /*
-      **폴백이 자리를 잡은 뒤에 친다.** 교체 전 입력에 채우면 그 값이 새 입력에 덮이고
-      엔터는 떨어져 나간 노드로 간다 — `main li` 로 기다리던 것이 **지도 갈래 좌측 패널의
-      목록**에 붙어 교체 전에 풀렸다 (`helpers/map-fallback.ts` 가 근거).
-
-      **개수를 세는 데에도 이 대기가 필요하다.** 교체 전에 세면 좌측 패널 목록을 세고
-      제출 뒤에는 폴백 목록을 세게 되어, 재조회와 무관하게 개수가 달라진다.
-    */
-    await mapFallbackReady(page)
-
-    const rows = page.getByRole('main').locator('li')
+    const rows = page.locator('#place-list li')
     const before = await rows.count()
     expect(before).toBeGreaterThan(0)
 
-    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).first()
+    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' })
     await box.fill(KEYWORD)
     await box.press('Enter')
 
@@ -150,20 +146,16 @@ test.describe('지도 보기 검색 (#596)', () => {
   })
 
   /*
-    **폴백에는 필터 칩도 `초기화` 도 없다.** 검색어를 지울 길이 이 입력 하나뿐이라,
-    비우고 제출하면 조건이 풀려야 한다 (`normalizeKeyword` 가 빈 값을 `null` 로).
+    **옮겨도 검색 조건이 따라와야 한다** (`fallbackListHref` 는 미리보기만 뺀다). 잃으면 지도에서 건 검색어가
+    목록으로 튕기는 순간 사라진다. 따라온 검색어를 비우고 제출하면 풀린다(`normalizeKeyword` 가 빈 값을 `null` 로).
   */
-  test('검색창을 비우고 제출하면 검색어가 풀린다', async ({ page }) => {
+  test('옮겨진 목록 보기가 검색어를 들고 있고, 비우고 제출하면 풀린다', async ({ page }) => {
     await page.goto(`/places?keyword=${encodeURIComponent(KEYWORD)}`)
+    await mapFailedToList(page, hasListView)
 
-    /*
-      **`role="status"` 도 `main li` 도 모자랐다.** 둘 다 폴백 **이전**의 지도 갈래에
-      이미 있어서, 대기가 교체 전에 풀렸다 — 그때 채운 값은 새 입력에 덮인다
-      (`helpers/map-fallback.ts` 가 근거).
-    */
-    await mapFallbackReady(page)
+    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' })
+    await expect(box).toHaveValue(KEYWORD)
 
-    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).first()
     await box.fill('')
     await box.press('Enter')
 
@@ -196,20 +188,23 @@ test.describe('담기 화면 검색 (#1012)', () => {
   })
 
   /*
-    `MOCK_API=true` 라 지도는 SDK 실패 폴백이다 (위 #596 절 머리 주석). 폴백의 검색이 곧
-    이 갈래의 검색이다 — 머리 아래·패널 자리는 소스 단언이 잠근다.
+    `MOCK_API=true` 라 지도 갈래는 담기의 목록 보기로 옮겨진다 (위 #596 절 머리 주석). 옮겨도 **담기 경로와
+    검색어가 남아야** 하고, 비우고 제출하면 검색어만 빠진다 — 담기 문맥(경로)과 보기는 그대로다.
   */
-  test('지도 갈래에서도 검색이 서고, 비우고 제출하면 담기 경로만 남는다', async ({ page }) => {
+  test('지도를 못 띄우면 담기 목록으로 옮겨지고, 비우고 제출하면 검색어만 빠진다', async ({
+    page,
+  }) => {
     await page.goto(`${PLAN_ADD}?keyword=${encodeURIComponent(KEYWORD)}`)
+    await mapFailedToList(page, hasListView)
 
-    await mapFallbackReady(page)
+    await expect(page).toHaveURL(onPlanAdd(`keyword=${encodeURIComponent(KEYWORD)}&view=list`))
 
-    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).first()
+    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' })
     await expect(box).toHaveValue(KEYWORD)
 
     await box.fill('')
     await box.press('Enter')
 
-    await expect(page).toHaveURL(new RegExp(`${PLAN_ADD.replace(/\//g, '\\/')}$`))
+    await expect(page).toHaveURL(onPlanAdd('view=list$'))
   })
 })
