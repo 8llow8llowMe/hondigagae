@@ -71,9 +71,18 @@ export function PetSwitcher({
   // localStorage 는 서버에서 읽을 수 없다. 마운트 후 복원해야 하이드레이션이 어긋나지 않는다.
   useEffect(() => restore(), [restore])
 
+  /*
+    **닫는 길은 하나다** — 고르기 · `반려견 등록` · `Esc` · 바깥 누름 · 트리거 다시 누름이 모두 이것을 탄다. 방향도
+    함께 아래로 돌려 다음 열기의 첫 프레임이 늘 아래다(재기 전 한 프레임, D1-2).
+  */
+  const close = () => {
+    setOpen(false)
+    setPlacement('below')
+  }
+
   useOverlay({
     open,
-    onClose: () => setOpen(false),
+    onClose: close,
     containerRef: panelRef,
     triggerRef,
     // 팝오버는 배경 덮개가 없어 페이지가 살아 있다 — 바탕 스크롤을 잠그지 않는다
@@ -88,7 +97,9 @@ export function PetSwitcher({
       const target = event.target as Node
       if (panelRef.current?.contains(target) === true) return
       if (triggerRef.current?.contains(target) === true) return
+      // `close` 와 같은 일 — 상태 설정자만 써서 effect 가 렌더마다 다시 걸리지 않게 한다
       setOpen(false)
+      setPlacement('below')
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
@@ -135,11 +146,6 @@ export function PetSwitcher({
   }
 
   const selectedPetId = selected.petId
-
-  const close = () => {
-    setOpen(false)
-    setPlacement('below')
-  }
 
   const toggle = () => {
     if (open) close()
