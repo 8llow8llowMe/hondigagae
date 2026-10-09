@@ -10,9 +10,10 @@ import { cn } from '@/lib/utils/cn'
 /**
  * 병원 · 약국 함께 보기 토글 (#1286, `docs/features/place/지도시설토글-세부명세.md` D4-1 · D5 · D6).
  *
- * **모양은 `ViewToggle` `md` 와 한 벌이다** — 같은 세로 묶음(`목록 보기` · `내 위치`)에 서므로 높이 44 ·
- * `rounded-lg` · `bg-bg` · `border-border` · `shadow-md` 를 같게 둔다. `md` 미만은 44 정사각 아이콘이고 글자는
- * `sr-only` 로 남는다(#1272 와 같은 규칙).
+ * **지도 도구 카드(`MapToolCard`)의 한 칸이다** (#1300 D1-2). 46 × 48 칸에 아이콘 20 + 간격 4 + 캡션
+ * `병원·약국`(`.map-tool-caption` 10/12 · 600)을 세로로 쌓는다. 캡션은 **모든 폭에서 보이고** 그대로 접근 이름이
+ * 된다 — 예전 `max-md` 아이콘 갈래 · `sr-only` 글자는 걷었다. 테두리 · 곡률 · 그림자는 카드가 갖는다.
+ * 칸 경계까지 채움이 차고 카드가 `overflow-hidden` 이라 포커스 링은 안쪽이다.
  *
  * **켬은 반전이다** (`bg-fg` · `text-fg-inverse`) — 색상(hue)이 아니라 명도로 가른다. 상태는 `aria-pressed` 가
  * 말하고, **접근 이름은 켬 · 끔에 따라 바꾸지 않는다** — 이름이 바뀌면 "누르면 무엇이 되나" 와 "지금 무엇인가"
@@ -43,15 +44,15 @@ export function PlaceMapFacilityToggle({
         aria-busy={status.kind === 'loading'}
         title={messages.map.facilityToggle}
         className={cn(
-          'text-body-2 focus-visible:ring-brand-500 inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-4 font-semibold whitespace-nowrap shadow-md transition-colors focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none max-md:w-11 max-md:px-0',
+          'focus-visible:ring-brand-500 flex h-12 w-full flex-col items-center justify-center gap-1 transition-colors focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset',
           on
-            ? 'bg-fg text-fg-inverse border-fg'
-            : // 모바일 아이콘은 바로 아래 `내 위치` 와 같은 낮춘 톤이다
-              'bg-bg border-border text-fg hover:bg-band max-md:text-fg-muted',
+            ? 'bg-fg text-fg-inverse'
+            : // 끔은 바로 아래 `내 위치` 칸과 같은 낮춘 톤이다
+              'text-fg-muted hover:bg-band hover:text-fg',
         )}
       >
-        <EmergencyIcon size={18} />
-        <span className="max-md:sr-only">{messages.map.facilityToggle}</span>
+        <EmergencyIcon size={20} />
+        <span className="map-tool-caption whitespace-nowrap">{messages.map.facilityToggle}</span>
       </button>
 
       <span role="status" aria-live="polite" className="sr-only">

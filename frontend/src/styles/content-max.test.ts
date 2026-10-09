@@ -124,18 +124,21 @@ describe('콘텐츠 컨테이너 — 헤더 (#376)', () => {
 })
 
 /*
-  #1287 — 지도 아일랜드 알약은 **콘텐츠 열의 오른쪽 끝**에 매단다. 지도 조작 줄(#412)과 같은 기준이라
-  1920 에서 알약 · 조작 줄 오른쪽 끝이 같은 x(1640)에 선다. 뷰포트 끝을 잡으면 243px 벌어진다.
+  #1287 → #1300 — 지도 아일랜드 알약은 **콘텐츠 열의 오른쪽 끝 − 40** 에 매단다. 지도 조작 카드(#412)와 같은 기준이라
+  1920 에서 알약 · 카드 오른쪽 끝이 같은 x(1640)에 선다. 뷰포트 끝을 잡으면 243px 벌어진다. #1300 부터 그 자리는
+  JSX 열(`content-container`)이 아니라 허용 상자(`.island-bar`, `fixed`)의 CSS 가 갖는다 — 왼쪽도 지도 경계로 잡아야 해서다.
 */
-describe('콘텐츠 컨테이너 — 지도 아일랜드 알약 (#1287)', () => {
+describe('콘텐츠 컨테이너 — 지도 아일랜드 알약 (#1287 · #1300)', () => {
   const island = repoSource('src/features/nav/island-header.tsx')
+  const bar = /(?:^|\n)\.island-bar\s*\{[^}]*\}/.exec(globals)?.[0] ?? ''
 
-  it('알약 열이 content-container 를 쓰고 인셋을 INSET_CLASS.main 으로 참조한다', () => {
-    expect(island).toContain("'content-container")
-    expect(island).toContain('INSET_CLASS.main')
+  it('허용 상자 오른쪽이 --content-max 로 콘텐츠 열 끝 − 40 이다', () => {
+    expect(bar).toContain(
+      'inset-inline-end: max(40px, calc((100% - var(--content-max)) / 2 + 40px))',
+    )
   })
 
-  it('바(<header>)는 캡하지 않는다 — 전폭 fixed 줄 안에서 열만 캡한다', () => {
+  it('바(<header>)는 캡하지 않는다 — 전폭 fixed 줄이다', () => {
     const barClasses = island.match(/<header className="([^"]*)"/)?.[1]
 
     expect(barClasses).toBeDefined()

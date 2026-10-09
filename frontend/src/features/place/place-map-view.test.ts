@@ -19,13 +19,13 @@ const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''
   자기 플로팅 컨트롤을 더 덮었다 — 812 에서 2px 여유, 800 에서 0, **640 에서 24px 덮음**.
 */
 describe('PlaceMapView — 시트 최대 단계의 윗변 (#901 D2)', () => {
-  it('호출부가 주지 않으면 지도 위 컨트롤 기준(136 · 아일랜드 120)으로 떨어진다 — 85dvh 가 아니다', () => {
+  it('호출부가 주지 않으면 지도 위 컨트롤 기준(136 · 아일랜드 CSS 변수)으로 떨어진다 — 85dvh 가 아니다', () => {
     // `<MapSheet` 의 여는 태그 안에 `toolbar={<PlaceMapFilterBar … />}` 가 들어 있어
     // 첫 `>` 로 자르면 태그가 중간에서 끊긴다 — 문자열 자체가 충분히 고유하다
     expect(code).toContain('maxTopInset={sheetMaxTopInset ?? controlsInset}')
-    // 아일랜드(#1287)만 120 이고, 끄면 예전 136 그대로다
+    // 아일랜드는 폭으로 갈리는 CSS 변수(60 / 120, #1300)이고, 끄면 예전 136 그대로다
     expect(code).toContain(
-      'const controlsInset = island ? MAP_ISLAND_TOP_CONTROLS_INSET : MAP_TOP_CONTROLS_INSET',
+      'const controlsInset = island ? MAP_ISLAND_INSET_VAR : MAP_TOP_CONTROLS_INSET',
     )
   })
 
@@ -120,20 +120,23 @@ describe('PlaceMapView — 장소 미리보기 (#1227)', () => {
     목록과 함께 스택 안에 있어 접으면 같이 밀려난다 — 접힌 목록 옆에 홀로 서지 않는다.
   */
   it('미리보기는 스택 안에서 1280 부터 흐름에 들고 그 아래는 목록 자리에 겹친다', () => {
+    // 1024~1279 의 목록 자리 — 아일랜드에서도 y 0 부터다(#1300 D1-2, 머리 64 가 로고 높이에 ‹ 목록 · ✕ 를 둔다)
     expect(code).toContain(
-      'map-panel-width bg-bg border-border absolute left-0 overflow-hidden border-r xl:static',
+      'className="map-panel-width bg-bg border-border absolute inset-y-0 left-0 overflow-hidden border-r xl:static"',
     )
-    // 1024~1279 의 목록 자리 — 아일랜드는 로고 띠 아래(top-16)부터, 아니면 위아래 끝까지 (#1287)
-    expect(code).toContain("island ? 'top-16 bottom-0' : 'inset-y-0'")
+    expect(code).not.toContain('top-16 bottom-0')
   })
 
   it('담기 지도(미리보기 꺼짐)는 정중앙 카메라 그대로다', () => {
     expect(code).toContain('selectedOffset={preview ? selectedOffset : undefined}')
   })
 
-  it('모바일 위 경계는 뷰포트 기준 136(아일랜드 120)이다 — root.top 에 더하지 않는다 (헤더 이중 차감)', () => {
-    expect(code).toContain('Math.max(root.top, controlsInset)')
-    expect(code).not.toContain('root.top + controlsInset')
+  it('모바일 위 경계는 뷰포트 기준 136(아일랜드 변수의 계산값)이다 — root.top 에 더하지 않는다 (헤더 이중 차감)', () => {
+    expect(code).toContain('Math.max(root.top, Number.isFinite(inset) ? inset : 0)')
+    // 아일랜드는 지금 폭의 계산된 변수를 읽는다 — 숫자 상수 둘을 matchMedia 로 고르지 않는다 (#1300 D1-2)
+    expect(code).toContain("getComputedStyle(rootElement).getPropertyValue('--map-island-inset')")
+    expect(code).not.toContain('matchMedia')
+    expect(code).not.toContain('root.top + inset')
     // prop 이 바뀌면 다시 잰다 — 빈 의존성이면 첫 값에 얼어붙는다
     expect(code).toContain('}, [controlsInset])')
   })
@@ -260,14 +263,18 @@ describe('PlaceMapView — 병원 · 약국 층 (#1286)', () => {
     expect(code).toContain('ref={facilityToggleRef}')
   })
 
-  it('토글은 목록 보기 아래 · 내 위치 위다', () => {
-    const viewToggle = code.indexOf('<ViewToggle current="map"')
+  /* #1300 — 토글은 아이콘 묶음 카드의 위 칸, `내 위치` 는 아래 칸이다(늦게 나타난다) */
+  it('토글은 목록 보기 아래 카드의 위 칸 · 내 위치는 아래 칸이다', () => {
+    const viewToggle = code.indexOf('<ViewToggle')
+    const card = code.indexOf('<MapToolCard>')
     const facility = code.indexOf('<PlaceMapFacilityToggle')
-    const locate = code.indexOf('<MapLocateButton')
+    const locate = code.indexOf('<MapLocateButton onLocate={locate} variant="cell" />')
 
     expect(viewToggle).toBeGreaterThan(-1)
-    expect(facility).toBeGreaterThan(viewToggle)
+    expect(card).toBeGreaterThan(viewToggle)
+    expect(facility).toBeGreaterThan(card)
     expect(locate).toBeGreaterThan(facility)
+    expect(code.indexOf('</MapToolCard>')).toBeGreaterThan(locate)
   })
 
   it('시설 묶음의 이름 틀을 넘긴다', () => {
@@ -326,25 +333,88 @@ describe('PlaceMapView — 지도 아일랜드 (#1287)', () => {
     expect(root).toContain("fill ? 'h-full' : 'map-canvas-height'")
   })
 
-  it('스택 맨 위 64 로고 띠 — 아일랜드에서만, 장식 면이고 본문은 그 아래(pt-16)부터다', () => {
-    expect(code).toContain("island && 'pt-16'")
-    const band = code.slice(code.indexOf('{island && (\n            <div'))
-    const tag = band.slice(0, band.indexOf('/>'))
-    expect(tag).toContain('aria-hidden')
-    expect(tag).toContain('absolute inset-x-0 top-0 h-16 border-b')
-    expect(tag).toContain('bg-bg')
+  /* #1300 — 알약 허용 상자가 1280 부터 미리보기 폭(800)까지 비킨다. 열려 있을 때만 단다 */
+  it('미리보기 · 시설 요약이 열리면 data-preview="open" 을 단다 — 끄면 · 닫히면 없다', () => {
+    expect(root).toContain("data-preview={island && docked ? 'open' : undefined}")
   })
 
-  it('로고 띠는 스택(id={stackId}) 안 맨 앞이다 — 접으면 스택과 함께 밀려난다', () => {
-    const stack = code.indexOf('id={stackId}')
-    const band = code.indexOf('{island && (\n            <div')
-    const list = code.indexOf("'map-panel-width bg-bg border-border flex h-full")
-    expect(band).toBeGreaterThan(stack)
-    expect(band).toBeLessThan(list)
+  /*
+    **로고 띠는 목록 칸 폭만이다** (#1300 D1-2) — 미리보기가 y 0 부터라 띠가 스택 전폭이면 미리보기 머리를 덮는다.
+    띠 · 그 아래 시작(64)이 목록 칸의 것이다.
+  */
+  it('로고 띠(64)는 목록 칸 안 맨 앞이고, 스택에는 pt-16 · 전폭 띠가 없다', () => {
+    const band = code.indexOf(
+      '{island && <div aria-hidden className="border-border h-16 shrink-0 border-b" />}',
+    )
+    const list = code.indexOf("'map-panel-width bg-bg border-border flex h-full flex-col")
+    const head = code.indexOf(
+      '{hasHead && <div className="border-border border-b p-3">{head}</div>}',
+    )
+
+    expect(band).toBeGreaterThan(list)
+    expect(band).toBeLessThan(head)
+    expect(code).not.toContain("island && 'pt-16'")
+    expect(code).not.toContain('absolute inset-x-0 top-0 h-16')
   })
 
-  it('조작 줄 · 시트 · 핀 보정이 아일랜드 값(top-17 · MAP_ISLAND_TOP_CONTROLS_INSET)을 쓴다', () => {
-    expect(code).toContain("island ? 'top-17' : 'top-5 lg:top-6'")
+  it('조작 줄은 <768 y 8 · ≥768 y 68 이다 — 모바일에는 알약이 없다', () => {
+    expect(code).toContain("island ? 'top-2 md:top-17' : 'top-5 lg:top-6'")
     expect(code.match(/\bcontrolsInset\b/g)?.length).toBeGreaterThanOrEqual(4)
+  })
+
+  /* 데스크톱은 목록이 옆에 보이는데 `목록 보기` 가 떠 있었다 — 패널 `크게 보기` 가 대신한다 (D0 #4) */
+  it('아일랜드의 보기 전환은 1024 이상에서 숨는다 — 끄면 className 이 비어 예전 그대로다', () => {
+    const tag = code.slice(
+      code.indexOf('<ViewToggle'),
+      code.indexOf('/>', code.indexOf('<ViewToggle')),
+    )
+
+    expect(tag).toContain("className={island ? 'lg:hidden' : ''}")
+  })
+
+  it('아일랜드 · 시설 층은 카드 하나에 칸을 담고, 끄면(담기) 내 위치는 혼자 뜨는 예전 버튼이다', () => {
+    expect(code.match(/<MapToolCard>/g)).toHaveLength(1)
+    expect(code).toContain('{island || facilityLayer ? (')
+    expect(code).toContain('locatable && <MapLocateButton onLocate={locate} />')
+  })
+})
+
+/*
+  #1300 — 패널 개수 줄 오른쪽 `크게 보기` (`지도-아일랜드알약-정리-세부명세.md` D1-2 · D4-2). 지도 위 `목록 보기` 와
+  같은 주소(`listHref`)로 가는 링크 하나이고, 줄이 44 를 갖는다. 담기 지도(아일랜드 꺼짐)는 예전 줄 그대로다.
+*/
+describe('PlaceMapView — 개수 줄 크게 보기 (#1300)', () => {
+  const start = code.indexOf('{island ? (\n              <div className="text-caption')
+  const branch = code.slice(start, code.indexOf(') : (', start))
+  const link = branch.slice(branch.indexOf('<Link'), branch.indexOf('</Link>'))
+
+  it('아일랜드 갈래 줄은 min-h-11 flex 양 끝 정렬이다', () => {
+    const row = /<div className="([^"]*)"/.exec(branch)?.[1]?.split(/\s+/) ?? []
+
+    expect(row).toEqual(
+      expect.arrayContaining(['flex', 'min-h-11', 'items-center', 'justify-between']),
+    )
+    expect(row).not.toContain('py-2')
+  })
+
+  it('링크는 listHref 로 가고 숨은 목록 + 보이는 크게 보기 + 화살표 아이콘이다', () => {
+    expect(branch).toContain('{listHref !== undefined && (')
+    expect(link).toContain('href={listHref}')
+    expect(link).toContain('<span className="sr-only">{`${messages.map.expandListPrefix} `}</span>')
+    expect(link).toContain('{messages.map.expandList}')
+    expect(link).toContain('<ChevronRightIcon size={16} />')
+    expect(link).toMatch(/className="[^"]*\bmin-h-11\b/)
+  })
+
+  it('아일랜드가 아니면 예전 줄 그대로다 — 링크가 없다', () => {
+    const rest = code.slice(
+      code.indexOf(') : (', start),
+      code.indexOf(')}', code.indexOf(') : (', start)),
+    )
+
+    expect(rest).toContain(
+      '<div className="text-caption text-fg-muted border-border bg-bg-sunken border-b px-4 py-2 font-medium">',
+    )
+    expect(rest).not.toContain('<Link')
   })
 })

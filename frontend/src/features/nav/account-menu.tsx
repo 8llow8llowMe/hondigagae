@@ -27,7 +27,16 @@ import { messages } from '@/lib/messages'
  * 예전에는 여기서 `useOverlay` 부터 패널 마크업까지 다시 만들고 있었다 — `MenuItem` 이
  * `href` 를 받지 못해서였고, 그것을 컴포넌트 쪽에서 고쳤다 (이슈 #70).
  */
-export function AccountMenu() {
+export function AccountMenu({
+  variant = 'header',
+}: {
+  /**
+   * `island` — 지도 아일랜드 알약의 **프로필 원**(#1300 D1-2). 트리거가 40 원(알약 48 · 여백 4 와 동심원)이고
+   * `내 정보` 글자가 없다. 접근 이름(`내 정보 메뉴 열기`) · `aria-haspopup` · `aria-expanded` · 메뉴 항목 ·
+   * 로그아웃 흐름은 띠 헤더와 같다 — 메뉴 동작을 두 벌로 두지 않는다.
+   */
+  variant?: 'header' | 'island'
+} = {}) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
@@ -113,10 +122,16 @@ export function AccountMenu() {
           있을 때도 20 아이콘이 32 원형 가운데라 글자까지의 거리가 예전 `pl-3` 과 같다.
           `aria-label`(`내 정보 메뉴 열기`)이 보이는 글자를 포함한다(WCAG 2.5.3).
         */
-        className="bg-band text-fg-muted focus-visible:ring-brand-500 flex size-11 items-center justify-center gap-2 rounded-full focus-visible:ring-2 focus-visible:outline-none lg:w-auto lg:pr-4 lg:pl-1.5"
+        className={
+          variant === 'island'
+            ? 'bg-band text-fg-muted focus-visible:ring-brand-500 flex size-10 shrink-0 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:outline-none'
+            : 'bg-band text-fg-muted focus-visible:ring-brand-500 flex size-11 items-center justify-center gap-2 rounded-full focus-visible:ring-2 focus-visible:outline-none lg:w-auto lg:pr-4 lg:pl-1.5'
+        }
       >
         <ProfileAvatar url={member?.profileImageUrl ?? null} size="sm" />
-        <span className="text-body-2 text-fg hidden font-semibold lg:inline">내 정보</span>
+        {variant === 'header' && (
+          <span className="text-body-2 text-fg hidden font-semibold lg:inline">내 정보</span>
+        )}
       </button>
 
       <Menu

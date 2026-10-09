@@ -231,10 +231,12 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
       // 긴급 시설 지도 보기 — `place-map-view.tsx` 와 같은 구조다(#353) - 지도가
       // 바탕이고 왼쪽 도킹 패널 · 손잡이가 그 위에 얹힌다 (#1232 D10)
       'src/features/emergency/emergency-map-view.tsx',
-      // 지도 아일랜드 헤더 (#1287) — 흰 띠 대신 지도 위에 뜨는 알약이다. 다른 지도 위 컨트롤과 같은 그림자
+      // 지도 아일랜드 헤더 (#1287 · #1300) — 흰 띠 대신 지도 위에 뜨는 알약이다. 다른 지도 위 컨트롤과 같은 그림자
       'src/features/nav/island-header.tsx',
       // 지도 우상단에 얹히는 현재 위치 버튼 — 보기 전환 토글과 같은 스택에 뜬다
       'src/features/map/map-locate-button.tsx',
+      // 지도 우측 아이콘 묶음 카드 (#1300) — 병원·약국 층 · 내 위치 칸을 담고 지도 위에 뜬다
+      'src/features/map/map-tool-card.tsx',
       // 같은 스택의 병원 · 약국 토글과 그 아래 안내 카드 (#1286) — 둘 다 지도 위에 뜬다
       'src/features/place/place-map-facility-toggle.tsx',
       // ── 드래그 중인 항목 (DESIGN.md §6 이 --shadow-md 용도에 명시한다) ─────

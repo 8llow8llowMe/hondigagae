@@ -59,20 +59,12 @@ const DRAG_THRESHOLD_PX = 24
 export const MAP_TOP_CONTROLS_INSET = 136
 
 /**
- * **지도 아일랜드**의 플로팅 컨트롤을 비켜 가는 `maxTopInset` — 이슈 #1287
- * (`docs/features/place/지도-아일랜드헤더-세부명세.md` D2-1).
- *
- * `/places` 지도 보기는 흰 헤더 띠가 없고 지도가 y 0 부터다. 헤더는 지도 위 알약이고, 조작 줄이
- * 그 아래 모든 폭에서 같은 y 68 에 선다 — 폭으로 갈리는 값이 없다.
- *
- * | 위 | 알약 | 간격 | 검색 · 보기 전환 | 여유 | 합 |
- * | ---: | ---: | ---: | ---: | ---: | ---: |
- * | 8 | 48 | 12 | 44 | 8 | **120** |
- *
- * `.map-island .map-preview-sheet`(`app/globals.css`)가 같은 `120px` 을 쓴다. 136 은 `/emergency` ·
- * 담기 지도가 계속 쓴다 — 그 화면들이 옮겨지면(명세 D7-3) 136 이 사라진다.
+ * **지도 아일랜드**(`/places`, #1287 · #1300)의 `maxTopInset` 은 숫자가 아니라 **CSS 변수**다 —
+ * `var(--map-island-inset)`. 알약이 768 이상에만 서서 바닥이 폭으로 갈린다(<768 = 60, ≥768 = 120). 값과 유도는
+ * `.map-island` 규칙 한 곳(`app/globals.css`)에 있고, 고른 핀 보정은 계산된 값을 읽는다(`place-map-view.tsx`).
+ * 136 은 `/emergency` · 담기 지도가 계속 쓴다.
  */
-export const MAP_ISLAND_TOP_CONTROLS_INSET = 120
+export const MAP_ISLAND_INSET_VAR = 'var(--map-island-inset)'
 
 /**
  * 여기서 시작한 제스처는 드래그로 치지 않는다 — **입력칸과 표식(`data-sheet-no-drag`)뿐이다.**
@@ -155,8 +147,11 @@ export function MapSheet({
    * 그리고 비율은 **기기가 작을수록 더 덮는다**: 667px 기기라면 `85dvh` 의 상단이
    * y=100 으로 내려가 지금보다 나빠진다. 헤더 높이는 기기 높이와 무관하게 거의
    * 일정하므로 px 이 안정적이다.
+   *
+   * **CSS 변수도 받는다** (#1300) — 폭에 따라 바닥이 갈리는 지도 아일랜드는 `var(--map-island-inset)` 을 넘긴다.
+   * 폭 판정을 JS(`matchMedia`)로 옮기면 하이드레이션 불일치 · 회전 때 어긋난다.
    */
-  maxTopInset?: number | undefined
+  maxTopInset?: number | `var(--${string})` | undefined
 }) {
   const [dragOffset, setDragOffset] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -266,9 +261,15 @@ export function MapSheet({
     사실상 0 이 된다). 비율끼리인 기존 경로는 `0.2 < 0.45 < 0.85` 로 단조성이 구조적으로
     보장됐지만 이 갈래는 보장하지 않으므로 CSS `max()` 로 클램프한다.
   */
+  const inset =
+    typeof maxTopInset === 'string'
+      ? maxTopInset
+      : maxTopInset > 0
+        ? `${String(maxTopInset)}px`
+        : null
   const base =
-    stop === 'max' && maxTopInset > 0
-      ? `max(${String(STOP_RATIO.mid * 100)}dvh, 100dvh - ${String(maxTopInset)}px)`
+    stop === 'max' && inset !== null
+      ? `max(${String(STOP_RATIO.mid * 100)}dvh, 100dvh - ${inset})`
       : `${String(STOP_RATIO[stop] * 100)}dvh`
 
   /*

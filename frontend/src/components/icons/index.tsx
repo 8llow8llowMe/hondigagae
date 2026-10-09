@@ -269,6 +269,20 @@ export function ListIcon(props: IconProps) {
   )
 }
 
+/**
+ * 메뉴(≡) — 지도 아일랜드 알약이 좁을 때 메뉴 셋을 접는 버튼 (#1300 D3-1).
+ * `ListIcon` 과 헷갈리지 않게 점 없이 가로줄 셋만 둔다 — 목록은 "보기 전환" 이고 이것은 "메뉴 열기" 다.
+ */
+export function MenuIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 6.5h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17.5h16" />
+    </Svg>
+  )
+}
+
 /** 위치 핀 — 지도 마커·현재 위치 버튼 */
 export function PinIcon(props: IconProps) {
   return (

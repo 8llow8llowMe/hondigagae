@@ -38,12 +38,12 @@ function notice(status: FacilityLayerStatus) {
 }
 
 describe('PlaceMapFacilityToggle', () => {
-  it('끔 — aria-pressed=false 이고 반전 면이 아니다', () => {
+  it('끔 — aria-pressed=false 이고 반전 면이 아니다 · 낮춘 톤이다', () => {
     const tag = buttonTag(toggle(false, { kind: 'off' }))
 
     expect(tag).toContain('aria-pressed="false"')
     expect(tag).toContain('type="button"')
-    expect(classTokens(tag)).toEqual(expect.arrayContaining(['bg-bg', 'border-border', 'text-fg']))
+    expect(classTokens(tag)).toContain('text-fg-muted')
     expect(classTokens(tag)).not.toContain('bg-fg')
   })
 
@@ -51,10 +51,8 @@ describe('PlaceMapFacilityToggle', () => {
     const tag = buttonTag(toggle(true, { kind: 'shown', count: 3, truncated: false }))
 
     expect(tag).toContain('aria-pressed="true"')
-    expect(classTokens(tag)).toEqual(
-      expect.arrayContaining(['bg-fg', 'text-fg-inverse', 'border-fg']),
-    )
-    expect(classTokens(tag)).not.toContain('bg-bg')
+    expect(classTokens(tag)).toEqual(expect.arrayContaining(['bg-fg', 'text-fg-inverse']))
+    expect(classTokens(tag)).not.toContain('text-fg-muted')
   })
 
   it('불러오는 동안만 aria-busy 다', () => {
@@ -64,19 +62,31 @@ describe('PlaceMapFacilityToggle', () => {
     )
   })
 
-  /* 상태는 aria-pressed 가 말한다 — 이름이 바뀌면 "지금 무엇" 과 "누르면 무엇" 이 섞인다 */
-  it('접근 이름은 켬 · 끔에 따라 바뀌지 않는다', () => {
+  /*
+    상태는 aria-pressed 가 말한다 — 이름이 바뀌면 "지금 무엇" 과 "누르면 무엇" 이 섞인다.
+    #1300 — 캡션이 모든 폭에서 보이고 그대로 접근 이름이 된다(예전 `max-md:sr-only` 를 걷었다).
+  */
+  it('접근 이름은 보이는 캡션이고 켬 · 끔에 따라 바뀌지 않는다', () => {
     for (const markup of [toggle(false, { kind: 'off' }), toggle(true, { kind: 'loading' })]) {
       expect(buttonTag(markup)).toContain(`title="${messages.map.facilityToggle}"`)
-      expect(markup).toContain(`<span class="max-md:sr-only">${messages.map.facilityToggle}</span>`)
+      expect(markup).toContain(
+        `<span class="map-tool-caption whitespace-nowrap">${messages.map.facilityToggle}</span>`,
+      )
+      // 버튼 안에 숨은 글자가 없다 — 숨은 상태 알림(버튼 밖 형제)은 따로다
+      expect(markup.slice(0, markup.indexOf('</button>'))).not.toContain('sr-only')
       expect(buttonTag(markup)).not.toContain('aria-label')
     }
   })
 
-  it('모바일은 44 정사각 아이콘이다 — 높이 44 · 폭 44', () => {
+  /* #1300 D1-2 — 지도 도구 카드의 한 칸. 테두리 · 그림자 · 곡률은 카드가 갖는다 */
+  it('카드 칸이다 — 46 × 48 세로 쌓기 · 안쪽 포커스 링 · 자기 테두리 · 그림자 · 곡률이 없다', () => {
     const tokens = classTokens(buttonTag(toggle(false, { kind: 'off' })))
 
-    expect(tokens).toEqual(expect.arrayContaining(['h-11', 'max-md:w-11', 'max-md:px-0']))
+    expect(tokens).toEqual(
+      expect.arrayContaining(['h-12', 'w-full', 'flex-col', 'focus-visible:ring-inset']),
+    )
+    for (const name of ['border', 'shadow-md', 'rounded-lg', 'max-md:w-11', 'h-11'])
+      expect(tokens).not.toContain(name)
   })
 
   it('숨은 상태 알림이 늘 있다 — 끔에서도 자리는 남고 글자만 빈다', () => {

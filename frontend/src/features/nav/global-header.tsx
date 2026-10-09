@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils/cn'
  * 로고와 nav 사이 gap 32, nav 항목 사이 gap 4.
  *
  * **로고는 심볼 + 워드마크 락업이다** — `HeaderLogo`(`header-parts.tsx`)가 그리고 근거(#240)도 거기 있다.
- * 아일랜드 헤더(#1287)와 같은 조각을 쓴다.
+ * 아일랜드 헤더(#1287)와 로고 조각만 같이 쓴다 — 오른쪽 묶음(`HeaderActions`)은 이 띠 전용이다(#1300).
  *
  * **`(auth)` 그룹에는 두지 않는다** — 이탈 경로가 되면 `returnTo` 흐름이 깨진다.
  *
@@ -33,7 +33,7 @@ import { cn } from '@/lib/utils/cn'
  *
  * **지도 아일랜드에서는 숨는다** (#1287). `/places` 지도 보기는 같은 셸의 `IslandHeader`(알약)를
  * 쓴다 — `body:has(.map-island) .global-header` 가 이 띠를 `display: none` 으로 걷는다
- * (`app/globals.css`). 로고 · 오른쪽 묶음은 두 헤더가 `header-parts.tsx` 의 같은 조각을 쓴다.
+ * (`app/globals.css`). 알약은 메뉴 셋 + 계정 하나다(#1300) — 이 띠의 내용은 그대로다.
  *
  * 높이를 `<header>` 자신이 갖고 `box-border` 로 테두리를 그 안에 넣는다. 그래야 헤더가
  * 실제로 차지하는 높이가 `--header-h`(56/64)와 정확히 같아진다 — 안쪽 div 가 높이를

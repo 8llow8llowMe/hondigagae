@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { MAP_ISLAND_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
+import { MAP_ISLAND_INSET_VAR, MapSheet, type SheetStop } from '@/components/map-sheet'
 import { Skeleton } from '@/components/skeleton'
 import { cn } from '@/lib/utils/cn'
 
@@ -73,13 +73,15 @@ function FilterBarSkeleton() {
  *
  * 흉내 내는 것(1280 · 390 실측, 2026-09-29):
  * - 바닥 — `MapCanvas` 의 SDK 대기 면과 같은 `bg-bg-sunken`, 높이는 `.map-canvas-height`
- * - 우상단 — 보기 전환 버튼(110×44, #1125), 1024 미만은 그 왼쪽 검색(입력 + 아이콘 버튼 44)
- * - 데스크톱 — 왼쪽에 붙은 400 패널(`inset-y-0 left-0`, #1232): 검색 줄 61 · 필터 줄 111 · 개수 줄 35 · 행
+ * - 우상단 — 1024 미만은 검색(입력 + 아이콘 버튼 44) · 보기 전환(<768 44 아이콘 · 768–1023 글자 `w-28`), 그 아래
+ *   지도 도구 카드 자리(`w-12 h-12.5` — 첫 페인트에는 `병원·약국` 칸 하나만 서고 `내 위치` 는 뒤에 붙는다, #1300)
+ * - 데스크톱 — 왼쪽에 붙은 400 패널(`inset-y-0 left-0`, #1232): 로고 띠 64 · 검색 줄 61 · 필터 줄 111 · 개수 줄 44 · 행
  * - 모바일 — `MapSheet` 를 **그대로** 쓴다(`mid`). 머리 높이(그래버 · 필터 102 · 개수 42)가
  *   시트 자신의 것이라 두 벌로 두면 갈린다
  *
- * **늘 아일랜드 모양이다** (#1287 D3-3) — 이 골격은 `/places` 지도 보기 전용이라 루트가 `map-island` 를
- * 달고, 조작 줄 y 68 · 스택 맨 위 64 로고 띠 · 시트 상한 120 이 `PlaceMapView island` 와 같다. 골격부터
+ * **늘 아일랜드 모양이다** (#1287 D3-3 · #1300 D3-4) — 이 골격은 `/places` 지도 보기 전용이라 루트가 `map-island`
+ * 를 달고, 조작 줄 y 8 / 68 · 목록 칸 맨 위 64 로고 띠 · 시트 상한 `--map-island-inset` 이 `PlaceMapView island` 와
+ * 같다. 미리보기가 없으므로 `data-preview` 를 달지 않는다. 골격부터
  * 헤더가 알약이어야 골격 → 본 화면 사이에 헤더 · 패널 자리가 바뀌지 않는다(#1232 D6 과 같은 이유).
  *
  * **client component 인 이유는 시트 하나다** — `MapSheet` 가 단계 상태를 받는다. 골격을
@@ -93,13 +95,18 @@ export function PlaceMapSkeleton() {
       <div aria-hidden className="bg-bg-sunken size-full" />
 
       {/* 우상단 — `PlaceMapView` 의 떠 있는 컨트롤 줄과 같은 칸 */}
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-17 z-30">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-2 z-30 md:top-17">
         <div className="content-container flex items-start justify-end gap-2 px-4 md:px-10">
           <div className="flex max-w-md min-w-0 flex-1 gap-2 lg:hidden">
             <Skeleton className="h-11 min-w-0 flex-1 rounded-md" />
             <Skeleton className="size-11 shrink-0 rounded-md" />
           </div>
-          <Skeleton className="h-11 w-28 shrink-0 rounded-lg" />
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            {/* 보기 전환 — <768 아이콘 44 · 768–1023 글자 · 1024 이상은 패널 `크게 보기` 가 맡아 없다 */}
+            <Skeleton className="size-11 rounded-lg md:w-28 lg:hidden" />
+            {/* 지도 도구 카드 — 칸 하나(1 + 48 + 1) */}
+            <Skeleton className="h-12.5 w-12 rounded-lg" />
+          </div>
         </div>
       </div>
 
@@ -108,10 +115,10 @@ export function PlaceMapSkeleton() {
         카드가 하이드레이션 뒤 붙은 패널로 바뀌면 그 자체가 레이아웃 이동이다. 손잡이는 그리지 않는다 —
         누를 수 없는 골격이고, 자리는 패널 오른쪽 끝이라 이동을 만들지 않는다.
       */}
-      <div className="map-dock-shadow absolute inset-y-0 left-0 z-30 hidden pt-16 lg:block">
-        {/* 로고 띠 — 로고는 셸의 `IslandHeader` 가 이 위에 세운다 */}
-        <div aria-hidden className="bg-bg border-border absolute inset-x-0 top-0 h-16 border-b" />
+      <div className="map-dock-shadow absolute inset-y-0 left-0 z-30 hidden lg:block">
         <div className="map-panel-width bg-bg border-border flex h-full flex-col overflow-hidden border-r">
+          {/* 로고 띠 — 목록 칸 안 맨 위 64. 로고는 셸의 `IslandHeader` 가 이 위에 세운다 */}
+          <div aria-hidden className="border-border h-16 shrink-0 border-b" />
           <div aria-hidden className="border-border flex gap-2 border-b px-3 py-2">
             <Skeleton className="h-11 min-w-0 flex-1 rounded-md" />
             <Skeleton className="h-11 w-16 shrink-0 rounded-md" />
@@ -119,8 +126,13 @@ export function PlaceMapSkeleton() {
           <div className="border-border border-b px-3 py-2">
             <FilterBarSkeleton />
           </div>
-          <div aria-hidden className="bg-bg-sunken border-border border-b px-4 py-2">
+          <div
+            aria-hidden
+            className="bg-bg-sunken border-border flex min-h-11 items-center justify-between gap-2 border-b ps-4 pe-2"
+          >
             <Skeleton className="h-4.5 w-20" />
+            {/* `크게 보기` 자리 */}
+            <Skeleton className="h-4.5 w-16" />
           </div>
           <div className="min-h-0 flex-1 overflow-hidden">
             <PlaceMapRowsSkeleton />
@@ -135,7 +147,7 @@ export function PlaceMapSkeleton() {
         onStopChange={setStop}
         toolbar={<FilterBarSkeleton />}
         header={<Skeleton className="h-4.5 w-20" />}
-        maxTopInset={MAP_ISLAND_TOP_CONTROLS_INSET}
+        maxTopInset={MAP_ISLAND_INSET_VAR}
       >
         <PlaceMapRowsSkeleton />
       </MapSheet>

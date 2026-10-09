@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import {
-  MAP_ISLAND_TOP_CONTROLS_INSET,
+  MAP_ISLAND_INSET_VAR,
   MAP_TOP_CONTROLS_INSET,
   MapSheet,
   SHEET_STOPS,
@@ -22,7 +22,10 @@ import { readGlobalsCss } from '@/test/tokens'
 // 넘기는지가 호출부에서 안 읽힌다.
 function render(
   stop: SheetStop,
-  { label = '목록', maxTopInset }: { label?: string; maxTopInset?: number } = {},
+  {
+    label = '목록',
+    maxTopInset,
+  }: { label?: string; maxTopInset?: number | `var(--${string})` } = {},
 ) {
   return renderToStaticMarkup(
     createElement(MapSheet, {
@@ -188,25 +191,45 @@ describe('MAP_TOP_CONTROLS_INSET — 지도 위 컨트롤을 비켜 간다 (#901
 })
 
 /**
- * #1287 — **지도 아일랜드**(`/places`)의 `max` 윗변. 헤더 띠가 없고 조작 줄이 알약 아래 모든 폭 y 68 이라
- * 폭으로 갈리는 값이 없다 (`지도-아일랜드헤더-세부명세.md` D2-1).
+ * #1300 — **지도 아일랜드**(`/places`)의 `max` 윗변은 CSS 변수다. 알약이 768 이상에만 서서 조작 줄 바닥이 폭으로
+ * 갈린다(`지도-아일랜드알약-정리-세부명세.md` D1-2 · D2-1). 값 · 유도는 `.map-island` 규칙 한 곳에 있다.
  */
-describe('MAP_ISLAND_TOP_CONTROLS_INSET — 아일랜드 지도 위 컨트롤을 비켜 간다 (#1287)', () => {
-  it('위 8 + 알약 48 + 간격 12 + 검색 44 + 여유 8 이다', () => {
-    expect(MAP_ISLAND_TOP_CONTROLS_INSET).toBe(8 + 48 + 12 + 44 + 8)
+describe('MAP_ISLAND_INSET_VAR — 아일랜드 지도 위 컨트롤을 비켜 간다 (#1300)', () => {
+  const css = readGlobalsCss()
+
+  it('변수를 주면 max 가 max(45dvh, 100dvh - var(--map-island-inset)) 로 선다', () => {
+    const markup = render('max', { maxTopInset: MAP_ISLAND_INSET_VAR })
+
+    expect(MAP_ISLAND_INSET_VAR).toBe('var(--map-island-inset)')
+    expect(markup).toContain('max(45dvh, 100dvh - var(--map-island-inset))')
+    expect(markup).not.toContain('85dvh')
   })
 
-  it('미리보기 시트 상한(CSS)이 같은 값을 쓴다 — 한쪽만 바뀌면 두 시트의 윗변이 갈린다', () => {
-    const css = readGlobalsCss()
+  it('max 가 아닌 단계에는 변수가 걸리지 않는다', () => {
+    expect(render('mid', { maxTopInset: MAP_ISLAND_INSET_VAR })).not.toContain('--map-island-inset')
+  })
+
+  it('<768 = 위 8 + 검색 44 + 여유 8 = 60 · ≥768 = 위 8 + 알약 48 + 간격 12 + 검색 44 + 여유 8 = 120 이 CSS 값이다', () => {
+    const base = /(?:^|\n)\.map-island\s*\{[^}]*\}/.exec(css)?.[0] ?? ''
+    const wide = /@media \(width >= 48rem\) \{\s*\.map-island\s*\{[^}]*\}/.exec(css)?.[0] ?? ''
+
+    expect(base).toContain(`--map-island-inset: ${String(8 + 44 + 8)}px`)
+    expect(wide).toContain(`--map-island-inset: ${String(8 + 48 + 12 + 44 + 8)}px`)
+  })
+
+  it('미리보기 시트 상한(CSS)이 같은 변수를 쓴다 — 한쪽만 바뀌면 두 시트의 윗변이 갈린다', () => {
     const rule = /\.map-island \.map-preview-sheet\s*\{[^}]*\}/.exec(css)?.[0]
 
     expect(rule).toBeDefined()
-    expect(rule).toContain(`${String(MAP_ISLAND_TOP_CONTROLS_INSET)}px`)
+    expect(rule).toContain(MAP_ISLAND_INSET_VAR)
   })
 
   it('헤더 띠가 있는 지도(136)는 그대로다 — /emergency · 담기가 계속 쓴다', () => {
     expect(MAP_TOP_CONTROLS_INSET).toBe(136)
     expect(css136()).toContain('136px')
+    expect(render('max', { maxTopInset: MAP_TOP_CONTROLS_INSET })).toContain(
+      'max(45dvh, 100dvh - 136px)',
+    )
   })
 })
 

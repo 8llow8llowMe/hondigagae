@@ -32,6 +32,8 @@ export const memberMessages = {
   version: '버전',
   versionValue: '1.0.0',
 
+  /** 지도 아일랜드 알약의 계정 자리(비로그인, #1300). 띠 헤더는 `header-parts.tsx` 의 `LOGIN_LABEL` 이 같은 글자다 */
+  login: '로그인',
   logout: '로그아웃',
   logoutConfirmTitle: '로그아웃할까요?',
   logoutConfirmDescription: '다시 이용하려면 로그인해야 해요.',

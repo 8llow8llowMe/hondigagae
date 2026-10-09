@@ -6,19 +6,27 @@ import { describe, expect, it, vi } from 'vitest'
 import { readSourceWithoutComments } from '@/test/source'
 
 /**
- * 지도 아일랜드 헤더 — 이슈 #1287 (`docs/features/place/지도-아일랜드헤더-세부명세.md` D3-1 · D6 · D7-4).
+ * 지도 아일랜드 헤더 — 이슈 #1287 → #1300 (`docs/features/place/지도-아일랜드알약-정리-세부명세.md` D3-1 · D6 ·
+ * D7-4).
  *
- * 목은 `global-header.test.ts` 와 같다 — 자식(`NavLinks` · `PetSwitcherSlot` · `AccountMenu`)이 라우터 ·
- * React Query 를 요구한다. 경로는 활성 판정 때문에 바꿀 수 있게 둔다.
+ * 알약 = 메뉴 셋 + 계정 하나. 띠 헤더의 오른쪽 묶음(`HeaderActions`)을 쓰지 않는다 — 그래서 #1287 의 "헤더와 같은
+ * 조각" 단언은 걷었다(D7-4).
+ *
+ * 목: 자식(`NavLinks` · `IslandLoginLink`)이 라우터를 요구한다. `AccountMenu` 는 React Query 를 요구해 **variant 와
+ * 트리거 모양만 흉내 낸 대역**으로 바꾼다 — 실제 트리거 클래스는 아래 `AccountMenu variant` 절이 소스로 본다.
  */
 const pathname = { current: '/places' }
 vi.mock('next/navigation', () => ({ usePathname: () => pathname.current }))
 vi.mock('@/features/nav/pet-switcher-slot', () => ({ PetSwitcherSlot: () => null }))
-vi.mock('@/features/nav/account-menu', () => ({ AccountMenu: () => null }))
+vi.mock('@/features/nav/account-menu', async () => {
+  const { createElement: h } = await import('react')
+  return {
+    AccountMenu: ({ variant }: { variant?: string }) =>
+      h('button', { type: 'button', 'data-account-variant': variant ?? 'header' }),
+  }
+})
 
 const { IslandHeader } = await import('@/features/nav/island-header')
-const { GlobalHeader } = await import('@/features/nav/global-header')
-const { HeaderActions } = await import('@/features/nav/header-parts')
 
 function render(authed: boolean, path = '/places') {
   pathname.current = path
@@ -34,7 +42,11 @@ function openTag(markup: string, match: (open: string) => boolean) {
   return [...markup.matchAll(/<[a-z]+ [^>]*>/g)].map((m) => m[0]).find(match)
 }
 
-const isPill = (open: string) => open.startsWith('<div ') && classList(open).has('rounded-full')
+/** 알약 — 허용 상자(`island-bar`) 바로 안의 둥근 면 */
+function pillTag(markup: string) {
+  const bar = markup.indexOf('class="island-bar"')
+  return openTag(markup.slice(bar + 1), (open) => open.startsWith('<div '))
+}
 
 describe.each([
   ['비로그인', false],
@@ -51,16 +63,7 @@ describe.each([
     expect(markup).toMatch(/<a [^>]*href="\/"/)
   })
 
-  it('/places 에서 장소 찾기가 켜진다 — 헤더와 같은 aria-current', () => {
-    const active = openTag(
-      render(authed),
-      (open) => open.startsWith('<a ') && open.includes('href="/places"'),
-    )
-
-    expect(active).toContain('aria-current="page"')
-  })
-
-  it('메뉴 순서가 헤더와 같다 — 장소 찾기 → 여행 일정 → AI 일정 생성', () => {
+  it('메뉴 셋이 순서대로다 — 장소 찾기 → 여행 일정 → AI 일정 생성', () => {
     const markup = render(authed)
     const order = ['장소 찾기', '여행 일정', 'AI 일정 생성'].map((label) => markup.indexOf(label))
 
@@ -68,22 +71,39 @@ describe.each([
     expect(order).toEqual([...order].sort((a, b) => a - b))
   })
 
-  it('알약은 불투명 흰 면 + 테두리 + 그림자 · 높이 48 · rounded-full 이다', () => {
-    const pill = classList(openTag(render(authed), isPill))
+  /* 알약 안 칩은 바깥과 동심원이다 — 사각(8) 칩이 알약 곡선과 어긋났다 (D0 #1) */
+  it('/places 활성 칩이 aria-current 이고 40 원형이다', () => {
+    const active = openTag(render(authed), (open) => open.includes('aria-current="page"'))
+    const chip = classList(active)
+
+    expect(active).toContain('href="/places"')
+    for (const name of ['h-10', 'rounded-full', 'px-3', 'text-body-2', 'bg-band'])
+      expect(chip.has(name)).toBe(true)
+    expect(chip.has('rounded-md')).toBe(false)
+  })
+
+  it('알약은 불투명 흰 면 + inset 테두리 + 그림자 · 높이 48 · 여백 4 · rounded-full 이다', () => {
+    const pill = classList(pillTag(render(authed)))
 
     for (const name of [
       'rounded-full',
       'bg-bg',
-      'border',
-      'border-border',
+      'inset-ring',
+      'inset-ring-border',
       'shadow-md',
       'h-12',
+      'p-1',
+      'ms-auto',
+      'w-max',
+      'max-w-full',
       'pointer-events-auto',
     ])
       expect(pill.has(name)).toBe(true)
+    // 테두리가 레이아웃을 먹으면 안쪽 40 이 38 이 된다
+    expect(pill.has('border')).toBe(false)
   })
 
-  /* 반투명 · 블러는 바다 위에서 대비를 잃는다 (D1-1 · D6) */
+  /* 반투명 · 블러는 바다 위에서 대비를 잃는다 (#1287 D1-1 · D6) */
   it('반투명 · 블러가 없다', () => {
     const markup = render(authed)
 
@@ -93,89 +113,129 @@ describe.each([
   })
 
   /*
-    **`fixed` 로고의 조상에 transform · filter 를 걸지 않는다** (D3-1 · D7-7). 걸리면 로고의 기준이 뷰포트가
-    아니라 그 조상이 되어 로고가 알약 안으로 끌려 들어간다. 로고 링크 앞의 여는 태그가 곧 그 조상이다.
+    **로고는 허용 상자(`island-bar`) 밖 형제다** (D3-1 · D7-7). `container-type` 은 `fixed` 자손의 기준 상자가 되어
+    로고를 허용 상자 안으로 끌고 들어간다. 로고 자리가 허용 상자보다 **먼저 닫혀야** 한다.
   */
-  it('로고의 조상(header · 열 · 알약 · 로고 자리)에 transform · filter 가 없다', () => {
+  it('로고 상자가 island-bar 밖이다 — 허용 상자가 열리기 전에 닫힌다', () => {
     const markup = render(authed)
-    const ancestors = markup.slice(0, markup.indexOf('href="/"'))
+    const logoOpen = markup.indexOf('island-logo')
+    const logoClose = markup.indexOf('</div>', markup.indexOf('href="/"'))
+    const barOpen = markup.indexOf('class="island-bar"')
+
+    expect(logoOpen).toBeGreaterThan(-1)
+    expect(barOpen).toBeGreaterThan(-1)
+    expect(logoClose).toBeLessThan(barOpen)
+  })
+
+  it('로고는 왼쪽 16 · 위 8 · 높이 48 에 fixed 로 선다 — 모든 표시 폭에서', () => {
+    const logo = classList(openTag(render(authed), (open) => classList(open).has('island-logo')))
+
+    for (const name of ['fixed', 'start-4', 'top-2', 'h-12', 'items-center', 'pointer-events-auto'])
+      expect(logo.has(name)).toBe(true)
+  })
+
+  it('로고 · 허용 상자의 조상에 transform · filter 가 없다', () => {
+    const markup = render(authed)
+    const ancestors = markup.slice(0, markup.indexOf('<nav'))
     const tags = [...ancestors.matchAll(/<[a-z]+ [^>]*>/g)].map((m) => m[0])
 
-    expect(tags.length).toBeGreaterThanOrEqual(5)
+    expect(tags.length).toBeGreaterThanOrEqual(4)
     for (const tag of tags)
       expect(tag).not.toMatch(
         /\b(transform|translate-|-translate-|scale-|rotate-|filter|blur|backdrop-|will-change)/,
       )
   })
 
-  it('≥1024 에서 로고가 알약 밖 왼쪽 위(16 · 8 · 높이 48)로 빠진다', () => {
-    const logo = classList(openTag(render(authed), (open) => classList(open).has('island-logo')))
-
-    for (const name of ['lg:fixed', 'lg:start-4', 'lg:top-2', 'lg:h-12', 'items-center'])
-      expect(logo.has(name)).toBe(true)
-  })
-
-  it('바깥 header 는 fixed · 위 8 · z-40 이고 지도 드래그를 먹지 않는다 — 표시는 CSS 가 정한다', () => {
+  it('바깥 header 는 fixed · z-40 이고 지도 드래그를 먹지 않는다 — 표시는 CSS 가 정한다', () => {
     const header = classList(openTag(render(authed), (open) => open.startsWith('<header')))
 
-    for (const name of ['fixed', 'top-2', 'z-40', 'pointer-events-none'])
-      expect(header.has(name)).toBe(true)
+    for (const name of ['fixed', 'z-40', 'pointer-events-none']) expect(header.has(name)).toBe(true)
     // `display` 는 `.island-header` · `body:has(.map-island)` 규칙이 갖는다 — 유틸리티가 끼면 순서 싸움이 된다
     for (const name of ['hidden', 'block', 'flex']) expect(header.has(name)).toBe(false)
   })
 
-  /* 1920 에서 알약 · 조작 줄 오른쪽 끝이 같은 열 끝(1640)에 맞는다 (#412) */
-  it('알약 열이 content-container 와 페이지 인셋을 쓴다', () => {
-    const column = classList(
-      openTag(render(authed), (open) => classList(open).has('content-container')),
+  /* 띠 헤더 전용 조각이 알약에 들어오지 않는다 (D1-1) */
+  it('회원가입 · 서비스 소개 · 병원 · 약국 링크가 없다', () => {
+    const markup = render(authed)
+
+    expect(markup).not.toContain('href="/signup"')
+    expect(markup).not.toContain('href="/about"')
+    expect(markup).not.toContain('href="/emergency"')
+    expect(markup).not.toContain('회원가입')
+  })
+
+  it('메뉴와 계정 사이 세로 구분선 1 × 20 이 있다', () => {
+    const divider = classList(
+      openTag(render(authed), (open) => open.startsWith('<span ') && open.includes('aria-hidden')),
     )
 
-    expect(column.has('px-4')).toBe(true)
-    expect(column.has('md:px-10')).toBe(true)
-    expect(column.has('justify-end')).toBe(true)
-  })
-
-  /* "로고 · 메뉴 이름 · 순서 · 로그인 버튼 모양 동일" — 구조로 지킨다 (D1-1) */
-  it('오른쪽 묶음 마크업이 띠 헤더와 같다', () => {
-    pathname.current = '/places'
-    const actions = renderToStaticMarkup(createElement(HeaderActions, { authed }))
-    const island = render(authed)
-    const band = renderToStaticMarkup(createElement(GlobalHeader, { authed }))
-
-    expect(actions.length).toBeGreaterThan(0)
-    expect(island).toContain(actions)
-    expect(band).toContain(actions)
+    for (const name of ['bg-border', 'h-5', 'w-px', 'mx-1']) expect(divider.has(name)).toBe(true)
   })
 })
 
-describe('IslandHeader — 비로그인 갈래', () => {
-  it('헤더와 같다 — 모바일 로그인 링크 · 데스크톱 로그인 · 회원가입 · 서비스 소개', () => {
+describe('IslandHeader — 비로그인', () => {
+  it('로그인은 지금 경로로 돌아오는 링크 하나다 — 채운 버튼이 아니다', () => {
+    const markup = render(false, '/places')
+    const login = openTag(markup, (open) => open.includes('href="/login?returnTo=%2Fplaces"'))
+    const classes = classList(login)
+
+    expect(markup.split('href="/login?returnTo=%2Fplaces"')).toHaveLength(2)
+    for (const name of ['h-10', 'rounded-full', 'px-3', 'text-body-2', 'font-semibold', 'text-fg'])
+      expect(classes.has(name)).toBe(true)
+    expect(classes.has('bg-brand-600')).toBe(false)
+    // 홈 복귀 `/login` 이 아니다
+    expect(markup).not.toContain('href="/login"')
+  })
+
+  it('보호 메뉴는 로그인 우회 링크다', () => {
     const markup = render(false)
 
-    expect(markup.split('href="/login"')).toHaveLength(3)
-    expect(markup).toContain('href="/signup"')
-    expect(markup).toContain('href="/about"')
+    expect(markup).toContain('href="/login?returnTo=%2Fplans"')
+    expect(markup).toContain('href="/login?returnTo=%2Fai-plans%2Fnew"')
   })
 
-  it('긴급 링크를 둔다 — 지도에서 /emergency 로 가는 길이다 (D8-2 A)', () => {
-    expect(render(false)).toContain('aria-label="병원 · 약국"')
+  it('계정 메뉴가 없다', () => {
+    expect(render(false)).not.toContain('data-account-variant')
   })
 })
 
-describe('헤더 두 벌이 같은 조각을 쓴다 (#1287)', () => {
-  it('GlobalHeader · IslandHeader 둘 다 header-parts 의 로고 · 오른쪽 묶음을 쓴다', () => {
-    for (const path of [
-      'src/features/nav/global-header.tsx',
-      'src/features/nav/island-header.tsx',
-    ]) {
-      const source = readSourceWithoutComments(path)
+describe('IslandHeader — 로그인', () => {
+  it('계정은 island 갈래(프로필 원)다 · 로그인 링크가 없다', () => {
+    const markup = render(true)
 
-      expect(source).toContain('<HeaderLogo />')
-      expect(source).toContain('<HeaderActions authed={authed} />')
-      expect(source).toContain('<NavLinks authed={authed} />')
-      // 조각을 다시 적지 않는다 — 한쪽만 고쳐지는 날 "내용 동일" 이 깨진다
-      expect(source).not.toContain('href="/emergency"')
-      expect(source).not.toContain('<Wordmark')
-    }
+    expect(markup).toContain('data-account-variant="island"')
+    expect(markup).not.toContain('returnTo=%2Fplaces')
+  })
+})
+
+/*
+  `AccountMenu` 는 React Query 를 요구해 node 에서 렌더하지 않는다 — 트리거 갈래를 소스로 본다.
+  island 갈래: 40 원 · `내 정보` 글자 없음 · 접근 이름 그대로.
+*/
+describe('AccountMenu variant="island" (D1-2)', () => {
+  const source = readSourceWithoutComments('src/features/nav/account-menu.tsx')
+
+  it('트리거가 size-10 rounded-full 이고 내 정보 글자는 header 갈래에만 있다', () => {
+    const island = /variant === 'island'\s*\?\s*'([^']*)'/.exec(source)?.[1] ?? ''
+
+    expect(island.split(/\s+/)).toEqual(expect.arrayContaining(['size-10', 'rounded-full']))
+    expect(island).not.toContain('lg:w-auto')
+    expect(source).toMatch(/variant === 'header' && \(\s*<span[^>]*>내 정보<\/span>/)
+  })
+
+  it('접근 이름 · 메뉴 속성은 갈래와 무관하다', () => {
+    expect(source).toContain('aria-label="내 정보 메뉴 열기"')
+    expect(source).toContain('aria-haspopup="menu"')
+  })
+})
+
+describe('island-header.tsx — 띠 헤더 조각을 쓰지 않는다 (D3-1)', () => {
+  const source = readSourceWithoutComments('src/features/nav/island-header.tsx')
+
+  it('HeaderActions 를 쓰지 않고 로고 조각만 공유한다', () => {
+    expect(source).not.toContain('HeaderActions')
+    expect(source).toContain('<HeaderLogo />')
+    expect(source).toContain('<NavLinks authed={authed} variant="island" />')
+    expect(source).not.toContain('<Wordmark')
   })
 })
