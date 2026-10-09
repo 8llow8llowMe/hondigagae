@@ -15,9 +15,12 @@
  *
  * ### 값이 아니라 순서가 계약이다
  *
- * 숫자 자체에는 의미가 없다. 지켜야 하는 것은 **묶음 > 선택 핀 > 일반 핀 > 선** 이고,
+ * 숫자 자체에는 의미가 없다. 지켜야 하는 것은 **묶음 > 선택 핀 > 일반 핀 > 선** 이고(#1286 부터 각 층
+ * 안에서 사각이 원 아래 — `cluster > squareCluster > selectedPin > pin > squarePin`),
  * `stacking.test.ts` 가 단언하는 것도 그 부등식이다.
  */
+
+import type { MapPinShape } from '@/lib/map/pin-content'
 
 /**
  * 층. 카카오 `CustomOverlay.zIndex` · `Polyline.zIndex` 에 그대로 넘긴다.
@@ -39,20 +42,37 @@ export const MAP_LAYER_Z = {
    * 핀이 이겨야 한다. CSS `z-index` 로 들어가 정수여야 해서 `pin` 을 한 칸 올렸다(값이 아니라 순서가 계약).
    */
   focus: 1,
-  pin: 2,
+  /**
+   * 시설 사각 (#1286 D2-4) — **같은 층 안에서 사각이 원 아래다.** `/places` 의 주인공은 장소이고 시설은
+   * 덧붙인 층이라, 겹치면 장소 원이 이긴다. 정수여야 해서 `pin` 을 한 칸 올렸다.
+   */
+  squarePin: 2,
+  pin: 3,
+  /** 고른 것은 모양과 무관하게 일반 핀 위다 — 고른 시설 사각도 여기다 */
   selectedPin: 10,
-  cluster: 11,
+  /** 시설 묶음(사각). 고른 핀 위 · 장소 묶음 아래 — 묶음이 고른 핀 위인 규칙(#671 A-1)은 두 모양 모두 지킨다 */
+  squareCluster: 11,
+  cluster: 12,
 } as const
 
-/** 마커 하나의 층. 축 둘(묶음인가 · 고른 것인가)을 **이 순서로** 본다 */
+/**
+ * 마커 하나의 층. 축 셋(묶음인가 · 고른 것인가 · 모양)을 **이 순서로** 본다.
+ *
+ * `shape` 를 주지 않으면 원이다 — 시설 층이 없는 지도는 예전과 같은 순서다.
+ */
 export function markerZIndex({
   isCluster,
   selected,
+  shape = 'circle',
 }: {
   isCluster: boolean
   selected: boolean
+  shape?: MapPinShape
 }): number {
+  const square = shape === 'square'
   // 묶음 판정이 먼저다 — 묶음 안에 고른 핀이 섞여도 원이 맨 위여야 한다
-  if (isCluster) return MAP_LAYER_Z.cluster
-  return selected ? MAP_LAYER_Z.selectedPin : MAP_LAYER_Z.pin
+  if (isCluster) return square ? MAP_LAYER_Z.squareCluster : MAP_LAYER_Z.cluster
+  // 다음이 선택이다 — 고른 것은 모양과 무관하게 일반 핀 위다
+  if (selected) return MAP_LAYER_Z.selectedPin
+  return square ? MAP_LAYER_Z.squarePin : MAP_LAYER_Z.pin
 }

@@ -77,3 +77,62 @@ describe('원 핀 CSS (#1280)', () => {
     expect(rule).not.toContain('translateY(6px)')
   })
 })
+
+describe('시설 사각 CSS (#1286 D2-5)', () => {
+  /* 두 클래스 선택자 — `.map-pin-dot-selected` 단독(34)보다 특이도가 높아야 이긴다 */
+  it('기본 사각은 24 · --radius-sm 이고 원 핀 위에 두 클래스로 얹는다', () => {
+    const rule = block('.map-pin-dot.map-pin-dot-square')
+
+    expect(rule).toContain('width: 24px')
+    expect(rule).toContain('height: 24px')
+    expect(rule).toContain('border-radius: var(--radius-sm)')
+  })
+
+  it('고른 사각은 32 다', () => {
+    const rule = block('.map-pin-dot-square.map-pin-dot-selected')
+
+    expect(rule).toContain('width: 32px')
+    expect(rule).toContain('height: 32px')
+  })
+
+  /* 패딩 박스 20 + 12 × 2 = 44 · 고른 사각 28 + 8 × 2 = 44 */
+  it('누르는 자리가 44 다', () => {
+    expect(block('.map-pin-dot.map-pin-dot-square::before')).toContain('inset: -12px')
+    expect(block('.map-pin-dot-square.map-pin-dot-selected::before')).toContain('inset: -8px')
+  })
+
+  /* 고른 사각 규칙이 기본 사각 규칙보다 뒤에 와야 32 가 이긴다 — 특이도가 같다 */
+  it('고른 사각 규칙이 기본 사각 규칙 뒤에 있다', () => {
+    expect(css.indexOf('\n.map-pin-dot-square.map-pin-dot-selected {')).toBeGreaterThan(
+      css.indexOf('\n.map-pin-dot.map-pin-dot-square {'),
+    )
+  })
+
+  it('채움 · 테두리 · 이름 알약은 덮지 않는다 — 원 핀 규칙을 물려받는다', () => {
+    const rule = block('.map-pin-dot.map-pin-dot-square')
+
+    expect(rule).not.toContain('background')
+    expect(rule).not.toContain('border:')
+  })
+})
+
+describe('시설 사각 묶음 CSS (#1286 D2-3)', () => {
+  it('사각 30 · --radius-sm 이다', () => {
+    const rule = block('.map-cluster.map-cluster-square')
+
+    expect(rule).toContain('width: 30px')
+    expect(rule).toContain('height: 30px')
+    expect(rule).toContain('border-radius: var(--radius-sm)')
+  })
+
+  /* 패딩 박스 26 + 9 × 2 = 44 */
+  it('누르는 자리가 44 다', () => {
+    expect(block('.map-cluster.map-cluster-square::before')).toContain('inset: -9px')
+  })
+
+  it('겹친 모양도 같은 모서리의 사각이다', () => {
+    expect(block('.map-cluster.map-cluster-square::after')).toContain(
+      'border-radius: var(--radius-sm)',
+    )
+  })
+})

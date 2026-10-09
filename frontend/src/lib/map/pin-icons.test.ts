@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { MAP_PIN_ICONS, pinIconSvg } from '@/lib/map/pin-icons'
 
 describe('pinIconSvg — 지도 핀 아이콘 (#1280)', () => {
-  it('10종 모두 24 격자 · currentColor · 선 1.5 의 장식 svg 다', () => {
-    expect(MAP_PIN_ICONS).toHaveLength(10)
+  it('12종 모두 24 격자 · currentColor · 선 1.5 의 장식 svg 다', () => {
+    expect(MAP_PIN_ICONS).toHaveLength(12)
     for (const icon of MAP_PIN_ICONS) {
       const svg = pinIconSvg(icon)
 
@@ -27,5 +27,16 @@ describe('pinIconSvg — 지도 핀 아이콘 (#1280)', () => {
   it('모양마다 그림이 다르다 — 같은 path 를 두 키가 쓰지 않는다', () => {
     const bodies = MAP_PIN_ICONS.map((icon) => pinIconSvg(icon))
     expect(new Set(bodies).size).toBe(MAP_PIN_ICONS.length)
+  })
+
+  /* 병원 · 약국 (#1286 D2-2) — 선 1.5 십자는 14px 에서 0.9px 이라 사라진다 */
+  it('cross 는 채운 도형이다 — 선을 끄고 currentColor 로 칠한다', () => {
+    const svg = pinIconSvg('cross')
+
+    expect(svg).toContain('fill="currentColor" stroke="none"')
+  })
+
+  it('pill 은 선 그림이다 — 채움을 켜지 않는다', () => {
+    expect(pinIconSvg('pill')).not.toContain('fill="currentColor"')
   })
 })

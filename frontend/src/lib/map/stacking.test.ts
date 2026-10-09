@@ -53,3 +53,42 @@ describe('markerZIndex', () => {
     expect(MAP_LAYER_Z.focus).toBeLessThan(markerZIndex({ isCluster: false, selected: false }))
   })
 })
+
+/*
+  시설 층 (#1286 D2-4) — **같은 층 안에서 사각(시설)이 원(장소) 아래다.** `/places` 의 주인공은 장소다.
+  고른 것은 모양과 무관하게 일반 핀 위이고, 묶음은 두 모양 모두 고른 핀 위다(#671 A-1).
+*/
+describe('markerZIndex — 사각(시설) 층', () => {
+  const z = (isCluster: boolean, selected: boolean, shape: 'circle' | 'square') =>
+    markerZIndex({ isCluster, selected, shape })
+
+  it('cluster > squareCluster > selectedPin > pin > squarePin > focus > route', () => {
+    const order = [
+      z(true, false, 'circle'),
+      z(true, false, 'square'),
+      z(false, true, 'circle'),
+      z(false, false, 'circle'),
+      z(false, false, 'square'),
+      MAP_LAYER_Z.focus,
+      MAP_LAYER_Z.route,
+    ]
+
+    for (let index = 1; index < order.length; index += 1) {
+      expect(order[index - 1]).toBeGreaterThan(order[index] as number)
+    }
+  })
+
+  it('고른 사각은 모양과 무관하게 고른 핀 층이다', () => {
+    expect(z(false, true, 'square')).toBe(z(false, true, 'circle'))
+    expect(z(false, true, 'square')).toBe(MAP_LAYER_Z.selectedPin)
+  })
+
+  it('사각 묶음은 그 안에 고른 핀이 있어도 묶음 층이다', () => {
+    expect(z(true, true, 'square')).toBe(MAP_LAYER_Z.squareCluster)
+  })
+
+  it('모양을 주지 않으면 원이다 — 시설 층 없는 지도는 예전 순서 그대로', () => {
+    expect(markerZIndex({ isCluster: false, selected: false })).toBe(MAP_LAYER_Z.pin)
+    expect(markerZIndex({ isCluster: true, selected: false })).toBe(MAP_LAYER_Z.cluster)
+  })
+})

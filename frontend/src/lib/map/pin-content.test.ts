@@ -5,6 +5,7 @@ import {
   focusMarkerContent,
   PIN_NAME_MAX_LEVEL,
   pinContent,
+  pinShape,
 } from '@/lib/map/pin-content'
 import { messages } from '@/lib/messages'
 
@@ -260,7 +261,7 @@ describe('pinContent — 카테고리 아이콘 원 (#1280)', () => {
     expect(classes).not.toContain('map-pin-muted')
   })
 
-  it('아이콘이 없는 핀은 예전 이름표 그대로다 — 긴급 시설 핀이 바뀌지 않는다', () => {
+  it('아이콘이 없는 핀은 예전 이름표 그대로다 — 정적 핀 · 기준점과 같은 갈래', () => {
     const content = pinContent({ title: '제주동물병원', caption: '1.2km' }, on)
 
     expect(content.icon).toBeNull()
@@ -281,5 +282,95 @@ describe('pinContent — 카테고리 아이콘 원 (#1280)', () => {
 
   it('이름이 서는 줌은 level 6 이하다', () => {
     expect(PIN_NAME_MAX_LEVEL).toBe(6)
+  })
+})
+
+describe('pinContent — 시설 사각 (#1286 D2-1)', () => {
+  const square = { title: '제주24시동물병원', icon: 'cross' as const, shape: 'square' as const }
+  const on = { selected: false, interactive: true }
+
+  it('사각 갈래는 원 핀 클래스 위에 수식어 하나를 얹는다', () => {
+    const content = pinContent(square, on)
+
+    expect(content.className).toBe('map-pin-dot map-pin-dot-square')
+    expect(content.icon).toBe('cross')
+    expect(content.label).toBe('제주24시동물병원')
+  })
+
+  it('선택 · 흐림 · named 수식어를 원 핀과 똑같이 받는다', () => {
+    const selected = pinContent({ ...square, muted: true }, { selected: true, interactive: true })
+    const classes = selected.className.split(' ')
+
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        'map-pin-dot',
+        'map-pin-dot-square',
+        'map-pin-dot-named',
+        'map-pin-dot-selected',
+        'map-pin-dot-muted',
+      ]),
+    )
+    expect(selected.ariaPressed).toBe(true)
+    expect(pinContent({ ...square, named: true }, on).className.split(' ')).toContain(
+      'map-pin-dot-named',
+    )
+  })
+
+  it('원 핀(모양 없음 · circle)에는 사각 수식어가 붙지 않는다', () => {
+    const dot = { title: '사라봉공원', icon: 'landscape' as const }
+
+    expect(pinContent(dot, on).className.split(' ')).not.toContain('map-pin-dot-square')
+    expect(pinContent({ ...dot, shape: 'circle' as const }, on).className.split(' ')).not.toContain(
+      'map-pin-dot-square',
+    )
+  })
+
+  /* 아이콘은 "무엇", 모양은 "어느 층" — 아이콘 없는 핀에서 shape 는 뜻이 없다 (D7-1) */
+  it('아이콘 없는 핀은 shape 를 무시한다 — 예전 이름표 그대로다', () => {
+    const content = pinContent({ title: '제주동물병원', shape: 'square' }, on)
+
+    expect(content.className).toBe('map-pin')
+    expect(pinShape({ shape: 'square' })).toBe('circle')
+  })
+
+  it('pinShape — 아이콘과 square 가 함께 있을 때만 사각이다', () => {
+    expect(pinShape(square)).toBe('square')
+    expect(pinShape({ icon: 'pill' })).toBe('circle')
+    expect(pinShape({ icon: 'pill', shape: 'circle' })).toBe('circle')
+  })
+
+  it('누를 수 없는 지도에서도 사각이고 정적 수식어가 붙는다', () => {
+    const content = pinContent(square, { selected: false, interactive: false })
+
+    expect(content.tag).toBe('div')
+    expect(content.className.split(' ')).toEqual(
+      expect.arrayContaining(['map-pin-dot', 'map-pin-dot-square', 'map-pin-static']),
+    )
+  })
+})
+
+describe('clusterContent — 시설 사각 묶음 (#1286 D2-3)', () => {
+  it('사각이면 map-cluster 위에 사각 수식어를 얹는다', () => {
+    expect(clusterContent(12, 'square').className).toBe('map-cluster map-cluster-square')
+  })
+
+  it('모양을 주지 않으면 원 묶음 그대로다', () => {
+    expect(clusterContent(12).className).toBe('map-cluster')
+    expect(clusterContent(12, 'circle').className).toBe('map-cluster')
+  })
+
+  it('문구 틀을 받으면 무엇을 세는지 이름이 말한다 — 보이는 숫자는 그대로', () => {
+    const content = clusterContent(135, 'square', messages.map.facilityClusterCount)
+
+    expect(content.text).toBe('99+')
+    expect(content.ariaLabel).toBe('이 지역 병원·약국 99+곳')
+    expect(content.tag).toBe('button')
+    expect(content.ariaPressed).toBeNull()
+  })
+
+  it('틀을 주지 않으면 장소 묶음 문구다', () => {
+    expect(clusterContent(7, 'square').ariaLabel).toBe(
+      messages.map.clusterCount.replace('{n}', '7'),
+    )
   })
 })

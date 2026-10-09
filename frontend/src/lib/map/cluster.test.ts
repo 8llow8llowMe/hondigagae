@@ -322,4 +322,15 @@ describe('clusterMarkerLabel', () => {
   it('문구는 messages 정본에서 온다', () => {
     expect(clusterMarkerLabel(7)).toBe(messages.map.clusterCount.replace('{n}', '7'))
   })
+
+  /* 시설 묶음 (#1286 D2-3) — 틀은 무엇을 세는지만 바꾼다. 몇인지는 보이는 글자 그대로다 */
+  it('문구 틀을 받아도 보이는 글자를 이름에 담는다', () => {
+    const template = messages.map.facilityClusterCount
+
+    expect(clusterMarkerLabel(12, template)).toBe('이 지역 병원·약국 12곳')
+    expect(clusterMarkerLabel(135, template)).toBe('이 지역 병원·약국 99+곳')
+    for (const count of [0, 1, 99, 100, 1000]) {
+      expect(clusterMarkerLabel(count, template)).toContain(clusterMarkerText(count))
+    }
+  })
 })
