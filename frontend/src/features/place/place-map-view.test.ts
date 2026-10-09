@@ -369,7 +369,7 @@ describe('PlaceMapView — 지도 아일랜드 (#1287)', () => {
       code.indexOf('/>', code.indexOf('<ViewToggle')),
     )
 
-    expect(tag).toContain("className={island ? 'lg:hidden' : ''}")
+    expect(tag).toContain("className={island && panelOpen ? 'lg:hidden' : ''}")
   })
 
   it('아일랜드 · 시설 층은 카드 하나에 칸을 담고, 끄면(담기) 내 위치는 혼자 뜨는 예전 버튼이다', () => {
