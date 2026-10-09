@@ -133,3 +133,15 @@ describe('모양별 묶음 (#1286 D2-3)', () => {
     expect(SOURCE).toContain('shape: group.shape })')
   })
 })
+
+describe('고른 핀 · 섞인 모양 (#1286 리뷰 1 · 2 · 4)', () => {
+  /* 판단은 `cluster.test.ts` 가 잠근다 — 여기서는 고른 id 를 넘기는지만 본다 */
+  it('고른 핀은 묶음 계산에서 뺀다 — level 5 에서 이웃과 접혀 사라지지 않는다', () => {
+    expect(SOURCE).toContain('{ keep: (item) => item.id === selectedId }')
+  })
+
+  /* 판단은 `pin-content.test.ts`, 규칙은 `map-pin-dot.test.ts` 가 잠근다 */
+  it('원 · 사각이 함께 서면 루트에 map-shapes-mixed 를 붙인다', () => {
+    expect(SOURCE).toContain('hasMixedPinShapes(pins) && MAP_SHAPES_MIXED_CLASS')
+  })
+})

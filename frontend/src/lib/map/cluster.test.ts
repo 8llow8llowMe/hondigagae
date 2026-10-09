@@ -198,6 +198,35 @@ describe('clusterForLevel', () => {
     expect(groups).toHaveLength(2)
   })
 
+  /*
+    **고른 핀은 접지 않는다** (#1286 리뷰 4). 고르면 카메라가 level 5 로 가는데 그 단계도 묶음이 있어, 고른 핀이
+    이웃과 한 묶음에 접히면 고른 것이 지도에 안 보인다 — 장소 · 시설 모양과 무관하다.
+  */
+  it('keep 이 참인 핀은 묶음에서 빠져 혼자 선다 — 고른 핀이 level 5 에서 접히지 않는다', () => {
+    const near = [
+      input('a', 33.4, 126.4),
+      input('picked', 33.4, 126.40005),
+      input('c', 33.4, 126.4001),
+    ]
+
+    // 고르지 않으면 셋이 한 묶음이다 — 이것이 고른 핀이 사라지던 상태다
+    expect(clusterForLevel(near, 5)).toHaveLength(1)
+
+    const groups = clusterForLevel(near, 5, { keep: (item) => item === 'picked' })
+
+    expect(groups.map((group) => group.items)).toEqual([['a', 'c'], ['picked']])
+    expect(groups[1]?.center).toEqual({ lat: 33.4, lng: 126.40005 })
+  })
+
+  it('keep 으로 뺀 핀끼리도 접지 않는다 · 키가 묶음 키와 겹치지 않는다', () => {
+    const groups = clusterForLevel([input('a', 33.4, 126.4), input('b', 33.4, 126.40001)], 9, {
+      keep: () => true,
+    })
+
+    expect(groups.map((group) => group.items)).toEqual([['a'], ['b']])
+    expect(new Set(groups.map((group) => group.key)).size).toBe(2)
+  })
+
   it('충분히 확대한 단계에서는 거리로도 합치지 않는다', () => {
     const groups = clusterForLevel(
       [

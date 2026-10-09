@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import dynamic from 'next/dynamic'
 
 import type { ReactNode } from 'react'
@@ -17,8 +18,14 @@ import { MapLocateButton } from '@/features/map/map-locate-button'
 import { ResearchHereButton } from '@/features/map/research-here-button'
 import { useMapFailureFallback } from '@/features/map/use-map-failure-fallback'
 import { facilityLayerStatus } from '@/features/place/facility-layer-status'
+import {
+  facilityLayerFacilities,
+  pickedFacility,
+  placeTakesOverFacility,
+} from '@/features/place/facility-selection'
 import { PlaceMapFacilitySummary } from '@/features/place/place-map-facility-summary'
 import {
+  hasFacilityNotice,
   PlaceMapFacilityNotice,
   PlaceMapFacilityToggle,
 } from '@/features/place/place-map-facility-toggle'
@@ -311,12 +318,29 @@ export function PlaceMapView({
     data: facilityQuery.data,
     error: facilityQuery.error,
   })
-  const layerFacilities = layerOn ? facilityQuery.data?.facilities : undefined
-  const selectedFacility =
-    pickedFacilityId === null || layerFacilities === undefined
-      ? null
-      : (layerFacilities.find((item) => item.facilityId === pickedFacilityId) ?? null)
+  const layerFacilities = facilityLayerFacilities({ on: layerOn, data: facilityQuery.data })
+  const { facility: selectedFacility, gone: pickedFacilityGone } = pickedFacility({
+    picked: pickedFacilityId,
+    facilities: layerFacilities,
+  })
   const facilityId = selectedFacility?.facilityId ?? null
+  /*
+    **응답에서 빠지면 고른 id 를 비운다** (리뷰 5). 파생만 하면 요약 · 고른 핀은 바로 사라지지만 id 가 남아, 같은
+    시설이 나중 응답에 다시 오면 사용자가 닫은 적 없는 요약이 저절로 다시 열린다.
+  */
+  useEffect(() => {
+    if (pickedFacilityGone) setPickedFacilityId(null)
+  }, [pickedFacilityGone])
+  /*
+    **URL 의 장소 선택이 다른 값으로 바뀌면 시설을 비운다** (리뷰 3 · `placeTakesOverFacility`). 시설 선택은 기록에
+    없어서, 장소 → 시설 → 브라우저 앞으로 가면 `?place=` 만 돌아오고 시설이 고른 채 남아 이긴다.
+  */
+  const lastPlaceIdRef = useRef(selectedId)
+  useEffect(() => {
+    const previous = lastPlaceIdRef.current
+    lastPlaceIdRef.current = selectedId
+    if (placeTakesOverFacility(previous, selectedId)) setPickedFacilityId(null)
+  }, [selectedId])
 
   /*
     시설을 고르면 장소 미리보기를 닫고(동시에 하나만) 접힌 스택을 편다 — `selectPlace` 와 같은 규칙. 장소
@@ -341,6 +365,29 @@ export function PlaceMapView({
   const closeFacility = () => {
     setPickedFacilityId(null)
     facilityToggleRef.current?.focus()
+  }
+  /** 데스크톱 목록 영역 — 시설 요약의 `‹ 목록` 이 포커스를 돌려줄 곳 (D6) */
+  const listRegionRef = useRef<HTMLDivElement>(null)
+  /*
+    **`‹ 목록` 은 목록으로 포커스를 보낸다** (D6 · 리뷰 8). ✕ 와 같은 함수면 포커스가 토글로 가서 "목록으로" 라는
+    말과 닿는 곳이 갈린다. 스크롤 영역에 보이는 첫 행으로, 행이 없으면(빈 상태 · 실패) 목록 영역으로.
+
+    **요약을 먼저 걷고(`flushSync`) 옮긴다.** 1024~1279 는 요약이 서 있는 동안 목록이 `invisible` 이라
+    (`lg:max-xl:invisible`) 그 안의 행은 포커스를 받지 않는다 — 실측: 그대로 부르면 포커스가 `body` 로 떨어졌다.
+  */
+  const backToListFromFacility = () => {
+    flushSync(() => setPickedFacilityId(null))
+    const region = listRegionRef.current
+    if (region === null) return
+
+    const top = region.getBoundingClientRect().top
+    const row = [...region.querySelectorAll<HTMLElement>('button[data-place-id]')].find(
+      (candidate) => {
+        const box = candidate.getBoundingClientRect()
+        return box.height > 0 && box.bottom > top
+      },
+    )
+    ;(row ?? region).focus()
   }
   const [failure, setFailure] = useState<MapSdkFailure | null>(null)
   // 실패하면 목록 보기로 옮긴다 — 안내 화면을 그리지 않는다 (#1289)
@@ -917,8 +964,9 @@ export function PlaceMapView({
         {/*
           **병원 · 약국 안내 카드 — 컨트롤 묶음 바로 아래 · 오른쪽 정렬** (#1286 D5). 묶음 기둥 안에 두면
           카드 폭이 기둥을 넓혀 375 에서 검색창을 밀어낸다 — 줄을 따로 둔다. 모바일 재검색 알약보다 위다.
+          **카드가 있을 때만 줄을 둔다** — 빈 줄의 `pt-2` 가 재검색 알약을 8px 밀어 내렸다(`hasFacilityNotice`).
         */}
-        {facilityLayer && (
+        {facilityLayer && hasFacilityNotice(facilityStatus) && (
           <div className="content-container flex justify-end px-4 pt-2 md:px-10">
             <PlaceMapFacilityNotice
               status={facilityStatus}
@@ -1009,7 +1057,12 @@ export function PlaceMapView({
               {listPending ? <Skeleton className="h-4.5 w-20" /> : countLine}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            {/* `tabIndex={-1}` — Tab 정류장이 아니다. 시설 요약 `‹ 목록` 이 행이 없을 때 포커스를 놓는 자리다 */}
+            <div
+              ref={listRegionRef}
+              tabIndex={-1}
+              className="focus-visible:ring-brand-500 min-h-0 flex-1 overflow-y-auto focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
+            >
               {listPending ? (
                 <PlaceMapRowsSkeleton />
               ) : nearbyFailed ? (
@@ -1045,6 +1098,7 @@ export function PlaceMapView({
                   facility={selectedFacility}
                   variant="panel"
                   onClose={closeFacility}
+                  onBackToList={backToListFromFacility}
                 />
               ) : previewId !== null ? (
                 <PlaceMapPreview

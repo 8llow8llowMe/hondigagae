@@ -136,3 +136,57 @@ describe('시설 사각 묶음 CSS (#1286 D2-3)', () => {
     )
   })
 })
+
+/*
+  **원 · 사각이 함께 선 지도** (#1286 리뷰 1 · 2, 명세 D2-4). 카카오 `CustomOverlay` 는 오버레이마다 래퍼에
+  z-index 를 걸어 쌓임 맥락을 만들므로 자식의 z 는 래퍼 사이를 못 넘는다 — 원(z 3) 의 `::before` 를 사각(z 2)
+  몸체 **아래로** 보낼 방법이 없다. 그래서 그 지도에서만 위층(원)의 투명 확장을 걷고, 상시 이름 알약이 누르는
+  자리를 내려놓는다. 판정 클래스는 `MapCanvas` 루트의 `map-shapes-mixed`(`hasMixedPinShapes`).
+*/
+describe('원 · 사각이 함께 선 지도 CSS (#1286 D2-4)', () => {
+  // 긴 선택자는 Prettier 가 줄을 나눈다 — 공백을 하나로 접어 본다
+  const flat = css.replace(/\s+/g, ' ')
+  const rule = (selector: string) =>
+    new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(
+      flat,
+    )?.[1] ?? ''
+
+  it('상시 이름 알약(선택 · 호버 · 포커스 아님)은 누르는 자리가 아니다 — 아래 사각이 눌린다', () => {
+    expect(
+      rule(
+        '.map-shapes-mixed .map-pin-dot-named:not(.map-pin-dot-selected):not(:hover):not(:focus-visible) > span',
+      ),
+    ).toContain('pointer-events: none')
+  })
+
+  it('고른 핀 알약은 그대로 눌린다 — 규칙이 선택을 빼고 건다', () => {
+    expect(css).not.toMatch(
+      /\.map-shapes-mixed \.map-pin-dot-selected[^{]*\{[^}]*pointer-events: none/,
+    )
+  })
+
+  it('원 핀(고르지 않은)의 44 확장을 걷는다 — 사각 몸체를 덮는 투명 영역이다', () => {
+    expect(
+      rule(
+        '.map-shapes-mixed .map-pin-dot:not(.map-pin-dot-square):not(.map-pin-dot-selected)::before',
+      ),
+    ).toContain('content: none')
+  })
+
+  it('원 묶음의 44 확장을 걷는다 — 사각 묶음(z 11) 위 원 묶음(z 12)이다', () => {
+    expect(rule('.map-shapes-mixed .map-cluster:not(.map-cluster-square)::before')).toContain(
+      'content: none',
+    )
+  })
+
+  it('사각의 44 확장은 그대로다 — 원 몸체 아래층이라 원을 가리지 않는다', () => {
+    expect(css).not.toMatch(/\.map-shapes-mixed [^{]*-square::before/)
+  })
+
+  it('걷는 규칙이 원 핀 · 묶음 ::before 규칙보다 뒤에 있다', () => {
+    const mixed = css.indexOf('\n.map-shapes-mixed .map-pin-dot:not(')
+
+    expect(mixed).toBeGreaterThan(css.indexOf('\n.map-pin-dot::before {'))
+    expect(mixed).toBeGreaterThan(css.indexOf('\n.map-cluster::before {'))
+  })
+})

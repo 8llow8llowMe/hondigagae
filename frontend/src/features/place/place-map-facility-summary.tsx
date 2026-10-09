@@ -22,12 +22,16 @@ export function PlaceMapFacilitySummary({
   facility,
   variant,
   onClose,
+  onBackToList,
   now = new Date(),
 }: {
   facility: NearbyFacilityItem
   /** `panel` = 데스크톱 도킹 스택, `sheet` = 모바일 하단 시트 */
   variant: PlaceMapPreviewVariant
+  /** ✕ — 요약을 닫고 포커스를 토글로 (D6) */
   onClose: () => void
+  /** `‹ 목록`(1024~1279 패널) — 요약을 닫고 포커스를 목록으로 (D6). 주지 않으면 ✕ 와 같다 */
+  onBackToList?: (() => void) | undefined
   /** 오늘 진료시간 한 줄의 기준 시각 — 테스트 이음새다(`FacilityRow` 와 같다) */
   now?: Date
 }) {
@@ -64,6 +68,7 @@ export function PlaceMapFacilitySummary({
       <PreviewTopBar
         variant={variant}
         onClose={onClose}
+        onBackToList={onBackToList}
         closeLabel={messages.map.facilitySummaryClose}
       />
 

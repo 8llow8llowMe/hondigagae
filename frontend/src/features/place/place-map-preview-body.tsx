@@ -232,10 +232,16 @@ export function PlaceMapPreviewBody({
 export function PreviewTopBar({
   variant,
   onClose,
+  onBackToList = onClose,
   closeLabel = messages.map.previewClose,
 }: {
   variant: PlaceMapPreviewVariant
   onClose: () => void
+  /**
+   * `‹ 목록`(1024~1279 패널). 주지 않으면 ✕ 와 같다 — 장소 미리보기는 닫으면 포커스가 고른 행으로 돌아가 둘이
+   * 같은 곳에 닿는다. 시설 요약은 ✕ 가 토글로 포커스를 보내므로(목록 행이 없다) `‹ 목록` 을 따로 받는다(#1286 D6).
+   */
+  onBackToList?: (() => void) | undefined
   /**
    * ✕ 의 접근 이름. 같은 머리를 시설 요약(#1286 `place-map-facility-summary.tsx`)도 쓴다 — 그쪽은 `요약 닫기`.
    */
@@ -247,7 +253,7 @@ export function PreviewTopBar({
       {variant === 'panel' && (
         <button
           type="button"
-          onClick={onClose}
+          onClick={onBackToList}
           className="text-link hover:text-link-hover focus-visible:ring-brand-500 text-body-2 inline-flex min-h-11 items-center gap-1 rounded-sm px-2 font-semibold focus-visible:ring-2 focus-visible:outline-none xl:hidden"
         >
           <ChevronLeftIcon size={16} aria-hidden />

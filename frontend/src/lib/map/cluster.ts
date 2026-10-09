@@ -126,7 +126,32 @@ export function clusterByGrid<T>(inputs: ClusterInput<T>[], cellSize: number): C
 export function clusterForLevel<T>(
   inputs: ClusterInput<T>[],
   level: number | null,
+  {
+    keep,
+  }: {
+    /**
+     * **참이면 접지 않고 혼자 세운다** — 고른 핀이다 (#1286 리뷰 4). 고르면 카메라가 level 5 로 가는데
+     * (`SELECTED_PLACE_MAP_LEVEL`) 그 단계에도 묶음이 있어, 고른 핀이 이웃과 접히면 고른 것이 지도에서
+     * 사라진다. 뺀 핀은 묶음 계산 뒤에 붙는다 — 쌓임은 `markerZIndex` 가 정한다.
+     */
+    keep?: (item: T) => boolean
+  } = {},
 ): ClusterGroup<T>[] {
+  if (keep === undefined) return clusterInputs(inputs, level)
+
+  const kept: ClusterGroup<T>[] = []
+  const rest: ClusterInput<T>[] = []
+  inputs.forEach((input, index) => {
+    // 키 앞머리가 격자 키(`row:col` · `single-`)와 겹치지 않는다
+    if (keep(input.item))
+      kept.push({ key: `kept-${String(index)}`, center: input.coord, items: [input.item] })
+    else rest.push(input)
+  })
+
+  return [...clusterInputs(rest, level), ...kept]
+}
+
+function clusterInputs<T>(inputs: ClusterInput<T>[], level: number | null): ClusterGroup<T>[] {
   if (level === null) return clusterByGrid(inputs, 0)
 
   const cellSize = cellSizeFor(level)

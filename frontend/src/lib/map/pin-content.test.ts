@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   clusterContent,
   focusMarkerContent,
+  hasMixedPinShapes,
+  MAP_SHAPES_MIXED_CLASS,
   PIN_NAME_MAX_LEVEL,
   pinContent,
   pinShape,
@@ -372,5 +374,31 @@ describe('clusterContent — 시설 사각 묶음 (#1286 D2-3)', () => {
     expect(clusterContent(7, 'square').ariaLabel).toBe(
       messages.map.clusterCount.replace('{n}', '7'),
     )
+  })
+})
+
+/*
+  **원 · 사각이 한 지도에 함께 서는가** (#1286 리뷰 1 · 2, `지도시설토글-세부명세.md` D2-4). 참이면 `MapCanvas` 루트에
+  `map-shapes-mixed` 가 붙고, 그 아래에서만 상시 이름 알약이 누르는 자리를 내려놓고 원(위층)의 투명 히트 확장이
+  걷힌다 — 사각(아래층)의 보이는 몸체를 가리지 않게. 장소만 · 시설만인 지도는 예전 그대로다.
+*/
+describe('hasMixedPinShapes — 시설 층이 켜진 지도 (#1286 D2-4)', () => {
+  const circle = { icon: 'pin' as const }
+  const square = { icon: 'cross' as const, shape: 'square' as const }
+
+  it('원과 사각이 함께 있을 때만 참이다', () => {
+    expect(hasMixedPinShapes([circle, square])).toBe(true)
+    expect(hasMixedPinShapes([circle, circle])).toBe(false)
+    expect(hasMixedPinShapes([square, square])).toBe(false)
+    expect(hasMixedPinShapes([])).toBe(false)
+  })
+
+  it('아이콘 없는 핀은 shape 를 줘도 원이다 — pinShape 와 같은 판정이다', () => {
+    expect(hasMixedPinShapes([{ shape: 'square' }, circle])).toBe(false)
+    expect(hasMixedPinShapes([{ shape: 'square' }, square])).toBe(true)
+  })
+
+  it('루트 클래스 이름은 globals.css 의 규칙과 같다', () => {
+    expect(MAP_SHAPES_MIXED_CLASS).toBe('map-shapes-mixed')
   })
 })
