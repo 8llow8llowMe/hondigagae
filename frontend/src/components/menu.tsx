@@ -37,15 +37,22 @@ type MenuItemBase = {
   /** 파괴적 항목. 목록의 마지막에 둔다 */
   destructive?: boolean
   disabled?: boolean
-  /**
-   * 지금 화면 — `aria-current="page"` + 600 (#1300). 지도 아일랜드 알약의 `≡` 가 메뉴 셋을 이 안에 접을 때
-   * 띠 헤더의 활성 표시(배경 · 굵기 · `aria-current`)가 메뉴 안에서도 남아야 한다. 이동 항목에만 뜻이 있다.
-   */
-  current?: boolean
 }
 
 export type MenuItem = MenuItemBase &
-  ({ href: string; onSelect?: never } | { href?: never; onSelect: () => void })
+  (
+    | {
+        href: string
+        onSelect?: never
+        /**
+         * 지금 화면 — `aria-current="page"` + 600 (#1300). 지도 아일랜드 알약의 `≡` 가 메뉴 셋을 이 안에 접을 때
+         * 띠 헤더의 활성 표시(배경 · 굵기 · `aria-current`)가 메뉴 안에서도 남아야 한다. **이동 항목에만 둔다** —
+         * 버튼 항목의 "지금 화면" 은 뜻이 없다(타입으로 막는다).
+         */
+        current?: boolean
+      }
+    | { href?: never; onSelect: () => void; current?: never }
+  )
 
 export function Menu({
   open,

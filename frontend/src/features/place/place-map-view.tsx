@@ -992,14 +992,15 @@ export function PlaceMapView({
               높이 44 는 같은 줄의 검색과 맞춘 값이다.
 
               **아일랜드 1024 이상은 두지 않는다** (#1300 D1-2) — 목록이 옆에 보이는데 `목록 보기` 가 떠 있었다. 패널
-              개수 줄의 `크게 보기` 가 같은 주소로 간다. 768–1023 은 패널이 없어 글자 버튼 그대로, <768 은 아이콘이다.
+              개수 줄의 `크게 보기` 가 같은 주소로 간다. **패널을 접으면 다시 선다** — `크게 보기` 가 접힌(inert) 패널과
+              함께 사라져 목록 보기로 가는 길이 화면에 하나도 남지 않았다(#1300 리뷰). 768–1023 은 패널이 없어 글자 버튼 그대로, <768 은 아이콘이다.
             */}
             {showToggle && (
               <ViewToggle
                 current="map"
                 listHref={listHref}
                 mapHref={mapHref}
-                className={island ? 'lg:hidden' : ''}
+                className={island && panelOpen ? 'lg:hidden' : ''}
               />
             )}
 
