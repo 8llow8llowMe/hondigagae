@@ -87,9 +87,8 @@ import type {
  */
 
 /**
- * 확대 애니메이션 길이. **뒤따르는 중심 이동을 언제 시작할지도 이 값이 정한다** —
- * 짧게 잡으면 확대가 끝나기 전에 이동이 끼어들어 튀고, 길게 잡으면 두 동작 사이가 끊긴다.
- * `panTo` 의 지속시간은 SDK 가 정하고 바꿀 수 없어서, 맞출 수 있는 쪽을 여기에 맞춘다.
+ * 확대 애니메이션 길이. 뒤따르는 중심 이동은 **이 시간이 아니라 확대가 끝났다는 SDK 신호**
+ * (`zoom_changed`)를 받고 시작한다 (#1297) — `zoomToward` 머리주석.
  */
 const ZOOM_MS = 300
 
@@ -109,6 +108,14 @@ function prefersReducedMotion(): boolean {
  * **옛 중심을 확대**해서 목표가 화면에서 아예 사라진다 (dev 실측: 목록이 "지도에 보이는
  * 0곳" 이 됐다). 그래서 `anchor` 로 **목표를 화면에 붙여 둔 채** 확대한다 — 뒤따르는
  * 중심 맞추기가 실행되지 않아도 목표는 화면 안에 남는다. 가운데가 아닐 뿐이다.
+ *
+ * **뒤따르는 이동은 확대가 끝난 신호(`zoom_changed`)를 받고 건다** (#1297). 예전에는
+ * `setTimeout(ZOOM_MS)` 로 걸었는데, **카카오 SDK 는 확대 애니메이션이 끝나기 전에 들어온
+ * `panTo` 를 조용히 버린다**(실측: 300ms 확대에 0–300ms 의 `panTo` 는 전부 버려지고 320ms 부터
+ * 먹힌다). 타이머와 마지막 프레임 중 무엇이 먼저 오는지는 메인 스레드 부하가 정해, 핀이 수백 개인
+ * 화면에서 자주 졌다 — 그러면 고른 핀이 확대 전 화면 자리(`anchor`)에 남아, 미리보기 오프셋(#1227)
+ * 이 있는 데스크톱에서는 패널 밑에 가려졌다. `zoom_changed` 는 애니메이션 확대가 **끝날 때 한 번**
+ * 온다(시작 때 오지 않는다 — 실측). 그 사이 사용자가 다른 단계로 확대했으면 옮기지 않는다.
  * 확대 후에는 같은 화면 거리가 좁은 실거리라 `panTo` 도 부드럽게 움직인다
  * (`panTo` 는 이동 거리가 화면보다 크면 애니메이션 없이 순간 이동한다).
  *
@@ -123,7 +130,7 @@ function prefersReducedMotion(): boolean {
  * JS 로 그리는 것이라 그 규칙이 닿지 않아 여기서 직접 판정해야 한다.
  *
  * 되돌려 주는 것은 **뒷정리 함수**다. 확대가 끝나기 전에 언마운트되거나 다음 조작이
- * 들어오면 예약해 둔 중심 맞추기를 취소해야 한다.
+ * 들어오면 걸어 둔 중심 맞추기(리스너)를 떼야 한다 — 빨리 연달아 고르면 앞 핀으로 되감긴다.
  */
 function zoomToward(params: {
   map: KakaoMap
@@ -165,14 +172,15 @@ function zoomToward(params: {
     return () => undefined
   }
 
+  const onZoomed = () => {
+    maps.event.removeListener(map, 'zoom_changed', onZoomed)
+    // 지도가 사라졌거나(언마운트·SDK 실패) 사이에 사용자가 다른 단계로 확대했으면 옮기지 않는다
+    if (mapRef.current === map && map.getLevel() === level) map.panTo(center)
+  }
+  maps.event.addListener(map, 'zoom_changed', onZoomed)
   map.setLevel(level, { animate: { duration: ZOOM_MS }, anchor: target })
 
-  const timer = setTimeout(() => {
-    // 지도가 사라졌을 수 있다 (언마운트·SDK 실패) — ref 로 다시 확인한다
-    mapRef.current?.panTo(center)
-  }, ZOOM_MS)
-
-  return () => clearTimeout(timer)
+  return () => maps.event.removeListener(map, 'zoom_changed', onZoomed)
 }
 
 export type MapPin = {

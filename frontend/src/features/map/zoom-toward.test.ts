@@ -2,7 +2,8 @@
  * **확대하며 그 지점으로 간다 — 사본이 둘이면 한쪽만 고쳐진다** (이슈 #873).
  *
  * 핀을 고르는 경로는 순서를 제대로 정해 뒀다: `anchor` 로 목표를 화면에 붙인 채
- * `animate` 확대 → `ZOOM_MS` 뒤 중심 맞추기, 그리고 `prefers-reduced-motion` 분기.
+ * `animate` 확대 → 확대가 끝난 신호(`zoom_changed`)를 받고 중심 맞추기(#1297), 그리고
+ * `prefers-reduced-motion` 분기.
  * 근거는 `zoomToward` 머리주석에 있다 — *"둘을 동시에 걸 수 없다. 같은 변환을 두
  * 애니메이션이 함께 밀면 중간에서 튄다."*
  *
@@ -58,11 +59,28 @@ describe('zoomToward — 확대와 이동의 순서 (#873)', () => {
     )
   })
 
-  /* 동시에 걸면 같은 변환을 두 애니메이션이 함께 밀어 중간에서 튄다 */
-  it('중심 맞추기는 확대가 끝난 뒤(ZOOM_MS)에 예약한다', () => {
-    expect(helper).toMatch(/setTimeout\([\s\S]{0,160}panTo\(center\)[\s\S]{0,40}\}, ZOOM_MS\)/)
-    // 언마운트·SDK 실패를 대비해 예약 시점에 생존을 다시 본다
-    expect(helper).toContain('mapRef.current?.panTo(center)')
+  /*
+    동시에 걸면 같은 변환을 두 애니메이션이 함께 밀어 중간에서 튄다. **시간으로 기다리지 않는다**
+    (#1297) — SDK 는 확대 애니메이션이 끝나기 전에 들어온 `panTo` 를 버리고, 타이머와 마지막
+    프레임 중 무엇이 먼저인지는 부하가 정한다. 끝 신호(`zoom_changed`)를 받고 옮긴다.
+  */
+  it('중심 맞추기는 확대가 끝난 신호(zoom_changed)를 받고 건다 — 타이머가 아니다', () => {
+    expect(helper).not.toContain('setTimeout(')
+    const onZoomed = helper.slice(helper.indexOf('const onZoomed = () => {'))
+    expect(onZoomed).toMatch(/const onZoomed = \(\) => \{[\s\S]{0,200}map\.panTo\(center\)/)
+    // 한 번만 — 받자마자 뗀다
+    expect(onZoomed).toMatch(
+      /const onZoomed = \(\) => \{\s*maps\.event\.removeListener\(map, 'zoom_changed', onZoomed\)/,
+    )
+    // 지도가 살아 있고 사용자가 사이에 다른 단계로 가지 않았을 때만
+    expect(onZoomed).toContain('mapRef.current === map && map.getLevel() === level')
+    // 리스너를 확대보다 먼저 건다 — 끝 신호를 놓치지 않게
+    expect(helper.indexOf("maps.event.addListener(map, 'zoom_changed', onZoomed)")).toBeGreaterThan(
+      -1,
+    )
+    expect(helper.indexOf("maps.event.addListener(map, 'zoom_changed', onZoomed)")).toBeLessThan(
+      helper.indexOf('map.setLevel(level, { animate'),
+    )
   })
 
   /*
@@ -74,7 +92,7 @@ describe('zoomToward — 확대와 이동의 순서 (#873)', () => {
     expect(measured).toBeGreaterThan(-1)
     expect(measured).toBeLessThan(helper.indexOf('map.setLevel(level, {'))
     expect(helper).toContain('scale: 2 ** ((zoomIn ? level : current) - current)')
-    const scheduled = helper.slice(helper.indexOf('setTimeout('))
+    const scheduled = helper.slice(helper.indexOf('const onZoomed = () => {'))
     expect(scheduled).not.toContain('getProjection')
   })
 
@@ -89,9 +107,11 @@ describe('zoomToward — 확대와 이동의 순서 (#873)', () => {
     expect(branch).toMatch(/if \(zoomIn\) map\.setLevel\(level\)/)
   })
 
-  /* 예약한 이동을 취소할 수 있어야 한다 — 호출부가 effect 면 그대로 cleanup 이 된다 */
-  it('뒷정리 함수를 돌려준다', () => {
-    expect(helper).toContain('return () => clearTimeout(timer)')
+  /* 걸어 둔 이동을 뗄 수 있어야 한다 — 호출부가 effect 면 그대로 cleanup 이 된다(빨리 연달아 고를 때 앞 핀으로 되감기지 않게) */
+  it('뒷정리 함수가 리스너를 뗀다', () => {
+    expect(helper).toContain(
+      "return () => maps.event.removeListener(map, 'zoom_changed', onZoomed)",
+    )
   })
 })
 
