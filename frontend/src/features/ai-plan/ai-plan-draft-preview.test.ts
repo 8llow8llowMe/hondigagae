@@ -245,6 +245,157 @@ describe('AiPlanDraftPreview — days 가 부족한 완료 (명세 S6)', () => {
   })
 })
 
+/**
+ * 빈 날 (#1270 · 백엔드 #1268). **만든 날은 방문 항목(장소 · 식사)이 있는 날이다** —
+ * `days.length` 가 아니다. 서버는 전부 빈 초안만 `AIPLAN_022` 로 실패시키고 일부만 빈
+ * 초안은 `COMPLETED` 로 내린다.
+ */
+describe('AiPlanDraftPreview — 빈 날 (#1270)', () => {
+  const LODGING = item({ itemType: 'LODGING', placeId: '9', title: '협재 펫 스테이' })
+
+  /** 일자 카드 하나 — 그 `h2` 를 가진 `<section>` 여는 태그부터 닫는 태그까지 */
+  function dayCard(html: string, day: number): string {
+    const sections = html.split('<section ').slice(1)
+    const card = sections.find((section) => section.includes(`>${day}일차</h2>`))
+    if (card === undefined) throw new Error(`${day}일차 카드가 없다`)
+    return card.slice(0, card.indexOf('</section>'))
+  }
+
+  /** dev job `e0f1fd25…` — 세 날 모두 `items: []` 였다. 예전에는 제목뿐인 카드 셋이 섰다 */
+  it('모든 날이 비면 빈 상태로 간다 — 일자 카드를 세우지 않는다', () => {
+    const html = render({
+      draft: {
+        days: [
+          { day: 1, items: [] },
+          { day: 2, items: [] },
+          { day: 3, items: [] },
+        ],
+        reasons: [],
+      },
+    })
+
+    expect(html).toContain(messages.aiPlan.emptyDraftTitle)
+    expect(html).not.toContain('1일차')
+    expect(html).not.toContain(messages.aiPlan.emptyDayTitle)
+  })
+
+  it('숙소만 있는 초안도 빈 상태다 — 숙소는 일정이 아니다', () => {
+    const html = render({
+      draft: { days: [{ day: 1, items: [LODGING] }], reasons: [] },
+      totalDays: 1,
+    })
+
+    expect(html).toContain(messages.aiPlan.emptyDraftTitle)
+    expect(html).not.toContain('협재 펫 스테이')
+  })
+
+  it('일부만 비면 만든 날을 방문 항목으로 센다', () => {
+    const html = render({
+      draft: {
+        days: [
+          { day: 1, items: [item()] },
+          { day: 2, items: [] },
+          { day: 3, items: [LODGING] },
+        ],
+        reasons: [],
+      },
+      totalDays: 3,
+    })
+
+    // `days.length` 로 셌다면 3일 중 3일이라 배너가 서지 않았다
+    expect(html).toContain('3일 중 1일만 만들었어요.')
+  })
+
+  it('빈 날 카드는 제목만 남기지 않고 채우지 못했다고 말한다', () => {
+    const html = render({
+      draft: {
+        days: [
+          { day: 1, items: [item()] },
+          { day: 2, items: [] },
+        ],
+        reasons: [],
+      },
+      totalDays: 2,
+    })
+    const empty = dayCard(html, 2)
+
+    expect(empty).toContain(messages.aiPlan.emptyDayTitle)
+    expect(empty).toContain(messages.aiPlan.emptyDayDescription)
+    // 항목이 없으면 빈 목록(`<ul>`)을 그리지 않는다 — 선만 두 겹이 된다
+    expect(empty).not.toContain('<ul')
+  })
+
+  it('채운 날 카드에는 안내를 달지 않는다', () => {
+    const html = render({
+      draft: {
+        days: [
+          { day: 1, items: [item()] },
+          { day: 2, items: [] },
+        ],
+        reasons: [],
+      },
+      totalDays: 2,
+    })
+
+    expect(dayCard(html, 1)).not.toContain(messages.aiPlan.emptyDayTitle)
+  })
+
+  /** 숙소 행은 담기가 그대로 싣는다 — 감추면 화면과 저장이 어긋난다 */
+  it('숙소만 있는 날은 안내를 달고 숙소 행은 남긴다', () => {
+    const html = render({
+      draft: {
+        days: [
+          { day: 1, items: [item()] },
+          { day: 2, items: [LODGING] },
+        ],
+        reasons: [],
+      },
+      totalDays: 2,
+    })
+    const lodgingDay = dayCard(html, 2)
+
+    expect(lodgingDay).toContain(messages.aiPlan.emptyDayTitle)
+    expect(lodgingDay).toContain('협재 펫 스테이')
+  })
+
+  /** 기간을 모르면 "N일 중" 을 단정하지 않는다 — 빈 날 카드는 그래도 말한다 */
+  it('기간을 모르면 배너 없이 빈 날 카드만 말한다', () => {
+    const html = render({
+      draft: {
+        days: [
+          { day: 1, items: [item()] },
+          { day: 2, items: [] },
+        ],
+        reasons: [],
+      },
+      totalDays: null,
+    })
+
+    expect(html).not.toContain('만들었어요.')
+    expect(dayCard(html, 2)).toContain(messages.aiPlan.emptyDayTitle)
+  })
+})
+
+describe('AiPlanDraftPreview — 방문 전 확인 안내 (#1270)', () => {
+  /** 개요 카드 — 첫 `<section>` 이다 */
+  function overview(html: string): string {
+    const start = html.indexOf('<section ')
+    return html.slice(start, html.indexOf('</section>', start))
+  }
+
+  it('개요 카드에 운영 시간 · 동반 조건 확인을 한 줄 단다', () => {
+    expect(overview(render())).toContain(messages.aiPlan.previewVerifyNotice)
+  })
+
+  it('담은 초안에도 단다 — 담았다고 확인할 일이 사라지지 않는다', () => {
+    expect(overview(render({ committed: true }))).toContain(messages.aiPlan.previewVerifyNotice)
+  })
+
+  it('일자 카드마다 반복하지 않는다 — 한 번이다', () => {
+    expect(render().split(messages.aiPlan.previewVerifyNotice)).toHaveLength(2)
+  })
+})
+
 describe('AiPlanDraftPreview — delisting 과 빼기', () => {
   it('보강이 404 를 낸 항목을 지목한다 — PLAN_004 의 원인 후보다', () => {
     const html = render({ delistedPlaceIds: new Set(['212481712381923328']) })
@@ -271,8 +422,19 @@ describe('AiPlanDraftPreview — 썸네일 (#1127)', () => {
     overrides: Partial<AiPlanScheduleItem>,
     thumbnails: ReadonlyMap<string, string | null>,
   ) {
+    /*
+      **둘째 날에 방문 항목을 둔다** (#1270). 숙소 · 모르는 유형 하나뿐인 초안은 만든 날이
+      0 이라 빈 상태로 가고, 그러면 "일러스트가 없다" 류 단언이 행 없이 통과한다. 둘째 날
+      항목은 보강 중(키 없음)이라 회색 타일 — 사진도 일러스트도 내지 않는다.
+    */
     return render({
-      draft: { days: [{ day: 1, items: [item(overrides)] }], reasons: [] },
+      draft: {
+        days: [
+          { day: 1, items: [item(overrides)] },
+          { day: 2, items: [item({ placeId: 'filler', title: '채움' })] },
+        ],
+        reasons: [],
+      },
       thumbnails,
     })
   }

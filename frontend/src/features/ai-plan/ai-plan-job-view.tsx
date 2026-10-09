@@ -28,7 +28,11 @@ import { toAiPlanCommitErrors } from '@/lib/ai-plan/commit-error'
 import { snapshotFromConditions } from '@/lib/ai-plan/conditions'
 import { defaultPlanTitle } from '@/lib/ai-plan/draft-title'
 import { draftToPlanPayload } from '@/lib/ai-plan/draft-to-plan'
-import { isNarrowedRegionFailure, isShortenablePeriodTimeout } from '@/lib/ai-plan/failure-hint'
+import {
+  isEmptyPlanFailure,
+  isNarrowedRegionFailure,
+  isShortenablePeriodTimeout,
+} from '@/lib/ai-plan/failure-hint'
 import { committedPlanIdOf, isJobCanceled, isJobFailed, jobStepProgress } from '@/lib/ai-plan/job'
 import { petNamesLabel } from '@/lib/ai-plan/pet-names'
 import { clearAiPlanRequest, readAiPlanRequest } from '@/lib/ai-plan/request-store'
@@ -447,7 +451,7 @@ function narrowedRegionHint(
  * 실패 화면에 덧붙일 단서 하나 (#710).
  *
  * **둘을 함께 붙이지 않는다.** 실패 코드가 하나이므로 단서도 하나다 — `AIPLAN_012` 는
- * 지역을, `AIPLAN_006` 은 기간을 가리키고 겹치지 않는다. 그래도 한 줄로 합쳐 두는 이유는
+ * 지역을, `AIPLAN_006` 은 기간을, `AIPLAN_022` 는 같은 조건의 재시도를 가리키고 겹치지 않는다. 그래도 한 줄로 합쳐 두는 이유는
  * **코드가 늘 때 두 줄이 나란히 서는 것을 여기서 막기 위해서**다: 단서가 둘이면 어느 쪽을
  * 먼저 해야 하는지가 화면에 없고, 그때는 코드가 아니라 **우선순위**를 정해야 한다.
  */
@@ -458,6 +462,9 @@ function failureHint(
 ): string | null {
   const region = narrowedRegionHint(errorCode, snapshot)
   if (region !== null) return region
+
+  // 빈 초안(`AIPLAN_022`)은 조건 탓이 아니다 — 같은 조건으로 다시 누르면 된다 (#1270)
+  if (isEmptyPlanFailure(errorCode)) return messages.aiPlan.failedEmptyPlanHint
 
   return isShortenablePeriodTimeout(errorCode, totalDays) ? messages.aiPlan.failedTimeoutHint : null
 }

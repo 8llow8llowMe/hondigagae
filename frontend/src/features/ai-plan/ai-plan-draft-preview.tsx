@@ -4,6 +4,7 @@ import { ReasonList } from '@/components/reason-list'
 import { Surface, SurfaceList } from '@/components/surface'
 import { AiPlanDraftItemRow } from '@/features/ai-plan/ai-plan-draft-item-row'
 import { formatBudget } from '@/lib/ai-plan/budget'
+import { draftDayCoverage, isVisitDay } from '@/lib/ai-plan/draft-days'
 import { draftItemDistances } from '@/lib/ai-plan/draft-distance'
 import { draftItemThumbnail } from '@/lib/ai-plan/draft-thumbnail'
 import { draftItemCount } from '@/lib/ai-plan/draft-to-plan'
@@ -93,7 +94,11 @@ export function AiPlanDraftPreview({
 }: AiPlanDraftPreviewProps) {
   const itemCount = draftItemCount(draft)
   const budgetLabel = formatBudget(budget)
-  const madeDays = draft.days.length
+  /*
+    **만든 날은 방문 항목이 있는 날이다** (#1270). `days.length` 로 세면 세 날 모두 빈 초안이
+    "3일 중 3일" 이 되어 빈 상태로 가지 않고 제목뿐인 카드가 선다.
+  */
+  const coverage = draftDayCoverage(draft, totalDays)
 
   /*
     **조각을 조립한다.** 조건을 잃으면 기간을 모르는데(명세 S5 함정 1), 한 문장에
@@ -109,10 +114,11 @@ export function AiPlanDraftPreview({
     .join(' · ')
 
   /**
-   * **`days` 가 여행 일수보다 적어도 감추지 않는다** (명세 S6). `status` 는 `COMPLETED`
-   * 인데 일부 일자가 비는 경우다 — 그대로 말하고 나머지는 담은 뒤에 채우라고 안내한다.
+   * **채우지 못한 날을 감추지 않는다** (명세 S6). `status` 는 `COMPLETED` 인데 일부 일자가
+   * 빠졌거나 비어 온 경우다 — 서버는 **전부 빈** 초안만 `AIPLAN_022` 로 실패시킨다(#1268).
+   * 그대로 말하고 나머지는 담은 뒤에 채우라고 안내한다.
    */
-  const partial = totalDays !== null && madeDays < totalDays
+  const partial = coverage.partial
 
   /*
     **`placeId` 가 없는 항목은 좌표도 없다.** `MOVE` 다 — 초안에 `WALK` 는 오지 않고(#89),
@@ -121,7 +127,12 @@ export function AiPlanDraftPreview({
   const coordOf = (item: AiPlanScheduleItem): LatLng | null =>
     item.placeId === null ? null : (coords.get(item.placeId) ?? null)
 
-  if (madeDays === 0) {
+  /*
+    **방문 항목이 하루도 없으면 빈 상태다** (#1270). 응답에 날이 있어도 전부 비었거나 숙소뿐이면
+    담을 일정이 아니다 — 서버도 같은 초안을 `AIPLAN_022` 로 실패시킨다. 여기 닿는 것은 그
+    변경 전에 완료된 작업이다(작업 기록은 24시간 남는다).
+  */
+  if (coverage.made === 0) {
     /*
       **빈 초안도 카드 안이다** (#440 판단). 카드 밖에 두면 이 갈래에서만 화면의 흰 면이
       통째로 사라진다 — 담기 패널은 여전히 카드 밖 L0 에 서 있으므로 흰 면이 하나도 없는
@@ -170,6 +181,13 @@ export function AiPlanDraftPreview({
           <p className="text-caption text-fg-subtle">
             {committed ? messages.aiPlan.previewCommitted : messages.aiPlan.previewNotSaved}
           </p>
+
+          {/*
+            **방문 전 확인 안내** (#1270). 담기 여부와 무관하게 선다 — 운영 시간 · 동반 조건은
+            원천 데이터에 늦게 반영되고, 담은 뒤에도 그 사실은 그대로다. 저장 문구보다 진한
+            `fg-muted` 다: 저장 시점은 상태 표시고 이것은 사용자가 할 일이다.
+          */}
+          <p className="text-caption text-fg-muted">{messages.aiPlan.previewVerifyNotice}</p>
         </header>
 
         {/*
@@ -181,8 +199,8 @@ export function AiPlanDraftPreview({
             <div className="bg-band rounded-md px-3 py-2">
               <p className="text-body-2 text-fg font-medium">
                 {messages.aiPlan.partialDays
-                  .replace('{total}', String(totalDays))
-                  .replace('{made}', String(madeDays))}
+                  .replace('{total}', String(coverage.total))
+                  .replace('{made}', String(coverage.made))}
               </p>
               <p className="text-caption text-fg-muted mt-1">
                 {messages.aiPlan.partialDaysDescription}
@@ -216,6 +234,12 @@ export function AiPlanDraftPreview({
         */
         const distances = draftItemDistances(dayItem.items, coordOf)
         const dayLabel = messages.aiPlan.dayLabel.replace('{day}', String(dayItem.day))
+        /*
+          **빈 날은 제목만 남기지 않는다** (#1270). 항목이 없거나 숙소뿐인 날이다. 숙소 행은
+          감추지 않는다 — 담기(`toDraftItems`)가 그대로 싣는 항목이라, 감추면 화면과 저장이
+          어긋난다.
+        */
+        const empty = !isVisitDay(dayItem)
 
         return (
           /*
@@ -224,21 +248,37 @@ export function AiPlanDraftPreview({
             `Surface` 의 `title` 슬롯이 그 `h2` 와 `pb-3` 을 그려 준다.
           */
           <Surface key={dayItem.day} title={dayLabel}>
+            {/*
+              빈 날 안내는 일정 상세의 빈 날(`plan-day-section.tsx` 의 `dayEmpty`)과 같은
+              자리 · 같은 선이다 — 제목 아래 1px 선 + 카드 인셋. 부분 생성 배너가 이미
+              `bg-band` 로 같은 사실을 말하므로 여기는 채움 없이 글줄만 둔다.
+            */}
+            {empty && (
+              <div className={cn('border-border border-t py-6', INSET_CLASS.card)}>
+                <p className="text-body-2 text-fg font-medium">{messages.aiPlan.emptyDayTitle}</p>
+                <p className="text-caption text-fg-muted mt-1">
+                  {messages.aiPlan.emptyDayDescription}
+                </p>
+              </div>
+            )}
+
             {/* 항목 목록은 카드 폭을 다 쓰고 위 1px 선으로 제목과 갈린다 (#447) */}
-            <SurfaceList className="border-border border-t">
-              {dayItem.items.map((item, index) => (
-                <AiPlanDraftItemRow
-                  key={`${dayItem.day}-${index}-${item.title}`}
-                  item={item}
-                  ordinal={index + 1}
-                  meta={item.placeId === null ? undefined : metaLines.get(item.placeId)}
-                  thumbnail={draftItemThumbnail(item, thumbnails)}
-                  distanceMeters={distances[index] ?? null}
-                  delisted={item.placeId !== null && delistedPlaceIds.has(item.placeId)}
-                  excluded={item.placeId !== null && excludedPlaceIds.has(item.placeId)}
-                />
-              ))}
-            </SurfaceList>
+            {dayItem.items.length > 0 && (
+              <SurfaceList className="border-border border-t">
+                {dayItem.items.map((item, index) => (
+                  <AiPlanDraftItemRow
+                    key={`${dayItem.day}-${index}-${item.title}`}
+                    item={item}
+                    ordinal={index + 1}
+                    meta={item.placeId === null ? undefined : metaLines.get(item.placeId)}
+                    thumbnail={draftItemThumbnail(item, thumbnails)}
+                    distanceMeters={distances[index] ?? null}
+                    delisted={item.placeId !== null && delistedPlaceIds.has(item.placeId)}
+                    excluded={item.placeId !== null && excludedPlaceIds.has(item.placeId)}
+                  />
+                ))}
+              </SurfaceList>
+            )}
           </Surface>
         )
       })}
