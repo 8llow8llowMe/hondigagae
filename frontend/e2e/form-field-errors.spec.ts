@@ -53,7 +53,8 @@ test.describe('서버 필드 오류 렌더 (#501)', () => {
       통과해 버려서, 이 이슈가 만든 퇴화를 그대로 놓친다.
     */
     // `getAttribute()` 는 재시도하지 않는다 — 제출은 비동기라 한 번 읽으면 렌더 전 값을 본다
-    await expect(codeInput).toHaveAttribute('aria-describedby', 'code-error')
+    // 오류가 먼저, 단계 문구(`signup-step-status`, #1295)가 뒤다 — 단계의 첫 칸이라 함께 가리킨다
+    await expect(codeInput).toHaveAttribute('aria-describedby', 'code-error signup-step-status')
     await expect(codeInput).toHaveAttribute('aria-invalid', 'true')
 
     const fieldError = page.locator('#code-error')
