@@ -15,7 +15,9 @@ import { type MapOffset, offsetCenter } from '@/lib/map/offset-center'
 import {
   clusterContent,
   focusMarkerContent,
+  hasMixedPinShapes,
   MAP_PIN_SHAPES,
+  MAP_SHAPES_MIXED_CLASS,
   type MapPinShape,
   PIN_NAME_MAX_LEVEL,
   type PinContent,
@@ -604,6 +606,8 @@ export function MapCanvas({
       clusterForLevel(
         positioned.filter((input) => pinShape(input.item) === shape),
         ordered ? null : level,
+        // 고른 핀은 접지 않는다 (#1286 리뷰 4) — 고른 단계(level 5)에도 묶음이 있어 이웃과 접히면 사라진다
+        { keep: (item) => item.id === selectedId },
       ).map((group) => ({ ...group, shape })),
     )
     const created: KakaoCustomOverlay[] = []
@@ -988,7 +992,17 @@ export function MapCanvas({
   }, [status, relayout])
 
   return (
-    <div className={cn('bg-bg-sunken relative isolate', className)}>
+    <div
+      className={cn(
+        'bg-bg-sunken relative isolate',
+        /*
+          원 · 사각이 함께 서면(시설 층을 켠 `/places`) 원의 투명한 것(상시 알약 · 44 확장)이 아래 사각 몸체를
+          덮지 않게 한다 — 규칙은 `globals.css` 의 `.map-shapes-mixed`, 판정과 근거는 `hasMixedPinShapes` (#1286 D2-4)
+        */
+        hasMixedPinShapes(pins) && MAP_SHAPES_MIXED_CLASS,
+        className,
+      )}
+    >
       <div ref={containerRef} className="size-full" />
 
       {status === 'loading' && (
@@ -1004,8 +1018,8 @@ export function MapCanvas({
 }
 
 /**
- * 개별 핀. **이름을 쓴다** — 4~12곳 규모라 핀만 찍으면 눌러봐야 안다
- * (아트보드 `혼디가개 긴급 시설` 02).
+ * 개별 핀. 아이콘 원 · 사각이면 이름 알약은 `named`(가까운 줌 · `PIN_NAME_MAX_LEVEL`) · 선택 · 호버 · 포커스 때만
+ * 선다(#1280 · #1286) — 멀리서는 모양과 아이콘만 남는다. 아이콘이 없는 핀(예전 이름표 · 정적 핀)은 이름표 그대로다.
  *
  * **판단은 여기 없다.** 무엇으로 그릴지는 `pinContent` 가 정하고 `pin-content.test.ts` 가
  * 잠근다 — 이 함수는 `interactive` 와 `onClick` 이 **같은 사실을 두 번 말하지 않게** 묶는

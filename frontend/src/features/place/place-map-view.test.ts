@@ -266,4 +266,36 @@ describe('PlaceMapView — 병원 · 약국 층 (#1286)', () => {
   it('시설 묶음의 이름 틀을 넘긴다', () => {
     expect(code).toContain('squareClusterLabel={messages.map.facilityClusterCount}')
   })
+
+  /* 판단은 `facility-selection.test.ts` 가 잠그고, 여기서는 그 함수를 거치는지만 본다 (리뷰 6 · 5 · 3) */
+  it('그릴 시설은 facilityLayerFacilities 를 거친다 — 꺼진 층이 직전 응답으로 되살아나지 않는다', () => {
+    expect(code).toContain(
+      'const layerFacilities = facilityLayerFacilities({ on: layerOn, data: facilityQuery.data })',
+    )
+    expect(code).not.toMatch(/facilityQuery\.data\?\.facilities/)
+  })
+
+  it('응답에서 빠진 시설은 고른 id 까지 비운다', () => {
+    expect(code).toContain('if (pickedFacilityGone) setPickedFacilityId(null)')
+  })
+
+  it('URL 의 장소 선택이 다른 값으로 바뀌면 시설 선택을 비운다 — 브라우저 앞으로 가기', () => {
+    expect(code).toMatch(
+      /if \(placeTakesOverFacility\(previous, selectedId\)\) setPickedFacilityId\(null\)\n {2}\}, \[selectedId\]\)/,
+    )
+  })
+
+  it('안내 카드 줄은 카드가 있을 때만 선다 — 빈 줄이 재검색 알약을 밀지 않는다', () => {
+    expect(code).toContain('{facilityLayer && hasFacilityNotice(facilityStatus) && (')
+  })
+
+  it('요약의 ‹ 목록 은 ✕ 와 갈린다 — 포커스가 토글이 아니라 목록으로 간다 (D6)', () => {
+    const back = /const backToListFromFacility = [\s\S]*?\n {2}\}/.exec(code)?.[0] ?? ''
+
+    expect(back).toContain('setPickedFacilityId(null)')
+    expect(back).toContain('listRegionRef.current')
+    expect(back).not.toContain('facilityToggleRef')
+    expect(code).toContain('onBackToList={backToListFromFacility}')
+    expect(code).toContain('ref={listRegionRef}')
+  })
 })

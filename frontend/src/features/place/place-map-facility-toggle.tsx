@@ -71,6 +71,14 @@ export function facilityStatusText(status: FacilityLayerStatus): string {
 }
 
 /**
+ * 안내 카드가 서는가 — 잘림 · 실패. 호출부가 **카드가 있을 때만 줄(래퍼)을 둔다** — 빈 래퍼의 `pt-2` 가 모바일
+ * 재검색 알약을 8px 밀어 내렸다(리뷰 7). `PlaceMapFacilityNotice` 도 이 판정으로 비운다 — 둘이 갈리지 않는다.
+ */
+export function hasFacilityNotice(status: FacilityLayerStatus): boolean {
+  return status.kind === 'failed' || (status.kind === 'shown' && status.truncated)
+}
+
+/**
  * 토글 아래 안내 카드 — 잘림 · 실패 (D5). **토스트가 아니다** — 다시 시도할 자리가 남아야 한다(`toast.tsx`).
  *
  * - 잘림: 받은 만큼 그렸다는 사실만 말한다. 닫기 없음 — 끄면 사라진다
@@ -89,7 +97,9 @@ export function PlaceMapFacilityNotice({
   const card =
     'bg-bg border-border text-body-2 text-fg pointer-events-auto max-w-xs rounded-lg border px-3 py-2 break-keep shadow-md'
 
-  if (status.kind === 'shown' && status.truncated) {
+  if (!hasFacilityNotice(status)) return null
+
+  if (status.kind === 'shown') {
     return (
       <p className={card}>{messages.map.facilityTruncated.replace('{n}', String(status.count))}</p>
     )

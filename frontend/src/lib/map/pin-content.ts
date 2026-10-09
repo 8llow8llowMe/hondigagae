@@ -50,6 +50,30 @@ export function pinShape(pin: {
   return pin.icon !== undefined && pin.shape === 'square' ? 'square' : 'circle'
 }
 
+/**
+ * 원 · 사각이 한 지도에 **함께** 서는가 — `/places` 에서 시설 층을 켠 동안이다 (#1286 리뷰 1 · 2, 명세 D2-4).
+ *
+ * 참이면 `MapCanvas` 루트에 `MAP_SHAPES_MIXED_CLASS` 가 붙고, 그 아래에서만 `globals.css` 가 두 가지를 내려놓는다.
+ * 같은 층 안에서 원(장소)이 사각(시설) 위라, 원이 가진 **투명한 것**이 아래 사각의 보이는 몸체를 덮어 보이는
+ * 사각을 누르면 장소가 골라졌다.
+ *
+ * - **상시 이름 알약(`named` 로만 선 것)은 누르는 자리가 아니다.** 선택 · 호버 · 포커스 알약은 그대로 눌린다
+ * - **원 핀 · 원 묶음의 44 확장(`::before`)을 걷는다.** 카카오 오버레이는 래퍼마다 z-index 라 자식 z 가 래퍼
+ *   사이를 못 넘는다 — 확장만 사각 몸체 아래로 보낼 방법이 없다
+ *
+ * 장소만 · 시설만인 지도(담기 · `/emergency`)는 예전 그대로다 — 원 핀은 "이름이 선 때는 원 + 알약 전체가 누르는
+ * 자리"(`지도핀-세부명세.md` D2)를 지킨다. 판정은 `pinShape` 하나다 — 그리는 모양과 갈리지 않는다.
+ */
+export function hasMixedPinShapes(
+  pins: readonly { icon?: MapPinIcon | undefined; shape?: MapPinShape | undefined }[],
+): boolean {
+  const shapes = new Set(pins.map(pinShape))
+  return shapes.has('circle') && shapes.has('square')
+}
+
+/** `hasMixedPinShapes` 가 참일 때 `MapCanvas` 루트에 붙는 클래스 — `globals.css` 의 규칙과 같은 이름 */
+export const MAP_SHAPES_MIXED_CLASS = 'map-shapes-mixed'
+
 /** 이 판단이 쓰는 필드만. `MapPin` 이 구조적으로 대입된다 */
 export type PinContentInput = {
   title: string

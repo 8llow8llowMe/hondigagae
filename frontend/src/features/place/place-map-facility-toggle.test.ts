@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import type { FacilityLayerStatus } from '@/features/place/facility-layer-status'
 import {
   facilityStatusText,
+  hasFacilityNotice,
   PlaceMapFacilityNotice,
   PlaceMapFacilityToggle,
 } from '@/features/place/place-map-facility-toggle'
@@ -133,5 +134,28 @@ describe('PlaceMapFacilityNotice', () => {
     expect(classTokens(tag)).toEqual(
       expect.arrayContaining(['pointer-events-auto', 'max-w-xs', 'shadow-md', 'rounded-lg']),
     )
+  })
+})
+
+/*
+  **카드가 없으면 줄도 없다** (리뷰 7). 래퍼(`pt-2`)가 늘 서면 카드가 없을 때도 모바일 재검색 알약이 8px 내려간다 —
+  호출부는 이 판정으로 래퍼째 그리지 않는다. 판정과 렌더가 갈리지 않게 카드가 그려지는 상태와 맞춘다.
+*/
+describe('hasFacilityNotice', () => {
+  const statuses: FacilityLayerStatus[] = [
+    { kind: 'off' },
+    { kind: 'loading' },
+    { kind: 'shown', count: 213, truncated: false },
+    { kind: 'shown', count: 250, truncated: true },
+    { kind: 'failed', retry: true, message: messages.map.facilityLoadFailed },
+    { kind: 'failed', retry: false, message: '반경은 50000 이하여야 해요' },
+  ]
+
+  it('잘림 · 실패에만 참이다', () => {
+    expect(statuses.map(hasFacilityNotice)).toEqual([false, false, false, true, true, true])
+  })
+
+  it('참일 때만 카드가 그려진다 — 판정과 렌더가 같은 말을 한다', () => {
+    for (const status of statuses) expect(notice(status) !== '').toBe(hasFacilityNotice(status))
   })
 })
