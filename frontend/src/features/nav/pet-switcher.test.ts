@@ -158,4 +158,11 @@ describe('PetSwitcher — 갈래별 메뉴 자리 (#1301)', () => {
     expect(source).toContain("placement={isChip ? placement : 'below'}")
     expect(source).toContain('noSheetDrag={isChip}')
   })
+
+  it('Esc · 바깥 누름도 방향을 아래로 되돌린다 — 닫는 길이 하나다 (#1301 리뷰 T1)', () => {
+    expect(source).toContain('onClose: close,')
+    expect(source).toMatch(
+      /setOpen\(false\)\s*\n\s*setPlacement\('below'\)\s*\n\s*\}\s*\n\s*document\.addEventListener/,
+    )
+  })
 })

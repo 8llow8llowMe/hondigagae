@@ -38,6 +38,18 @@ export function readPlacePreviewParam(value: string | string[] | undefined): str
     : null
 }
 
+/**
+ * 미리보기를 뺀 **조건** — `place` 를 지우고 키 순으로 줄 세운 쿼리. 미리보기를 쌓을 때와 닫을 때를 견준다
+ * (`placePreviewHistoryAction` 의 `baseChanged`). 줄 세우는 것은 같은 조건이 조립 순서만 달라 "바뀜" 으로 읽히지
+ * 않게 하려는 것이다.
+ */
+export function placePreviewBaseQuery(search: string): string {
+  const params = new URLSearchParams(search)
+  params.delete(PLACE_PREVIEW_KEY)
+  params.sort()
+  return params.toString()
+}
+
 export type PlacePreviewHistoryAction = 'none' | 'push' | 'replace' | 'back'
 
 /**
@@ -49,17 +61,22 @@ export type PlacePreviewHistoryAction = 'none' | 'push' | 'replace' | 'back'
  *
  * `pushed` 는 호출부가 쥔 표시다 — 뒤로 · 앞으로 가기(`popstate`)가 오면 `false` 로 돌린다. 쌓은 칸을
  * 지나 공유 링크 칸으로 돌아왔는데 표시가 남아 있으면 ✕ 가 사이트 밖으로 back 한다(리뷰 지적).
+ *
+ * `baseChanged` — 쌓은 뒤 **조건(`place` 를 뺀 쿼리, `placePreviewBaseQuery`)이 바뀌었나.** 바뀌었으면 쌓은
+ * 칸이어도 replace 로 닫는다. 반려견을 바꾸면 체구 필터 맞춤이 미리보기 칸을 `replace` 로 덮는데(#1301
+ * `keepPreview`), 그때 back 하면 열기 전 칸 — 옛 반려견의 체구 값 — 으로 돌아가 결과가 되감긴다(#1301 리뷰 B1).
  */
 export function placePreviewHistoryAction(params: {
   currentId: string | null
   placeId: string | null
   pushed: boolean
+  baseChanged: boolean
 }): PlacePreviewHistoryAction {
-  const { currentId, placeId, pushed } = params
+  const { currentId, placeId, pushed, baseChanged } = params
 
   if (placeId === null) {
     if (currentId === null) return 'none'
-    return pushed ? 'back' : 'replace'
+    return pushed && !baseChanged ? 'back' : 'replace'
   }
 
   if (placeId === currentId) return 'none'

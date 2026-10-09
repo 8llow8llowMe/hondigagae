@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import {
+  placePreviewBaseQuery,
   placePreviewHistoryAction,
   placePreviewHref,
   readPlacePreview,
@@ -39,13 +40,16 @@ export function usePlacePreview(urlSynced: boolean): {
     **뒤로 · 앞으로 가기가 오면 버린다** (`popstate`). 쌓은 칸을 지나 공유 링크로 들어온 칸에
     돌아왔는데 표시가 남아 있으면 ✕ 가 back 해서 사이트 밖으로 나간다. 버리면 최악이 "칸 하나가
     남는다" 이고, 그쪽이 훨씬 덜 나쁘다.
+
+    **쌓을 때의 조건(`place` 를 뺀 쿼리)을 값으로 든다** (#1301 리뷰 B1) — `null` 이면 쌓지 않았다. 닫을 때
+    조건이 달라졌으면(반려견을 바꿔 체구 필터가 맞춰짐) back 이 옛 조건 칸으로 되감으므로 replace 로 닫는다.
   */
-  const pushedRef = useRef(false)
+  const pushedRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!urlSynced) return
     const forget = () => {
-      pushedRef.current = false
+      pushedRef.current = null
     }
     window.addEventListener('popstate', forget)
     return () => window.removeEventListener('popstate', forget)
@@ -59,15 +63,17 @@ export function usePlacePreview(urlSynced: boolean): {
       }
 
       const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      const base = placePreviewBaseQuery(window.location.search)
       const action = placePreviewHistoryAction({
         currentId: readPlacePreview(new URLSearchParams(window.location.search)),
         placeId,
-        pushed: pushedRef.current,
+        pushed: pushedRef.current !== null,
+        baseChanged: pushedRef.current !== null && pushedRef.current !== base,
       })
 
       if (action === 'none') return
       if (action === 'back') {
-        pushedRef.current = false
+        pushedRef.current = null
         window.history.back()
         return
       }
@@ -75,8 +81,10 @@ export function usePlacePreview(urlSynced: boolean): {
       const next = placePreviewHref(current, placeId)
       if (action === 'push') {
         window.history.pushState(null, '', next)
-        pushedRef.current = true
+        pushedRef.current = base
       } else {
+        // 닫기를 replace 로 했으면 쌓은 칸은 이제 지금 칸이다 — 다음 열기가 다시 쌓는다
+        if (placeId === null) pushedRef.current = null
         window.history.replaceState(null, '', next)
       }
     },

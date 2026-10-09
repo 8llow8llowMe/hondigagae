@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   PLACE_PREVIEW_KEY,
+  placePreviewBaseQuery,
   placePreviewHistoryAction,
   placePreviewHref,
   readPlacePreview,
@@ -55,8 +56,12 @@ describe('readPlacePreviewParam — 서버 페이지 레코드', () => {
 })
 
 describe('placePreviewHistoryAction', () => {
-  const act = (currentId: string | null, placeId: string | null, pushed: boolean) =>
-    placePreviewHistoryAction({ currentId, placeId, pushed })
+  const act = (
+    currentId: string | null,
+    placeId: string | null,
+    pushed: boolean,
+    baseChanged = false,
+  ) => placePreviewHistoryAction({ currentId, placeId, pushed, baseChanged })
 
   it('처음 열기는 push, 다른 장소는 replace, 같은 장소는 none', () => {
     expect(act(null, '1', false)).toBe('push')
@@ -74,5 +79,57 @@ describe('placePreviewHistoryAction', () => {
 
   it('이미 닫혀 있으면 none', () => {
     expect(act(null, null, true)).toBe('none')
+  })
+})
+
+/**
+ * 쌓은 칸에서 닫기 전에 **조건이 바뀌었으면 back 하지 않는다** (#1301 리뷰 B1).
+ *
+ * 반려견을 바꾸면 체구 필터 맞춤이 미리보기 칸을 `replace` 로 덮는다(`keepPreview`). 그 뒤 ✕ 가 back 하면
+ * 미리보기 열기 전 칸 — **옛 반려견의 체구 값** — 으로 돌아간다. 조건(`place` 를 뺀 쿼리)이 쌓을 때와 다르면
+ * replace 로 닫아 지금 조건을 지킨다.
+ */
+describe('placePreviewHistoryAction — 쌓은 뒤 조건이 바뀜 (#1301 B1)', () => {
+  const act = (pushed: boolean, baseChanged: boolean) =>
+    placePreviewHistoryAction({ currentId: '1', placeId: null, pushed, baseChanged })
+
+  it('쌓은 칸이어도 조건이 바뀌었으면 replace 로 닫는다', () => {
+    expect(act(true, true)).toBe('replace')
+  })
+
+  it('조건이 그대로면 예전처럼 back 이다', () => {
+    expect(act(true, false)).toBe('back')
+  })
+
+  it('고르기 · 바꾸기는 조건 변화와 무관하다', () => {
+    expect(
+      placePreviewHistoryAction({
+        currentId: null,
+        placeId: '1',
+        pushed: false,
+        baseChanged: true,
+      }),
+    ).toBe('push')
+    expect(
+      placePreviewHistoryAction({ currentId: '1', placeId: '2', pushed: true, baseChanged: true }),
+    ).toBe('replace')
+  })
+})
+
+describe('placePreviewBaseQuery — place 를 뺀 조건', () => {
+  it('place 를 뺀다', () => {
+    expect(placePreviewBaseQuery('?petSizeType=SMALL&petWeightKg=4&place=212481712381923328')).toBe(
+      'petSizeType=SMALL&petWeightKg=4',
+    )
+  })
+
+  it('키 순서가 달라도 같은 조건이면 같다', () => {
+    expect(placePreviewBaseQuery('?place=1&b=2&a=1')).toBe(placePreviewBaseQuery('?a=1&b=2'))
+  })
+
+  it('반려견을 바꾸면 달라진다', () => {
+    expect(placePreviewBaseQuery('?petSizeType=LARGE&place=1')).not.toBe(
+      placePreviewBaseQuery('?petSizeType=SMALL&petWeightKg=4'),
+    )
   })
 })
