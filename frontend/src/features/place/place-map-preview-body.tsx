@@ -229,12 +229,17 @@ export function PlaceMapPreviewBody({
  * 머리 줄 — (1024~1279) `‹ 목록` · 닫기. **상세로 가는 길은 여기 없다** (#1230).
  * `‹ 목록` 은 `xl` 에서 사라진다 — 1280 부터는 목록이 옆에 그대로 있다. 시트(모바일)에도 없다.
  */
-function PreviewTopBar({
+export function PreviewTopBar({
   variant,
   onClose,
+  closeLabel = messages.map.previewClose,
 }: {
   variant: PlaceMapPreviewVariant
   onClose: () => void
+  /**
+   * ✕ 의 접근 이름. 같은 머리를 시설 요약(#1286 `place-map-facility-summary.tsx`)도 쓴다 — 그쪽은 `요약 닫기`.
+   */
+  closeLabel?: string
 }) {
   return (
     // 아래 `pb-2` — 닫기(44)의 호버 배경이 바로 밑 사진에 붙지 않게 띄운다 (#1264)
@@ -253,7 +258,7 @@ function PreviewTopBar({
       <button
         type="button"
         onClick={onClose}
-        aria-label={messages.map.previewClose}
+        aria-label={closeLabel}
         className="text-fg-muted hover:text-fg hover:bg-band focus-visible:ring-brand-500 ml-auto inline-flex size-11 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
       >
         <CloseIcon size={20} />

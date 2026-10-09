@@ -16,17 +16,25 @@ import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
 import { ResearchHereButton } from '@/features/map/research-here-button'
 import { useMapFailureFallback } from '@/features/map/use-map-failure-fallback'
+import { facilityLayerStatus } from '@/features/place/facility-layer-status'
+import { PlaceMapFacilitySummary } from '@/features/place/place-map-facility-summary'
+import {
+  PlaceMapFacilityNotice,
+  PlaceMapFacilityToggle,
+} from '@/features/place/place-map-facility-toggle'
 import { PlaceMapFilterBar } from '@/features/place/place-map-filter-bar'
 import { PlaceMapPanel } from '@/features/place/place-map-panel'
 import { PlaceMapPreview } from '@/features/place/place-map-preview'
 import { PlaceMapRowsSkeleton } from '@/features/place/place-map-skeleton'
 import { PlaceSearchField } from '@/features/place/place-search-field'
+import { useFacilityLayer } from '@/features/place/use-facility-layer'
 import { useNearbyPlaces } from '@/features/place/use-nearby-places'
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { usePlaceList } from '@/features/place/use-place-list'
 import { usePlacePreview } from '@/features/place/use-place-preview'
 import { isRetriable } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
+import { facilityPinId, readFacilityPinId, toFacilityPin } from '@/lib/emergency/facility-pin'
 import { type LatLng, SELECTED_PLACE_MAP_LEVEL } from '@/lib/geo/coord'
 import { getCurrentPosition, getPositionIfGranted, offersLocate } from '@/lib/geo/current-position'
 import type { MapOffset } from '@/lib/map/offset-center'
@@ -101,6 +109,7 @@ export function PlaceMapView({
   initialFocus,
   initialFocusName,
   preview = false,
+  facilityLayer = false,
 }: {
   filters: PlaceFilters
   /** 미로그인이면 반려견 목록을 조회하지 않는다 — 필터의 크기 축이 빠진다 (#200) */
@@ -198,6 +207,14 @@ export function PlaceMapView({
    * `place` 가 붙을 이유도 없다. 끄면 선택은 예전처럼 화면 안 상태다 (`usePlacePreview`).
    */
   preview?: boolean | undefined
+  /**
+   * 오른쪽 위 묶음에 **병원 · 약국 함께 보기** 토글을 둔다 (#1286, `지도시설토글-세부명세.md`). `/places` 만
+   * 켠다 — 담기 지도는 켜지 않는다(그 화면의 일은 "이 일정에 넣을 곳 고르기" 다).
+   *
+   * 켜도 **처음에는 꺼진 토글**이고, 누르기 전에는 시설 조회가 나가지 않는다(`architecture-guide.md` §9 —
+   * 지도 뷰 첫 화면은 별도 조회 금지). 시설 요약은 미리보기 자리를 쓰므로 `preview` 와 함께 켠다.
+   */
+  facilityLayer?: boolean | undefined
 }) {
   /*
     **`undefined` 만이 아니라 `null`·`false` 도 "머리 없음" 이다** (#1012 검토). 호출부가
@@ -267,8 +284,63 @@ export function PlaceMapView({
     홀로 섰다. 담기 지도(미리보기 꺼짐)는 고른다고 패널을 펴지 않는다 — 지금과 같다.
   */
   const selectPlace = (id: string | null) => {
+    // 장소와 시설은 하나만 고른다 (#1286 D3-3) — 장소를 고르면 시설 요약이 닫힌다
+    setPickedFacilityId(null)
     setSelectedId(id)
     if (preview && id !== null) setPanelOpen(true)
+  }
+
+  /*
+    ── 병원 · 약국 층 (#1286, `지도시설토글-세부명세.md` D3) ─────────────────────────────
+
+    **토글 · 고른 시설 둘 다 화면 안 상태다** — URL 에 싣지 않는다(D3-2 · D8-1). 시설 층은 결과 조건이 아니라
+    보기 층이라 카메라 위치 · 패널 접힘과 같은 수명이다. URL 에 실으면 필터 칩마다(`placeFilterHref`) 이 키를
+    실어 날라야 하고, 미리보기의 `pushState` · `back` 과 어긋난다.
+
+    **고른 시설은 최신 응답에서 id 로 찾는다** — `openNow` 가 1분마다 갱신되고, 없어지면 선택이 풀린다.
+    끄면(`layerOn` 거짓) 응답을 읽지 않는다 — 조회 훅은 끈 뒤에도 직전 응답을 남긴다(`useFacilityLayer`).
+  */
+  const [facilityOn, setFacilityOn] = useState(false)
+  const layerOn = facilityLayer && facilityOn
+  const [pickedFacilityId, setPickedFacilityId] = useState<string | null>(null)
+  /** 요약을 ✕ 로 닫으면 포커스가 돌아올 곳 (D6) — 고른 핀은 다시 그려져 사라졌고, 시설은 목록 행이 없다 */
+  const facilityToggleRef = useRef<HTMLButtonElement>(null)
+  const facilityQuery = useFacilityLayer(layerOn)
+  const facilityStatus = facilityLayerStatus({
+    on: layerOn,
+    data: facilityQuery.data,
+    error: facilityQuery.error,
+  })
+  const layerFacilities = layerOn ? facilityQuery.data?.facilities : undefined
+  const selectedFacility =
+    pickedFacilityId === null || layerFacilities === undefined
+      ? null
+      : (layerFacilities.find((item) => item.facilityId === pickedFacilityId) ?? null)
+  const facilityId = selectedFacility?.facilityId ?? null
+
+  /*
+    시설을 고르면 장소 미리보기를 닫고(동시에 하나만) 접힌 스택을 편다 — `selectPlace` 와 같은 규칙. 장소
+    미리보기가 열려 있을 때만 닫는다: `?place=` 가 없는데 `select(null)` 을 부르면 할 일이 없다.
+  */
+  const selectFacility = (id: string) => {
+    if (selectedId !== null) setSelectedId(null)
+    setPickedFacilityId(id)
+    setPanelOpen(true)
+  }
+  /** 핀 하나의 선택이 장소인지 시설인지는 id 앞머리가 가른다 (`facilityPinId`) */
+  const selectOnMap = (id: string) => {
+    const picked = readFacilityPinId(id)
+    if (picked === null) selectPlace(id)
+    else selectFacility(picked)
+  }
+  const toggleFacilityLayer = () => {
+    // 끄면 요약도 닫힌다 — 켤 때는 고른 것이 없다
+    setPickedFacilityId(null)
+    setFacilityOn((on) => !on)
+  }
+  const closeFacility = () => {
+    setPickedFacilityId(null)
+    facilityToggleRef.current?.focus()
   }
   const [failure, setFailure] = useState<MapSdkFailure | null>(null)
   // 실패하면 목록 보기로 옮긴다 — 안내 화면을 그리지 않는다 (#1289)
@@ -334,13 +406,18 @@ export function PlaceMapView({
     const closed = lastPreviewRef.current
     lastPreviewRef.current = preview ? selectedId : null
     if (closed === null || selectedId !== null) return
+    /*
+      **시설로 갈아탄 것이면 건너뛴다** (#1286 D3-3). 장소 미리보기는 그때도 닫히지만, 포커스는 방금 연 시설
+      요약 몫이다 — 여기서 숨은 목록 행으로 데려가면 요약에서 포커스를 빼앗는다.
+    */
+    if (facilityId !== null) return
     if (document.activeElement !== null && document.activeElement !== document.body) return
 
     const row = [
       ...document.querySelectorAll<HTMLElement>(`button[data-place-id="${CSS.escape(closed)}"]`),
     ].find((candidate) => candidate.getClientRects().length > 0)
     row?.focus()
-  }, [preview, selectedId])
+  }, [preview, selectedId, facilityId])
 
   /*
     ── 현재 위치 ────────────────────────────────────────────────────────────
@@ -504,6 +581,22 @@ export function PlaceMapView({
       })),
     [visible, mutedIds],
   )
+  /*
+    **시설 사각을 장소 원 뒤에 잇는다** (#1286). 묶음은 `MapCanvas` 가 모양별로 따로 접는다. 거리 캡션은
+    두지 않는다 — 조회 중심이 제주시청이라 사용자와 무관한 거리다(D3-1).
+  */
+  const mapPins: MapPin[] = useMemo(
+    () =>
+      layerFacilities === undefined
+        ? pins
+        : [
+            ...pins,
+            ...layerFacilities.map((item) =>
+              toFacilityPin(item, { id: facilityPinId(item.facilityId), caption: null }),
+            ),
+          ],
+    [pins, layerFacilities],
+  )
 
   const handleBounds = useCallback((next: MapBounds, userMoved: boolean) => {
     /*
@@ -628,7 +721,10 @@ export function PlaceMapView({
     `null` 이고 패널이 상세 응답으로 그린다. 지도 SDK 가 실패한 갈래(목록 폴백)는 위에서 이미
     돌아갔다 — 행이 상세 링크라 미리보기가 할 일이 없다.
   */
-  const previewId = preview ? selectedId : null
+  /* 시설을 골랐으면 장소 미리보기는 없다 — 닫히는 `back` 이 오기 전 한 박자도 둘이 겹치지 않게 */
+  const previewId = preview && facilityId === null ? selectedId : null
+  /** 도킹 칸 · 모바일 미리보기 시트를 장소 미리보기와 시설 요약이 번갈아 쓴다 (D4-3) */
+  const docked = previewId !== null || facilityId !== null
   const previewSummary =
     previewId === null ? null : (places.find((place) => place.placeId === previewId) ?? null)
   const closePreview = () => setSelectedId(null)
@@ -643,9 +739,10 @@ export function PlaceMapView({
     <div ref={rootRef} className={cn('relative', fill ? 'h-full' : 'map-canvas-height')}>
       {/* 지도가 바탕이다. 데스크톱은 좌측 패널이 그 위에 얹힌다 (아트보드 05) */}
       <MapCanvas
-        pins={pins}
-        selectedId={selectedId}
-        onSelect={selectPlace}
+        pins={mapPins}
+        /* 장소와 시설은 하나만 고른다 — 시설이 골라져 있으면 그 핀이다 (D3-3) */
+        selectedId={facilityId !== null ? facilityPinId(facilityId) : selectedId}
+        onSelect={selectOnMap}
         onBoundsChange={handleBounds}
         onCameraApplied={handleCameraApplied}
         camera={focusCamera}
@@ -654,6 +751,7 @@ export function PlaceMapView({
         selectedLevel={SELECTED_PLACE_MAP_LEVEL}
         selectedOffset={preview ? selectedOffset : undefined}
         focusMarker={focusMarker}
+        squareClusterLabel={messages.map.facilityClusterCount}
         /* 왼쪽은 도킹 스택이 덮는다 — 카카오 로고 · 축척을 우하단으로 비킨다 (#1232 D5) */
         copyrightPosition="right"
         onFailure={setFailure}
@@ -679,7 +777,7 @@ export function PlaceMapView({
               미리보기가 목록 옆에 서면 800, 그 아래는 미리보기가 목록 자리라 400 이다(#1227). 접히면 0.
             */
             panelOpen && 'lg:left-100',
-            previewId !== null && panelOpen && 'xl:left-200',
+            docked && panelOpen && 'xl:left-200',
           )}
         >
           <ResearchHereButton onClick={researchHere} />
@@ -798,10 +896,36 @@ export function PlaceMapView({
             */}
             {showToggle && <ViewToggle current="map" listHref={listHref} mapHref={mapHref} />}
 
+            {/*
+              **병원 · 약국 토글은 `목록 보기` 아래 · `내 위치` 위다** (#1286 D4-1). `내 위치` 는 늦게 나타나므로
+              (`locatable`) 그 아래에 두면 토글이 한 박자 뒤에 밀린다.
+            */}
+            {facilityLayer && (
+              <PlaceMapFacilityToggle
+                ref={facilityToggleRef}
+                on={facilityOn}
+                status={facilityStatus}
+                onToggle={toggleFacilityLayer}
+              />
+            )}
+
             {/* 제주 밖·거부·미지원이면 렌더하지 않는다 — 눌러도 같은 답이다 */}
             {locatable && <MapLocateButton onLocate={locate} />}
           </div>
         </div>
+
+        {/*
+          **병원 · 약국 안내 카드 — 컨트롤 묶음 바로 아래 · 오른쪽 정렬** (#1286 D5). 묶음 기둥 안에 두면
+          카드 폭이 기둥을 넓혀 375 에서 검색창을 밀어낸다 — 줄을 따로 둔다. 모바일 재검색 알약보다 위다.
+        */}
+        {facilityLayer && (
+          <div className="content-container flex justify-end px-4 pt-2 md:px-10">
+            <PlaceMapFacilityNotice
+              status={facilityStatus}
+              onRetry={() => void facilityQuery.refetch()}
+            />
+          </div>
+        )}
 
         {/*
           **`lg` 미만의 재검색은 상단 컨트롤 묶음 맨 아래다** (#1278). 하단에 두면 시트 중간 · 최대 단계에
@@ -848,7 +972,7 @@ export function PlaceMapView({
                 **1024~1279 는 미리보기가 목록 자리를 쓴다** (#1227). 400 + 400 이면 지도가 224 남는다.
                 `invisible` 이라 a11y 트리 · Tab 에서도 빠지고, 목록 스크롤과 선택은 남는다.
               */
-              previewId !== null && 'lg:max-xl:invisible',
+              docked && 'lg:max-xl:invisible',
             )}
           >
             {/* 담기 화면의 머리 — 열린 패널의 맨 위 블록이다 (D9). 접혀 있으면 떠 있는 기둥이 대신 그린다 */}
@@ -909,19 +1033,29 @@ export function PlaceMapView({
             ── 데스크톱 미리보기 (#1227) — 1280 부터 목록 **바로 옆**(흐름 안, 간격 0), 그 아래는 목록 자리
             (`absolute left-0` — 래퍼 폭에 들지 않아 손잡이가 400 에 남는다).
           */}
-          {previewId !== null && (
+          {docked && (
             <div
               ref={previewPanelRef}
               className="map-panel-width bg-bg border-border absolute inset-y-0 left-0 overflow-hidden border-r xl:static"
             >
-              <PlaceMapPreview
-                key={previewId}
-                placeId={previewId}
-                summary={previewSummary}
-                authed={authed}
-                variant="panel"
-                onClose={closePreview}
-              />
+              {/* 같은 칸을 번갈아 쓴다 — 동시에 하나만 골라져 있어 겹치지 않는다 (#1286 D4-3) */}
+              {selectedFacility !== null ? (
+                <PlaceMapFacilitySummary
+                  key={selectedFacility.facilityId}
+                  facility={selectedFacility}
+                  variant="panel"
+                  onClose={closeFacility}
+                />
+              ) : previewId !== null ? (
+                <PlaceMapPreview
+                  key={previewId}
+                  placeId={previewId}
+                  summary={previewSummary}
+                  authed={authed}
+                  variant="panel"
+                  onClose={closePreview}
+                />
+              ) : null}
             </div>
           )}
         </div>
@@ -954,7 +1088,7 @@ export function PlaceMapView({
           미리보기가 열리면 **같은 자리를 내준다** (#1227). 언마운트하지 않는다 — 닫으면 보던
           목록 스크롤 · 단계 그대로 돌아와야 한다.
         */
-        className={cn(previewId !== null && 'hidden')}
+        className={cn(docked && 'hidden')}
         stop={sheetStop}
         onStopChange={setSheetStop}
         /*
@@ -999,20 +1133,29 @@ export function PlaceMapView({
         모바일 미리보기 — 목록 시트와 **같은 층(`z-30`) · 같은 바닥(탭바 위)**이다. 높이는 내용만큼이고
         상한이 있다(`.map-preview-sheet`) — 위쪽 검색 · 보기 전환을 덮지 않는다.
       */}
-      {previewId !== null && (
+      {docked && (
         // 목록 시트(`MapSheet`)와 같은 면이다 — 같은 자리를 번갈아 쓴다
         <div
           ref={previewSheetRef}
           className="map-sheet-clears-tabbar map-preview-sheet bg-bg border-border fixed inset-x-0 z-30 flex flex-col overflow-hidden rounded-t-xl border-t shadow-lg lg:hidden"
         >
-          <PlaceMapPreview
-            key={previewId}
-            placeId={previewId}
-            summary={previewSummary}
-            authed={authed}
-            variant="sheet"
-            onClose={closePreview}
-          />
+          {selectedFacility !== null ? (
+            <PlaceMapFacilitySummary
+              key={selectedFacility.facilityId}
+              facility={selectedFacility}
+              variant="sheet"
+              onClose={closeFacility}
+            />
+          ) : previewId !== null ? (
+            <PlaceMapPreview
+              key={previewId}
+              placeId={previewId}
+              summary={previewSummary}
+              authed={authed}
+              variant="sheet"
+              onClose={closePreview}
+            />
+          ) : null}
         </div>
       )}
     </div>
