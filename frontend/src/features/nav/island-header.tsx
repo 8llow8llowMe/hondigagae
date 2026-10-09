@@ -25,6 +25,11 @@ import { cn } from '@/lib/utils/cn'
  * 로고의 기준이 뷰포트가 아니라 그 조상이 되어 로고가 알약 안으로 끌려 들어간다(D7-7).
  * **불투명 흰 면이다** — 반투명 · 블러는 바다 위에서 대비를 잃는다(D1-1).
  *
+ * **768 미만 좌우 안쪽 4 다** (그 위는 8). 375 · 로그인 최악값이 로고 106 + gap 12 + 스위처 상한 160
+ * (`max-w-40`) + gap 8 + 긴급 44 = 330 인데, 띠 헤더 안쪽 343 에서 테두리 2 · 안쪽 16 을 빼면 325 라
+ * 긴급 아이콘이 둥근 테두리 밖으로 삐져나왔다. 4 로 두면 333 이다. `overflow-hidden` 으로 자르지 않는다 —
+ * 계정 · 반려견 팝오버가 포털이 아니라 트리거 아래에 붙어 함께 잘린다.
+ *
  * 바깥 `<header>` · 열은 `pointer-events-none` 이고 알약만 되살린다 — 지도 위 빈 띠가 드래그를
  * 먹지 않게(#412 조작 줄과 같은 수법). `z-40` 은 `GlobalHeader` 와 같은 층이다 — 안의 계정 ·
  * 반려견 팝오버가 지도 조작 줄(`z-30`) 위에 선다(#393).
@@ -33,7 +38,7 @@ export function IslandHeader({ authed }: { authed: boolean }) {
   return (
     <header className="island-header pointer-events-none fixed inset-x-0 top-2 z-40">
       <div className={cn('content-container flex justify-end', INSET_CLASS.main)}>
-        <div className="bg-bg border-border pointer-events-auto flex h-12 w-full min-w-0 items-center justify-between gap-3 rounded-full border px-2 shadow-md lg:w-auto">
+        <div className="bg-bg border-border pointer-events-auto flex h-12 w-full min-w-0 items-center justify-between gap-3 rounded-full border px-1 shadow-md md:px-2 lg:w-auto">
           <div className="flex min-w-0 items-center gap-8">
             {/* ≥1024 에서 알약 밖 왼쪽 위로 빠진다 — 높이 48 안에 링크 44 가 세로 가운데 */}
             <div className="island-logo flex items-center lg:fixed lg:start-4 lg:top-2 lg:h-12">

@@ -252,7 +252,9 @@ describe('로딩 골격 — 완료 화면과 같은 자리', () => {
     expect(classes).toContain('map-canvas-height')
     expect(classes).toContain('map-island')
     // 조작 줄은 알약 아래 y 68 — 헤더 띠가 있는 지도의 top-5 가 아니다
-    expect(markup).toContain('top-17')
+    const controls =
+      /<div [^>]*class="(pointer-events-none absolute inset-x-0[^"]*)"/.exec(markup)?.[1] ?? ''
+    expect(controls.split(/\s+/)).toContain('top-17')
     expect(markup).not.toMatch(/class="[^"]*\btop-5\b/)
     expect(markup).toContain('aria-label="장소 목록"')
   })
