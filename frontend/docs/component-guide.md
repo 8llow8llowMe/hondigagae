@@ -236,17 +236,17 @@ type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 
 프로젝트 전체 a11y 규칙은 `styling-guide.md` §6이다. 여기서는 **각 컴포넌트가 자체적으로 보장해야 하는 것**을 정한다.
 
-| 컴포넌트                    | 보장                                                                                                                                        |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Button`                    | `type` 기본값 `"button"` (form 안에서 의도치 않은 submit 방지). `loading` 이면 `disabled` + `aria-busy`                                     |
-| `Chip` / `Tab`              | `aria-pressed` / `aria-selected` 를 상태와 동기                                                                                             |
-| `Input` 계열                | `label` 연결(`id`/`htmlFor`), `error` 시 `aria-invalid`. `aria-describedby` 는 `Field` 가 보인 안내 · 오류 하나 (#1100)                     |
-| `Modal` / `BottomSheet`     | focus trap, `Esc` 닫기, 열릴 때 body 스크롤 잠금, 닫힐 때 트리거로 포커스 복귀. `BottomSheet` 의 Tab 가두기는 `trapFocus` 옵트인 (#1295)    |
-| `RadioGroup`                | `<fieldset>` + `<legend>` 로 그룹 라벨. 각 항목의 `<label htmlFor>` 가 자기 input 을 가리킴. `error` 시 `aria-invalid` + `aria-describedby` |
-| `Checkbox`                  | 자체 `<label htmlFor>`. `error` 시 `aria-invalid` + `aria-describedby`                                                                      |
-| `Skeleton`                  | `aria-hidden` (스크린리더에 의미 없는 반복 읽기 방지)                                                                                       |
-| `EmptyState` / `ErrorState` | 제목이 heading 요소여야 한다. **레벨은 담는 곳이 정한다** — `headingLevel` (`styling-guide.md` §3-1)                                        |
-| `InfoTip`                   | hover · focus · click **셋 다** 열고 `Esc`·바깥 클릭이 닫는다. `title` 속성을 쓰지 않는다. `md` 미만은 `BottomSheet` 로 떨어뜨린다          |
+| 컴포넌트                    | 보장                                                                                                                                                                               |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Button`                    | `type` 기본값 `"button"` (form 안에서 의도치 않은 submit 방지). `loading` 이면 `disabled` + `aria-busy`                                                                            |
+| `Chip` / `Tab`              | `aria-pressed` / `aria-selected` 를 상태와 동기                                                                                                                                    |
+| `Input` 계열                | `label` 연결(`id`/`htmlFor`), `error` 시 `aria-invalid`. `aria-describedby` 는 `Field` 가 보인 안내 · 오류 하나 + `extraDescribedBy` (#1100 · #1295)                               |
+| `Modal` / `BottomSheet`     | focus trap, `Esc` 닫기, 열릴 때 body 스크롤 잠금, 닫힐 때 트리거로 포커스 복귀. `BottomSheet` 의 Tab 가두기는 `trapFocus` 옵트인, 복귀 자리는 `triggerRef` 로 바꿀 수 있다 (#1295) |
+| `RadioGroup`                | `<fieldset>` + `<legend>` 로 그룹 라벨. 각 항목의 `<label htmlFor>` 가 자기 input 을 가리킴. `error` 시 `aria-invalid` + `aria-describedby`                                        |
+| `Checkbox`                  | 자체 `<label htmlFor>`. `error` 시 `aria-invalid` + `aria-describedby`                                                                                                             |
+| `Skeleton`                  | `aria-hidden` (스크린리더에 의미 없는 반복 읽기 방지)                                                                                                                              |
+| `EmptyState` / `ErrorState` | 제목이 heading 요소여야 한다. **레벨은 담는 곳이 정한다** — `headingLevel` (`styling-guide.md` §3-1)                                                                               |
+| `InfoTip`                   | hover · focus · click **셋 다** 열고 `Esc`·바깥 클릭이 닫는다. `title` 속성을 쓰지 않는다. `md` 미만은 `BottomSheet` 로 떨어뜨린다                                                 |
 
 ### 폼 실패 표시는 한 길로만 읽힌다 — `announce` ([#1102](https://github.com/8llow8llowMe/hondigagae/issues/1102))
 
@@ -302,6 +302,9 @@ type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 | hint 만          | `fieldHintId()`  | `<id>-hint`               |
 | 오류 (hint 무관) | `fieldErrorId()` | `<id>-error` 하나         |
 | 둘 다 없음       | —                | 걸지 않는다               |
+
+`extraDescribedBy`(#1295)를 주면 위 값 **뒤에** 덧붙인다 — 예: 가입 단계 첫 칸의 `code-error signup-step-status`,
+안내 · 오류가 없으면 `signup-step-status` 만. 고칠 정보(안내 · 오류)가 먼저 읽히게 뒤에 둔다. 주지 않으면 위 표 그대로다.
 
 - id 규칙(`fieldErrorId` · `fieldHintId`)과 판정(`fieldDescription`)은 `components/field.tsx` 한 곳이다.
   `Field` 의 렌더도 같은 판정을 본다 — 그리는 조건과 가리키는 조건이 갈리지 않게.
