@@ -1,45 +1,37 @@
 import { expect, type Page } from '@playwright/test'
 
 /**
- * **지도 SDK 실패 폴백이 자리를 잡을 때까지 기다린다** — e2e 플레이크의 근본원인.
+ * **지도 SDK 실패로 목록 보기로 옮겨질 때까지 기다린다** — #1289 · #1299.
  *
- * ### 무엇이 흔들렸나
+ * ### e2e 의 지도 갈래는 늘 목록으로 옮겨진다
  *
- * 전체 스위트에서 **매번 다른 지도 검색 테스트 하나**가 떨어졌다 (`emergency-search` ·
- * `place-search`). 실패 모양은 늘 같았다 — 엔터를 쳤는데 URL 이 그대로이고, 실패
- * 스냅샷의 검색창이 **채워 넣은 값이 아니라 빈칸**(또는 URL 의 옛 검색어)이었다.
- * 단독 실행하면 전부 통과했다.
+ * e2e 는 `MOCK_API=true` 이고 카카오 SDK 가 뜨지 않는다(키 없음 · 도메인 불일치). #1289 부터 SDK 가
+ * 실패하면 지도 자리에 안내 + 축소판 목록을 그리지 않고 **그 화면의 목록 보기로 `router.replace`** 하며
+ * 토스트로 이유를 한 번 말한다(`features/map/use-map-failure-fallback.ts`). 그래서 e2e 에서 지도
+ * 갈래로 들어간 스펙이 실제로 재는 것은 **"옮겨진 목록 보기"** 다.
  *
- * ### 원인 — 두 갈래가 같은 안정 신호를 갖고 있었다
+ * ### 무엇을 기다리나 — 두 가지 다
  *
- * 두 스펙은 `role="status"` 또는 `main li` 로 폴백을 기다렸는데, **둘 다 폴백 이전의
- * 지도 갈래에도 있다**:
+ * 1. **토스트의 꼬리** `목록으로 보여드려요` — 세 사유(`errorNoKey` · `errorScript` ·
+ *    `errorUnsupported`) 문구가 공유한다. 환경마다 사유가 갈리므로(키가 없으면 `no-key`, 키가 있어도
+ *    도메인이 안 맞으면 스크립트 실패) 사유별 문구를 고르지 않는다. 이것이 보이면 **실패 갈래를 탔다**.
+ * 2. **주소가 목록 보기로 바뀐 것** — 토스트는 `replace` **직전**에 뜬다. App Router 는 새 트리를
+ *    커밋한 뒤 주소를 바꾸므로, 주소가 바뀌었으면 목록 보기의 입력이 이미 붙어 있다. 토스트만 보고 치면
+ *    떨어져 나갈 지도 갈래의 입력에 채우게 된다 — 예전 플레이크(채운 값이 새 입력 초기값에 덮이고
+ *    엔터가 떨어진 노드로 감)와 같은 모양이다.
  *
- *  · `MapCanvas` 가 SDK 를 부르는 동안 `role="status"`("지도를 불러오는 중")를 그린다.
- *    DOM 상 폴백 안내보다 **앞**이라 `.first()` 가 이것에 붙는다.
- *  · 지도 갈래의 좌측 패널도 목록이라 `main li` 가 이미 차 있다.
- *
- * 그래서 두 대기 모두 **교체 전**에 풀리고, 그 뒤 SDK 실패가 도착하면 React 가
- * 서브트리를 통째로 바꾼다. 지도 갈래는 검색 폼이 **둘**(오버레이 · 패널)이고 폴백은
- * **하나**라 세 폼이 전부 갈린다 — 채워 둔 값은 새 입력의 `useState(filters.keyword)`
- * 초기값으로 덮이고, 엔터는 떨어져 나간 노드로 간다.
- *
- * MutationObserver 로 실제 순서를 찍어 확인했다 (8회 중 2회 재현):
- *
- *     observing 5173ms → filled, value="" → REMOVED form → REMOVED form → ADDED form
- *
- * ### 처방
- *
- * **폴백에만 있는 것**을 기다린다. 세 실패 문구(`errorNoKey` · `errorScript` ·
- * `errorUnsupported`)가 공유하는 꼬리가 그것이다 — 어떤 이유로 실패했든 같은 문장으로
- * 끝나고, 지도 갈래에는 이 문장이 없다. 안내는 폴백 트리와 **같은 커밋**에 그려지므로
- * 이것이 보이면 새 입력도 이미 붙어 있다.
- *
- * 실패 사유별 문구를 골라 쓰지 않는 이유는 **환경마다 사유가 갈리기 때문**이다 — 키가
- * 없으면 `no-key`, 키가 있어도 도메인이 안 맞으면 스크립트 실패다.
+ * `isList` 는 화면마다 다르다: `/places` · 담기는 `view=list` 가 실리고, `/emergency` 는 목록이 기본이라
+ * `view` 가 빠진다(`view=map` 이 사라지는 것으로 안다).
  */
-const FALLBACK_TAIL = '목록으로 보여드릴게요'
+const FALLBACK_TOAST_TAIL = '목록으로 보여드려요'
 
-export async function mapFallbackReady(page: Page): Promise<void> {
-  await expect(page.getByText(FALLBACK_TAIL)).toBeVisible()
+export async function mapFailedToList(page: Page, isList: (url: URL) => boolean): Promise<void> {
+  await expect(page.getByText(FALLBACK_TOAST_TAIL)).toBeVisible()
+  await expect(page).toHaveURL(isList)
 }
+
+/** `/places` · 일정 담기 — 목록 보기는 `view=list` 를 싣는다 */
+export const hasListView = (url: URL): boolean => url.searchParams.get('view') === 'list'
+
+/** `/emergency` — 목록이 기본 보기라 `view=map` 이 빠지면 목록이다 */
+export const leftMapView = (url: URL): boolean => url.searchParams.get('view') !== 'map'
