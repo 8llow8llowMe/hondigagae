@@ -1,5 +1,6 @@
 import { ApiError } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
+import { isPlanItemLimitError } from '@/lib/plan/item-limit'
 
 /**
  * 일자별 항목 **일괄 교체** 저장 실패의 분류.
@@ -38,7 +39,7 @@ export type PlanDaySaveCopy = {
  * **4xx 는 전부 재시도를 주지 않는다.** 같은 본문을 다시 보내면 같은 실패다 —
  * `PLAN_004`(사라진 장소) · `PLAN_002`(기간 밖 일자) · `PLAN_001`(404, 지워졌거나 남의 일정) ·
  * `PLAN_100`(시각 형식 오류, #623) · `PLAN_124`(경로변수 형식, #803) ·
- * `PLAN_108`~`PLAN_112`(Bean Validation)가 모두 그렇다.
+ * `PLAN_108`~`PLAN_112`(Bean Validation) · `PLAN_028`·`PLAN_136`(항목 수 상한, #1251)가 모두 그렇다.
  * 근거: `PlanErrorCode.java` · `ValidationErrorSupport.java` 소스 실측.
  */
 export function toPlanDaySaveError(cause: unknown, copy: PlanDaySaveCopy): PlanDaySaveError {
@@ -52,6 +53,14 @@ export function toPlanDaySaveError(cause: unknown, copy: PlanDaySaveCopy): PlanD
     */
     if (cause.resultCode === 'PLAN_100') {
       return { message: messages.plan.editStartTimeFormatError, retriable: false }
+    }
+    /*
+      `PLAN_028` · `PLAN_136` — 일정 항목 수 상한 (#1251). "나머지 4xx" 로 떨어뜨리지 않는다 —
+      새로고침해도 같은 400 이라 그쪽 안내("새로고침한 뒤 다시 시도")가 거짓이 된다.
+      문구를 화면마다 나누지 않는 이유는 `messages.plan.saveItemLimitError` 주석.
+    */
+    if (isPlanItemLimitError(cause)) {
+      return { message: messages.plan.saveItemLimitError, retriable: false }
     }
     /*
       `PLAN_002` 는 문구를 나누지 않는다 — 어느 화면에서든 "들고 있는 상세가 낡았다"

@@ -8,7 +8,9 @@ import {
   type AiPlanCommitPanelProps,
   AiPlanCommittedPanel,
 } from '@/features/ai-plan/ai-plan-commit-panel'
-import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
+import { toAiPlanCommitErrors } from '@/lib/ai-plan/commit-error'
+import { ApiError } from '@/lib/api/error'
+import { apiErrorToFormErrors, NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 
 function render(overrides: Partial<AiPlanCommitPanelProps> = {}) {
@@ -172,5 +174,32 @@ describe('AiPlanCommittedPanel — 이미 담은 작업 (#1041)', () => {
 
     expect(html).toContain(messages.aiPlan.commitAgain)
     expect(html).toContain('href="/ai-plans/new?from=job-1"')
+  })
+})
+
+/*
+  #1251 — 항목 수 상한(`PLAN_136`)은 `fieldErrors: [{ field: 'items' }]` 로 온다. 이 폼에는
+  `items` 칸이 없어 공용 매핑대로면 문구가 렌더되지 않는다. `toAiPlanCommitErrors` 가 폼
+  전체 오류로 올리고, 패널은 그것을 `FormAlert` 로 그린다.
+*/
+describe('AiPlanCommitPanel — 항목 수 상한 PLAN_136 (#1251)', () => {
+  const LIMIT_MESSAGE = '일정 항목은 최대 100개까지 담을 수 있습니다.'
+  const limitError = new ApiError(400, 'PLAN_136', LIMIT_MESSAGE, [
+    { code: 'PLAN_136', field: 'items', message: LIMIT_MESSAGE },
+  ])
+
+  it('전제 — 공용 매핑 결과를 그대로 주면 어떤 문구도 안 보인다', () => {
+    const html = render({ errors: apiErrorToFormErrors(limitError, messages.form.submitFailed) })
+
+    expect(html).not.toContain(LIMIT_MESSAGE)
+    expect(html).not.toContain('role="alert"')
+  })
+
+  it('담기 오류 매핑을 거치면 상한 문구가 알림으로 보이고 새로고침 안내는 없다', () => {
+    const html = render({ errors: toAiPlanCommitErrors(limitError) })
+
+    expect(html).toContain('role="alert"')
+    expect(html).toContain(messages.aiPlan.commitItemLimitError)
+    expect(html).not.toContain(messages.plan.saveStaleError)
   })
 })

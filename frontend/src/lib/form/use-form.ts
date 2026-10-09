@@ -13,6 +13,14 @@ export type UseFormOptions<TValues, TResult> = {
   initialValues: TValues
   onSubmit: (values: TValues) => Promise<TResult>
   onSuccess?: (result: TResult, values: TValues) => void
+  /**
+   * 제출 실패를 폼 오류로 옮기는 함수. **생략하면 공용 매핑**(`apiErrorToFormErrors` +
+   * `messages.form.submitFailed`)이다 — 기존 호출부는 모두 생략한다.
+   *
+   * 서버가 **폼에 없는 칸**의 필드 오류를 내는 폼만 준다 (#1251 AI 초안 담기의 `PLAN_136` →
+   * `items`). 공용 매핑은 그 오류를 `fields` 에 넣고 `form` 을 비워 문구가 사라진다.
+   */
+  toErrors?: (error: unknown) => FormErrors
 }
 
 export type UseFormReturn<TValues> = {
@@ -56,6 +64,11 @@ export type UseFormReturn<TValues> = {
   submitCount: number
 }
 
+/** 공용 제출 실패 매핑 — docs/form-guide.md §4 */
+function defaultToErrors(error: unknown): FormErrors {
+  return apiErrorToFormErrors(error, messages.form.submitFailed)
+}
+
 /**
  * 폼 상태 배선. **로직은 순수 함수에 있다** — docs/form-guide.md §2.
  *
@@ -67,6 +80,7 @@ export function useForm<TValues extends Record<string, unknown>, TResult>({
   initialValues,
   onSubmit,
   onSuccess,
+  toErrors = defaultToErrors,
 }: UseFormOptions<TValues, TResult>): UseFormReturn<TValues> {
   const [values, setValues] = useState<TValues>(initialValues)
   const [errors, setErrors] = useState<FormErrors>(NO_FORM_ERRORS)
@@ -138,13 +152,13 @@ export function useForm<TValues extends Record<string, unknown>, TResult>({
     } catch (error) {
       // 클라이언트 오류와 합치지 않고 교체한다. 합치면 이미 고친 필드의
       // 낡은 오류가 남는다 — docs/form-guide.md §5
-      setErrors(apiErrorToFormErrors(error, messages.form.submitFailed))
+      setErrors(toErrors(error))
       setSubmitCount((count) => count + 1)
     } finally {
       submittingRef.current = false
       setSubmitting(false)
     }
-  }, [onSubmit, onSuccess, schema, values])
+  }, [onSubmit, onSuccess, schema, toErrors, values])
 
   /*
     **첫 오류 필드를 여기서 고르지 않는다** (#560).

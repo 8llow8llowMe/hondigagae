@@ -77,4 +77,47 @@ describe('toPlanDaySaveError', () => {
 
     expect(error.message).toBe(messages.plan.editDayOutOfRangeError)
   })
+  /*
+    일정 항목 수 상한 (#1251 · BE #1243). 새로고침해도 같은 400 이 되풀이된다 — 예전에는
+    "나머지 4xx" 로 떨어져 `saveStaleError`("새로고침한 뒤 다시 시도")를 보였다.
+  */
+  it.each([
+    ['PLAN_028', null],
+    [
+      'PLAN_136',
+      [
+        {
+          code: 'PLAN_136',
+          field: 'items',
+          message: '일정 항목은 최대 100개까지 담을 수 있습니다.',
+        },
+      ],
+    ],
+  ] as const)('%s 는 상한 문구를 내고 재시도를 주지 않는다', (code, fieldErrors) => {
+    const error = toPlanDaySaveError(
+      new ApiError(400, code, null, fieldErrors === null ? null : [...fieldErrors]),
+      COPY,
+    )
+
+    expect(error.retriable).toBe(false)
+    expect(error.message).toBe(messages.plan.saveItemLimitError)
+    expect(error.message).not.toBe(messages.plan.saveStaleError)
+    expect(error.message).toContain('100')
+  })
+
+  it('상한 문구는 화면 문구(copy)와 무관하게 같다 — 편집모드에도 같은 문구다', () => {
+    const edit = toPlanDaySaveError(new ApiError(400, 'PLAN_028', null), {
+      retriable: messages.plan.editSaveErrorDescription,
+      missingPlace: messages.plan.editMissingPlaceError,
+    })
+
+    expect(edit.message).toBe(messages.plan.saveItemLimitError)
+  })
+
+  it('상한이 아닌 나머지 4xx(PLAN_124)는 여전히 새로고침 안내다', () => {
+    const error = toPlanDaySaveError(new ApiError(400, 'PLAN_124', null), COPY)
+
+    expect(error.retriable).toBe(false)
+    expect(error.message).toBe(messages.plan.saveStaleError)
+  })
 })

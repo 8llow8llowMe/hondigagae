@@ -8,6 +8,8 @@
  * **서버가 내려주는 문구는 여기에 없다.** 진행 안내(`status.description`), 실패 사유
  * (`errorMessage`), 추천 근거(`reasons[].description`)는 그대로 렌더한다 (명세 S2 · S7).
  */
+import { PLAN_MAX_ITEMS } from '@/lib/plan/item-limit'
+
 export const aiPlanMessages = {
   // ── 조건 입력 (아트보드 01) ─────────────────────────────────────────────
 
@@ -435,4 +437,11 @@ export const aiPlanMessages = {
   /** `{count}` 치환 */
   commitExcludedNotice: '{count}개 항목을 빼고 담아요.',
   commitExcludedReset: '다시 포함하기',
+  /**
+   * 담기 실패 — 일정 항목 수 상한(`PLAN_136`, #1251). **재시도를 주지 않는다** — 같은 초안을
+   * 다시 담으면 같은 400 이다. 이 화면에서는 초안의 항목을 줄일 수 없어(빼기는 조회되지 않는
+   * 곳만) **기간을 줄여 다시 만드는 것**이 할 일이다 — 바로 아래 `전체 다시 만들기` 가 그 길이다.
+   * 숫자는 `PLAN_MAX_ITEMS`(서버 `Plan.MAX_ITEMS` 복제본) 하나에서 온다.
+   */
+  commitItemLimitError: `일정에는 항목을 최대 ${PLAN_MAX_ITEMS}개까지 담을 수 있어요. 여행 기간을 줄여 다시 만들어 주세요.`,
 } as const

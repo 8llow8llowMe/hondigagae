@@ -24,6 +24,7 @@ import { usePetList } from '@/features/pet/use-pet-list'
 import { SIGUNGU_LABEL } from '@/features/place/filter-labels'
 import { planKeys } from '@/features/plan/queries'
 import { formatBudget } from '@/lib/ai-plan/budget'
+import { toAiPlanCommitErrors } from '@/lib/ai-plan/commit-error'
 import { snapshotFromConditions } from '@/lib/ai-plan/conditions'
 import { defaultPlanTitle } from '@/lib/ai-plan/draft-title'
 import { draftToPlanPayload } from '@/lib/ai-plan/draft-to-plan'
@@ -587,6 +588,11 @@ function AiPlanCommitContainer({
         throw error
       }
     },
+    /*
+      **항목 수 상한(`PLAN_136`)을 폼 전체 오류로 올린다** (#1251). 서버가 `items` 칸 오류로
+      보내는데 이 폼에는 그 칸이 없어, 공용 매핑대로면 문구가 아무 데도 안 나온다.
+    */
+    toErrors: toAiPlanCommitErrors,
     onSuccess: (plan) => {
       /*
         담으면 초안이 되고 **소유권이 plan-service 로 넘어간다.** 조건 보관은 여기서

@@ -6,6 +6,8 @@
  * 백엔드 `PlanValidationMessage` 복제본이라 톤을 바꾸면 같은 폼에서 클라이언트 검증과
  * 서버 검증의 말투가 갈린다.
  */
+import { PLAN_MAX_ITEMS } from '@/lib/plan/item-limit'
+
 export const planMessages = {
   // ── 반려견 여행 준비물 (#155) ──────────────────────────────────────────────
   /**
@@ -712,6 +714,18 @@ export const planMessages = {
    * Bean Validation 이 여기 온다 — 전부 "들고 있는 화면이 낡았다" 로 귀결된다.
    */
   saveStaleError: '화면이 최신이 아니에요. 새로고침한 뒤 다시 시도해 주세요.',
+  /**
+   * `PLAN_028` · `PLAN_136` — 일정 항목 수 상한 (#1251 · BE #1243). **새로고침 안내가 아니다** —
+   * 새로고침해도 같은 400 이 되풀이된다. 재시도도 주지 않는다.
+   *
+   * **화면마다 나누지 않는다** (`PlanDaySaveCopy` 에 넣지 않았다). 교체를 부르는 모든 화면 —
+   * 편집모드 · 장소/산책 코스 담기 시트 · 장소/이동 추가 · 하루 재생성 반영 — 에서 할 일이
+   * "담긴 항목을 줄인다" 로 같고, 어디서 줄이는지(편집모드는 그 자리, 나머지는 일정 상세)는
+   * 화면이 자명하게 말해 준다. 서버 `resultMessage` 는 사실만 말하고 두 코드의 말이 달라
+   * (`일정에는 항목을…` / `일정 항목은…`) FE 문구 하나로 묶는다.
+   * 숫자는 `PLAN_MAX_ITEMS`(서버 `Plan.MAX_ITEMS` 복제본) 하나에서 온다.
+   */
+  saveItemLimitError: `일정에는 항목을 최대 ${PLAN_MAX_ITEMS}개까지 담을 수 있어요. 담긴 항목을 줄인 뒤 다시 시도해 주세요.`,
 
   editSaveErrorTitle: '순서를 저장하지 못했어요',
   editSaveErrorDescription: '편집한 내용은 그대로 있어요. 다시 시도해 주세요.',
