@@ -113,6 +113,12 @@ export type FormErrors = {
 
 `field` 가 `"request"` 면 백엔드가 필드를 특정하지 못한 경우다 → `form` 으로 보낸다.
 
+**폼에 없는 칸의 필드 오류는 사라진다.** 공용 매핑은 `fieldErrors` 가 잡히면 `form` 을 비우므로, 서버가 화면에
+칸이 없는 필드(`items` 등)로 오류를 내면 문구가 아무 데도 렌더되지 않는다. 그런 폼만 `useForm` 의 생략 가능한
+`toErrors` 로 매핑을 바꿔 준다 — 생략하면 공용 매핑(`apiErrorToFormErrors` + `messages.form.submitFailed`)이다.
+지금 쓰는 곳은 AI 초안 담기의 `PLAN_136`(일정 항목 수 상한) 하나다(`lib/ai-plan/commit-error.ts`, #1251 ·
+plan 공통명세 S1-1). 폼마다 칸 목록을 넘기는 공용 규칙으로 넓히지 않았다 — 모든 호출부가 바뀌는데 겪는 코드가 하나다.
+
 ## 5. 클라이언트 검증
 
 zod 스키마는 **백엔드 제약의 복제본**이다. 각 필드에 대응하는 백엔드 코드를 주석으로 남긴다.
