@@ -241,7 +241,7 @@ type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 | `Button`                    | `type` 기본값 `"button"` (form 안에서 의도치 않은 submit 방지). `loading` 이면 `disabled` + `aria-busy`                                     |
 | `Chip` / `Tab`              | `aria-pressed` / `aria-selected` 를 상태와 동기                                                                                             |
 | `Input` 계열                | `label` 연결(`id`/`htmlFor`), `error` 시 `aria-invalid`. `aria-describedby` 는 `Field` 가 보인 안내 · 오류 하나 (#1100)                     |
-| `Modal` / `BottomSheet`     | focus trap, `Esc` 닫기, 열릴 때 body 스크롤 잠금, 닫힐 때 트리거로 포커스 복귀                                                              |
+| `Modal` / `BottomSheet`     | focus trap, `Esc` 닫기, 열릴 때 body 스크롤 잠금, 닫힐 때 트리거로 포커스 복귀. `BottomSheet` 의 Tab 가두기는 `trapFocus` 옵트인 (#1295)    |
 | `RadioGroup`                | `<fieldset>` + `<legend>` 로 그룹 라벨. 각 항목의 `<label htmlFor>` 가 자기 input 을 가리킴. `error` 시 `aria-invalid` + `aria-describedby` |
 | `Checkbox`                  | 자체 `<label htmlFor>`. `error` 시 `aria-invalid` + `aria-describedby`                                                                      |
 | `Skeleton`                  | `aria-hidden` (스크린리더에 의미 없는 반복 읽기 방지)                                                                                       |
