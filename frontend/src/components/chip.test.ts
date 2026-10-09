@@ -100,3 +100,35 @@ describe('Chip — sm 의 누르는 자리 (#905 R3)', () => {
     expect(chipTag('md')).not.toContain('before:')
   })
 })
+
+/**
+ * 여는 것의 종류 — 장소-반려견칩-세부명세 D1-2 · D6 (#1301).
+ *
+ * 기본은 예전 그대로 `dialog`(시트) 다. 메뉴를 여는 칩만 `menu` 를 준다.
+ */
+describe('Chip — popup (#1301)', () => {
+  function chipTag(props: { expanded?: boolean; popup?: 'dialog' | 'menu' }): string {
+    const markup = renderToStaticMarkup(
+      createElement(Chip, { selected: false, onSelect: vi.fn(), ...props, children: '몽실이' }),
+    )
+    return /<button[^>]*>/.exec(markup)?.[0] ?? ''
+  }
+
+  it('expanded 만 주면 aria-haspopup="dialog" 그대로다', () => {
+    expect(chipTag({ expanded: false })).toContain('aria-haspopup="dialog"')
+  })
+
+  it('popup="menu" 면 aria-haspopup="menu" 다', () => {
+    const tag = chipTag({ expanded: false, popup: 'menu' })
+
+    expect(tag).toContain('aria-haspopup="menu"')
+    expect(tag).not.toContain('aria-haspopup="dialog"')
+  })
+
+  it('expanded 없이 popup 만 주면 aria-haspopup 이 없다 — 토글 칩 의미가 남는다', () => {
+    const tag = chipTag({ popup: 'menu' })
+
+    expect(tag).not.toContain('aria-haspopup')
+    expect(tag).toContain('aria-pressed="false"')
+  })
+})

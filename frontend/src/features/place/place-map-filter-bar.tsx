@@ -8,6 +8,7 @@ import { Chip, ChipGroup } from '@/components/chip'
 import { FilterListHeading } from '@/components/filter-list'
 import { ChevronDownIcon, SlidersIcon } from '@/components/icons'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
+import { PetSwitcherSlot } from '@/features/nav/pet-switcher-slot'
 import { useSelectedPet } from '@/features/nav/use-selected-pet'
 import {
   PLACE_KIND_FILTER_ORDER,
@@ -56,15 +57,24 @@ type OpenSheet = 'region' | 'more'
  *
  * **유형은 라디오다.** 백엔드 `contentType` 이 단일 `@RequestParam` 이라 여러 개를 보낼
  * 수 없고, "전체" 칩이 해제 역할을 맡는다 (`ContentTypeField` 와 같은 판단).
+ *
+ * **`petSwitch` 를 켜면 1행 맨 앞에 반려견 칩이 선다** (#1301, 장소-반려견칩-세부명세). 판정 · 체구 필터가 쓰는
+ * 반려견을 판정이 쓰이는 자리에서 바꾼다 — 지도 아일랜드는 띠 헤더(스위처)를 걷어서(#1300) 다른 바꿀 곳이 없다.
  */
 export function PlaceMapFilterBar({
   filters,
-  /** 미로그인이면 반려견 목록을 조회하지 않는다 — 크기 축 컨트롤이 빠진다 (#200) */
+  /** 미로그인이면 반려견 목록을 조회하지 않는다 — 크기 축 컨트롤 · 반려견 칩이 빠진다 (#200) */
   authed,
+  /**
+   * 1행 맨 앞 반려견 칩. **기본 끔** — `PlaceMapView` 가 `island` 일 때만 켠다(`petSwitch={island}`). 칩이 필요한
+   * 곳 = 띠 헤더 스위처가 걷힌 곳이라 같은 조건 하나로 묶으면 스위처와 칩이 한 화면에 둘 서지 않는다 (D1-2)
+   */
+  petSwitch = false,
   className,
 }: {
   filters: PlaceFilters
   authed: boolean
+  petSwitch?: boolean
   className?: string
 }) {
   const { apply, reset } = usePlaceFilterNav()
@@ -103,6 +113,9 @@ export function PlaceMapFilterBar({
 
   const rail = useScrollRail<HTMLDivElement>()
 
+  // 미로그인에는 반려견 목록을 조회하지 않는다 — 칩도 없다 (D5)
+  const showPetSwitch = petSwitch && authed
+
   return (
     <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
       {/*
@@ -112,43 +125,51 @@ export function PlaceMapFilterBar({
         스크롤러**다. 바깥 div 를 스크롤러로 삼으면 넘치는 방향의 끝 여백이 사라져
         마지막 칩이 잘린다 (`components/scroll-rail.tsx` 머리주석).
       */}
-      <div className="scroll-rail">
-        <ChipGroup
-          ref={rail.ref}
-          onScroll={rail.onScroll}
-          label={messages.place.filterContentTypeLabel}
-          exclusive
-          // `py-1.5 -my-1.5`: 칩의 히트 띠가 `overflow-x-auto` 에 잘리지 않게 (#905 R3 · emergency-filter-bar 와 같다)
-          className={cn(
-            '-my-1.5 flex scrollbar-none gap-1.5 overflow-x-auto py-1.5',
-            rail.fadeClassName,
-          )}
-        >
-          <Chip
+      {/*
+        반려견 칩은 **유형 스크롤러 밖**이다 (D1-2) — `overflow-x-auto` 안이면 메뉴 팝오버가 세로까지 잘리고, 칩이
+        유형과 함께 밀려 사라진다. 2행은 스크롤러가 아니라 넘치면 잘리므로 1행에 둔다. 칩을 끄면 감싸개는 클래스
+        없는 블록이라 예전 배치 그대로다.
+      */}
+      <div className={cn(showPetSwitch && 'flex min-w-0 items-center gap-1.5')}>
+        {showPetSwitch && <PetSwitcherSlot variant="chip" />}
+        <div className={cn('scroll-rail', showPetSwitch && 'min-w-0 flex-1')}>
+          <ChipGroup
+            ref={rail.ref}
+            onScroll={rail.onScroll}
+            label={messages.place.filterContentTypeLabel}
             exclusive
-            selected={kind === null}
-            onSelect={() => apply(withPlaceKind(filters, null))}
+            // `py-1.5 -my-1.5`: 칩의 히트 띠가 `overflow-x-auto` 에 잘리지 않게 (#905 R3 · emergency-filter-bar 와 같다)
+            className={cn(
+              '-my-1.5 flex scrollbar-none gap-1.5 overflow-x-auto py-1.5',
+              rail.fadeClassName,
+            )}
           >
-            {messages.place.filterAll}
-          </Chip>
-          {/* 카페는 음식점 바로 뒤 한 선택지다 — 유형이 아니라 원천 분류다 (#1156) */}
-          {PLACE_KIND_FILTER_ORDER.map((option) => (
             <Chip
-              key={option}
               exclusive
-              selected={kind === option}
-              onSelect={() => apply(withPlaceKind(filters, option))}
+              selected={kind === null}
+              onSelect={() => apply(withPlaceKind(filters, null))}
             >
-              {PLACE_KIND_LABEL[option]}
+              {messages.place.filterAll}
             </Chip>
-          ))}
-        </ChipGroup>
+            {/* 카페는 음식점 바로 뒤 한 선택지다 — 유형이 아니라 원천 분류다 (#1156) */}
+            {PLACE_KIND_FILTER_ORDER.map((option) => (
+              <Chip
+                key={option}
+                exclusive
+                selected={kind === option}
+                onSelect={() => apply(withPlaceKind(filters, option))}
+              >
+                {PLACE_KIND_LABEL[option]}
+              </Chip>
+            ))}
+          </ChipGroup>
 
-        <ScrollRailArrows
-          rail={rail}
-          prevLabel={messages.place.filterTypePrev}
-          nextLabel={messages.place.filterTypeNext}
-        />
+          <ScrollRailArrows
+            rail={rail}
+            prevLabel={messages.place.filterTypePrev}
+            nextLabel={messages.place.filterTypeNext}
+          />
+        </div>
       </div>
 
       {/* ── 2행: 동반 가능만 · 지역 · 더보기 ──────────────────────────────── */}

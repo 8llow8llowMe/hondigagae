@@ -1126,7 +1126,8 @@ export function PlaceMapView({
             )}
 
             <div className="border-border border-b px-3 py-2">
-              <PlaceMapFilterBar filters={filters} authed={authed} />
+              {/* 반려견 칩은 아일랜드(띠 헤더 스위처가 걷힌 곳)에서만 — 담기 지도는 헤더 스위처가 있다 (#1301 D1-2) */}
+              <PlaceMapFilterBar filters={filters} authed={authed} petSwitch={island} />
             </div>
 
             {/*
@@ -1258,7 +1259,7 @@ export function PlaceMapView({
           **모바일 지도에는 필터가 아예 없었다** — 목록 칩 줄은 목록 보기에만 붙어 있어서,
           지도에서 조건을 좁히려면 목록으로 되돌아가야 했다.
         */
-        toolbar={<PlaceMapFilterBar filters={filters} authed={authed} />}
+        toolbar={<PlaceMapFilterBar filters={filters} authed={authed} petSwitch={island} />}
         header={
           listPending ? (
             <Skeleton className="h-4.5 w-20" />

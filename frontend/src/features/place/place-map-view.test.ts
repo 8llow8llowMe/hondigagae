@@ -418,3 +418,27 @@ describe('PlaceMapView — 개수 줄 크게 보기 (#1300)', () => {
     expect(rest).not.toContain('<Link')
   })
 })
+
+/*
+  #1301 — 지도 필터 줄 반려견 칩은 **아일랜드일 때만**(장소-반려견칩-세부명세 D1-2 · D8-1). 칩이 필요한 곳 =
+  띠 헤더 스위처가 걷힌 곳이라 같은 조건 하나로 묶는다. 담기 지도는 `island` 를 주지 않아 칩도 없다.
+*/
+describe('PlaceMapView — 반려견 칩 (#1301)', () => {
+  it('필터 바 두 곳(도킹 패널 · 시트) 모두 petSwitch={island} 다', () => {
+    const bars = code.match(/<PlaceMapFilterBar[^>]*\/>/g) ?? []
+
+    expect(bars).toHaveLength(2)
+    for (const bar of bars) expect(bar).toContain('petSwitch={island}')
+  })
+
+  it('체구 필터 URL 맞춤은 보기에 한 번이다', () => {
+    expect(code.match(/<PlaceFilterPetSync\b/g)).toHaveLength(1)
+  })
+
+  it('목록 보기 필터(칩 줄 · 레일)에는 반려견 칩이 없다 — 목록 보기는 띠 헤더 스위처가 맡는다', () => {
+    for (const file of ['./place-filter-chips.tsx', './place-filter-rail.tsx']) {
+      const other = readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8')
+      expect(other).not.toContain('PetSwitcherSlot')
+    }
+  })
+})

@@ -27,6 +27,8 @@ export function MobileTabBar({ authed }: { authed: boolean }) {
   return (
     <nav
       aria-label="하단"
+      // 지도 필터 줄 반려견 칩 메뉴가 아래 여유를 잴 때 바닥으로 쓴다 (`pet-switcher.tsx`, #1301)
+      data-tab-bar
       className="border-border bg-bg pb-safe fixed inset-x-0 bottom-0 z-40 h-16 border-t md:hidden"
     >
       <ul className="grid h-full grid-cols-4">

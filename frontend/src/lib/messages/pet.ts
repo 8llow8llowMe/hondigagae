@@ -31,6 +31,16 @@ export const petMessages = {
   loadFailedTitle: '정보를 불러오지 못했어요',
   loadFailedDescription: '잠시 후 다시 시도해주세요.',
 
+  // 반려견 스위처 (헤더 · 지도 필터 줄 칩 — 장소-반려견칩-세부명세 D4-2, #1301)
+  /**
+   * 트리거 안 `sr-only` 앞말. 뒤에 공백 한 칸과 보이는 이름이 붙어 접근 이름이 `반려견 바꾸기, 지금 몽실이`
+   * 가 된다 — 보이는 이름만으로는 무엇을 하는 버튼인지 들리지 않는다. 보이는 글자가 이름 안에 들어야 하므로
+   * `aria-label` 로 덮지 않는다 (WCAG 2.5.3)
+   */
+  switcherNamePrefix: '반려견 바꾸기, 지금',
+  /** 메뉴 `aria-label` */
+  switcherMenuLabel: '반려견 전환',
+
   // 상한
   limitReached: '최대 5마리까지 등록할 수 있어요.',
   /**

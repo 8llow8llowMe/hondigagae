@@ -34,6 +34,18 @@ export type ChipProps = {
    */
   expanded?: boolean
   /**
+   * `expanded` 칩이 **여는 것의 종류** — `aria-haspopup` 값이다. 기본 `dialog`(시트).
+   *
+   * 값을 고르는 팝오버 메뉴를 여는 칩(지도 필터 줄의 반려견 칩, #1301)은 `menu` 를 준다 — 메뉴를 여는
+   * 버튼이 `dialog` 로 읽히면 열고 나서 들리는 것과 어긋난다. `expanded` 가 없으면 쓰이지 않는다:
+   * 토글 · 라디오 칩은 아무것도 열지 않는다.
+   */
+  popup?: 'dialog' | 'menu'
+  /** `expanded` 칩이 여는 패널의 id — `aria-controls`. `expanded` 가 없으면 쓰이지 않는다 */
+  controls?: string
+  /** 메뉴를 닫을 때 포커스를 되돌릴 자리 (`useOverlay` 의 `triggerRef`) */
+  ref?: Ref<HTMLButtonElement>
+  /**
    * 아이콘만 든 칩의 이름. 주면 `aria-label`(보조기기)과 `title`(마우스 호버 툴팁)
    * 양쪽에 남긴다 — 예전 `ViewToggle` 아이콘형(#240, #1125 에서 글자 버튼이 됐다)이 쓰던 규칙이다.
    *
@@ -73,6 +85,9 @@ export function Chip({
   onSelect,
   exclusive = false,
   expanded,
+  popup = 'dialog',
+  controls,
+  ref,
   label,
   size = 'md',
   children,
@@ -85,7 +100,7 @@ export function Chip({
   */
   const a11y =
     expanded !== undefined
-      ? ({ 'aria-expanded': expanded, 'aria-haspopup': 'dialog' } as const)
+      ? ({ 'aria-expanded': expanded, 'aria-haspopup': popup, 'aria-controls': controls } as const)
       : exclusive
         ? ({
             role: 'radio',
@@ -97,6 +112,7 @@ export function Chip({
 
   return (
     <button
+      ref={ref}
       type="button"
       {...a11y}
       aria-label={label}
