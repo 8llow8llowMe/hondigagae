@@ -96,13 +96,14 @@
 
 ## 3. 장소 탐색 — **구현 완료**
 
-| 화면              | 경로                   | API                                                                                                     | 상태                                                                                      |
-| ----------------- | ---------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| 장소 목록         | `/places`              | `GET /places` (지역·타입·반려견 동반 필터, `SliceResponse` 커서)                                        | 구현                                                                                      |
-| 장소 상세         | `/places/[placeId]`    | `GET /places/{placeId}` + `GET /places/{placeId}/suitability` (intro/petInfo/images 결합, **nullable**) | 구현 — 영업 상태 포함 (#294)                                                              |
-| 장소 상세 하단 바 | `/places/[placeId]` 내 | `GET`·`POST`·`DELETE /favorites/places` + `POST /plans` + `PUT /plans/{planId}/days/{day}/items`        | 구현 — 저장 + 일정에 담기 ([#118](https://github.com/8llow8llowMe/hondigagae/issues/118)) |
-| 지도 뷰           | `/places?view=map`     | 목록 캐시 재사용 + `GET /places/nearby`(지도 이동 시) + 카카오 지도 SDK                                 | **구현** ([#14](https://github.com/8llow8llowMe/hondigagae/issues/14))                    |
-| 지도 병원·약국 층 | `/places?view=map` 내  | `GET /emergencies/facilities` (토글을 켰을 때만 · 고정 50km)                                            | **명세** (#1286)                                                                          |
+| 화면               | 경로                   | API                                                                                                     | 상태                                                                                      |
+| ------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 장소 목록          | `/places`              | `GET /places` (지역·타입·반려견 동반 필터, `SliceResponse` 커서)                                        | 구현                                                                                      |
+| 지도 아일랜드 헤더 | `/places?view=map` 내  | **없음** — 셸 헤더의 모양 · 자리만 바뀐다                                                               | **명세** (#1287)                                                                          |
+| 장소 상세          | `/places/[placeId]`    | `GET /places/{placeId}` + `GET /places/{placeId}/suitability` (intro/petInfo/images 결합, **nullable**) | 구현 — 영업 상태 포함 (#294)                                                              |
+| 장소 상세 하단 바  | `/places/[placeId]` 내 | `GET`·`POST`·`DELETE /favorites/places` + `POST /plans` + `PUT /plans/{planId}/days/{day}/items`        | 구현 — 저장 + 일정에 담기 ([#118](https://github.com/8llow8llowMe/hondigagae/issues/118)) |
+| 지도 뷰            | `/places?view=map`     | 목록 캐시 재사용 + `GET /places/nearby`(지도 이동 시) + 카카오 지도 SDK                                 | **구현** ([#14](https://github.com/8llow8llowMe/hondigagae/issues/14))                    |
+| 지도 병원·약국 층  | `/places?view=map` 내  | `GET /emergencies/facilities` (토글을 켰을 때만 · 고정 50km)                                            | **명세** (#1286)                                                                          |
 
 주의:
 
