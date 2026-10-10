@@ -127,6 +127,10 @@ public class PlaceCustomRepositoryImpl implements PlaceCustomRepository {
                 BigDecimal.valueOf(criteria.lat() - latDelta), BigDecimal.valueOf(criteria.lat() + latDelta)))
             .and(place.lng.between(
                 BigDecimal.valueOf(criteria.lng() - lngDelta), BigDecimal.valueOf(criteria.lng() + lngDelta)));
+        // 목록(listFilters)과 같은 판단이다 — null 이면 조건을 걸지 않아 생략한 요청은 예전과 같다 (#1316)
+        if (criteria.sigunguCode() != null) {
+            where.and(place.sigunguCode.eq(criteria.sigunguCode()));
+        }
 
         return queryFactory.selectFrom(place).where(where).fetch();
     }

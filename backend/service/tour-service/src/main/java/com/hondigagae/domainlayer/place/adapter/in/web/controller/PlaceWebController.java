@@ -25,6 +25,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -129,7 +130,8 @@ public class PlaceWebController {
             + "호출 예\n"
             + "- 제주시청 반경 3km 카페: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&radius=3000&sourceCategory=카페`\n"
             + "- 성산이 이름이나 주소에 들어간 5km 안 장소: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&keyword=성산`\n"
-            + "- 소형견 동반 가능한 5km 안 장소: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&petAllowanceType=ALLOWED&petSizeType=SMALL`")
+            + "- 소형견 동반 가능한 5km 안 장소: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&petAllowanceType=ALLOWED&petSizeType=SMALL`\n"
+            + "- 지도에서 이 지역 재검색, 시군구 유지: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&sigunguCode=4` (4 = 제주시, 3 = 서귀포시)")
     @GetMapping("/nearby")
     public ResponseEntity<Response<NearbyPlaceResponse>> getNearbyPlaces(
         @Parameter(description = "[필수] 중심 위도 (WGS84, -90~90)", required = true, example = "33.4996213")
@@ -146,6 +148,8 @@ public class PlaceWebController {
         @Min(value = 1, message = PlaceValidationMessage.RADIUS_RANGE_INVALID)
         @Max(value = 50_000, message = PlaceValidationMessage.RADIUS_RANGE_INVALID)
         @RequestParam(defaultValue = "5000") int radius,
+
+        @Parameter(description = "[선택] 관광 시군구코드(TourAPI sigunguCode). 생략하면 시군구 제한 없음", example = "3") @RequestParam(required = false) String sigunguCode,
 
         @Parameter(description = "[선택] 콘텐츠 타입. 생략하면 전체. TOURIST_SPOT 관광지 · CULTURE 문화시설 · FESTIVAL 축제공연행사 · COURSE 여행코스 · LEPORTS 레포츠 · LODGING 숙박 · SHOPPING 쇼핑 · RESTAURANT 음식점(카페 포함)", example = "RESTAURANT") @RequestParam(required = false) ContentType contentType,
         @Parameter(description = "[선택] 반려동물 동반 구분. 생략하면 이 조건으로 걸러내지 않아 NOT_ALLOWED·UNKNOWN 도 함께 나옵니다. 동반 가능한 곳만 보려면 ALLOWED. ALLOWED 동반 가능 · PARTIALLY_ALLOWED 일부 구역/조건부 · NOT_ALLOWED 동반 불가 · UNKNOWN 정보 없음", example = "ALLOWED") @RequestParam(required = false) PetAllowanceType petAllowanceType,
@@ -173,6 +177,9 @@ public class PlaceWebController {
             .lat(lat)
             .lng(lng)
             .radius(radius)
+            // 빈 값(`sigunguCode=`)은 생략과 같게 본다 — 그대로 두면 `sigungu_code = ''` 로 0건이 되는데
+            // 캐시 키는 생략한 요청과 같아(`part()` 가 null 을 "" 로 쓴다) 정상 요청이 빈 결과를 받는다 (#1316)
+            .sigunguCode(StringUtils.hasText(sigunguCode) ? sigunguCode : null)
             .contentType(contentType)
             .petAllowanceType(petAllowanceType)
             .indoor(indoor)
