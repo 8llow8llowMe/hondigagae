@@ -346,11 +346,35 @@ describe('지도 갈래는 검색을 두 자리에 둔다 (#584)', () => {
     expect(toggle).toBeGreaterThan(search)
 
     const tag = overlay.slice(search, overlay.indexOf('/>', search))
-    expect(tag).toContain('lg:hidden')
     // 375 에 225 밖에 없다(보기 전환 110, #1125) — 글자 제출 버튼이면 입력이 157 로 줄어 placeholder 가 잘린다
     expect(tag).toContain('compact')
+
+    /*
+      **검색은 기둥 하나에 싸여 있다** (#1313) — 숨김(`lg:hidden`) · 상한(`max-w-md`)은 그 기둥이 갖는다.
+      기둥 여는 태그는 검색 바로 앞의 마지막 `<div` 다.
+    */
+    const column = overlay.slice(overlay.lastIndexOf('<div', search), search)
+    expect(column).toContain('lg:hidden')
     // 768 에서 538 로 벌어지지 않게 상한을 둔다
-    expect(tag).toContain('max-w-md')
+    expect(column).toContain('max-w-md')
+    expect(column).toContain('flex-col')
+  })
+
+  /*
+    **모바일 재검색 알약은 검색창 바로 아래, 같은 기둥 안이다** (#1313). 상단 행 전체 아래에 두면 오른쪽 기둥
+    높이만큼 검색창 아래가 비었다. 검색 다음, 기둥이 닫히기 전, 보기 토글보다 앞이어야 한다.
+  */
+  it('모바일 재검색 알약은 검색창 바로 아래, 같은 기둥 안이다', () => {
+    const search = overlay.indexOf('<EmergencySearchField')
+    const pill = overlay.indexOf('<ResearchHereButton', search)
+    const toggle = overlay.indexOf('<ViewToggle')
+
+    expect(pill).toBeGreaterThan(search)
+    expect(pill).toBeLessThan(toggle)
+    // 검색과 알약 사이에 다른 요소가 없다 — 검색 태그가 닫히고 곧바로 알약 조건이다
+    const between = overlay.slice(overlay.indexOf('/>', search) + 2, pill)
+    expect(between).not.toContain('<div')
+    expect(between).toContain('offerResearch && bounds !== null &&')
   })
 
   /* 패널 툴바 안쪽이 374 라 목록 갈래 모바일 검색(343)보다 넓다 — 줄일 이유가 없다 */

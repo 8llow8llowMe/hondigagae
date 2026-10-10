@@ -22,7 +22,7 @@ function repoSource(relative: string): string {
 
 /*
   **#1278 — 알약이 폭마다 다른 자리에 선다.** 데스크톱은 지도 하단 중앙(`.map-research-offset`), `lg` 미만은
-  상단 컨트롤 묶음 맨 아래(흐름 안)다. 하단에 두면 시트 중간 · 최대 단계에 가려졌고, 고정 좌표(검색 줄 아래
+  상단 컨트롤 묶음 맨 아래(흐름 안)였다가 #1313 부터 검색창 바로 아래(같은 기둥 안)다. 하단에 두면 시트 중간 · 최대 단계에 가려졌고, 고정 좌표(검색 줄 아래
   72)로 두면 `/emergency` 의 위치 안내와 겹쳤다(실측). 그래서 시트 비율과 묶이던 예전 계약(#396)은 없다.
 */
 const SCREENS = [
@@ -40,7 +40,11 @@ describe('재검색 알약 자리 (#1278)', () => {
     expect(rule).not.toContain('var(--tabbar-h)')
   })
 
-  it('두 지도 화면 모두 하단 알약은 lg 부터, 상단 알약은 lg 미만에서만 선다', () => {
+  /*
+    **상단 알약은 검색창 기둥 안, 검색창 바로 아래다** (#1313). 상단 행 전체 아래(#1278)에 두면 오른쪽 기둥
+    높이만큼 검색창 아래가 비었다. 기둥이 `lg:hidden` 이라 알약도 lg 미만에서만 선다.
+  */
+  it('두 지도 화면 모두 하단 알약은 lg 부터, 상단 알약은 lg 미만 검색창 바로 아래에 선다', () => {
     for (const file of SCREENS) {
       const source = repoSource(file)
 
@@ -48,14 +52,14 @@ describe('재검색 알약 자리 (#1278)', () => {
         /'map-research-offset absolute inset-x-0 z-30 hidden justify-center px-4 lg:flex'/,
       )
       expect(source).toMatch(
-        /<div className="flex justify-center px-4 pt-2 lg:hidden">\s*<ResearchHereButton/,
+        /<div className="flex max-w-md min-w-0 flex-1 flex-col items-center gap-2 lg:hidden">\s*<(?:Place|Emergency)SearchField[\s\S]{0,300}?\/>\s*\{offerResearch[^}]*&& \(?\s*<ResearchHereButton/,
       )
     }
   })
 
   it('두 화면이 같은 버튼 컴포넌트를 쓴다 — 같은 문구 · 같은 모양 (#396)', () => {
-    for (const file of SCREENS) {
-      expect(repoSource(file).match(/<ResearchHereButton /g)).toHaveLength(2)
-    }
+    // 데스크톱 하단 · 모바일 검색창 아래. `/places` 는 검색창이 없는 갈래(담기 지도의 머리 카드)의 예전 자리가 하나 더 있다
+    expect(repoSource(SCREENS[0] as string).match(/<ResearchHereButton /g)).toHaveLength(3)
+    expect(repoSource(SCREENS[1] as string).match(/<ResearchHereButton /g)).toHaveLength(2)
   })
 })
