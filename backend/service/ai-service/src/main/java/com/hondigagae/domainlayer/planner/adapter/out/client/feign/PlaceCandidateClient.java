@@ -25,6 +25,9 @@ public interface PlaceCandidateClient {
      * @param indoor null 이면 실내 여부를 가리지 않는다. true 면 실내만
      * @param sourceCategory null 이면 분류를 가리지 않는다. 카페는 {@code 카페}
      * @param contentType null 이면 콘텐츠 타입을 가리지 않는다. 숙박은 {@code LODGING} (#1236)
+     * @param lat 기준 위도. {@code lng} 와 함께 주면 그 점에서 가까운 순이고, 둘 다 null 이면 {@code placeId} 순이다 (#1312).
+     *            하나만 주면 tour-service 가 400(PLACE_109)을 낸다
+     * @param lng 기준 경도
      */
     @GetMapping("/api/v1/places")
     Response<PlaceSliceClientResponse> searchPlaces(
@@ -34,6 +37,8 @@ public interface PlaceCandidateClient {
         @RequestParam("size") int size,
         @RequestParam(value = "indoor", required = false) Boolean indoor,
         @RequestParam(value = "sourceCategory", required = false) String sourceCategory,
-        @RequestParam(value = "contentType", required = false) String contentType
+        @RequestParam(value = "contentType", required = false) String contentType,
+        @RequestParam(value = "lat", required = false) Double lat,
+        @RequestParam(value = "lng", required = false) Double lng
     );
 }

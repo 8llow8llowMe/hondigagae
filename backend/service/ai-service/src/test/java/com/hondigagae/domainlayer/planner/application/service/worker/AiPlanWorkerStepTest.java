@@ -9,6 +9,7 @@ import com.hondigagae.domainlayer.planner.application.model.AiPlanJobMode;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanStepOutcome;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanJobSubscription;
 import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
+import com.hondigagae.domainlayer.planner.application.model.JejuZone;
 import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
@@ -314,6 +315,85 @@ class AiPlanWorkerStepTest {
             .containsExactly(801L, 803L, 802L, 100L);
     }
 
+    // 권역 대표점 거리순 후보 (#1312) ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("제주 전체 요청이면 id 순 일반 후보에 남동부가 없어도 거리순 조회로 남동부 방문 · 숙박 · 음식점을 하한만큼 싣고 상한 50을 지킨다")
+    void fillsSouthEastFromAnchoredLookupsWithinLimit() {
+        RecordingCandidates candidates = southEastReady();
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(new FakeJobStore(pendingJob(null)), new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        List<PlaceCandidate> pool = llm.lastQuery.safeCandidates();
+        assertThat(pool).hasSize(50);
+        assertThat(candidates.nearbyLookups).isEqualTo(18);
+        assertThat(pool).extracting(PlaceCandidate::placeId)
+            .contains(901L, 902L, 903L, 911L, 912L, 921L, 922L)
+            .doesNotContain(904L, 905L, 913L, 923L);
+        // 북부 일반 후보의 꼬리가 권역 몫만큼(방문 3 · 숙박 2 · 음식점 2) 빠졌다
+        assertThat(pool).filteredOn(candidate -> candidate.placeId() <= 50L).hasSize(43);
+    }
+
+    @Test
+    @DisplayName("시군구를 지정하거나 하루 재생성이면 거리순 조회를 하지 않는다 — 기존 동작 그대로다")
+    void skipsAnchoredLookupsForSigunguOrRegeneration() {
+        RecordingCandidates sigungu = southEastReady();
+        worker(new FakeJobStore(pendingJob("4")), new FakeJobEvents(), new RecordingLlm(), sigungu).runJob(JOB_ID);
+        assertThat(sigungu.nearbyLookups).isZero();
+
+        AiPlanJob regenerate = pendingJob(null);
+        regenerate.requestParams().put("regenerateDay", "2");
+        RecordingCandidates regenerated = southEastReady();
+        worker(new FakeJobStore(regenerate), new FakeJobEvents(), new RecordingLlm(), regenerated).runJob(JOB_ID);
+        assertThat(regenerated.nearbyLookups).isZero();
+    }
+
+    @Test
+    @DisplayName("거리순 방문 조회가 실패해도 생성은 계속하고, 숙박 · 음식점 거리순 결과는 싣는다")
+    void continuesWhenAnchoredLookupFails() {
+        RecordingCandidates candidates = southEastReady();
+        candidates.nearbyVisitFailure = new AiPlanException(AiPlanErrorCode.INTERNAL_SERVICE_UNAVAILABLE);
+        FakeJobStore store = new FakeJobStore(pendingJob(null));
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(store, new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        assertThat(store.current().status()).isEqualTo(AiPlanJobStatus.COMPLETED);
+        assertThat(llm.lastQuery.safeCandidates()).hasSize(50).extracting(PlaceCandidate::placeId)
+            .contains(911L, 912L, 921L, 922L)
+            .doesNotContain(901L);
+    }
+
+    /** 일반 후보는 북부 50곳(id 1~50, 남동부 0), 거리순 조회는 남동부 방문 4 · 숙박 3 · 음식점 3곳을 돌려준다. */
+    private static RecordingCandidates southEastReady() {
+        RecordingCandidates candidates = new RecordingCandidates();
+        List<PlaceCandidateQueryResult> general = new ArrayList<>();
+        for (long id = 1; id <= 50; id++) {
+            general.add(PlaceCandidateQueryResult.builder()
+                .placeId(id).title("북부" + id).contentTypeName("관광지").lat(33.5).lng(126.5).build());
+        }
+        candidates.general = general;
+        candidates.nearbyVisits = List.of(
+            located(901L, "관광지", 33.3260, 126.8420), located(902L, "관광지", 33.3523, 126.7470),
+            located(903L, "관광지", 33.2800, 126.7200), located(904L, "관광지", 33.3000, 126.7600),
+            // 남동부 대표점에서 찾았어도 경계 너머(북동부)면 어느 권역 몫으로도 싣지 않는다
+            located(905L, "관광지", 33.4592, 126.8317));
+        candidates.nearbyLodgings = List.of(
+            located(911L, "숙박", 33.3300, 126.8000), located(912L, "숙박", 33.3100, 126.7900),
+            located(913L, "숙박", 33.3200, 126.8100));
+        candidates.nearbyRestaurants = List.of(
+            located(921L, "음식점", 33.3250, 126.8300), located(922L, "음식점", 33.2900, 126.7300),
+            located(923L, "음식점", 33.3150, 126.8200));
+        return candidates;
+    }
+
+    private static PlaceCandidateQueryResult located(long placeId, String contentTypeName, double lat, double lng) {
+        return PlaceCandidateQueryResult.builder()
+            .placeId(placeId).title("장소" + placeId).contentTypeName(contentTypeName).lat(lat).lng(lng)
+            .build();
+    }
+
     // 단계별 소요 지표 (#985) ────────────────────────────────────────────────
 
     @Test
@@ -597,6 +677,41 @@ class AiPlanWorkerStepTest {
         /** 음식점 검색이 돌려줄 장소 (#1245). 비우면 음식점을 더 싣지 않는다. */
         private List<PlaceCandidateQueryResult> restaurants = List.of();
         private int requestedSize;
+        /** 일반 검색 결과 (#1312). null 이면 북부 후보 하나(100)다. */
+        private List<PlaceCandidateQueryResult> general;
+        /** 남동부 대표점에서 부를 때만 돌려줄 거리순 결과 (#1312). 다른 대표점에서는 비어 있다. */
+        private List<PlaceCandidateQueryResult> nearbyVisits = List.of();
+        private List<PlaceCandidateQueryResult> nearbyLodgings = List.of();
+        private List<PlaceCandidateQueryResult> nearbyRestaurants = List.of();
+        private AiPlanException nearbyVisitFailure;
+        private int nearbyLookups;
+
+        @Override
+        public List<PlaceCandidateQueryResult> findNearbyCandidates(String areaCode, double lat, double lng, int size) {
+            nearbyLookups++;
+            if (nearbyVisitFailure != null) {
+                throw nearbyVisitFailure;
+            }
+            return atSouthEast(lat, lng) ? nearbyVisits : List.of();
+        }
+
+        @Override
+        public List<PlaceCandidateQueryResult> findNearbyLodgingCandidates(String areaCode, double lat, double lng, int size) {
+            nearbyLookups++;
+            return atSouthEast(lat, lng) ? nearbyLodgings : List.of();
+        }
+
+        @Override
+        public List<PlaceCandidateQueryResult> findNearbyRestaurantCandidates(
+            String areaCode, double lat, double lng, int size
+        ) {
+            nearbyLookups++;
+            return atSouthEast(lat, lng) ? nearbyRestaurants : List.of();
+        }
+
+        private static boolean atSouthEast(double lat, double lng) {
+            return lat == JejuZone.SOUTH_EAST.getAnchorLat() && lng == JejuZone.SOUTH_EAST.getAnchorLng();
+        }
 
         @Override
         public List<PlaceCandidateQueryResult> findRestaurantCandidates(String areaCode, String sigunguCode, int size) {
@@ -616,6 +731,9 @@ class AiPlanWorkerStepTest {
         public List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, String sigunguCode, int size) {
             requestedSigunguCode = sigunguCode;
             captured = true;
+            if (general != null) {
+                return general;
+            }
             return List.of(PlaceCandidateQueryResult.builder()
                 .placeId(100L).title("후보").lat(33.5).lng(126.5)
                 .build());

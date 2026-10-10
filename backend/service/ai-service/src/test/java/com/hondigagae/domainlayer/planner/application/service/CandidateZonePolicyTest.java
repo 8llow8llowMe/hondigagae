@@ -176,6 +176,70 @@ class CandidateZonePolicyTest {
         }
     }
 
+    @Nested
+    @DisplayName("권역 방문 하한 (#1312)")
+    class VisitFloor {
+
+        // 남동부(남원 · 표선) 방문 장소 — 일반 후보 id 순 첫 50곳에는 2곳뿐이었다
+        private final PlaceCandidate pyoseonBeach = spot(901L, 33.3260, 126.8420);
+        private final PlaceCandidate noksanro = spot(902L, 33.3523, 126.7470);
+        private final PlaceCandidate namwonTrail = spot(903L, 33.2800, 126.7200);
+        private final PlaceCandidate fourthSouthEast = spot(904L, 33.3000, 126.7600);
+
+        @Test
+        @DisplayName("권역마다 방문 장소가 세 곳이 되도록 채운다 — 이미 있는 곳도 세고, 숙박 · 음식점은 방문 몫이 아니다")
+        void fillsEachZoneUpToThree() {
+            List<PlaceCandidate> base = List.of(visit(1L, "관광지"), pyoseonBeach);
+            List<PlaceCandidate> found = List.of(cafe(905L, 33.3200, 126.8000), noksanro, namwonTrail, fourthSouthEast);
+
+            List<PlaceCandidate> pool = CandidateZonePolicy.ensureVisits(found, base, 50);
+
+            assertThat(pool).extracting(PlaceCandidate::placeId).containsExactly(1L, 901L, 902L, 903L);
+        }
+
+        @Test
+        @DisplayName("상한을 넘으면 꼬리를 덜어 내되 다른 권역의 하한을 지키는 방문 장소는 남긴다")
+        void trimsTailButKeepsFloorHolders() {
+            // 북부 넷(하한 셋 + 여분 하나) · 남부 하나 — 상한 6에 남동부 둘을 실으려면 하나를 빼야 한다
+            List<PlaceCandidate> base = List.of(
+                visit(1L, "관광지"), visit(2L, "관광지"), visit(3L, "관광지"), visit(4L, "관광지"), spot(5L, 33.2448, 126.5715));
+
+            List<PlaceCandidate> pool = CandidateZonePolicy.ensureVisits(List.of(pyoseonBeach, noksanro), base, 6);
+
+            // 남부 하나(5)는 남부 하한이라 남고, 북부의 넷째(4)가 빠진다
+            assertThat(pool).extracting(PlaceCandidate::placeId).containsExactly(1L, 2L, 3L, 5L, 901L, 902L);
+        }
+
+        @Test
+        @DisplayName("숙박 · 음식점을 실을 때도 권역 하한을 지키는 방문 장소는 덜어 내지 않는다 — 하한 0 이면 전처럼 덜어 낸다")
+        void spreadKeepsFloorHoldersOnlyWithFloor() {
+            List<PlaceCandidate> base = List.of(visit(1L, "관광지"), visit(2L, "관광지"), pyoseonBeach);
+
+            List<PlaceCandidate> floored = CandidateZonePolicy.spread(Kind.LODGING, List.of(JUNGMUN_STAY), base, 3, 3);
+            List<PlaceCandidate> unfloored = CandidateZonePolicy.spread(Kind.LODGING, List.of(JUNGMUN_STAY), base, 3);
+
+            // 하한이 있으면 덜어 낼 꼬리가 없어 숙박을 싣지 않는다 — 상한은 넘지 않는다
+            assertThat(floored).extracting(PlaceCandidate::placeId).containsExactly(1L, 2L, 901L);
+            assertThat(unfloored).extracting(PlaceCandidate::placeId).containsExactly(1L, 2L, 201L);
+        }
+
+        @Test
+        @DisplayName("풀의 권역 × 종류별 개수를 한 줄로 적는다")
+        void describesZonesAndKinds() {
+            String line = CandidateZonePolicy.describe(
+                List.of(pyoseonBeach, noksanro, JUNGMUN_STAY, DANGDANG, cafe(699L, 35.1587, 129.1604)));
+
+            assertThat(line).contains("SOUTH_EAST(visit=2,lodging=0,restaurant=0)")
+                .contains("SOUTH_WEST(visit=0,lodging=1,restaurant=0)")
+                .contains("NORTH_WEST(visit=0,lodging=0,restaurant=1)")
+                .endsWith("unknown=1");
+        }
+    }
+
+    private static PlaceCandidate spot(long id, double lat, double lng) {
+        return new PlaceCandidate(id, "장소" + id, "관광지", "제주", "동반 가능", null, null, false, null, lat, lng);
+    }
+
     private static PlaceCandidate stay(long id, double lat, double lng) {
         return new PlaceCandidate(id, "숙소" + id, "숙박", "제주", "동반 가능", null, null, true, "펜션", lat, lng);
     }

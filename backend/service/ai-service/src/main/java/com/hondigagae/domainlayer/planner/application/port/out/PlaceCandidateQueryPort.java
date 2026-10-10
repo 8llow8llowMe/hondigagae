@@ -55,6 +55,26 @@ public interface PlaceCandidateQueryPort {
     }
 
     /**
+     * 한 점에서 가까운 순으로 동반 가능 장소를 찾는다 — 종류를 가리지 않는다 (#1312). 제주 전체 일정의 후보 풀을 권역
+     * 대표점마다 채우는 데 쓴다 — {@code placeId} 순 첫 페이지는 권역이 쏠려 남동부 방문 장소가 2곳뿐이었다.
+     *
+     * <p>기본 구현은 빈 목록이다({@link #findLodgingCandidates} 와 같은 이유). 시군구는 걸지 않는다 — 제주 전체 요청에만 쓴다.
+     */
+    default List<PlaceCandidateQueryResult> findNearbyCandidates(String areaCode, double lat, double lng, int size) {
+        return List.of();
+    }
+
+    /** 한 점에서 가까운 순의 동반 가능 숙박 (#1312). 기본 구현은 빈 목록이다. */
+    default List<PlaceCandidateQueryResult> findNearbyLodgingCandidates(String areaCode, double lat, double lng, int size) {
+        return List.of();
+    }
+
+    /** 한 점에서 가까운 순의 동반 가능 음식점(카페 포함) (#1312). 기본 구현은 빈 목록이다. */
+    default List<PlaceCandidateQueryResult> findNearbyRestaurantCandidates(String areaCode, double lat, double lng, int size) {
+        return List.of();
+    }
+
+    /**
      * 아이디로 후보를 직접 가져온다 — 사용자가 필수 포함으로 지정한 장소는 검색 상위 N 에
      * 없어도 후보에 넣어야 하기 때문이다. 노출 불가 장소는 결과에서 빠진다.
      */

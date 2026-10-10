@@ -55,16 +55,40 @@ public class PlaceCandidateClientAdapter implements PlaceCandidateQueryPort {
         return search(areaCode, sigunguCode, size, null, null, CONTENT_TYPE_RESTAURANT);
     }
 
+    @Override
+    public List<PlaceCandidateQueryResult> findNearbyCandidates(String areaCode, double lat, double lng, int size) {
+        return search(areaCode, null, size, null, null, null, lat, lng);
+    }
+
+    @Override
+    public List<PlaceCandidateQueryResult> findNearbyLodgingCandidates(String areaCode, double lat, double lng, int size) {
+        return search(areaCode, null, size, null, null, CONTENT_TYPE_LODGING, lat, lng);
+    }
+
+    @Override
+    public List<PlaceCandidateQueryResult> findNearbyRestaurantCandidates(String areaCode, double lat, double lng, int size) {
+        return search(areaCode, null, size, null, null, CONTENT_TYPE_RESTAURANT, lat, lng);
+    }
+
     private List<PlaceCandidateQueryResult> search(
         String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory, String contentType
+    ) {
+        return search(areaCode, sigunguCode, size, indoor, sourceCategory, contentType, null, null);
+    }
+
+    /** {@code lat} · {@code lng} 를 함께 주면 그 점에서 가까운 순, 둘 다 null 이면 {@code placeId} 순이다 (#1312). */
+    private List<PlaceCandidateQueryResult> search(
+        String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory, String contentType,
+        Double lat, Double lng
     ) {
         PlaceSliceClientResponse body = internalResponseSupport.requestAndUnwrapOrNull(
             InternalResponseSupport.TOUR_SERVICE,
             () -> placeCandidateClient.searchPlaces(
-                areaCode, sigunguCode, PET_ALLOWED, size, indoor, sourceCategory, contentType));
+                areaCode, sigunguCode, PET_ALLOWED, size, indoor, sourceCategory, contentType, lat, lng));
 
         if (body == null || body.contents() == null) {
-            log.warn("Place candidates empty areaCode={} sigunguCode={} size={}", areaCode, sigunguCode, size);
+            log.warn("Place candidates empty areaCode={} sigunguCode={} contentType={} lat={} lng={} size={}",
+                areaCode, sigunguCode, contentType, lat, lng, size);
             return List.of();
         }
         return body.contents().stream()

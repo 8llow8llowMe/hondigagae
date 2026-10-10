@@ -9,6 +9,7 @@ import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PetLifeStage;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -385,6 +386,34 @@ class AiPlanPromptFactoryTest {
         assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-15")
                 .regenerateDay(2).planOutline(outline).build()))
             .doesNotContain("권역 순서 제안");
+    }
+
+    @Test
+    @DisplayName("숙박만 있는 권역은 덮은 것으로 보지 않는다 — 그 권역의 날에 갈 곳이 없다 (#1312)")
+    void skipsZoneOrderWhenAZoneHasOnlyLodging() {
+        PlaceCandidate southEastStay = PlaceCandidate.builder()
+            .placeId(14L).title("모두올레 애견펜션").contentTypeName("숙박").addr("제주특별자치도 서귀포시 표선면")
+            .petAllowanceName("동반 가능").indoor(true).lat(33.3300).lng(126.8000)
+            .build();
+        PlaceCandidate southEastCafe = PlaceCandidate.builder()
+            .placeId(17L).title("표선 카페").contentTypeName("음식점").addr("제주특별자치도 서귀포시 표선면")
+            .petAllowanceName("동반 가능").indoor(true).sourceCategory("카페").lat(33.3260).lng(126.8420)
+            .build();
+        List<PlaceCandidate> withoutSouthEastVisit = List.of(
+            zoned(11L, "곽지해수욕장", "제주특별자치도 제주시 애월읍", 33.4505, 126.3053),
+            zoned(12L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631),
+            zoned(13L, "정방폭포", "제주특별자치도 서귀포시 동홍동", 33.2448, 126.5715),
+            southEastStay,
+            zoned(15L, "용눈이오름", "제주특별자치도 제주시 구좌읍", 33.4592, 126.8317),
+            zoned(16L, "용두암", "제주특별자치도 제주시 용담2동", 33.5163, 126.5119));
+
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-19").placeCandidates(withoutSouthEastVisit).build()))
+            .doesNotContain("권역 순서 제안");
+
+        List<PlaceCandidate> withSouthEastCafe = new ArrayList<>(withoutSouthEastVisit);
+        withSouthEastCafe.add(southEastCafe);
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-19").placeCandidates(withSouthEastCafe).build()))
+            .contains("4일차 남동부");
     }
 
     /** 6권역에 하나씩 후보가 있는 질의 — 섬 전체를 덮는다. */
