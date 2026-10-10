@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
 import com.hondigagae.domainlayer.auth.application.exception.AuthException;
+import com.hondigagae.domainlayer.auth.application.info.VerificationCodeSendInfo;
 import com.hondigagae.domainlayer.auth.application.port.out.EmailVerificationStorePort;
 import com.hondigagae.domainlayer.auth.application.port.out.MailSendPort;
 import com.hondigagae.domainlayer.auth.application.service.support.VerificationCodeGenerator;
@@ -135,6 +136,67 @@ class EmailVerificationProcessorTest {
             .isEqualTo(AuthErrorCode.EMAIL_CODE_COOLDOWN);
     }
 
+    /**
+     * #1293 — 응답의 시간 정보가 가입 상태(미가입 · 기가입 · 탈퇴)마다 다르면 그 차이로 가입 여부를 알아낼 수 있다.
+     * 실제로 코드가 발급되지 않은 기가입 · 탈퇴 분기도 같은 값을 돌려줘야 한다.
+     */
+    @Test
+    void sendCode_returnsSameTimingRegardlessOfRegistration() {
+        memberRepositoryPort.register("active@example.com");
+        memberRepositoryPort.register(withdrawnEmailHasher.hash(WITHDRAWN_EMAIL));
+
+        VerificationCodeSendInfo unregistered = processor.sendCode("new@example.com", CLIENT_IP);
+        VerificationCodeSendInfo registered = processor.sendCode("active@example.com", CLIENT_IP);
+        VerificationCodeSendInfo withdrawn = processor.sendCode(WITHDRAWN_EMAIL, CLIENT_IP);
+
+        assertThat(unregistered.codeExpiresIn()).isEqualTo(Duration.ofMinutes(5));
+        assertThat(unregistered.resendAvailableIn()).isEqualTo(Duration.ofSeconds(60));
+        assertThat(registered).isEqualTo(unregistered);
+        assertThat(withdrawn).isEqualTo(unregistered);
+    }
+
+    @Test
+    void sendCode_withinEmailCooldown_carriesRemainingCooldownAsRetryAfter() {
+        processor.sendCode("user@example.com", CLIENT_IP);
+        storePort.cooldownRemaining = Optional.of(Duration.ofMillis(41_200));
+
+        assertThatThrownBy(() -> processor.sendCode("user@example.com", CLIENT_IP))
+            .isInstanceOf(AuthException.class)
+            .extracting(exception -> ((AuthException) exception).getRetryAfter())
+            .isEqualTo(Optional.of(Duration.ofMillis(41_200)));
+    }
+
+    @Test
+    void sendCode_withinEmailCooldown_unreadableTtl_fallsBackToCooldown() {
+        processor.sendCode("user@example.com", CLIENT_IP);
+
+        assertThatThrownBy(() -> processor.sendCode("user@example.com", CLIENT_IP))
+            .isInstanceOf(AuthException.class)
+            .extracting(exception -> ((AuthException) exception).getRetryAfter())
+            .isEqualTo(Optional.of(Duration.ofSeconds(60)));
+    }
+
+    @Test
+    void sendCode_overIpLimit_carriesRemainingWindowAsRetryAfter() {
+        storePort.ipCounts.put(CLIENT_IP, (long) IP_MAX_SEND_COUNT);
+        storePort.ipWindowRemaining = Optional.of(Duration.ofSeconds(2_500));
+
+        assertThatThrownBy(() -> processor.sendCode("user@example.com", CLIENT_IP))
+            .isInstanceOf(AuthException.class)
+            .extracting(exception -> ((AuthException) exception).getRetryAfter())
+            .isEqualTo(Optional.of(Duration.ofSeconds(2_500)));
+    }
+
+    @Test
+    void sendCode_overIpLimit_unreadableTtl_fallsBackToConfiguredWindow() {
+        storePort.ipCounts.put(CLIENT_IP, (long) IP_MAX_SEND_COUNT);
+
+        assertThatThrownBy(() -> processor.sendCode("user@example.com", CLIENT_IP))
+            .isInstanceOf(AuthException.class)
+            .extracting(exception -> ((AuthException) exception).getRetryAfter())
+            .isEqualTo(Optional.of(Duration.ofHours(1)));
+    }
+
     @Test
     void verifyCode_fifthMismatch_invalidatesCode() {
         storePort.saveCode("user@example.com", "12345678", Duration.ofMinutes(5));
@@ -181,6 +243,18 @@ class EmailVerificationProcessorTest {
         private final Set<String> cooldowns = new HashSet<>();
         private final Map<String, Long> ipCounts = new HashMap<>();
         private boolean ipCounterBroken;
+        private Optional<Duration> cooldownRemaining = Optional.empty();
+        private Optional<Duration> ipWindowRemaining = Optional.empty();
+
+        @Override
+        public Optional<Duration> findCooldownRemaining(String email) {
+            return cooldownRemaining;
+        }
+
+        @Override
+        public Optional<Duration> findIpSendWindowRemaining(String clientIp) {
+            return ipWindowRemaining;
+        }
 
         @Override
         public void saveCode(String email, String code, Duration ttl) {

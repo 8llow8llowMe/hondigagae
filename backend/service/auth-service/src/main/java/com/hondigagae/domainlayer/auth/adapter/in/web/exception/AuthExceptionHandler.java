@@ -5,7 +5,9 @@ import com.hondigagae.common.exception.ValidationErrorSupport;
 import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
 import com.hondigagae.domainlayer.auth.application.exception.AuthException;
 import jakarta.validation.ConstraintViolationException;
+import java.time.Duration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -24,11 +26,25 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @RestControllerAdvice(basePackages = "com.hondigagae.domainlayer.auth")
 public class AuthExceptionHandler {
 
+    /**
+     * 재시도 대기 시간이 실린 예외(429 셋 — AUTH_003 · AUTH_015 · AUTH_016)는 표준 {@code Retry-After}
+     * 헤더(초, 정수)를 함께 싣는다 (#1293). 본문 봉투 · 코드 · 상태는 그대로다.
+     */
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<Response<Void>> handleAuthException(AuthException exception) {
-        return ResponseEntity
-            .status(exception.getErrorCode().getHttpStatus())
-            .body(Response.fail(exception.getErrorCode().getCode(), exception.getMessage()));
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(exception.getErrorCode().getHttpStatus());
+        exception.getRetryAfter()
+            .ifPresent(retryAfter -> builder.header(HttpHeaders.RETRY_AFTER, String.valueOf(toRetryAfterSeconds(retryAfter))));
+        return builder.body(Response.fail(exception.getErrorCode().getCode(), exception.getMessage()));
+    }
+
+    /**
+     * 초 단위로 올림하고 최소 1초를 보장한다. 버림하면 남은 0.4초가 {@code Retry-After: 0} 이 되어
+     * "지금 바로 다시 보내라"로 읽히고, 그 요청은 아직 살아 있는 키에 걸려 다시 429 가 된다.
+     */
+    static long toRetryAfterSeconds(Duration retryAfter) {
+        long seconds = (retryAfter.toMillis() + 999) / 1000;
+        return Math.max(seconds, 1L);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

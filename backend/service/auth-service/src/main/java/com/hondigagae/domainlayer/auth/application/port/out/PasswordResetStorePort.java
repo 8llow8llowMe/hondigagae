@@ -27,4 +27,10 @@ public interface PasswordResetStorePort {
     long increaseVerifyFailureCount(String email, Duration ttl);
 
     void clearVerifyFailures(String email);
+
+    /**
+     * 재발송 쿨다운의 남은 시간 ({@code Retry-After} 용, #1293). 키가 없거나 만료가 없거나 저장소를 읽지 못하면
+     * 비어 있다 — 호출부가 설정값으로 대체한다. 예외를 던지지 않는다.
+     */
+    Optional<Duration> findCooldownRemaining(String email);
 }

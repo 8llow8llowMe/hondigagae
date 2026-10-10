@@ -65,7 +65,7 @@ public class RedisEmailVerificationStoreAdapter implements EmailVerificationStor
     @Override
     public long increaseIpSendCount(String clientIp, Duration window) {
         try {
-            String key = buildKey("emailSendIp", clientIp);
+            String key = buildIpSendKey(clientIp);
             Long count = redisTemplate.opsForValue().increment(key);
             // 첫 발송에서만 TTL 을 걸어 고정 윈도우를 만든다 (로그인 실패 카운터와 동일한 방식).
             ensureCounterTtl(key, count, window);
@@ -76,6 +76,16 @@ public class RedisEmailVerificationStoreAdapter implements EmailVerificationStor
                 exception.getMessage());
             return 0L;
         }
+    }
+
+    @Override
+    public Optional<Duration> findCooldownRemaining(String email) {
+        return RedisKeyTtlReader.readRemaining(redisTemplate, buildCooldownKey(email));
+    }
+
+    @Override
+    public Optional<Duration> findIpSendWindowRemaining(String clientIp) {
+        return RedisKeyTtlReader.readRemaining(redisTemplate, buildIpSendKey(clientIp));
     }
 
     @Override
@@ -121,6 +131,10 @@ public class RedisEmailVerificationStoreAdapter implements EmailVerificationStor
 
     private String buildCooldownKey(String email) {
         return buildKey("emailVerificationCooldown", email);
+    }
+
+    private String buildIpSendKey(String clientIp) {
+        return buildKey("emailSendIp", clientIp);
     }
 
     private String buildKey(String type, String email) {

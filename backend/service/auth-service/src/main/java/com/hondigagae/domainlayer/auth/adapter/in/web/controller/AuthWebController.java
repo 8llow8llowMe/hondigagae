@@ -10,6 +10,7 @@ import com.hondigagae.domainlayer.auth.adapter.in.web.dto.request.AuthPasswordRe
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.request.AuthPasswordResetRequest;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthGeneralLoginResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuthorizeResponse;
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthVerificationCodeSendResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.provider.OAuthStateCookieProvider;
 import com.hondigagae.domainlayer.auth.adapter.in.web.provider.RefreshCookieProvider;
@@ -57,7 +58,8 @@ public class AuthWebController {
     @Operation(
         summary = "일반 로그인",
         description = "이메일과 비밀번호로 로그인합니다. 형식 오류는 400(필드별 검증 코드), 자격증명 불일치는 401(AUTH_006)로 "
-            + "구분됩니다. 실패가 누적되면 해당 이메일이 일정 시간 잠깁니다(AUTH_015, 429).\n\n"
+            + "구분됩니다. 실패가 누적되면 해당 이메일이 일정 시간 잠깁니다(AUTH_015, 429). "
+            + "잠금 응답에는 잠금이 풀릴 때까지 남은 초가 표준 `Retry-After` 헤더(정수)로 실립니다.\n\n"
             + "인증 불필요. **필수: 요청 바디의 email, password.** "
             + "응답 바디의 accessToken 을 이후 요청의 `Authorization: Bearer` 헤더에 넣고, refresh 토큰은 HttpOnly 쿠키로 자동 저장됩니다.\n\n"
             + "호출 예: `POST /api/v1/auth/login` `{\"email\":\"user@example.com\",\"password\":\"P@ssw0rd!\"}`"
@@ -188,15 +190,18 @@ public class AuthWebController {
     @Operation(summary = "이메일 인증코드 발송",
         description = "회원가입용 이메일 인증코드를 발송합니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 시간당 발송 상한(AUTH_016)이 적용되며, "
             + "가입 여부와 무관하게 항상 성공으로 응답합니다(기가입 이메일에는 안내 메일 발송).\n\n"
+            + "응답 바디의 codeExpiresInSeconds(코드 유효 시간)와 resendAvailableInSeconds(재발송 대기 시간)도 가입 여부와 무관하게 같은 값입니다. "
+            + "429(AUTH_003 · AUTH_016) 응답에는 다시 요청할 수 있을 때까지 남은 초가 표준 `Retry-After` 헤더(정수)로 실립니다.\n\n"
             + "인증 불필요. **필수: 요청 바디의 email.**\n\n"
             + "호출 예: `POST /api/v1/auth/email/send-code` `{\"email\":\"user@example.com\"}`")
     @PostMapping("/email/send-code")
-    public ResponseEntity<Response<Void>> sendEmailVerificationCode(
+    public ResponseEntity<Response<AuthVerificationCodeSendResponse>> sendEmailVerificationCode(
         @Valid @RequestBody AuthEmailCodeSendRequest request,
         HttpServletRequest httpServletRequest
     ) {
-        authWebUseCase.sendEmailVerificationCode(request.email(), clientIpResolver.resolve(httpServletRequest));
-        return ResponseEntity.ok().body(Response.success());
+        AuthVerificationCodeSendResponse response =
+            authWebUseCase.sendEmailVerificationCode(request.email(), clientIpResolver.resolve(httpServletRequest));
+        return ResponseEntity.ok().body(Response.success(response));
     }
 
     @Operation(summary = "이메일 인증코드 검증",
@@ -214,16 +219,20 @@ public class AuthWebController {
         계정 존재 여부와 무관하게 항상 성공으로 응답하며, 미가입 이메일과 소셜 전용 계정에는
         각각 안내 메일이 발송됩니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 발송 상한(AUTH_016)이 적용됩니다.
 
+        응답 바디의 codeExpiresInSeconds(코드 유효 시간)와 resendAvailableInSeconds(재발송 대기 시간)도 계정 상태와 무관하게 같은 값입니다.
+        429(AUTH_003 · AUTH_016) 응답에는 다시 요청할 수 있을 때까지 남은 초가 표준 `Retry-After` 헤더(정수)로 실립니다.
+
         인증 불필요. **필수: 요청 바디의 email.**
 
         호출 예: `POST /api/v1/auth/password/reset/send-code` `{"email":"user@example.com"}`""")
     @PostMapping("/password/reset/send-code")
-    public ResponseEntity<Response<Void>> sendPasswordResetCode(
+    public ResponseEntity<Response<AuthVerificationCodeSendResponse>> sendPasswordResetCode(
         @Valid @RequestBody AuthPasswordResetCodeSendRequest request,
         HttpServletRequest httpServletRequest
     ) {
-        authWebUseCase.sendPasswordResetCode(request.email(), clientIpResolver.resolve(httpServletRequest));
-        return ResponseEntity.ok().body(Response.success());
+        AuthVerificationCodeSendResponse response =
+            authWebUseCase.sendPasswordResetCode(request.email(), clientIpResolver.resolve(httpServletRequest));
+        return ResponseEntity.ok().body(Response.success(response));
     }
 
     @Operation(summary = "비밀번호 재설정", description = """

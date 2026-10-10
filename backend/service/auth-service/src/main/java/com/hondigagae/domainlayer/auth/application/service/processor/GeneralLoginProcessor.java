@@ -11,6 +11,7 @@ import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPo
 import com.hondigagae.domainlayer.member.application.service.support.EmailNormalizer;
 import com.hondigagae.domainlayer.member.domain.model.Member;
 import com.hondigagae.global.properties.LoginAttemptProperties;
+import java.time.Duration;
 import java.util.Optional;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -49,8 +50,10 @@ public class GeneralLoginProcessor {
         String email = EmailNormalizer.normalize(command.email());
 
         // 1. 잠금 검사 — 회원 조회보다 먼저 수행해 잠긴 이메일에는 DB 조회/bcrypt 비용조차 주지 않는다.
+        //    남은 잠금 시간(Retry-After)도 이메일 키 TTL 이라 가입 여부와 무관하다 (#1293).
         if (loginAttemptStorePort.isLocked(email)) {
-            throw new AuthException(AuthErrorCode.LOGIN_ATTEMPT_LOCKED);
+            Duration retryAfter = loginAttemptStorePort.findLockRemaining(email).orElse(loginAttemptProperties.lockDuration());
+            throw AuthException.withRetryAfter(AuthErrorCode.LOGIN_ATTEMPT_LOCKED, retryAfter);
         }
 
         // 2. 회원 조회 (미존재도 LOGIN_FAILED로 응답해 계정 존재 여부를 노출하지 않는다)
@@ -83,7 +86,8 @@ public class GeneralLoginProcessor {
         long failureCount = loginAttemptStorePort.increaseFailureCount(email, loginAttemptProperties.lockDuration());
         if (failureCount >= loginAttemptProperties.maxFailureCount()) {
             loginAttemptStorePort.lock(email, loginAttemptProperties.lockDuration());
-            return new AuthException(AuthErrorCode.LOGIN_ATTEMPT_LOCKED);
+            // 방금 건 잠금이라 남은 시간이 곧 잠금 시간이다 — TTL 을 다시 읽으러 왕복하지 않는다.
+            return AuthException.withRetryAfter(AuthErrorCode.LOGIN_ATTEMPT_LOCKED, loginAttemptProperties.lockDuration());
         }
         return new AuthException(AuthErrorCode.LOGIN_FAILED);
     }

@@ -46,6 +46,11 @@ public class RedisPasswordResetStoreAdapter implements PasswordResetStorePort {
     }
 
     @Override
+    public Optional<Duration> findCooldownRemaining(String email) {
+        return RedisKeyTtlReader.readRemaining(redisTemplate, buildCooldownKey(email));
+    }
+
+    @Override
     public long increaseVerifyFailureCount(String email, Duration ttl) {
         String key = buildFailKey(email);
         Long count = redisTemplate.opsForValue().increment(key);

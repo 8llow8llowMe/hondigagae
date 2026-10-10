@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.auth.adapter.out.persistence;
 import com.hondigagae.domainlayer.auth.application.port.out.LoginAttemptStorePort;
 import com.hondigagae.redis.properties.RedisProperties;
 import java.time.Duration;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -83,6 +84,11 @@ public class RedisLoginAttemptStoreAdapter implements LoginAttemptStorePort {
         } catch (DataAccessException exception) {
             log.error("[RedisLoginAttemptStoreAdapter] 로그인 실패 카운터 초기화 실패: error={}", exception.getMessage());
         }
+    }
+
+    @Override
+    public Optional<Duration> findLockRemaining(String email) {
+        return RedisKeyTtlReader.readRemaining(redisTemplate, buildLockKey(email));
     }
 
     /**

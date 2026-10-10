@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.auth.application.port.out;
 
 import java.time.Duration;
+import java.util.Optional;
 
 /**
  * 로그인 실패 횟수 / 잠금 상태 저장소 계약.
@@ -27,4 +28,10 @@ public interface LoginAttemptStorePort {
 
     /** 실패 카운터와 잠금을 모두 해제한다 (로그인 성공 시). */
     void clearFailures(String email);
+
+    /**
+     * 잠금의 남은 시간 ({@code Retry-After} 용, #1293). 키가 없거나 만료가 없거나 저장소를 읽지 못하면
+     * 비어 있다 — 호출부가 설정값으로 대체한다. 예외를 던지지 않는다.
+     */
+    Optional<Duration> findLockRemaining(String email);
 }

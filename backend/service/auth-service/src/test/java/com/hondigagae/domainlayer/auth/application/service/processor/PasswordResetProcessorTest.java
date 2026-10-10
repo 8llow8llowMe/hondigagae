@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
 import com.hondigagae.domainlayer.auth.application.exception.AuthException;
+import com.hondigagae.domainlayer.auth.application.info.VerificationCodeSendInfo;
 import com.hondigagae.domainlayer.auth.application.port.out.EmailVerificationStorePort;
 import com.hondigagae.domainlayer.auth.application.port.out.JwtTokenStorePort;
 import com.hondigagae.domainlayer.auth.application.port.out.MailSendPort;
@@ -119,6 +120,69 @@ class PasswordResetProcessorTest {
             .isEqualTo(AuthErrorCode.EMAIL_CODE_COOLDOWN);
     }
 
+    /**
+     * #1293 — 응답에 싣는 시간 정보가 계정 상태(일반 · 미가입 · 소셜 전용 · 탈퇴)마다 달라지면 그 자체가
+     * 계정 열거 벡터다. 네 분기의 반환값이 같은 값이어야 한다.
+     */
+    @Test
+    void sendResetCode_returnsSameTimingRegardlessOfAccountState() {
+        memberRepositoryPort.register(Member.builder()
+            .id(3L).email("withdrawn@example.com").password(passwordEncoder.encode("OldPassword1!"))
+            .nickname("gone").role(SecurityRole.USER).status(MemberStatus.WITHDRAWN)
+            .build());
+
+        VerificationCodeSendInfo general = processor.sendResetCode(EMAIL, CLIENT_IP);
+        VerificationCodeSendInfo unregistered = processor.sendResetCode("unknown@example.com", CLIENT_IP);
+        VerificationCodeSendInfo socialOnly = processor.sendResetCode(SOCIAL_EMAIL, CLIENT_IP);
+        VerificationCodeSendInfo withdrawn = processor.sendResetCode("withdrawn@example.com", CLIENT_IP);
+
+        assertThat(general.codeExpiresIn()).isEqualTo(Duration.ofMinutes(5));
+        assertThat(general.resendAvailableIn()).isEqualTo(Duration.ofSeconds(60));
+        assertThat(List.of(unregistered, socialOnly, withdrawn)).allSatisfy(info -> assertThat(info).isEqualTo(general));
+    }
+
+    @Test
+    void sendResetCode_overIpLimit_carriesRemainingWindowAsRetryAfter() {
+        emailStorePort.ipCounts.put(CLIENT_IP, (long) IP_MAX_SEND_COUNT);
+        emailStorePort.ipWindowRemaining = Optional.of(Duration.ofSeconds(1234));
+
+        assertThatThrownBy(() -> processor.sendResetCode(EMAIL, CLIENT_IP))
+            .isInstanceOf(AuthException.class)
+            .extracting(exception -> ((AuthException) exception).getRetryAfter())
+            .isEqualTo(Optional.of(Duration.ofSeconds(1234)));
+    }
+
+    @Test
+    void sendResetCode_overIpLimit_unreadableTtl_fallsBackToConfiguredWindow() {
+        emailStorePort.ipCounts.put(CLIENT_IP, (long) IP_MAX_SEND_COUNT);
+
+        assertThatThrownBy(() -> processor.sendResetCode(EMAIL, CLIENT_IP))
+            .isInstanceOf(AuthException.class)
+            .extracting(exception -> ((AuthException) exception).getRetryAfter())
+            .isEqualTo(Optional.of(Duration.ofHours(1)));
+    }
+
+    @Test
+    void sendResetCode_withinCooldown_carriesRemainingCooldownAsRetryAfter() {
+        processor.sendResetCode(EMAIL, CLIENT_IP);
+        resetStorePort.cooldownRemaining = Optional.of(Duration.ofSeconds(42));
+
+        assertThatThrownBy(() -> processor.sendResetCode(EMAIL, CLIENT_IP))
+            .isInstanceOf(AuthException.class)
+            .extracting(exception -> ((AuthException) exception).getRetryAfter())
+            .isEqualTo(Optional.of(Duration.ofSeconds(42)));
+    }
+
+    @Test
+    void sendResetCode_withinCooldown_unreadableTtl_fallsBackToCooldown() {
+        processor.sendResetCode(EMAIL, CLIENT_IP);
+
+        assertThatThrownBy(() -> processor.sendResetCode(EMAIL, CLIENT_IP))
+            .isInstanceOf(AuthException.class)
+            .extracting(exception -> ((AuthException) exception).getRetryAfter())
+            .isEqualTo(Optional.of(Duration.ofSeconds(60)));
+    }
+
     @Test
     void resetPassword_changesPasswordAndRevokesAllSessions() {
         processor.sendResetCode(EMAIL, CLIENT_IP);
@@ -196,11 +260,29 @@ class PasswordResetProcessorTest {
         public void clearVerifyFailures(String email) {
             failures.remove(email);
         }
+
+        private Optional<Duration> cooldownRemaining = Optional.empty();
+
+        @Override
+        public Optional<Duration> findCooldownRemaining(String email) {
+            return cooldownRemaining;
+        }
     }
 
     private static class StubEmailVerificationStorePort implements EmailVerificationStorePort {
 
         private final Map<String, Long> ipCounts = new HashMap<>();
+        private Optional<Duration> ipWindowRemaining = Optional.empty();
+
+        @Override
+        public Optional<Duration> findCooldownRemaining(String email) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<Duration> findIpSendWindowRemaining(String clientIp) {
+            return ipWindowRemaining;
+        }
 
         @Override
         public void saveCode(String email, String code, Duration ttl) {
