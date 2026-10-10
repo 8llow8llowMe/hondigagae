@@ -39,7 +39,7 @@ public enum PlanDayWeatherUnavailableReason implements CodeNameDescribable {
     NO_PLACE_ITEM("장소 미지정",
         "이 날짜에는 장소가 지정된 일정 항목이 없어 날씨를 붙이지 못했습니다."),
     BEYOND_FORECAST_RANGE("예보 범위 밖",
-        "예보는 오늘부터 11일까지만 제공되어 이 날짜는 아직 알려 드릴 수 없습니다."),
+        "예보는 오늘부터 열흘 뒤까지만 제공되어 이 날짜는 아직 알려 드릴 수 없습니다."),
     LOOKUP_FAILED("조회 실패",
         "날씨 정보를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.");
 
