@@ -444,12 +444,18 @@ describe('MapSheet — 머리 밀도 headerSize (#1314 D8-4)', () => {
     expect(countLineTag(markup)).not.toContain('pb-2')
   })
 
-  it('sm 의 `목록 더 보기` 는 보이는 상자 32 + 아래로만 12 넓힌 누르는 자리 = 44', () => {
+  /*
+    **위아래 6 씩 나눠 넓힌다** (#1314 리뷰). 아래로만 12 면 그 띠가 스크롤과 무관하게 목록 칸 맨 위 12 에 붙어,
+    스크롤한 뒤 행의 `상세` · `담기` 윗끝을 가로채고 그 자리의 세로 스와이프를 시트 드래그로 바꿨다. 위 6 은 칩의 보이는
+    면이 아니라 칩 sm 의 투명 히트 띠(`before:-inset-y-1.5`)라 새로 덮는 것이 없다.
+  */
+  it('sm 의 `목록 더 보기` 는 보이는 상자 32 + 위아래 6 씩 넓힌 누르는 자리 = 44', () => {
     const tag = stopButtonTag(renderHead('sm'))
 
     expect(tag).toMatch(/(\s|")h-8(\s|")/)
-    expect(tag).toContain('before:top-0')
-    expect(tag).toContain('before:-bottom-3')
+    expect(tag).toContain('before:-top-1.5')
+    expect(tag).toContain('before:-bottom-1.5')
+    expect(tag).not.toContain('before:-bottom-3')
     expect(tag).not.toContain('py-2')
   })
 

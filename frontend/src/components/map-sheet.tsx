@@ -115,8 +115,9 @@ export function sheetDragIntent(dx: number, dy: number): 'pending' | 'sheet' | '
  * - `md`(기본) — 필터 줄 밑 `pb-2` + 개수 줄(글자 버튼 34 + `pb-2`) **42**. `/emergency` 가 쓴다
  * - `sm` — **개수 줄을 필터 줄 바로 밑 작은 글줄 32 로 좁힌다.** 390×844 `mid` 에서 머리 110 → 92, 목록이 약 0.17 행
  *   더 보인다(실측은 명세 D2-3). `목록 더 보기` 의 보이는 상자는 글줄 높이 32 이고, 누르는 자리는 `::before` 로
- *   **아래로만 12** 넓혀 44 다 — 위로 넓히면 필터 칩의 보이는 면을 덮고, 아래 12 는 목록 첫 행의 `py-3` 윗여백
- *   (스크롤 0 에서 비어 있는 자리)이다. 넓힌 띠가 목록 위에 칠해지도록 머리를 로컬 층(`z-10`)으로 올린다
+ *   **위아래 6 씩** 넓혀 44 다. 위 6 은 칩의 보이는 면이 아니라 칩 sm 의 투명 히트 띠 자리다. 아래로만 12 였을 때는
+ *   그 띠가 스크롤과 무관하게 목록 칸 맨 위에 붙어 행의 `상세` · `담기` 윗끝을 가로채고 그 자리 세로 스와이프를 시트
+ *   드래그로 바꿨다(#1314 리뷰) — 반으로 줄였다. 넓힌 띠가 목록 위에 칠해지도록 머리를 로컬 층(`z-10`)으로 올린다
  *
  * 개수 글줄의 글자는 지금처럼 `header` 가 그린다 — 낭독 순서(필터 줄 → 개수 → `목록 더 보기`)도 그대로다.
  */
@@ -139,7 +140,7 @@ const COUNT_LINE_CLASS: Record<MapSheetHeaderSize, string> = {
 
 const STOP_BUTTON_CLASS: Record<MapSheetHeaderSize, string> = {
   md: 'px-2 py-2',
-  sm: "relative inline-flex h-8 items-center px-2 before:absolute before:inset-x-0 before:top-0 before:-bottom-3 before:content-['']",
+  sm: "relative inline-flex h-8 items-center px-2 before:absolute before:inset-x-0 before:-top-1.5 before:-bottom-1.5 before:content-['']",
 }
 
 export function MapSheet({
