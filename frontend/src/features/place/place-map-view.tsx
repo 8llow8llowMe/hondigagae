@@ -982,13 +982,21 @@ export function PlaceMapView({
             **머리가 있으면 여기 두지 않는다** (#1012). 그 자리가 머리 카드 밑이다 — 아래
             머리 기둥이 대신 그린다.
           */}
+          {/*
+            **재검색 알약은 검색창 바로 아래다** (#1313). 예전에는 상단 행 전체 아래에 섰는데, 행의 높이를 오른쪽
+            기둥(목록 아이콘 + 아이콘 카드, 약 152)이 정해 검색창(44) 아래로 약 110px 이 비어 보였다. 같은 일(조회
+            영역)을 하는 두 컨트롤을 한 기둥에 붙인다. 알약은 기둥 가운데 — 오른쪽 기둥과 겹치지 않는다.
+          */}
           {searchable && !hasHead && (
-            <PlaceSearchField
-              filters={filters}
-              compact
-              id="place-keyword-map"
-              className="pointer-events-auto max-w-md min-w-0 flex-1 lg:hidden"
-            />
+            <div className="flex max-w-md min-w-0 flex-1 flex-col items-center gap-2 lg:hidden">
+              <PlaceSearchField
+                filters={filters}
+                compact
+                id="place-keyword-map"
+                className="pointer-events-auto w-full"
+              />
+              {offerResearch && <ResearchHereButton onClick={researchHere} />}
+            </div>
           )}
 
           <div className="pointer-events-auto flex shrink-0 flex-col items-end gap-2">
@@ -1050,10 +1058,10 @@ export function PlaceMapView({
         )}
 
         {/*
-          **`lg` 미만의 재검색은 상단 컨트롤 묶음 맨 아래다** (#1278). 하단에 두면 시트 중간 · 최대 단계에
-          가려졌다. 흐름 안이라 위 줄(검색 · 보기 전환 · 내 위치)이 커져도 겹치지 않는다.
+          **`lg` 미만 · 검색창이 없는 갈래**(담기 지도의 머리 카드 등)의 재검색은 상단 컨트롤 묶음 맨 아래다
+          (#1278). 하단에 두면 시트 중간 · 최대 단계에 가려졌다. 검색창이 있으면 그 바로 아래에 선다(위, #1313).
         */}
-        {offerResearch && (
+        {offerResearch && !(searchable && !hasHead) && (
           <div className="flex justify-center px-4 pt-2 lg:hidden">
             <ResearchHereButton onClick={researchHere} />
           </div>

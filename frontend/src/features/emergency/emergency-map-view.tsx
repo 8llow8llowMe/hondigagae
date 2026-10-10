@@ -553,18 +553,26 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
             `items-start` 는 검색(44)과 토글 묶음(토글 44 + 내 위치 44)의 **윗변**을 맞춘다:
             `items-end` 면 검색이 내 위치 버튼 옆까지 내려간다.
           */}
-          <EmergencySearchField
-            filters={board.filters}
-            onFiltersChange={board.setFilters}
-            compact
-            id="emergency-keyword-map"
-            /*
-              **`max-w-md` 로 상한을 둔다.** 768 실측에서 상한이 없으면 입력이 538px 로
-              벌어져, 짧은 placeholder 하나를 담고 지도를 가로로 길게 가린다. 375 에서는
-              `flex-1` 이 준 245 가 상한보다 작아 그대로다 — 좁은 쪽은 손대지 않는다.
-            */
-            className="pointer-events-auto max-w-md min-w-0 flex-1 lg:hidden"
-          />
+          {/*
+            **`max-w-md` 로 상한을 둔다.** 768 실측에서 상한이 없으면 입력이 538px 로
+            벌어져, 짧은 placeholder 하나를 담고 지도를 가로로 길게 가린다. 375 에서는
+            `flex-1` 이 준 245 가 상한보다 작아 그대로다 — 좁은 쪽은 손대지 않는다.
+
+            **재검색 알약은 검색창 바로 아래다** (#1313) — `/places` 와 같은 자리(#396). 상단 행 아래에 두면
+            오른쪽 기둥(보기 전환 + 내 위치) 높이만큼 검색창 아래가 비었다.
+          */}
+          <div className="flex max-w-md min-w-0 flex-1 flex-col items-center gap-2 lg:hidden">
+            <EmergencySearchField
+              filters={board.filters}
+              onFiltersChange={board.setFilters}
+              compact
+              id="emergency-keyword-map"
+              className="pointer-events-auto w-full"
+            />
+            {offerResearch && bounds !== null && (
+              <ResearchHereButton onClick={() => board.researchAt(boundsCenter(bounds))} />
+            )}
+          </div>
 
           <div className="pointer-events-auto flex shrink-0 flex-col items-end gap-2">
             <ViewToggle current="map" listHref={listHref} mapHref={mapHref} />
@@ -592,16 +600,6 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
             <div className="bg-bg border-border pointer-events-auto max-w-md rounded-lg border px-3 py-2 shadow-md">
               <PositionNotice reason={board.fallback} onRetry={board.locate} />
             </div>
-          </div>
-        )}
-
-        {/*
-          **`lg` 미만의 재검색은 묶음 맨 아래 — 위치 안내보다도 아래다** (#1278). 고정 좌표로 두면 이 안내와
-          겹쳤다(실측). 하단에 두면 시트 중간 · 최대 단계에 가려졌다.
-        */}
-        {offerResearch && bounds !== null && (
-          <div className="flex justify-center px-4 pt-2 lg:hidden">
-            <ResearchHereButton onClick={() => board.researchAt(boundsCenter(bounds))} />
           </div>
         )}
       </div>
