@@ -293,15 +293,39 @@ class OllamaLlmAdapterTest {
     }
 
     @Test
-    @DisplayName("일정 요청 옵션에 keep-alive 기본값 -1(상주)이 실린다 — 빠진 요청 하나가 서버 기본 5분으로 되돌린다")
+    @DisplayName("일정 요청 옵션에 keep-alive 기본값 -1m(상주, 단위 있는 값)이 실린다 — 빠진 요청 하나가 서버 기본 5분으로 되돌린다")
     void planRequestCarriesKeepAlive() {
         stubResponse(ONE_ITEM_DRAFT);
 
         adapter.generatePlanDraft(query(candidate(100L, "오설록")));
 
         OllamaChatOptions options = sentOptions();
-        assertThat(options.getKeepAlive()).isEqualTo("-1");
+        assertThat(options.getKeepAlive()).isEqualTo("-1m");
         assertThat(options.getFormat()).isEqualTo("json");
+    }
+
+    @Test
+    @DisplayName("단위 없는 정수 keep-alive 는 초 단위로 바꿔 보내고 단위 있는 값은 그대로 둔다 — Ollama 가 단위 없는 문자열을 400 으로 거부한다 (#1321)")
+    void normalizesUnitlessKeepAlive() {
+        assertThat(OllamaLlmAdapter.ollamaKeepAlive("-1")).isEqualTo("-1s");
+        assertThat(OllamaLlmAdapter.ollamaKeepAlive(" 300 ")).isEqualTo("300s");
+        assertThat(OllamaLlmAdapter.ollamaKeepAlive("-1m")).isEqualTo("-1m");
+        assertThat(OllamaLlmAdapter.ollamaKeepAlive("24h")).isEqualTo("24h");
+        assertThat(OllamaLlmAdapter.ollamaKeepAlive("30m")).isEqualTo("30m");
+        assertThat(OllamaLlmAdapter.ollamaKeepAlive(null)).isNull();
+    }
+
+    @Test
+    @DisplayName("단위 없는 -1 을 설정해도 요청에는 -1s 로 실린다 (#1321)")
+    void unitlessConfiguredKeepAliveIsSentWithSeconds() {
+        OllamaLlmAdapter pinned = adapter(new AiLlmProperties(null, null, null, null, null, null, null, null, null, null, null, "-1"));
+        stubResponse("""
+            {"items":[]}
+            """);
+
+        pinned.generatePackingList(PackingChecklistQuery.builder().startDate("2026-09-09").endDate("2026-09-12").build());
+
+        assertThat(sentOptions().getKeepAlive()).isEqualTo("-1s");
     }
 
     @Test

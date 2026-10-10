@@ -572,12 +572,12 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
 230자(하루)다. 토큰 수는 dev 의 `LLM timing ... outputTokens=` 로 확인한다 — gpt-oss 는 추론(analysis) 토큰도 출력
 토큰으로 세므로, JSON 이 1/3 이 되어도 출력 토큰이 같은 비율로 줄지는 않는다.
 
-**keep-alive (`ai-llm.keep-alive`, 기본 `-1` 상주).** 첫 시도가 더 느린 것은 Ollama 기본 keep_alive(5분)가 지나 모델이
+**keep-alive (`ai-llm.keep-alive`, 기본 `-1m` 상주).** 첫 시도가 더 느린 것은 Ollama 기본 keep_alive(5분)가 지나 모델이
 내려가고 다음 요청에 로드가 붙기 때문으로 본다(`LLM timing` 의 `loadMs` 가 0 이 아니다). **요청마다 싣는다** —
 keep_alive 는 요청 단위 값이라 빠뜨린 요청 하나가 서버 기본으로 되돌린다. 일정 · 준비물 호출이 같은 옵션 조립
 (`OllamaLlmAdapter#buildRequestOptions`)을 쓴다. **요청 값이 서버 `OLLAMA_KEEP_ALIVE` 를 덮는다** (#1246) — dev 의
 Ollama 는 전용 호스트(ollama-01, 서버 24h)인데 요청이 30분을 실어 30분 쉬면 모델이 내려갔고, 다음 첫 요청에 로드
-6~8초가 붙었다. **기본을 `-1`(상주)로 둔다** (#1321) — Ollama 가 전용 호스트라 메모리 트레이드오프가 없고, 24h 는
+6~8초가 붙었다. **기본을 `-1m`(상주)로 둔다** (#1321). 단위 없는 문자열 `"-1"` 은 Ollama 가 HTTP 400(`missing unit in duration`)으로 거부한다(dev 2026-10-10 실측; `"-1m"` · 숫자 `-1` · `"24h"` 는 200) — Spring AI 는 문자열로 보내므로 기본이 `-1m` 이고, 어댑터가 단위 없는 정수(`-1` · `300`)는 `s` 를 붙여 보낸다(`ollamaKeepAlive`) — Ollama 가 전용 호스트라 메모리 트레이드오프가 없고, 24h 는
 하루 넘게 쉬면 첫 요청에 모델 로드 약 60초가 붙는다(dev 2026-10-10 실측, `loadMs=61584`). Ollama 가 다른 서비스와 같은
 호스트면 붐빌 때 `AI_LLM_KEEP_ALIVE=30m` 처럼 줄인다.
 

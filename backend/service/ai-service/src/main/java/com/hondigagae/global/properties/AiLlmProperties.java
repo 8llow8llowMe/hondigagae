@@ -44,9 +44,9 @@ public record AiLlmProperties(
     // 후보 장소를 몇 개까지 프롬프트에 실을지. 토큰 비용과 선택지 다양성의 절충이다.
     // 프롬프트 크기를 좌우하는 값이라 contextTokens 와 함께 봐야 한다.
     Integer placeCandidateSize,
-    // 호출 뒤 모델을 메모리에 붙들어 둘 시간(Ollama keep_alive, "30m" · "-1" 형식, 기본 "-1"). 요청마다 싣는다.
+    // 호출 뒤 모델을 메모리에 붙들어 둘 시간(Ollama keep_alive, "30m" · "-1m" 형식, 기본 "-1m"). 요청마다 싣는다.
     // Ollama 기본 5분이면 뜸한 dev 에서 첫 요청마다 모델 로드가 붙는다(#1128) — 대신 그동안 main-server 와
-    // 나눠 쓰는 메모리를 쥐고 있는다. "-1" 은 상주다 — Ollama 전용 호스트라 기본으로 상주시킨다(#1321).
+    // 나눠 쓰는 메모리를 쥐고 있는다. "-1m" 은 상주다(단위 없는 문자열은 Ollama 가 400 으로 거부한다) — Ollama 전용 호스트라 기본으로 상주시킨다(#1321).
     String keepAlive
 ) {
 
@@ -94,7 +94,7 @@ public record AiLlmProperties(
             placeCandidateSize = 50;
         }
         if (keepAlive == null || keepAlive.isBlank()) {
-            keepAlive = "-1";
+            keepAlive = "-1m";
         }
     }
 }
