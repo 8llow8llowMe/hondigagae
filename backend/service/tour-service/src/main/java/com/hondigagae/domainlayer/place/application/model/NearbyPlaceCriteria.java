@@ -17,6 +17,8 @@ public record NearbyPlaceCriteria(
     double lat,
     double lng,
     int radius,
+    // 목록 조회의 sigunguCode 와 같은 의미다. 지도의 "이 지역에서 재검색" 이 시군구 필터를 잃지 않게 한다 (#1316).
+    String sigunguCode,
     ContentType contentType,
     PetAllowanceType petAllowanceType,
     Boolean indoor,

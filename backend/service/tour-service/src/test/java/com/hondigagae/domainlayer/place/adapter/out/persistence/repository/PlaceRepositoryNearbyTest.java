@@ -151,6 +151,21 @@ class PlaceRepositoryNearbyTest {
         assertThat(for15kg).extracting(PlaceEntity::getTitle).containsExactly("상한 없는 카페");
     }
 
+    @Test
+    @DisplayName("시군구로 거르면 반경 안에서도 그 시군구 장소만 남고, 생략하면 시군구를 가리지 않는다 (#1316)")
+    void filterBySigunguCode() {
+        placeRepository.save(place(60L, "제주시 카페", "33.5000", "126.5300", null));
+        placeRepository.save(baseBuilder(61L, "다른 시군구 카페").contentTypeId("39")
+            .lat(new BigDecimal("33.5001")).lng(new BigDecimal("126.5301"))
+            .sigunguCode("3").build());
+
+        List<PlaceEntity> jejuOnly = placeRepository.searchNearby(criteria().sigunguCode("4").build());
+        List<PlaceEntity> noFilter = placeRepository.searchNearby(criteria().build());
+
+        assertThat(jejuOnly).extracting(PlaceEntity::getTitle).containsExactly("제주시 카페");
+        assertThat(noFilter).extracting(PlaceEntity::getTitle).containsExactlyInAnyOrder("제주시 카페", "다른 시군구 카페");
+    }
+
     private NearbyPlaceCriteria.NearbyPlaceCriteriaBuilder criteria() {
         return NearbyPlaceCriteria.builder()
             .lat(CENTER_LAT)

@@ -37,9 +37,12 @@ public class RedisPlaceSearchCacheAdapter implements PlaceSearchCachePort {
      * v3 (#1202) — 목록에 기준 좌표가 생겨 키 의미가 바뀌었고(같은 조건이라도 좌표가 다르면 순서가 다르다), 저장 봉투의
      * {@code PlaceSummaryInfo} 에 {@code distanceMeters} 가 더해졌다. v2 항목과 섞이지 않게 네임스페이스를 올린다.
      * 주변 검색(v2)은 키 의미가 그대로이고, 옛 항목은 {@code distanceMeters} 없이도 읽혀(null) 올리지 않는다.
+     *
+     * <p>주변 v3 (#1316) — 시군구 필터가 키에 들어가 키 의미가 바뀌었다. 저장 봉투는 그대로지만, 롤링 배포 중 시군구를 모르는
+     * 옛 인스턴스가 쓴 v2 항목(시군구로 거르지 않은 결과)과 한 네임스페이스를 나눠 쓰지 않게 올린다.
      */
     private static final String LIST_KEY_FORMAT = "%s:tour:place:list:v3:%s";
-    private static final String NEARBY_KEY_FORMAT = "%s:tour:place:nearby:v2:%s";
+    private static final String NEARBY_KEY_FORMAT = "%s:tour:place:nearby:v3:%s";
 
     private final StringRedisTemplate stringRedisTemplate;
     private final RedisProperties redisProperties;
@@ -131,6 +134,7 @@ public class RedisPlaceSearchCacheAdapter implements PlaceSearchCachePort {
             String.valueOf(criteria.lat()),
             String.valueOf(criteria.lng()),
             String.valueOf(criteria.radius()),
+            part(criteria.sigunguCode()),
             part(criteria.contentType()),
             part(criteria.petAllowanceType()),
             part(criteria.indoor()),
