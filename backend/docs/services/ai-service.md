@@ -572,13 +572,14 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
 230자(하루)다. 토큰 수는 dev 의 `LLM timing ... outputTokens=` 로 확인한다 — gpt-oss 는 추론(analysis) 토큰도 출력
 토큰으로 세므로, JSON 이 1/3 이 되어도 출력 토큰이 같은 비율로 줄지는 않는다.
 
-**keep-alive (`ai-llm.keep-alive`, 기본 `30m`).** 첫 시도가 더 느린 것은 Ollama 기본 keep_alive(5분)가 지나 모델이
+**keep-alive (`ai-llm.keep-alive`, 기본 `-1` 상주).** 첫 시도가 더 느린 것은 Ollama 기본 keep_alive(5분)가 지나 모델이
 내려가고 다음 요청에 로드가 붙기 때문으로 본다(`LLM timing` 의 `loadMs` 가 0 이 아니다). **요청마다 싣는다** —
 keep_alive 는 요청 단위 값이라 빠뜨린 요청 하나가 서버 기본으로 되돌린다. 일정 · 준비물 호출이 같은 옵션 조립
-(`OllamaLlmAdapter#buildRequestOptions`)을 쓴다. **트레이드오프** — 그동안 Ollama 호스트의 메모리를 쥐고 있는다.
-Ollama 가 다른 서비스와 같은 호스트면 붐빌 때 줄이고, `-1` 은 상주다(`AI_LLM_KEEP_ALIVE`). **요청 값이 서버
-`OLLAMA_KEEP_ALIVE` 를 덮는다** (#1246) — dev 의 Ollama 는 전용 호스트(ollama-01, 서버 24h)인데 요청이 30분을 실어
-30분 쉬면 모델이 내려갔고, 다음 첫 요청에 로드 6~8초가 붙었다. 전용 호스트면 `AI_LLM_KEEP_ALIVE=24h` 로 맞춘다.
+(`OllamaLlmAdapter#buildRequestOptions`)을 쓴다. **요청 값이 서버 `OLLAMA_KEEP_ALIVE` 를 덮는다** (#1246) — dev 의
+Ollama 는 전용 호스트(ollama-01, 서버 24h)인데 요청이 30분을 실어 30분 쉬면 모델이 내려갔고, 다음 첫 요청에 로드
+6~8초가 붙었다. **기본을 `-1`(상주)로 둔다** (#1321) — Ollama 가 전용 호스트라 메모리 트레이드오프가 없고, 24h 는
+하루 넘게 쉬면 첫 요청에 모델 로드 약 60초가 붙는다(dev 2026-10-10 실측, `loadMs=61584`). Ollama 가 다른 서비스와 같은
+호스트면 붐빌 때 `AI_LLM_KEEP_ALIVE=30m` 처럼 줄인다.
 
 **단계별 시간은 `Duration` 으로 온다 (#1235).** Spring AI 1.1.x 의 `OllamaChatModel` 은 Ollama 의 나노초 지표
 (`total-duration` · `load-duration` · `prompt-eval-duration` · `eval-duration`)를 `java.time.Duration` 으로 바꿔
@@ -588,19 +589,32 @@ Ollama 가 다른 서비스와 같은 호스트면 붐빌 때 줄이고, `-1` �
 58.9초(입력 5,614 · 출력 301 토큰, 재시작 뒤 첫 호출), 준비물 37.2초(입력 1,699 · 출력 148 토큰, 직전 호출 5시간 뒤).
 둘 다 로드가 섞였을 가능성이 높아, 배포 뒤 **같은 조건으로 연달아 두 번** 재서 첫 호출과 두 번째를 가른다.
 
-**시간의 대부분은 입력 처리(prefill)이고, Ollama 가 그 값을 틀리게 보고한다 (#1246).** 값이 찍히자 생성 61~95초 중
-38~69초가 어느 지표에도 없었다(`total − load − prefill − decode`). ollama-01 에서 직접 잰 결과 그 시간은 입력 길이를
-따라 늘었다 — 후보 줄 10 · 50줄(입력 675 · 2,917 토큰)에 지표 밖 3.9 · 10.6초, 보고된 `prompt_eval_duration` 은
-83 · 94ms 로 길이와 무관했다. 같은 시간대 다른 클라이언트 요청은 없었고(GIN 로그), 추론(think=low)은 60~146자로
-짧았으며, 출력은 19~20 tok/s 로 예측대로다. 그래서:
-- **`LLM timing` 에 `prefillEstMs`(= `totalMs − loadMs − decodeMs`)를 함께 남긴다.** `prefillMs` 보고값은 긴 입력에서
-  믿지 않는다.
+**`LLM timing` 의 `unreportedMs` 는 입력 처리 추정이 아니라 보고되지 않은 구간이다 (#1246 · #1321).** 값이 찍히자 생성
+61~95초 중 38~69초가 어느 지표에도 없었다(`total − load − prefill − decode`). 처음에는 이를 입력 처리(prefill)로 읽고
+`prefillEstMs` 라 불렀지만, #1321 의 dev 실측(2026-10-10)이 그 해석을 뒤집었다. ai-service 의 Ollama 요청은
+`format:"json"` + `think:"low"` 다. Ollama 는 이때 **추론을 먼저 생성하고(첫 단계) 문법을 걸어 다시 생성한다.** 첫 단계의
+시간 — 추론 토큰 생성 + 캐시가 안 맞을 때의 입력 처리 — 은 `prompt_eval_duration` · `eval_duration` 어디에도 없다.
+그래서 `unreportedMs = totalMs − loadMs − decodeMs` 는 **보고되지 않은 구간**이고, `prefillMs` 보고값이 입력 길이와
+무관하게 작은 것(83 · 94ms · 64ms)도 같은 이유다.
+
+**#1321 실측 (dev ollama-01, 2026-10-10).**
+
+| 확인 | 결과 | 읽는 법 |
+|------|------|---------|
+| 같은 요청을 `format` 없이 재생 (입력 4,184 토큰) | 입력 처리 **0.08~0.11초** | 앞부분(KV) 캐시는 이미 재사용된다. 앱의 같은 조건 두 요청은 바이트 단위로 같았다 |
+| `format` 유무 각 4회 | 있음 평균 **37.9초** · 없음 **42.2초** | `format` 은 유지한다 |
+| 추론 길이 700~1,800자 | 소요가 추론 길이를 따라 흔들림 | `unreportedMs` 가 크다 = 추론이 길었다 |
+| 하루 넘게 쉰 뒤 첫 요청 | `loadMs=61584` (약 **61.6초**) | 모델 상주(`keep-alive -1`)의 근거 |
+
+- **`inputTokens`(`prompt_eval_count`)는 캐시 적중 판단에 쓸 수 없다.** 캐시가 맞아도 전체 토큰 수를 보고한다.
+- **캐시 적중은 이렇게 본다.** (1) 같은 요청을 이어서 보냈을 때 `unreportedMs` 가 줄어든다. (2) 같은 요청을 `format` 없이
+  재생해 `prompt_eval_duration` 이 0.1초 안팎이면 입력이 캐시에서 왔다.
 - **후보 줄을 짧게 둔다.** 전체 주소 대신 `권역 · 읍면동`(`권역: 남서부 · 한경면`), 모든 후보가 같은 `동반 가능` 은
   목록 머리에 한 번만 적고 다른 값(`부분 동반 가능` 등)만 줄에 남긴다. 도로명 · 번지는 모델이 쓸 곳이 없었다.
-- **후보 목록을 요청 조건보다 앞에 둔다.** 전에는 기간 · 요청 문구가 맨 앞이라 거기서 갈린 뒤의 후보 목록(입력의
-  대부분)을 매번 새로 처리했다(10/8 `inputTokens` 5,644 · 5,764 · 7,062 — 프롬프트 전체). 순서는 시스템 프롬프트 →
-  후보 목록 → 여행 조건 · 반려견 · 날씨 · 재생성이다. 같은 지역 · 같은 요청 종류가 이어지면 Ollama 가 후보 목록까지
-  캐시를 재사용한다(`inputTokens` 가 줄어든다). 동시 처리 1 · 모델 상주(keep-alive)일 때 잘 든다.
+- **후보 목록을 요청 조건보다 앞에 둔다** (#1246). 순서는 시스템 프롬프트 → 후보 목록 → 여행 조건 · 반려견 · 날씨 ·
+  재생성이다. 같은 지역 · 같은 요청 종류가 이어지면 Ollama 가 후보 목록까지 앞부분 캐시를 재사용한다. 이 계약은
+  `AiPlanPromptFactoryTest` 가 잠근다 — 같은 조회 조건이면 프롬프트가 같고, 여행 조건 · 날씨만 달라도 후보 목록
+  끝까지의 접두사가 같다 (#1321). 동시 처리 1 · 모델 상주일 때 잘 든다.
 
 **후속 후보.** 스키마를 Ollama `format` 에 JSON 스키마로 직접 싣는 방법이 있다 — 지금은 `format=json` 에 스키마 지시
 (2,246자)를 프롬프트로 싣는다. 싣고 나면 지시문을 프롬프트에서 뺄 수 있지만, gpt-oss 가 `format` 스키마를 지키는지
