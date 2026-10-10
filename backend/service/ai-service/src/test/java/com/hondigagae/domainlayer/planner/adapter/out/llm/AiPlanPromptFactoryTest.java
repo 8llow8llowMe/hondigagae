@@ -389,8 +389,8 @@ class AiPlanPromptFactoryTest {
     }
 
     @Test
-    @DisplayName("숙박만 있는 권역은 덮은 것으로 보지 않는다 — 그 권역의 날에 갈 곳이 없다 (#1312)")
-    void skipsZoneOrderWhenAZoneHasOnlyLodging() {
+    @DisplayName("방문 장소 없이 숙박 · 음식점만 있는 권역은 덮은 것으로 보지 않는다 — 그 권역의 날에 갈 곳이 없다 (#1312)")
+    void skipsZoneOrderWhenAZoneHasNoVisit() {
         PlaceCandidate southEastStay = PlaceCandidate.builder()
             .placeId(14L).title("모두올레 애견펜션").contentTypeName("숙박").addr("제주특별자치도 서귀포시 표선면")
             .petAllowanceName("동반 가능").indoor(true).lat(33.3300).lng(126.8000)
@@ -410,9 +410,15 @@ class AiPlanPromptFactoryTest {
         assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-19").placeCandidates(withoutSouthEastVisit).build()))
             .doesNotContain("권역 순서 제안");
 
+        // 음식점만 더해도 덮지 않는다 — 방문 조회가 실패하면 그 권역에 식사 자리만 남을 수 있다
         List<PlaceCandidate> withSouthEastCafe = new ArrayList<>(withoutSouthEastVisit);
         withSouthEastCafe.add(southEastCafe);
         assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-19").placeCandidates(withSouthEastCafe).build()))
+            .doesNotContain("권역 순서 제안");
+
+        List<PlaceCandidate> withSouthEastVisit = new ArrayList<>(withSouthEastCafe);
+        withSouthEastVisit.add(zoned(18L, "표선해수욕장", "제주특별자치도 서귀포시 표선면", 33.3260, 126.8420));
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-19").placeCandidates(withSouthEastVisit).build()))
             .contains("4일차 남동부");
     }
 

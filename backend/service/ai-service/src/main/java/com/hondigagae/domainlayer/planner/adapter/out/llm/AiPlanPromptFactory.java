@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.application.model.RequestNoteConstraints;
+import com.hondigagae.domainlayer.planner.application.service.CandidateZonePolicy;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -301,8 +302,9 @@ public class AiPlanPromptFactory {
      * <ul>
      *   <li><b>하루짜리 · 하루 재생성</b> — 날짜 사이 이동이 없다(재생성은 기존 일정이 앞뒤 날을 정한다)</li>
      *   <li><b>필수 포함 장소가 있다</b> — 사용자가 고른 곳이 제안한 권역 밖일 수 있다</li>
-     *   <li><b>후보가 6권역을 다 덮지 않는다</b> — 시군구를 지정했거나 제주 밖이면 돌 섬이 없다. <b>숙박만 있는 권역은
-     *       덮은 것으로 보지 않는다 (#1312)</b> — 그 권역의 날에 갈 곳이 없어 모델이 다른 권역 장소로 채운다</li>
+     *   <li><b>후보가 6권역을 다 덮지 않는다</b> — 시군구를 지정했거나 제주 밖이면 돌 섬이 없다. <b>방문 장소(숙박 ·
+     *       음식점이 아닌 곳)가 없는 권역은 덮은 것으로 보지 않는다 (#1312)</b> — 그 권역의 날에 갈 곳이 없어 모델이 다른
+     *       권역 장소로 채운다. 방문 조회가 실패해 숙박 · 음식점만 남은 권역도 같다</li>
      * </ul>
      */
     private void appendZoneOrder(StringBuilder prompt, AiPlanGenerationQuery query) {
@@ -313,7 +315,7 @@ public class AiPlanPromptFactory {
         Set<JejuZone> covered = EnumSet.noneOf(JejuZone.class);
         for (PlaceCandidate candidate : query.safeCandidates()) {
             JejuZone zone = JejuZone.of(candidate.lat(), candidate.lng());
-            if (zone != null && !RequestNoteConstraints.LODGING_CONTENT_TYPE.equals(candidate.contentTypeName())) {
+            if (zone != null && CandidateZonePolicy.isVisit(candidate)) {
                 covered.add(zone);
             }
         }

@@ -38,6 +38,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -66,6 +67,18 @@ public class AiPlanWorker {
 
     /** 제주의 관광 지역코드. 권역({@link JejuZone})은 제주에만 있다 (#1312). */
     private static final String JEJU_AREA_CODE = "39";
+
+    /**
+     * 권역 거리순 조회 18번 전체의 벽시계 예산 (#1312). 이 시간이 지나면 남은 조회를 부르지 않는다.
+     *
+     * <p>3초는 tour-service 서킷의 느린 호출 기준(3초)과 같다 — 느린 호출 하나가 예산을 다 쓰므로, 잡 하나가 서킷에 쌓는
+     * 느린 호출은 많아야 하나다. 예산은 호출을 시작하기 전에만 보므로 최악 소요는 3초 + 진행 중 호출의 read timeout 5초 =
+     * 8초, 내부 조회 2회분이다 — {@code AiPlanTaskExecutorTest} 가 이 값으로 잡 최악값을 센다.
+     */
+    public static final Duration ZONE_ANCHORED_BUDGET = Duration.ofSeconds(3);
+
+    /** 거리순 조회 예산을 재는 시계. 테스트가 시간을 흘리려고 바꾼다. */
+    LongSupplier nanoClock = System::nanoTime;
 
     private final AiPlanJobStorePort aiPlanJobStorePort;
     private final AiPlanJobEventPort aiPlanJobEventPort;
@@ -581,43 +594,83 @@ public class AiPlanWorker {
      * 6권역 대표점({@link JejuZone#getAnchorLat()})마다 가까운 순으로 방문 장소 · 숙박 · 음식점을 찾는다 (#1312). 찾은 것 중
      * <b>실제 권역이 그 권역인 것만</b> 그 권역 몫으로 둔다 — 대표점 근처라도 경계 너머 장소는 옆 권역의 것이다.
      *
-     * <p>tour-service 를 권역 6 × 종류 3 = 18번 부른다. 원천 단위가 "한 점에서 가까운 순" 이라 묶을 수 없고(대표점마다
-     * 정렬 기준이 다르다), 생성 한 번에 한 번만 돈다 — LLM 호출이 수십 초라 순차 호출 수백 ms 는 문제가 아니다.
-     * <b>실패한 조회는 빈 목록으로 이어 간다</b> — 그 권역 · 종류만 몫이 덜 찬다.
+     * <p>tour-service 를 많아야 권역 6 × 종류 3 = 18번 부른다. 원천 단위가 "한 점에서 가까운 순" 이라 묶을 수 없고(대표점마다
+     * 정렬 기준이 다르다), 생성 한 번에 한 번만 돈다. 정상 경로에서는 호출마다 짧아 LLM 호출(수십 초) 앞에서 무시할 만하지만,
+     * 장애 경로에서 18번을 다 기다리면 잡 타임아웃 산술이 깨지고 이 호출들이 혼자 서킷을 연다. 그래서
+     * ({@link BudgetedLookups}):
+     * <ul>
+     *   <li><b>첫 실패에서 나머지를 건너뛴다</b> — 서킷에 실패를 더 쌓지 않는다. 이미 찾은 것과 id 순 결과로 이어 간다</li>
+     *   <li><b>누적 {@link #ZONE_ANCHORED_BUDGET} 를 넘으면 더 부르지 않는다</b> — 최악 소요는 예산 + 진행 중 호출 하나의
+     *       read timeout 이다</li>
+     * </ul>
+     *
+     * <p>부르는 순서는 종류 우선(방문 → 음식점 → 숙박), 종류 안에서는 권역 선언 순서다. 예산에 걸려 뒤가 잘리면 id 순 결과가
+     * 대신할 수 없는 방문 장소를 먼저 지키고, 숙박은 id 순 첫 페이지에도 권역마다 있어(남동부 6곳) 맨 뒤에 둔다.
      */
     private ZoneAnchoredCandidates loadZoneAnchored(String areaCode) {
+        List<AnchoredLookup> plan = new ArrayList<>();
+        for (AnchoredKind kind : AnchoredKind.values()) {
+            for (JejuZone zone : JejuZone.values()) {
+                plan.add(new AnchoredLookup(zone, kind));
+            }
+        }
+        List<Supplier<List<PlaceCandidateQueryResult>>> lookups = plan.stream()
+            .<Supplier<List<PlaceCandidateQueryResult>>>map(lookup -> () -> lookup.kind().find(
+                placeCandidateQueryPort, areaCode, lookup.zone().getAnchorLat(), lookup.zone().getAnchorLng()))
+            .toList();
+        BudgetedLookups.Outcome<PlaceCandidateQueryResult> outcome =
+            BudgetedLookups.run(lookups, ZONE_ANCHORED_BUDGET.toNanos(), nanoClock);
+        if (outcome.stop() != BudgetedLookups.Stop.NONE) {
+            AnchoredLookup next = plan.get(outcome.results().size());
+            log.warn("Zone anchored candidates lookup stopped, continuing with what was found. reason={} done={} total={} "
+                    + "nextZone={} nextKind={} errorCode={}",
+                outcome.stop(), outcome.results().size(), plan.size(), next.zone(), next.kind(),
+                outcome.failure() == null ? null : outcome.failure().getErrorCode().getCode());
+        }
+
         List<PlaceCandidate> visits = new ArrayList<>();
         List<PlaceCandidate> lodgings = new ArrayList<>();
         List<PlaceCandidate> restaurants = new ArrayList<>();
-        for (JejuZone zone : JejuZone.values()) {
-            double lat = zone.getAnchorLat();
-            double lng = zone.getAnchorLng();
-            anchoredLookup(zone, "VISIT", () -> placeCandidateQueryPort.findNearbyCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE))
-                .stream().filter(CandidateZonePolicy::isVisit).forEach(visits::add);
-            anchoredLookup(zone, "LODGING",
-                () -> placeCandidateQueryPort.findNearbyLodgingCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE))
-                .stream().filter(Kind.LODGING::matches).forEach(lodgings::add);
-            anchoredLookup(zone, "RESTAURANT",
-                () -> placeCandidateQueryPort.findNearbyRestaurantCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE))
-                .stream().filter(Kind.RESTAURANT::matches).forEach(restaurants::add);
+        for (int index = 0; index < outcome.results().size(); index++) {
+            AnchoredLookup lookup = plan.get(index);
+            List<PlaceCandidate> inZone = outcome.results().get(index).stream()
+                .map(this::toCandidate)
+                .filter(candidate -> JejuZone.of(candidate.lat(), candidate.lng()) == lookup.zone())
+                .toList();
+            switch (lookup.kind()) {
+                case VISIT -> inZone.stream().filter(CandidateZonePolicy::isVisit).forEach(visits::add);
+                case RESTAURANT -> inZone.stream().filter(Kind.RESTAURANT::matches).forEach(restaurants::add);
+                case LODGING -> inZone.stream().filter(Kind.LODGING::matches).forEach(lodgings::add);
+            }
         }
         return new ZoneAnchoredCandidates(List.copyOf(visits), List.copyOf(lodgings), List.copyOf(restaurants));
     }
 
-    /** 한 권역 · 한 종류의 거리순 조회. 권역이 맞는 것만 남기고, 실패하면 빈 목록이다. */
-    private List<PlaceCandidate> anchoredLookup(
-        JejuZone zone, String kind, Supplier<List<PlaceCandidateQueryResult>> lookup
-    ) {
-        try {
-            return lookup.get().stream()
-                .map(this::toCandidate)
-                .filter(candidate -> JejuZone.of(candidate.lat(), candidate.lng()) == zone)
-                .toList();
-        } catch (AiPlanException exception) {
-            log.warn("Zone anchored candidates lookup failed, continuing without them. zone={} kind={} errorCode={}",
-                zone, kind, exception.getErrorCode().getCode());
-            return List.of();
-        }
+    /** 거리순으로 찾는 종류. 선언 순서가 부르는 순서다. */
+    private enum AnchoredKind {
+        VISIT {
+            @Override
+            List<PlaceCandidateQueryResult> find(PlaceCandidateQueryPort port, String areaCode, double lat, double lng) {
+                return port.findNearbyCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE);
+            }
+        },
+        RESTAURANT {
+            @Override
+            List<PlaceCandidateQueryResult> find(PlaceCandidateQueryPort port, String areaCode, double lat, double lng) {
+                return port.findNearbyRestaurantCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE);
+            }
+        },
+        LODGING {
+            @Override
+            List<PlaceCandidateQueryResult> find(PlaceCandidateQueryPort port, String areaCode, double lat, double lng) {
+                return port.findNearbyLodgingCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE);
+            }
+        };
+
+        abstract List<PlaceCandidateQueryResult> find(PlaceCandidateQueryPort port, String areaCode, double lat, double lng);
+    }
+
+    private record AnchoredLookup(JejuZone zone, AnchoredKind kind) {
     }
 
     /** 권역 대표점 기준 거리순으로 찾은 종류별 후보 (#1312). 권역 선언 순서로, 권역 안에서는 가까운 순이다. */
