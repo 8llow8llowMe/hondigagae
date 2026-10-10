@@ -73,22 +73,22 @@ BossPickSeoul 과 **같은 agent** 를 쓴다. 새로 띄울 것은 없다.
 | builder (backend) | `builder-backend` | ollama-01 `192.168.0.10` | Gradle 빌드 |
 | builder (frontend) | `builder-frontend` | ollama-01 `192.168.0.10` | pnpm 빌드 |
 | deploy (dev) | `deploy-backend-dev` | main-server `192.168.0.11` | Vault 조회, compose up |
-| deploy (prod) | `deploy-backend-prod` | backend-1 `192.168.0.13` | 동일 |
+| deploy (prod) | `deploy-backend-prod` | backend-server `192.168.0.9` | 동일 |
 | deploy (fe dev) | `deploy-frontend-dev` | main-server `192.168.0.11` | 번들 전개, compose up |
-| deploy (fe prod) | `deploy-frontend-prod` | backend-1 `192.168.0.13` | 동일 |
+| deploy (fe prod) | `deploy-frontend-prod` | backend-server `192.168.0.9` | 동일 |
 
 agent 에 필요한 도구: `java 21`, `docker`, `docker compose`, `rsync`, `curl`.
 (Vault CLI 는 필요 없다. 파이프라인이 HTTP API 를 직접 부른다)
 
-**dev 는 준비됐고 prod 는 아니다.** main-server `docker ps` (2026-09-03) 기준 현황:
+**dev · prod 모두 준비됐다.** dev 는 main-server `docker ps` (2026-09-03), prod 는 backend-server (2026-10-10) 기준 현황:
 
 | agent | 상태 |
 | --- | --- |
 | `ai-host-builder` | 기동 중. `builder-frontend` 라벨이 붙어 있는지 Jenkins 노드 화면에서 확인 |
 | `backend-dev-agent` | 기동 중 (main-server, `deploy-backend-dev`) |
 | `frontend-dev-agent` | 기동 중 (main-server, `deploy-frontend-dev`) |
-| `backend-prod-agent` | **미기동** — backend-1(운영 미니 PC) 에 컨테이너 추가 필요 |
-| `frontend-prod-agent` | **미기동** — backend-1 에 컨테이너 추가 필요 |
+| `backend-prod-agent` | 기동 중 (backend-server, `deploy-backend-prod`, 2026-10-10) |
+| `frontend-prod-agent` | 기동 중 (backend-server, `deploy-frontend-prod`, 2026-10-10) |
 
 agent 가 없으면 해당 잡은 실행 자체를 못 하고 노드를 기다리며 멈춘다(빌드 실패가 아니라 대기다).
 `Infra/jenkins/docker-compose-jenkins-deploy-agent.yml` 로 띄우고 위 라벨을 붙인다.
@@ -277,7 +277,7 @@ docker exec hondigagae-batch-service-dev \
 3. **Vault secret 적재** — `kv/hondigagae/backend/dev/env` 에 `backend/.env.example` 채운 값
 4. **nginx conf 적용** — Infra 레포의 `nginx/conf.d/*.hondigagae.conf` 4개.
    HTTPS 블록은 주석 상태로 두고 reload → 인증서 발급 → 주석 해제 후 다시 reload
-5. **배포 호스트 준비** — deploy agent 와 batch CSV 디렉터리를 **dev(main-server) · prod(`backend-1`) 둘 다** 만들고,
+5. **배포 호스트 준비** — deploy agent 와 batch CSV 디렉터리를 **dev(main-server) · prod(`backend-server`) 둘 다** 만들고,
    그 호스트 경로를 각 환경 Vault 의 `BATCH_DATA_DIR` 에 넣는다. dev 를 빠뜨리면 batch 만 배포되지 않는다 (#878)
 6. **멀티브랜치 파이프라인 8개 생성** — 잡 이름은 `hondigagae-{service}` / `hondigagae-frontend-web`
 7. **`service-discovery` 배포** → Eureka UI 확인

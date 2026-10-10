@@ -36,6 +36,10 @@
 > 않았다 (#878). 스케줄이 실제로 도는지는 `../batch-dev-runbook.md` §3 으로 본다.
 
 - **스위치**: `batch.schedule.enabled` (`BATCH_SCHEDULE_ENABLED`). dev 기본 true, local·CI·prod 기본 false.
+  **prod 는 Vault 에서 `true` 로 켰다** (2026-10-10, #1323). dev 와 같은 TourAPI 키 · 같은 cron(월 03:00)이라
+  장소 파이프라인이 같은 날 쿼터(상품당 일 1,000콜)를 나눠 쓴다 — 한도에 닿으면 남은 장소를 건너뛰고 끝나므로
+  기동 · 적재가 깨지지는 않지만, 한쪽 갱신이 덜 될 수 있다. prod cron 을 다른 요일로 옮기려면 compose 가
+  `BATCH_SCHEDULE_PLACE_PIPELINE_CRON` 을 컨테이너에 넘기도록 먼저 바꿔야 한다(지금은 넘기지 않는다).
   조건은 `batch.schedule.enabled=true` **그리고** `spring.batch.job.enabled=false` 둘 다라,
   `docker exec` 로 잡 하나만 돌리려 띄운 **수동 JVM 에서는 트리거가 등록되지 않고 스케줄러도
   시작되지 않는다.** `auto-startup` 은 `application.yml` 에서 고정 false 이고, 조건을 통과한

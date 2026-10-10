@@ -159,7 +159,7 @@ on/off 스위치와 스텁 어댑터는 두지 않는다(2026-09-03 제거). 프
 | 데이터 delisting | **구현** | `delisted_at` 표시 + 급감 가드. `data-refresh-guide.md` 2절 |
 | 배포 파이프라인 | **구현** | #21 — 서비스별 `docker-compose-*.yml` + Jenkins. `deploy-guide.md`·`jenkins-cicd-dev-deploy-guide.md` |
 | 배치 메트릭 | **구현** | `place_import_rows` 게이지 + `place_import_last_success_timestamp` (기동 씨딩 포함). Prometheus 경보 rule 등록은 인프라 후속 |
-| 배치 주기 실행 | **구현 — dev 미가동** | #378 — batch-service 프로세스 안 Quartz. 장소 파이프라인 매주 월 03:00 / 혼잡도 매일 06:00 KST, 실행 중 가드 + `batch_schedule_*` 지표. prod 전환은 dev 관찰 뒤 결정. **dev 에서 스케줄은 아직 한 번도 돌지 않았다** — 컨테이너 미기동(#878) |
+| 배치 주기 실행 | **구현 — dev 미가동** | #378 — batch-service 프로세스 안 Quartz. 장소 파이프라인 매주 월 03:00 / 혼잡도 매일 06:00 KST, 실행 중 가드 + `batch_schedule_*` 지표. prod 는 2026-10-10 에 Vault `BATCH_SCHEDULE_ENABLED=true` 로 켰다(#1323). **dev 에서 스케줄은 아직 한 번도 돌지 않았다** — 컨테이너 미기동(#878) |
 
 ### 데이터가 없어 못 하는 것
 

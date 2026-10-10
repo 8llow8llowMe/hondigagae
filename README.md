@@ -98,9 +98,9 @@ Controller → WebUseCase → WebFacade → Processor → Port → Adapter
 | 백엔드 게이트웨이 | dev | `192.168.0.11` | 7000 | `api-dev.hondigagae.com` |
 | 백엔드 auth (단독) | dev | `192.168.0.11` | 7081 | `api-dev.hondigagae.com` |
 | 프론트 웹 | dev | `192.168.0.11` | 7300 | `dev.hondigagae.com` |
-| 백엔드 게이트웨이 | prod | `192.168.0.13` | 5000 | `api.hondigagae.com` |
-| 백엔드 auth (단독) | prod | `192.168.0.13` | 5081 | `api.hondigagae.com` |
-| 프론트 웹 | prod | `192.168.0.13` | 5300 | `www.hondigagae.com` |
+| 백엔드 게이트웨이 | prod | `192.168.0.9` | 5000 | `api.hondigagae.com` |
+| 백엔드 auth (단독) | prod | `192.168.0.9` | 5081 | `api.hondigagae.com` |
+| 프론트 웹 | prod | `192.168.0.9` | 5300 | `www.hondigagae.com` |
 
 ### CI/CD
 
