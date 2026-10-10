@@ -20,7 +20,7 @@ public record DailyWeatherItem(
 
     @Schema(
         description = "이 값이 나온 예보의 출처. MID_TERM 이면 오전/오후 단위라 대략적이고 습도·바람이 없다",
-        example = "{\"code\":\"SHORT_TERM\",\"name\":\"단기예보\",\"description\":\"오늘부터 약 5일까지의 시간 단위 예보입니다. 가장 정확합니다.\"}")
+        example = "{\"code\":\"SHORT_TERM\",\"name\":\"단기예보\",\"description\":\"오늘부터 나흘 뒤 무렵까지의 시간 단위 예보입니다. 가장 정확합니다.\"}")
     CodeNameDescriptionMetadata forecastSource,
 
     @Schema(description = "최저기온(섭씨)", example = "24.0")

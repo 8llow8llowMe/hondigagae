@@ -59,7 +59,7 @@ public enum PlanItemWalkSafetyUnavailableReason implements CodeNameDescribable {
     PAST_DATE("지난 날짜",
         "이미 지난 날짜라 예보가 남아 있지 않습니다. 이 항목의 산책 위험도는 확인할 수 없습니다."),
     BEYOND_FORECAST_RANGE("예보 범위 밖",
-        "산책 위험도는 시각별 예보로만 안내할 수 있고, 그 예보는 오늘부터 5일까지입니다. "
+        "산책 위험도는 시각별 예보로만 안내할 수 있고, 그 예보는 오늘부터 나흘 뒤까지입니다. "
             + "이 날짜는 아직 알려 드릴 수 없습니다."),
     /**
      * <b>문장이 원인을 단정하지 않는다.</b> 이 사유로 접히는 원천 상태가 둘이다 — 그 시각 예보가
