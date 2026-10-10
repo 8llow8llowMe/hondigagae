@@ -70,6 +70,17 @@ export const placeMessages = {
   filterTypeNext: '다음 유형 보기',
   filterPetAllowanceLabel: '반려견 동반',
   filterAllowedOnly: '반려견 동반 가능만',
+  /**
+   * 지도 필터 줄(#1314)의 동반 칩 — 보이는 글자는 짧게, 앞에 `sr-only` `filterAllowedOnlyPrefix` + 공백 한 칸을 둬
+   * 접근 이름은 `filterAllowedOnly` 와 같다. 390 에서 긴 글자면 칩 하나가 레일을 다 먹는다 (지도필터-한줄 D1-2)
+   */
+  filterAllowedOnlyShort: '동반 가능만',
+  filterAllowedOnlyPrefix: '반려견',
+  /**
+   * 지도 필터 줄 `필터 n` 버튼 숫자 뒤 `sr-only` — 접근 이름이 `필터, 2개 적용됨` 이 된다 (#1314 D6).
+   * 숫자는 보이는 글자이고 `aria-label` 로 덮지 않는다 (WCAG 2.5.3)
+   */
+  filterAppliedCountSuffix: '개 적용됨',
 
   filterRegionLabel: '지역',
   filterRegionAll: '제주 전체',

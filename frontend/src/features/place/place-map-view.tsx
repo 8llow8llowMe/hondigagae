@@ -1268,6 +1268,11 @@ export function PlaceMapView({
           지도에서 조건을 좁히려면 목록으로 되돌아가야 했다.
         */
         toolbar={<PlaceMapFilterBar filters={filters} authed={authed} petSwitch={island} />}
+        /*
+          **개수 줄을 필터 줄 바로 밑 작은 글줄로 좁힌다** (#1314 D8-4) — 한 줄 필터와 함께 `mid` 에서 목록 두 행이 다
+          보이게 한다. `목록 더 보기` 의 누르는 자리 44 는 `MapSheet` 가 지킨다(`MapSheetHeaderSize` 주석)
+        */
+        headerSize="sm"
         header={
           listPending ? (
             <Skeleton className="h-4.5 w-20" />

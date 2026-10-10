@@ -20,8 +20,19 @@ export function PetSwitcherSlot({ variant = 'header' }: { variant?: PetSwitcherV
   const { data, isPending, isError } = usePetList(true)
   // 호출부가 `{authed && <PetSwitcherSlot />}` 로 이미 막는다 (#200 — `HeaderActions` · `PlaceMapFilterBar`)
 
-  // 칩 갈래는 필터 줄 flex 안이라 줄어들지 않게 `shrink-0` — 칩이 서도 유형 줄이 밀리지 않는다 (D5)
-  if (isPending) return <Skeleton className="h-11 w-24 shrink-0 rounded-md" />
+  // 칩 갈래는 필터 줄 flex 안이라 줄어들지 않게 `shrink-0` — 칩이 서도 유형 줄이 밀리지 않는다 (D5).
+  // 높이는 칩(`Chip` sm)과 같다 — 모바일 36 · 768 이상 44 (#1314). 헤더 갈래는 44 그대로다
+  if (isPending) {
+    return (
+      <Skeleton
+        className={
+          variant === 'chip'
+            ? 'h-9 w-24 shrink-0 rounded-md md:h-11'
+            : 'h-11 w-24 shrink-0 rounded-md'
+        }
+      />
+    )
+  }
 
   // 5xx·네트워크 실패 → 숨긴다. 재시도 UI 를 헤더에 두지 않는다
   if (isError || data === undefined) return null
