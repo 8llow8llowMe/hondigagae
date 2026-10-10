@@ -293,28 +293,28 @@ class OllamaLlmAdapterTest {
     }
 
     @Test
-    @DisplayName("일정 요청 옵션에 keep-alive 기본값 30m 가 실린다 — 빠진 요청 하나가 서버 기본 5분으로 되돌린다")
+    @DisplayName("일정 요청 옵션에 keep-alive 기본값 -1(상주)이 실린다 — 빠진 요청 하나가 서버 기본 5분으로 되돌린다")
     void planRequestCarriesKeepAlive() {
         stubResponse(ONE_ITEM_DRAFT);
 
         adapter.generatePlanDraft(query(candidate(100L, "오설록")));
 
         OllamaChatOptions options = sentOptions();
-        assertThat(options.getKeepAlive()).isEqualTo("30m");
+        assertThat(options.getKeepAlive()).isEqualTo("-1");
         assertThat(options.getFormat()).isEqualTo("json");
     }
 
     @Test
     @DisplayName("준비물 요청 옵션에도 설정한 keep-alive 가 실린다 — 두 호출이 같은 옵션 조립을 쓴다")
     void packingRequestCarriesConfiguredKeepAlive() {
-        OllamaLlmAdapter pinned = adapter(new AiLlmProperties(null, null, null, null, null, null, null, null, null, null, null, "-1"));
+        OllamaLlmAdapter pinned = adapter(new AiLlmProperties(null, null, null, null, null, null, null, null, null, null, null, "10m"));
         stubResponse("""
             {"items":[]}
             """);
 
         pinned.generatePackingList(PackingChecklistQuery.builder().startDate("2026-09-09").endDate("2026-09-12").build());
 
-        assertThat(sentOptions().getKeepAlive()).isEqualTo("-1");
+        assertThat(sentOptions().getKeepAlive()).isEqualTo("10m");
     }
 
     @Test
@@ -567,13 +567,13 @@ class OllamaLlmAdapterTest {
         // 모델이 이미 올라와 있으면 0 이다. 0 이 아니면 keep-alive 를 의심할 신호라 지우지 않는다.
         assertThat(logged).contains("loadMs=0");
         assertThat(logged).contains("outputTokens=820");
-        // 전체 - 로드 - 디코드 (#1246) — 보고된 prefillMs 가 긴 입력에서 틀려서 함께 남긴다
-        assertThat(logged).contains("prefillEstMs=8200");
+        // 전체 - 로드 - 디코드 (#1246 · #1321) — 보고되지 않은 구간. format + think 두 단계라 추론 생성이 여기 든다
+        assertThat(logged).contains("unreportedMs=8200");
     }
 
     @Test
-    @DisplayName("보고된 prefill 이 틀려도 전체에서 로드 · 디코드를 뺀 값이 실제 입력 처리 시간으로 남는다 (#1246)")
-    void estimatesPrefillWhenReportedValueIsWrong() {
+    @DisplayName("보고된 prefill 이 작아도 전체에서 로드 · 디코드를 뺀 보고되지 않은 구간이 남는다 (#1246 · #1321)")
+    void logsUnreportedMillis() {
         ListAppender<ILoggingEvent> appender = attachAppender();
         // dev 실측 모양 (2026-10-08 3일 1회차): total 95.4초 · load 8.4초 · 보고 prefill 64ms · decode 18.2초
         ChatResponseMetadata metadata = ChatResponseMetadata.builder()
@@ -588,7 +588,7 @@ class OllamaLlmAdapterTest {
 
         adapter.generatePlanDraft(query(candidate(100L, "오설록")));
 
-        assertThat(timingLog(appender)).contains("prefillMs=64").contains("prefillEstMs=68793");
+        assertThat(timingLog(appender)).contains("prefillMs=64").contains("unreportedMs=68793");
     }
 
     /*
@@ -613,7 +613,7 @@ class OllamaLlmAdapterTest {
 
         String logged = timingLog(appender);
         assertThat(logged).contains("totalMs=3000").contains("loadMs=1500")
-            .contains("prefillMs=500").contains("decodeMs=1000").contains("prefillEstMs=500");
+            .contains("prefillMs=500").contains("decodeMs=1000").contains("unreportedMs=500");
     }
 
     @Test
@@ -624,7 +624,7 @@ class OllamaLlmAdapterTest {
 
         // 던지지 않는 것이 요점이다
         assertThat(adapter.generatePlanDraft(query(candidate(100L, "오설록"))).days()).hasSize(1);
-        assertThat(timingLog(appender)).contains("prefillMs=null").contains("decodeMs=null").contains("prefillEstMs=null");
+        assertThat(timingLog(appender)).contains("prefillMs=null").contains("decodeMs=null").contains("unreportedMs=null");
     }
 
     /*

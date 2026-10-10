@@ -327,6 +327,56 @@ class AiPlanPromptFactoryTest {
     }
 
     @Test
+    @DisplayName("같은 조회 조건이면 시스템 · 사용자 프롬프트가 두 번 만들어도 같다 — 캐시 접두사가 흔들리지 않는다 (#1321)")
+    void promptsAreDeterministic() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-15")
+            .requestNote("오후엔 실내 카페에서 쉬고 싶어요")
+            .placeCandidates(List.of(
+                zoned(1L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631),
+                zoned(2L, "성산일출봉", "제주특별자치도 서귀포시 성산읍", 33.4580, 126.9425)))
+            .build();
+
+        assertThat(factory.systemPrompt()).isEqualTo(factory.systemPrompt());
+        assertThat(factory.userPrompt(query)).isEqualTo(factory.userPrompt(query));
+    }
+
+    @Test
+    @DisplayName("후보 목록이 같으면 여행 조건 · 날씨가 달라도 후보 목록 끝까지의 접두사가 같다 — 고정 부분을 앞에 둔다 (#1246 · #1321)")
+    void prefixBeforeTripConditionsIgnoresRequestConditions() {
+        List<PlaceCandidate> candidates = List.of(
+            zoned(1L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631),
+            zoned(2L, "성산일출봉", "제주특별자치도 서귀포시 성산읍", 33.4580, 126.9425));
+        AiPlanGenerationQuery first = AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-15")
+            .requestNote("오후엔 실내 카페에서 쉬고 싶어요")
+            .placeCandidates(candidates)
+            .build();
+        AiPlanGenerationQuery second = AiPlanGenerationQuery.builder()
+            .startDate("2026-11-02")
+            .endDate("2026-11-03")
+            .requestNote("바다 보며 산책하고 싶어요")
+            .weatherOutlook(List.of(DayWeatherOutlook.builder()
+                .date(java.time.LocalDate.parse("2026-11-02"))
+                .precipitationTypeName("비").maxPrecipitationProbability(80)
+                .build()))
+            .placeCandidates(candidates)
+            .build();
+
+        String firstPrompt = factory.userPrompt(first);
+        String secondPrompt = factory.userPrompt(second);
+        String conditionsHead = "\n여행 조건\n";
+
+        assertThat(firstPrompt).isNotEqualTo(secondPrompt);
+        int firstCut = firstPrompt.indexOf(conditionsHead);
+        int secondCut = secondPrompt.indexOf(conditionsHead);
+        assertThat(firstCut).isPositive();
+        assertThat(firstPrompt.substring(0, firstCut)).isEqualTo(secondPrompt.substring(0, secondCut));
+    }
+
+    @Test
     @DisplayName("동반 가능은 목록 머리에 한 번만 적고, 다른 동반 조건만 줄에 남긴다 (#1246)")
     void petAllowanceOnlyWhenNotAllowed() {
         PlaceCandidate partial = PlaceCandidate.builder()
