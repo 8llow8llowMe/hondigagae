@@ -5,8 +5,6 @@ import { useState } from 'react'
 import { BottomSheet } from '@/components/bottom-sheet'
 import { Button } from '@/components/button'
 import { Chip, ChipGroup } from '@/components/chip'
-import { FilterListHeading } from '@/components/filter-list'
-import { ChevronDownIcon, SlidersIcon } from '@/components/icons'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { PetSwitcherSlot } from '@/features/nav/pet-switcher-slot'
 import { useSelectedPet } from '@/features/nav/use-selected-pet'
@@ -14,51 +12,55 @@ import {
   PLACE_KIND_FILTER_ORDER,
   PLACE_KIND_LABEL,
   placeKindOf,
-  SIGUNGU_LABEL,
   withPlaceKind,
 } from '@/features/place/filter-labels'
-import { IndoorField, PetSizeField, RegionField } from '@/features/place/place-filter-fields'
+import { mapSheetFilterCount } from '@/features/place/map-filter-count'
+import {
+  PlaceMapFilterButton,
+  PlaceMapFilterSheetFields,
+} from '@/features/place/place-map-filter-sheet'
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { messages } from '@/lib/messages'
 import { DEFAULT_PLACE_FILTERS, toPlaceFilterQuery } from '@/lib/url/place-filters'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceFilters } from '@/types/place'
 
-/** 열려 있는 시트. `null` 이면 닫힘 */
-type OpenSheet = 'region' | 'more'
-
 /**
- * 지도 보기의 필터 줄 — **유형을 가로로 펼친 토글 + 나머지 축은 시트 트리거.**
+ * 지도 보기의 필터 줄 — **한 줄 + 필터 시트** (#1314, 장소-지도필터-한줄-세부명세).
  *
- * **지도 보기에는 필터 컨트롤이 아예 없었다.** 데스크톱 레일은 지도를 세 번 접어서
- * 쓸 수 없고(`app/(main)/places/(list)/page.tsx` 주석), 모바일 칩 줄은 목록에만
- * 붙어 있었다. 그래서 지도에서 조건을 좁히려면 목록으로 되돌아가야 했다.
+ * ```text
+ * [≡ 필터 n] │ [◉ 몽실이 ▾] [동반 가능만] [전체] [관광지] [음식점] … [초기화] →
+ * └ 고정 ──────────────────┘ └ 가로 스크롤러 ─────────────────────────────┘
+ * ```
  *
- * 그 자리에는 "지도에 보이는 곳 20" 이라는 **제목**이 있었다. 제목이 할 일이 없는
- * 자리다 — 패널이 무엇인지는 안에 든 목록이 이미 말한다. 개수는 목록 위 캡션으로
- * 내리고, 이 자리는 사용자가 실제로 만질 것에 준다.
+ * 도킹 패널(≥1024) · 모바일 시트 툴바(<1024) · 담기 지도가 **이 한 벌을 그대로** 쓴다 — 폭으로 갈라 두 모양을 두면
+ * 1023 ↔ 1024 를 넘을 때 같은 조건이 다른 자리로 옮겨 가 다시 배운다 (D1-2).
  *
- * **유형만 펼친다.** 8종 + "전체" 라 가로로 나열되는 것이 자연스럽고, 지도에서 가장
- * 자주 바꾸는 축이다. 지역(3갈래)·실내·크기는 값을 고르기보다 조합해서 확정하는
- * 축이라 시트로 남긴다 — 가로줄에 다 펼치면 스크롤이 길어져 유형이 묻힌다.
+ * **지도 보기에는 필터 컨트롤이 아예 없었다.** 데스크톱 레일은 지도를 세 번 접어서 쓸 수 없고, 모바일 칩 줄은 목록에만
+ * 붙어 있었다. 그래서 지도에서 조건을 좁히려면 목록으로 되돌아가야 했다. 그 자리의 제목("지도에 보이는 곳 20")은
+ * 목록 위 캡션으로 내리고 이 자리는 사용자가 실제로 만질 것에 준다.
  *
- * **두 줄이다.** 한 줄에 유형·지역·더보기를 다 두면 400 폭에서 유형이 세 개만 보이고,
- * 뒤쪽 유형(쇼핑·여행코스)에 **닿을 방법이 없었다** — 트랙패드 가로 스크롤을 아는
- * 사용자에게만 열린 기능이었다. 1행은 유형 전용 스크롤러 + 원형 화살표,
- * 2행은 **동반 가능만 · 지역 · 더보기**다.
+ * **두 줄(44 + 6 + 44)이던 것을 한 줄로 줄였다** (#1314). 시트 `mid` 에서 목록이 한 행 남짓만 보였다. 줄이는 방법은
+ * 카카오맵 · 네이버지도와 같다 — **자주 바꾸는 축은 줄에 펼치고, 조합해서 확정하는 축은 시트 하나로 접는다.**
  *
- * **동반 축은 2행 맨 왼쪽 토글이다.** 시트 안에 있던 동안에는 이 서비스의 존재 이유인
- * 조건이 두 단계 뒤에 접혀 있었다 — 반려견과 갈 수 있는 곳을 찾으러 온 화면이다.
- * `ALLOWED` 한 갈래만 쓰는 축이라 시트를 열 이유가 없고, 목록 칩 줄이 이미 같은 자리에
- * 같은 토글을 둔다 (`place-filter-chips.tsx`) — 두 보기에서 같게 생겨야 한 번만 배운다.
+ * - **맨 앞 `필터` 버튼** — 지역 · 실내/야외 · 체구를 **한 시트**에서 고른다. 예전에는 `지역` · `더보기` 가 각자 시트라
+ *   조건 둘을 바꾸려면 시트를 두 번 열었다. 숫자는 **접혀서 안 보이는** 축만 센다(`mapSheetFilterCount`)
+ * - **`동반 가능만` 은 레일 안 첫 칩**이다 — 이 서비스의 존재 이유인 조건이라 시트에 접지 않는다. 목록 칩 줄이 같은
+ *   토글을 둔다(`place-filter-chips.tsx`). 보이는 글자만 짧고(`동반 가능만`) 접근 이름은 `반려견 동반 가능만` 그대로
+ * - **유형은 라디오다.** 백엔드 `contentType` 이 단일 `@RequestParam` 이라 여러 개를 보낼 수 없고, `전체` 칩이 해제다
+ * - **`초기화` 는 스크롤러 끝**(dirty 일 때만, 즉시 · 전량 · 검색어 포함) — 목록 칩 줄 · 긴급 지도 줄과 한 규칙이다.
+ *   시트 안에는 두지 않는다(D8-3)
  *
- * "더 있다" 신호(fade 마스크 + 원형 화살표)는 **홈의 가로 줄과 같은 `ScrollRail` 을 쓴다.**
- * 같은 사실을 말하는 컨트롤이 화면마다 다르게 생기면 사용자가 두 번 배운다.
+ * **칩은 전부 `sm`** — 모바일 시각 36 · 누르는 자리 46, 768 이상 44 (`DESIGN.md` §7 "지도 화면의 칩은 모바일 36").
+ * `/emergency` 지도 줄과 같은 크기다.
  *
- * **유형은 라디오다.** 백엔드 `contentType` 이 단일 `@RequestParam` 이라 여러 개를 보낼
- * 수 없고, "전체" 칩이 해제 역할을 맡는다 (`ContentTypeField` 와 같은 판단).
+ * **레일 칩은 즉시, 시트는 확정**이다 (아트보드 02 규칙). 여러 축을 한 번에 고르는 자리라 누를 때마다 뒤에서 결과가
+ * 바뀌면 무엇을 고르는 중인지 모른다. **바뀐 것이 없으면 URL 을 건드리지 않고 닫기만** 한다 — 같은 값을 다시
+ * `replace` 하면 `?place=` 가 떨어져 옆 미리보기가 이유 없이 닫힌다.
  *
- * **`petSwitch` 를 켜면 1행 맨 앞에 반려견 칩이 선다** (#1301, 장소-반려견칩-세부명세). 판정 · 체구 필터가 쓰는
+ * "더 있다" 신호(fade 마스크 + 원형 화살표)는 홈 · 긴급 · 목록 칩 줄과 같은 `ScrollRail` 이다.
+ *
+ * **`petSwitch` 를 켜면 `필터` 뒤에 반려견 칩이 선다** (#1301, 장소-반려견칩-세부명세). 판정 · 체구 필터가 쓰는
  * 반려견을 판정이 쓰이는 자리에서 바꾼다 — 지도 아일랜드는 띠 헤더(스위처)를 걷어서(#1300) 다른 바꿀 곳이 없다.
  */
 export function PlaceMapFilterBar({
@@ -66,7 +68,7 @@ export function PlaceMapFilterBar({
   /** 미로그인이면 반려견 목록을 조회하지 않는다 — 크기 축 컨트롤 · 반려견 칩이 빠진다 (#200) */
   authed,
   /**
-   * 1행 맨 앞 반려견 칩. **기본 끔** — `PlaceMapView` 가 `island` 일 때만 켠다(`petSwitch={island}`). 칩이 필요한
+   * `필터` 뒤 반려견 칩. **기본 끔** — `PlaceMapView` 가 `island` 일 때만 켠다(`petSwitch={island}`). 칩이 필요한
    * 곳 = 띠 헤더 스위처가 걷힌 곳이라 같은 조건 하나로 묶으면 스위처와 칩이 한 화면에 둘 서지 않는다 (D1-2)
    */
   petSwitch = false,
@@ -81,34 +83,26 @@ export function PlaceMapFilterBar({
   const { pet } = useSelectedPet(authed)
   const kind = placeKindOf(filters)
 
-  const [open, setOpen] = useState<OpenSheet | null>(null)
-  // 시트 초안. 열 때 현재 값을 복사하고 적용 전까지 URL 을 건드리지 않는다
+  const [sheetOpen, setSheetOpen] = useState(false)
+  // 시트 초안. 열 때 현재 값을 복사하고 확정 전까지 URL 을 건드리지 않는다
   const [draft, setDraft] = useState<PlaceFilters>(filters)
 
-  function openSheet(sheet: OpenSheet) {
+  function openSheet() {
     setDraft(filters)
-    setOpen(sheet)
+    setSheetOpen(true)
   }
 
   function applyDraft() {
-    apply(draft)
-    setOpen(null)
+    /*
+      **바뀐 것이 없으면 닫기만 한다** (#1314 D1-2). 비교는 `dirty` 와 같은 직렬화(`toPlaceFilterQuery`)다 — URL 에
+      실리는 모양이 같으면 같은 조건이다. 다시 `replace` 하면 `?place=` 가 떨어져 미리보기가 닫힌다.
+    */
+    if (toPlaceFilterQuery(draft) !== toPlaceFilterQuery(filters)) apply(draft)
+    setSheetOpen(false)
   }
 
-  const regionLabel =
-    filters.sigunguCode === null
-      ? messages.place.filterRegionLabel
-      : (SIGUNGU_LABEL[filters.sigunguCode] ?? messages.place.filterRegionLabel)
-
   const allowedOnly = filters.petAllowanceType === 'ALLOWED'
-
-  /*
-    시트 안의 두 축 중 하나라도 걸려 있으면 트리거가 켜져 있어야 한다 — 접힌 곳에 걸린
-    필터는 결과만 줄이고 이유는 보이지 않는다. **동반 축은 이제 여기서 빠진다**:
-    2행 토글로 나왔으므로 시트에 함께 두면 같은 필터를 두 곳에서 만지게 된다.
-  */
-  const moreActive = filters.indoor !== null || filters.petSizeType !== null
-
+  const sheetCount = mapSheetFilterCount(filters)
   const dirty = toPlaceFilterQuery(filters) !== toPlaceFilterQuery(DEFAULT_PLACE_FILTERS)
 
   const rail = useScrollRail<HTMLDivElement>()
@@ -117,34 +111,54 @@ export function PlaceMapFilterBar({
   const showPetSwitch = petSwitch && authed
 
   return (
-    <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
-      {/*
-        ── 1행: 유형 ───────────────────────────────────────────────────────
+    <div className={cn('flex min-w-0 items-center gap-1.5', className)}>
+      <PlaceMapFilterButton count={sheetCount} expanded={sheetOpen} onSelect={openSheet} />
 
-        `.scroll-rail`(globals.css)이 화살표를 앉히는 기준면이고, **묶음 자신이
-        스크롤러**다. 바깥 div 를 스크롤러로 삼으면 넘치는 방향의 끝 여백이 사라져
-        마지막 칩이 잘린다 (`components/scroll-rail.tsx` 머리주석).
-      */}
+      {/* `필터` 는 값을 고르는 칩이 아니라 시트를 여는 버튼이라 칩 줄과 갈라 보인다 (D1-2 구분선) */}
+      <span aria-hidden className="bg-border h-5 w-px shrink-0" />
+
       {/*
-        반려견 칩은 **유형 스크롤러 밖**이다 (D1-2) — `overflow-x-auto` 안이면 메뉴 팝오버가 세로까지 잘리고, 칩이
-        유형과 함께 밀려 사라진다. 2행은 스크롤러가 아니라 넘치면 잘리므로 1행에 둔다. 칩을 끄면 감싸개는 클래스
-        없는 블록이라 예전 배치 그대로다.
+        반려견 칩은 **스크롤러 밖 고정**이다 (#1301 D1-2 · #1314 D8-1) — `overflow-x-auto` 안이면 메뉴 팝오버가 세로까지
+        잘리고, 칩이 레일과 함께 밀려 사라진다. 고정이라 메뉴 · `menuPlacement` 가 한 글자도 바뀌지 않는다.
       */}
-      <div className={cn(showPetSwitch && 'flex min-w-0 items-center gap-1.5')}>
-        {showPetSwitch && <PetSwitcherSlot variant="chip" />}
-        <div className={cn('scroll-rail', showPetSwitch && 'min-w-0 flex-1')}>
+      {showPetSwitch && <PetSwitcherSlot variant="chip" />}
+
+      {/*
+        `.scroll-rail`(globals.css)이 화살표를 앉히는 기준면이고 **스크롤러 자신이 flex 컨테이너**다 — 바깥 div 를
+        스크롤러로 삼으면 넘치는 방향의 끝 여백이 사라져 마지막 칩이 잘린다 (`components/scroll-rail.tsx`).
+        `EmergencyFilterBar` 와 같은 짜임이다: 스크롤러는 레이아웃일 뿐 이름을 갖지 않고, 유형 축은 안의 `radiogroup` 이다.
+      */}
+      <div className="scroll-rail min-w-0 flex-1">
+        <div
+          ref={rail.ref}
+          onScroll={rail.onScroll}
+          className={cn(
+            // `py-1.5 -my-1.5`: 칩의 히트 띠가 `overflow-x-auto` 에 잘리지 않게 (#905 R3 · emergency-filter-bar 와 같다)
+            '-my-1.5 flex min-w-0 scrollbar-none items-center gap-1.5 overflow-x-auto py-1.5',
+            rail.fadeClassName,
+          )}
+        >
+          {/*
+            즉시 반영이다 — 시트가 아니라 토글이라 "적용" 이 없다. **선택 표시는 칩의 tint 하나다** (#393) — 옆 유형
+            칩들과 같은 방법으로 말해야 한 묶음 안에서 다른 종류의 컨트롤처럼 보이지 않는다.
+          */}
+          <Chip
+            size="sm"
+            selected={allowedOnly}
+            onSelect={() => apply({ ...filters, petAllowanceType: allowedOnly ? null : 'ALLOWED' })}
+            className="shrink-0"
+          >
+            <span className="sr-only">{`${messages.place.filterAllowedOnlyPrefix} `}</span>
+            {messages.place.filterAllowedOnlyShort}
+          </Chip>
+
           <ChipGroup
-            ref={rail.ref}
-            onScroll={rail.onScroll}
             label={messages.place.filterContentTypeLabel}
             exclusive
-            // `py-1.5 -my-1.5`: 칩의 히트 띠가 `overflow-x-auto` 에 잘리지 않게 (#905 R3 · emergency-filter-bar 와 같다)
-            className={cn(
-              '-my-1.5 flex scrollbar-none gap-1.5 overflow-x-auto py-1.5',
-              rail.fadeClassName,
-            )}
+            className="flex shrink-0 gap-1.5"
           >
             <Chip
+              size="sm"
               exclusive
               selected={kind === null}
               onSelect={() => apply(withPlaceKind(filters, null))}
@@ -155,6 +169,7 @@ export function PlaceMapFilterBar({
             {PLACE_KIND_FILTER_ORDER.map((option) => (
               <Chip
                 key={option}
+                size="sm"
                 exclusive
                 selected={kind === option}
                 onSelect={() => apply(withPlaceKind(filters, option))}
@@ -164,86 +179,27 @@ export function PlaceMapFilterBar({
             ))}
           </ChipGroup>
 
-          <ScrollRailArrows
-            rail={rail}
-            prevLabel={messages.place.filterTypePrev}
-            nextLabel={messages.place.filterTypeNext}
-          />
+          {dirty && (
+            <Chip size="sm" selected={false} onSelect={reset} className="shrink-0">
+              {messages.place.resetFilters}
+            </Chip>
+          )}
         </div>
-      </div>
 
-      {/* ── 2행: 동반 가능만 · 지역 · 더보기 ──────────────────────────────── */}
-      <div className="flex min-w-0 items-center gap-1.5">
-        {/*
-          즉시 반영이다 — 시트가 아니라 토글이라 "적용" 이 없다 (아트보드 02 절의 규칙).
-
-          **선택 표시는 칩의 tint 하나다** (#393). 예전에는 여기에만 체크 아이콘을 덧댔는데,
-          바로 윗줄의 유형 칩들이 같은 `Chip` 으로 tint 만 바꾸고 있어 **한 필터 묶음 안에서
-          선택을 말하는 방법이 두 가지**가 됐다. 아이콘이 붙은 칩만 다른 종류의 컨트롤처럼
-          보인다. `Chip` 은 tint 와 함께 weight 도 올리므로 색 하나에만 기대지 않는다.
-        */}
-        <Chip
-          selected={allowedOnly}
-          onSelect={() => apply({ ...filters, petAllowanceType: allowedOnly ? null : 'ALLOWED' })}
-          className="shrink-0"
-        >
-          {messages.place.filterAllowedOnly}
-        </Chip>
-
-        <Chip
-          selected={filters.sigunguCode !== null}
-          expanded={open === 'region'}
-          onSelect={() => openSheet('region')}
-          className="shrink-0"
-        >
-          {regionLabel}
-          <ChevronDownIcon size={16} />
-        </Chip>
-
-        {/* 자기 줄을 가졌으니 글자를 되살린다 — 한 줄이던 때는 폭이 없어 아이콘만 뒀다 */}
-        <Chip
-          selected={moreActive}
-          expanded={open === 'more'}
-          onSelect={() => openSheet('more')}
-          className="shrink-0"
-        >
-          <SlidersIcon size={16} />
-          {messages.place.filterMore}
-        </Chip>
-
-        {dirty && (
-          <Chip selected={false} onSelect={reset} className="shrink-0">
-            {messages.place.resetFilters}
-          </Chip>
-        )}
-      </div>
-
-      <BottomSheet
-        open={open === 'region'}
-        onClose={() => setOpen(null)}
-        title={messages.place.filterRegionLabel}
-        footer={<SheetFooter onCancel={() => setOpen(null)} onApply={applyDraft} />}
-      >
-        <RegionField filters={draft} onChange={setDraft} />
-      </BottomSheet>
-
-      <BottomSheet
-        open={open === 'more'}
-        onClose={() => setOpen(null)}
-        title={messages.place.filterMore}
-        footer={<SheetFooter onCancel={() => setOpen(null)} onApply={applyDraft} />}
-      >
-        {/* 동반 축은 2행 토글로 나갔다 — 시트의 첫 절이 실내다. 위에 구분선을 두지 않는다 */}
-        <FilterListHeading>{messages.place.filterIndoorLabel}</FilterListHeading>
-        <IndoorField filters={draft} onChange={setDraft} />
-
-        {/* 제목은 `PetSizeField` 가 그린다 — 반려견이 없으면 절 전체가 사라져야 한다 */}
-        <PetSizeField
-          filters={draft}
-          onChange={setDraft}
-          pet={pet}
-          heading={messages.place.filterPetSizeLabel}
+        <ScrollRailArrows
+          rail={rail}
+          prevLabel={messages.place.filterTypePrev}
+          nextLabel={messages.place.filterTypeNext}
         />
+      </div>
+
+      <BottomSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title={messages.place.filterTitle}
+        footer={<SheetFooter onCancel={() => setSheetOpen(false)} onApply={applyDraft} />}
+      >
+        <PlaceMapFilterSheetFields filters={draft} onChange={setDraft} pet={pet} />
       </BottomSheet>
     </div>
   )

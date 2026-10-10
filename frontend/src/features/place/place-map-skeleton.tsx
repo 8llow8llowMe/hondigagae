@@ -45,22 +45,16 @@ export function PlaceMapRowsSkeleton() {
 }
 
 /**
- * `PlaceMapFilterBar` 자리 — 유형 칩 한 줄(44) + 조건 버튼 한 줄(44), 사이 `gap-1.5`.
- * 선택값은 `searchParams` 라 골격이 알 수 없어 **높이만** 실화면 값이다.
+ * `PlaceMapFilterBar` 자리 — **칩 한 줄**(#1314): 모바일 36 · 768 이상 44 (`Chip` sm).
+ * 선택값은 `searchParams` 라 골격이 알 수 없어 **높이만** 실화면 값이다. 두 줄 골격이 남으면 로드 순간 시트 머리 ·
+ * 패널 필터 칸이 50 줄어들며 목록이 튄다.
  */
 function FilterBarSkeleton() {
   return (
-    <div aria-hidden className="flex min-w-0 flex-col gap-1.5">
-      <div className="flex gap-1.5 overflow-hidden">
-        {['w-14', 'w-18', 'w-18', 'w-14', 'w-20'].map((width, index) => (
-          <Skeleton key={index} className={cn('h-11 shrink-0 rounded-md', width)} />
-        ))}
-      </div>
-      <div className="flex gap-1.5">
-        <Skeleton className="h-11 w-36 rounded-md" />
-        <Skeleton className="h-11 w-20 rounded-md" />
-        <Skeleton className="h-11 w-24 rounded-md" />
-      </div>
+    <div aria-hidden className="flex min-w-0 gap-1.5 overflow-hidden">
+      {['w-18', 'w-24', 'w-24', 'w-14', 'w-18'].map((width, index) => (
+        <Skeleton key={index} className={cn('h-9 shrink-0 rounded-md md:h-11', width)} />
+      ))}
     </div>
   )
 }
@@ -75,9 +69,9 @@ function FilterBarSkeleton() {
  * - 바닥 — `MapCanvas` 의 SDK 대기 면과 같은 `bg-bg-sunken`, 높이는 `.map-canvas-height`
  * - 우상단 — 1024 미만은 검색(입력 + 아이콘 버튼 44) · 보기 전환(<768 44 아이콘 · 768–1023 글자 `w-28`), 그 아래
  *   지도 도구 카드 자리(`w-12 h-12.5` — 첫 페인트에는 `병원·약국` 칸 하나만 서고 `내 위치` 는 뒤에 붙는다, #1300)
- * - 데스크톱 — 왼쪽에 붙은 400 패널(`inset-y-0 left-0`, #1232): 로고 띠 64 · 검색 줄 61 · 필터 줄 111 · 개수 줄 44 · 행
- * - 모바일 — `MapSheet` 를 **그대로** 쓴다(`mid`). 머리 높이(그래버 · 필터 102 · 개수 42)가
- *   시트 자신의 것이라 두 벌로 두면 갈린다
+ * - 데스크톱 — 왼쪽에 붙은 400 패널(`inset-y-0 left-0`, #1232): 로고 띠 64 · 검색 줄 61 · 필터 줄 61 · 개수 줄 44 · 행
+ * - 모바일 — `MapSheet` 를 **그대로** 쓴다(`mid` · `headerSize="sm"`). 머리 높이(그래버 24 · 필터 36 · 개수 글줄 32,
+ *   #1314)가 시트 자신의 것이라 두 벌로 두면 갈린다
  *
  * **늘 아일랜드 모양이다** (#1287 D3-3 · #1300 D3-4) — 이 골격은 `/places` 지도 보기 전용이라 루트가 `map-island`
  * 를 달고, 조작 줄 y 8 / 68 · 목록 칸 맨 위 64 로고 띠 · 시트 상한 `--map-island-inset` 이 `PlaceMapView island` 와
@@ -146,6 +140,7 @@ export function PlaceMapSkeleton() {
         stop={stop}
         onStopChange={setStop}
         toolbar={<FilterBarSkeleton />}
+        headerSize="sm"
         header={<Skeleton className="h-4.5 w-20" />}
         maxTopInset={MAP_ISLAND_INSET_VAR}
       >

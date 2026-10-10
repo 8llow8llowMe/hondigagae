@@ -107,13 +107,14 @@ function renderChip(pets: Pet[], totalCount = pets.length): string {
 }
 
 describe('PetSwitcher variant="chip" — 지도 필터 줄 칩 (#1301 D7-4)', () => {
-  it('트리거는 메뉴를 여는 꺼진 칩이다 — Chip md 44 · rounded-md · 켠 색 없음', () => {
+  it('트리거는 메뉴를 여는 꺼진 칩이다 — Chip sm(모바일 36 · ≥768 44, #1314) · rounded-md · 켠 색 없음', () => {
     const tag = triggerTag(renderChip([pet('1', '몽실이'), pet('2', '초코')]))
 
     expect(tag).toContain('aria-haspopup="menu"')
     expect(tag).toContain('aria-expanded="false"')
     expect(tag).toContain('aria-controls=')
-    expect(tag).toContain('h-11')
+    expect(tag).toMatch(/(\s|")h-9(\s|")/)
+    expect(tag).toContain('md:h-11')
     expect(tag).toContain('rounded-md')
     expect(tag).not.toMatch(/(^|\s|")bg-band(\s|")/)
     expect(tag).not.toContain('aria-pressed')
@@ -143,6 +144,8 @@ describe('PetSwitcher variant="chip" — 지도 필터 줄 칩 (#1301 D7-4)', ()
 
     expect(tag).toContain('max-w-40')
     expect(tag).not.toContain('border')
+    // 지도 줄의 `sm` 은 칩 갈래만이다 — 헤더 트리거는 44 그대로 (#1314)
+    expect(tag).not.toMatch(/(\s|")h-9(\s|")/)
   })
 })
 

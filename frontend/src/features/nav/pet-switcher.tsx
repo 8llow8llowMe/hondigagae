@@ -178,9 +178,11 @@ export function PetSwitcher({
 
   if (isChip) {
     return (
-      <div className="relative shrink-0">
+      // `flex` — 블록 안 inline-flex 칩은 글줄 바탕선 몫만큼 감싸개가 1px 커져 필터 줄이 37 이 됐다 (#1314 실측)
+      <div className="relative flex shrink-0">
         {/*
-          **`Chip` 그대로다** — 같은 필터 줄의 `지역 ▾` · `더보기` 와 같은 컨트롤로 읽혀야 한다. `selected={false}`
+          **`Chip` 그대로다** — 같은 필터 줄의 `필터` · 동반 · 유형 칩과 같은 컨트롤로 읽혀야 한다. 크기도 줄과 같은
+          `sm`(모바일 36 · 누르는 자리 46, ≥768 44 — #1314 D8-2). `selected={false}`
           고정: 켠 색은 "결과를 좁히는 조건이 걸림" 이고 `초기화` 의 대상인데, 반려견은 좁히지도 초기화되지도
           않는다 (장소-반려견칩 D1-2).
 
@@ -189,6 +191,7 @@ export function PetSwitcher({
         */}
         <Chip
           ref={triggerRef}
+          size="sm"
           selected={false}
           expanded={open}
           popup="menu"

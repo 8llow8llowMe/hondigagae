@@ -109,6 +109,39 @@ export function sheetDragIntent(dx: number, dy: number): 'pending' | 'sheet' | '
   return ay > ax ? 'sheet' : 'none'
 }
 
+/**
+ * 머리(필터 줄 + 개수 줄)의 밀도 — 장소-지도필터-한줄-세부명세 D2 (#1314 D8-4).
+ *
+ * - `md`(기본) — 필터 줄 밑 `pb-2` + 개수 줄(글자 버튼 34 + `pb-2`) **42**. `/emergency` 가 쓴다
+ * - `sm` — **개수 줄을 필터 줄 바로 밑 작은 글줄 32 로 좁힌다.** 390×844 `mid` 에서 머리 110 → 92, 목록이 약 0.17 행
+ *   더 보인다(실측은 명세 D2-3). `목록 더 보기` 의 보이는 상자는 글줄 높이 32 이고, 누르는 자리는 `::before` 로
+ *   **아래로만 12** 넓혀 44 다 — 위로 넓히면 필터 칩의 보이는 면을 덮고, 아래 12 는 목록 첫 행의 `py-3` 윗여백
+ *   (스크롤 0 에서 비어 있는 자리)이다. 넓힌 띠가 목록 위에 칠해지도록 머리를 로컬 층(`z-10`)으로 올린다
+ *
+ * 개수 글줄의 글자는 지금처럼 `header` 가 그린다 — 낭독 순서(필터 줄 → 개수 → `목록 더 보기`)도 그대로다.
+ */
+export type MapSheetHeaderSize = 'md' | 'sm'
+
+const HEAD_CLASS: Record<MapSheetHeaderSize, string> = {
+  md: '',
+  sm: 'relative z-10',
+}
+
+const TOOLBAR_CLASS: Record<MapSheetHeaderSize, string> = {
+  md: 'px-3 pb-2',
+  sm: 'px-3',
+}
+
+const COUNT_LINE_CLASS: Record<MapSheetHeaderSize, string> = {
+  md: 'flex items-center justify-between gap-2 px-4 pb-2',
+  sm: 'flex h-8 items-center justify-between gap-2 px-4',
+}
+
+const STOP_BUTTON_CLASS: Record<MapSheetHeaderSize, string> = {
+  md: 'px-2 py-2',
+  sm: "relative inline-flex h-8 items-center px-2 before:absolute before:inset-x-0 before:top-0 before:-bottom-3 before:content-['']",
+}
+
 export function MapSheet({
   label,
   stop,
@@ -118,6 +151,7 @@ export function MapSheet({
   children,
   className,
   maxTopInset = 0,
+  headerSize = 'md',
 }: {
   /**
    * 시트의 접근성 이름. **화면마다 다르다** — 장소 찾기는 "장소 목록", 긴급 시설은
@@ -152,6 +186,8 @@ export function MapSheet({
    * 폭 판정을 JS(`matchMedia`)로 옮기면 하이드레이션 불일치 · 회전 때 어긋난다.
    */
   maxTopInset?: number | `var(--${string})` | undefined
+  /** 머리 밀도 — `sm` 은 개수 줄을 작은 글줄로 좁힌다 (`MapSheetHeaderSize` 주석, #1314) */
+  headerSize?: MapSheetHeaderSize
 }) {
   const [dragOffset, setDragOffset] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -339,7 +375,10 @@ export function MapSheet({
           가 거기까지 닿지 않았고, 칩 위에서 아래로 끌면 브라우저가 세로 제스처를 가져가
           `pointercancel` 이 났다(실측). 실기기에서 "잘 안 잡힌다" 의 원인이다.
         */
-        className="map-sheet-head cursor-grab touch-pan-x select-none active:cursor-grabbing"
+        className={cn(
+          'map-sheet-head cursor-grab touch-pan-x select-none active:cursor-grabbing',
+          HEAD_CLASS[headerSize],
+        )}
       >
         {/*
           그래버 — 보이는 손잡이. **막대 밑에 12px 여유를 둔다**(24px 띠, 사용자 지적 2026-10-07) — `pt-2 pb-1`
@@ -354,7 +393,7 @@ export function MapSheet({
         {/* 필터 같은 전폭 컨트롤. 최소 단계에서도 남으므로 지도를 보면서 조건을 바꿀 수 있다 */}
         {toolbar !== undefined && (
           // 필터 줄도 손잡이다 — 칩을 잡고 위아래로 끌면 시트가 움직인다 (#1278, `sheetDragIntent`)
-          <div className="px-3 pb-2">{toolbar}</div>
+          <div className={TOOLBAR_CLASS[headerSize]}>{toolbar}</div>
         )}
 
         {/**
@@ -368,12 +407,15 @@ export function MapSheet({
          * 바꾸면 `min`(지도를 보는 단계)에 **키보드로 갈 방법이 사라진다** — 버튼 하나로
          * 세 단계를 왕복시키려면 라벨이 무엇을 할지 말하지 못한다.
          */}
-        <div className="flex items-center justify-between gap-2 px-4 pb-2">
+        <div className={COUNT_LINE_CLASS[headerSize]}>
           <div className="min-w-0 flex-1">{header}</div>
           <button
             type="button"
             onClick={() => onStopChange(stop === 'max' ? 'min' : 'max')}
-            className="text-caption text-fg-muted hover:text-fg focus-visible:ring-brand-500 shrink-0 rounded-md px-2 py-2 font-semibold focus-visible:ring-2 focus-visible:outline-none"
+            className={cn(
+              'text-caption text-fg-muted hover:text-fg focus-visible:ring-brand-500 shrink-0 rounded-md font-semibold focus-visible:ring-2 focus-visible:outline-none',
+              STOP_BUTTON_CLASS[headerSize],
+            )}
           >
             {stop === 'max' ? messages.map.collapseSheet : messages.map.expandSheet}
           </button>
@@ -386,7 +428,8 @@ export function MapSheet({
         단계 높이는 **비율**(`STOP_RATIO`)인데 머리는 **고정 px** 라, 기기가 짧을수록 목록이
         사라졌다. 360×640 실측으로 `/places` 는 머리가 160 인데 `min` 이 20dvh = 128 이라
         **목록 0행**이었다(개수 줄까지 잘렸다). 칩을 한 줄 레일로 합치는 안은 #883 이 유형
-        9종 때문에 보류한 판단이라 되받지 않고, 시트 쪽에 하한을 건다. (그래버 막대 밑 여백을 4 → 12 로
+        9종 때문에 보류한 판단이라 되받지 않고, 시트 쪽에 하한을 건다. (그 뒤 #1314 가 `/places` 필터를 한 줄 +
+        필터 시트로 합쳤다 — 하한은 그대로 둔다. 머리가 작아진 만큼 `min` 이 비율대로 선다) (그래버 막대 밑 여백을 4 → 12 로
         넓힌 2026-10-07 뒤로 머리는 약 8px 더 크다 — 그래서 그래버 위 여백은 늘리지 않았다)
 
          - 시트가 `min-h-min` — 제 min-content 아래로 줄지 않는다. 비율 높이는 그대로 두고

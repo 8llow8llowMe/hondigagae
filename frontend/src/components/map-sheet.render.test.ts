@@ -401,3 +401,63 @@ describe('MapSheet — 최소 단계에도 목록이 한 줄은 남는다 (#901 
     expect(listTag('max')).toContain('overflow-y-auto')
   })
 })
+
+describe('MapSheet — 머리 밀도 headerSize (#1314 D8-4)', () => {
+  function renderHead(headerSize: 'md' | 'sm' | undefined) {
+    return renderToStaticMarkup(
+      createElement(MapSheet, {
+        label: '목록',
+        stop: 'mid',
+        onStopChange: () => undefined,
+        toolbar: createElement('div', null, '필터 줄'),
+        header: createElement('p', null, '목록 20곳'),
+        children: createElement('p', null, '목록 자리'),
+        ...(headerSize === undefined ? {} : { headerSize }),
+      }),
+    )
+  }
+
+  /** 단계 이동 버튼 여는 태그 — 클래스 단언을 이 안으로 좁힌다 */
+  function stopButtonTag(markup: string): string {
+    return /<button[^>]*>(?=목록 더 보기)/.exec(markup)?.[0] ?? ''
+  }
+
+  /** `목록 20곳` 을 품은 개수 줄 여는 태그 */
+  function countLineTag(markup: string): string {
+    return /<div class="([^"]*)"><div class="min-w-0 flex-1"><p>목록 20곳/.exec(markup)?.[1] ?? ''
+  }
+
+  it('기본(md)은 지금 그대로다 — 필터 칸 pb-2 · 개수 줄 pb-2 · 버튼 py-2', () => {
+    const markup = renderHead(undefined)
+
+    expect(markup).toContain('<div class="px-3 pb-2"><div>필터 줄</div>')
+    expect(countLineTag(markup)).toContain('pb-2')
+    expect(stopButtonTag(markup)).toContain('py-2')
+    expect(stopButtonTag(markup)).not.toContain('before:')
+  })
+
+  it('sm 은 개수 줄을 32 글줄로 좁히고 필터 칸 아래 여백을 뗀다', () => {
+    const markup = renderHead('sm')
+
+    expect(markup).toContain('<div class="px-3"><div>필터 줄</div>')
+    expect(countLineTag(markup)).toMatch(/(^|\s)h-8(\s|$)/)
+    expect(countLineTag(markup)).not.toContain('pb-2')
+  })
+
+  it('sm 의 `목록 더 보기` 는 보이는 상자 32 + 아래로만 12 넓힌 누르는 자리 = 44', () => {
+    const tag = stopButtonTag(renderHead('sm'))
+
+    expect(tag).toMatch(/(\s|")h-8(\s|")/)
+    expect(tag).toContain('before:top-0')
+    expect(tag).toContain('before:-bottom-3')
+    expect(tag).not.toContain('py-2')
+  })
+
+  it('sm 은 넓힌 띠가 목록 위에 칠해지도록 머리를 로컬 층(z-10)으로 올린다', () => {
+    const head = /<div class="(map-sheet-head[^"]*)"/.exec(renderHead('sm'))?.[1] ?? ''
+
+    expect(head).toContain('relative')
+    expect(head).toContain('z-10')
+    expect(/<div class="(map-sheet-head[^"]*)"/.exec(renderHead('md'))?.[1]).not.toContain('z-10')
+  })
+})
