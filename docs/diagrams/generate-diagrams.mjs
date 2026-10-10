@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../images');
 fs.mkdirSync(OUT, { recursive: true });
 
-const FONT = 'Segoe UI, Malgun Gothic, sans-serif';
+const FONT = 'Malgun Gothic, Segoe UI, sans-serif';
 const C = {
   bg: '#FFFFFF',
   panel: '#F1F5F9',
@@ -134,7 +134,7 @@ function architecture() {
     PX,
     46,
     '혼디가개 · System Architecture',
-    'auth 는 Nginx 에서 단독 분기하고, 장소·일정·AI 는 API Gateway 를 경유한다',
+    '웹은 Next.js BFF 가 받고, API 도메인은 Nginx 에서 auth 만 직결 · 장소·일정·AI 는 API Gateway 를 경유한다',
   );
 
   const userY = 92;
@@ -151,7 +151,7 @@ function architecture() {
     h: 62,
     ic: 'Nginx',
     title: 'Nginx + Certbot',
-    sub: 'HTTPS 종료 · auth 단독 · 그 외 게이트웨이',
+    sub: 'TLS 종단 · auth 직결 · 그 외 /api/ 게이트웨이 · SSE 버퍼링 off',
   });
   const domX = IX + 496;
   s += pill(domX, edgeY + 48, 'www.hondigagae.com', '#DBEAFE');
@@ -185,7 +185,7 @@ function architecture() {
     const row = Math.floor(i / 2);
     s += pill(IX + 552 + col * 250, feY + 50 + row * 28, c[0], '#FFFFFF', '#334155');
   });
-  s += arrow(W / 2, feY + feH, W / 2, feY + feH + 36, { label: 'HTTPS · /api/v1/**' });
+  s += arrow(W / 2, feY + feH, W / 2, feY + feH + 36, { label: 'BFF → 공개 API 도메인 · /api/v1/**' });
 
   const beY = 536;
   const beH = 372;
@@ -206,7 +206,7 @@ function architecture() {
     h: 68,
     ic: 'Spring',
     title: 'api-gateway',
-    sub: 'JWT 1차 검증 · 라우팅 · Swagger 집계',
+    sub: 'JWT 1차 검증 · Redis 블랙리스트 · Swagger 집계',
   });
   s += card({
     x: IX + halfW + 24,
@@ -225,8 +225,8 @@ function architecture() {
     ['auth-service', '인증 · 회원 · 반려견 프로필', 'Gateway 미경유'],
     ['tour-service', '장소 · 긴급 · 적합도', null],
     ['plan-service', '여행 일정 CRUD · 소유권', null],
-    ['ai-service', 'AI 플래너 job · 폴링', 'Claude'],
-    ['batch-service', 'TourAPI · 문화정보원 · 식약처', '내부 전용'],
+    ['ai-service', 'AI 플래너 job · SSE · 폴링', 'Ollama · gpt-oss:20b'],
+    ['batch-service', '공공데이터 적재 · Quartz', '내부 전용'],
     ['shared-travel', '적합도 · 반려견 공유 타입', 'core'],
   ];
   services.forEach((sv, i) => {
@@ -250,12 +250,13 @@ function architecture() {
   const dataY = beY + beH + 34;
   const dataH = 130;
   s += panel({ x: PX, y: dataY, w: PW, h: dataH, title: 'DATA & EXTERNAL' });
-  const dW = (IW - 3 * 20) / 4;
+  const dW = (IW - 4 * 20) / 5;
   const data = [
-    ['Mysql', 'MySQL', '장소 · 일정 · 회원'],
+    ['Mysql', 'MySQL', '서비스별 스키마'],
     ['Redis', 'Redis', '토큰 · AI job · 캐시'],
     ['Minio', 'MinIO', '프로필 이미지'],
-    ['tour', '공공 데이터', 'TourAPI · 문화정보원 · 식약처'],
+    ['Ollama', 'Ollama', 'gpt-oss:20b 추론'],
+    ['tour', '공공 데이터', 'TourAPI 외 4종'],
   ];
   data.forEach((d, i) => {
     s += card({
@@ -274,6 +275,19 @@ function architecture() {
 }
 
 /* ---------------------------------------------------------------- */
+function stepCard({ x, y, w, h, ic, icColor, title, lines }) {
+  const iconSize = 28;
+  const cx = x + w / 2;
+  let out = `
+  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="${C.card}" stroke="${C.cardBorder}" stroke-width="1.5"/>
+  ${icon(ic, cx - iconSize / 2, y + 14, iconSize, icColor)}
+  <text x="${cx}" y="${y + 66}" text-anchor="middle" font-family="${FONT}" font-size="14" font-weight="700" fill="${C.title}">${esc(title)}</text>`;
+  lines.forEach((l, i) => {
+    out += `<text x="${cx}" y="${y + 86 + i * 17}" text-anchor="middle" font-family="${FONT}" font-size="11.5" fill="${C.sub}">${esc(l)}</text>`;
+  });
+  return out;
+}
+
 function infrastructure() {
   let s = '';
 
@@ -285,82 +299,98 @@ function infrastructure() {
   );
 
   const ciY = 82;
-  const ciH = 150;
+  const ciH = 234;
   s += panel({ x: PX, y: ciY, w: PW, h: ciH, title: 'CI/CD PIPELINE', accent: '#FDBA74', fill: '#FFF7ED' });
   const steps = [
-    ['Github', 'GitHub', 'push · webhook'],
-    ['Jenkins', 'Jenkins Controller', '파이프라인 제어'],
-    ['Gradle', 'builder-backend', 'gradle · bootJar'],
-    ['Vault', 'HashiCorp Vault', 'kv/hondigagae/{env}'],
-    ['Docker', 'deploy agent', '.env.runtime · compose'],
+    ['Github', 'Pull Request', ['Rebase and merge', '릴리스는 merge commit']],
+    ['Githubactions', 'GitHub Actions', ['backend · frontend-ci', 'e2e 3샤드 · 라벨 부여']],
+    ['Jenkins', 'Jenkins 멀티브랜치', ['develop → dev', 'main → prod']],
+    ['Gradle', 'builder · ollama-01', ['Gradle test · bootJar', 'pnpm build']],
+    ['Vault', 'Vault', ['KV v2 · 환경별 시크릿', 'deploy agent 가 조회']],
+    ['Docker', 'deploy agent', ['.env.runtime', 'compose up · 기동 확인']],
   ];
-  const stW = (IW - 4 * 34) / 5;
+  const gap = 26;
+  const stW = (IW - (steps.length - 1) * gap) / steps.length;
+  const stH = 128;
   steps.forEach((st, i) => {
-    const x = IX + i * (stW + 34);
-    s += card({
+    const x = IX + i * (stW + gap);
+    s += stepCard({
       x,
       y: ciY + 46,
       w: stW,
-      h: 78,
+      h: stH,
       ic: st[0],
       icColor: st[0] === 'Vault' ? '#B8860B' : undefined,
       title: st[1],
-      sub: st[2],
+      lines: st[2],
     });
-    if (i < steps.length - 1) s += arrow(x + stW + 4, ciY + 85, x + stW + 30, ciY + 85);
+    if (i < steps.length - 1) s += arrow(x + stW + 3, ciY + 46 + stH / 2, x + stW + gap - 3, ciY + 46 + stH / 2);
   });
-  s += `<text x="${IX}" y="${ciY + 142}" font-family="${FONT}" font-size="12" fill="${C.sub}">Jenkinsfile 은 서비스별 + 공통 groovy · 시크릿은 Vault kv/hondigagae/{env} 가 원본</text>`;
+  const ciNotes = [
+    '머지된 PR 의 서비스 라벨로 배포 대상을 고른다 · 라벨이 없으면 배포하지 않고, 수동 배포는 FORCE_DEPLOY',
+    '배치는 배포와 분리한다 · batch-service 의 Quartz 스케줄 또는 수동 실행으로 돈다',
+  ];
+  ciNotes.forEach((n, i) => {
+    s += `<text x="${IX}" y="${ciY + 46 + stH + 24 + i * 19}" font-family="${FONT}" font-size="12" fill="${C.sub}">${esc(n)}</text>`;
+  });
 
-  const hostY = 258;
+  const hostY = ciY + ciH + 34;
   s += `<text x="${PX}" y="${hostY - 8}" font-family="${FONT}" font-size="15" font-weight="700" fill="${C.panelTitle}" letter-spacing="0.4">SERVER TOPOLOGY</text>`;
 
   const hosts = [
     {
-      title: 'public edge',
-      sub: 'Nginx 호스트 · storage 192.168.0.12',
-      items: [['Nginx', 'Nginx + Certbot', 'HTTPS · 도메인 라우팅']],
-    },
-    {
-      title: 'main-server · 192.168.0.11',
-      sub: 'dev 환경 (포트 7XXX)',
+      title: 'storage · 192.168.0.12',
+      sub: '인그레스 · 오브젝트 스토리지 (aarch64)',
       items: [
-        ['Springboot', 'Backend dev', 'gateway 7000 · auth 7081'],
-        ['Nextdotjs', 'Frontend dev', '7300'],
-        ['Mysql', 'MySQL', 'dev DB 공용'],
-        ['Redis', 'Redis master', 'Sentinel 1'],
+        ['Nginx', 'Nginx', 'TLS 종단 · 전 도메인 인그레스'],
+        ['Letsencrypt', 'Certbot', 'HTTP-01 · 12시간 갱신 루프'],
+        ['Minio', 'MinIO', '프로필 이미지'],
+        ['Redis', 'Redis node3', 'replica · Sentinel'],
       ],
     },
     {
-      title: 'backend-1 · 192.168.0.13',
-      sub: 'prod 환경 (포트 5XXX)',
+      title: 'main-server · 192.168.0.11',
+      sub: 'dev 환경 · 공용 데이터 (aarch64)',
       items: [
-        ['Springboot', 'Backend prod', 'gateway 5000 · auth 5081'],
-        ['Nextdotjs', 'Frontend prod', '5300'],
-        ['Redis', 'Redis replica', 'Sentinel 2'],
+        ['Springboot', 'Backend dev', '서비스 7종 · 7xxx'],
+        ['Nextdotjs', 'frontend-web dev', 'Next.js SSR + BFF · 7xxx'],
+        ['Mysql', 'MySQL', 'dev 스키마 + prod 스키마'],
+        ['Redis', 'Redis node1', 'master · Sentinel'],
+        ['Docker', 'deploy agent', 'deploy-backend/frontend-dev'],
+      ],
+    },
+    {
+      title: 'backend-server · 192.168.0.9',
+      sub: 'prod 환경 (x86_64)',
+      items: [
+        ['Springboot', 'Backend prod', '서비스 7종 · 5xxx'],
+        ['Nextdotjs', 'frontend-web prod', 'Next.js SSR + BFF · 5xxx'],
+        ['Docker', 'deploy agent', 'deploy-backend/frontend-prod'],
       ],
     },
     {
       title: 'ollama-01 · 192.168.0.10',
-      sub: '빌드 · 시크릿 (x86_64)',
+      sub: 'AI 추론 · 빌드 · 시크릿 (x86_64)',
       items: [
-        ['Jenkins', 'Jenkins', 'controller + builder'],
-        ['Vault', 'Vault', 'kv/hondigagae/{env}'],
+        ['Ollama', 'Ollama', 'gpt-oss:20b · AI 플래너'],
+        ['Jenkins', 'Jenkins', 'controller + builder agent'],
+        ['Vault', 'Vault', 'KV v2 · 환경별 시크릿'],
       ],
     },
     {
       title: 'monitoring · 192.168.0.14',
-      sub: '관측 스택',
+      sub: '관측 스택 · 혼디가개 target 등록 예정',
       items: [
-        ['Prometheus', 'Prometheus', 'actuator · node_exporter'],
+        ['Prometheus', 'Prometheus', 'node_exporter 수집'],
         ['Grafana', 'Grafana', '호스트 지표 대시보드'],
       ],
     },
     {
-      title: 'storage · 192.168.0.12',
-      sub: '오브젝트 스토리지 · Redis quorum',
+      title: '외부 공공데이터',
+      sub: 'batch-service 가 수집',
       items: [
-        ['Minio', 'MinIO', 'minio.hondigagae.com'],
-        ['Redis', 'Redis replica', 'Sentinel 3'],
+        ['tour', 'TourAPI · 관광빅데이터', '한국관광공사'],
+        ['tour', '문화정보원 · 식약처', 'VWorld (좌표 · 주소)'],
       ],
     },
   ];
@@ -386,7 +416,7 @@ function infrastructure() {
         w: hw - 28,
         h: 58,
         ic: it[0],
-        icColor: it[0] === 'Vault' ? '#B8860B' : undefined,
+        icColor: it[0] === 'Vault' ? '#B8860B' : it[0] === 'tour' ? '#0F766E' : undefined,
         title: it[1],
         sub: it[2],
       });
@@ -395,10 +425,11 @@ function infrastructure() {
 
   const notesY = rowTop[1] + Math.max(...hosts.slice(cols).map(bodyH)) + 26;
   const notes = [
-    'Nginx 는 auth(/api/v1/auth, /api/v1/members)를 백엔드에 직결하고, 나머지 /api/ 는 게이트웨이로 보낸다',
-    'BossPickSeoul 과 호스트를 공유하므로 포트 대역을 나눈다 · 혼디가개 dev 7xxx / prod 5xxx',
-    '배포 시크릿은 Vault kv/hondigagae/{env}/{service} 가 원본이고, 서버에는 .env.runtime 으로만 잠시 존재한다',
-    'Redis 는 3노드 센티널(.11 master · .13 · .12 replica) quorum 2 를 공유 인프라로 사용한다',
+    '브라우저 → Nginx(.12) → 웹 도메인은 frontend-web(SSR + BFF /api/bff), API 도메인은 /api/v1/auth · /api/v1/members 를 auth-service 에 직결',
+    '그 외 /api/ 는 api-gateway(JWT 1차 검증 + Redis 블랙리스트, Eureka lb:// 라우팅) → tour · plan · ai · BFF 도 공개 API 도메인을 거친다',
+    'AI 진행 스트림(SSE)은 Nginx 에서 proxy_buffering off · ai-service 는 ollama-01 의 Ollama 를 호출한다',
+    'dev · prod 서비스 모두 MySQL · Redis(.11) 와 MinIO(.12)를 쓴다 · prod 스키마 hondigagae_{auth,tour,plan}_prod 가 같은 인스턴스에 있다',
+    'BossPickSeoul 과 호스트를 공유하므로 포트 대역을 나눈다 · 배포 시크릿은 Vault 가 원본이고 서버에는 .env.runtime 으로만 잠시 존재한다',
   ];
   s += panel({ x: PX, y: notesY, w: PW, h: 42 + notes.length * 24, title: null, accent: '#CBD5E1' });
   notes.forEach((n, i) => {
