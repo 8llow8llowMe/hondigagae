@@ -43,7 +43,7 @@ env 키를 모아 두고, 각 compose 가 필요한 것만 골라 쓴다. 서비
 그대로 두면 둘 다 auth 가 6081 을 원해 포트 바인딩이 실패한다.
 그래서 혼디가개는 **dev `7XXX` / prod `5XXX`** 를 쓴다. (Infra README §4 배치 원칙 5번)
 
-| 서비스 | 컨테이너 내부 | dev (192.168.0.11) | prod (192.168.0.13) |
+| 서비스 | 컨테이너 내부 | dev (192.168.0.11) | prod (192.168.0.9) |
 | --- | --- | --- | --- |
 | service-discovery | 8761 | 7761 | 5761 |
 | api-gateway | 8000 | 7000 | 5000 |
@@ -65,14 +65,14 @@ compose 파일 하나에 dev/prod 서비스가 같이 정의되어 있고 `docke
 | 환경 | 호스트 | 도메인 |
 | --- | --- | --- |
 | dev | `main-server` `192.168.0.11` | `api-dev.hondigagae.com` / `dev.hondigagae.com` |
-| prod | `backend-1` `192.168.0.13` | `api.hondigagae.com` / `www.hondigagae.com` |
+| prod | `backend-server` `192.168.0.9` | `api.hondigagae.com` / `www.hondigagae.com` |
 
 `storage`(`192.168.0.12`)에는 올리지 않는다. 총 1.9GB / swap 0 에 nginx 가 함께 있어
 OOM 이 나면 전 도메인의 인그레스가 같이 죽는다.
 
-**prod 호스트는 빠듯하다.** `backend-1` 은 available 6.4Gi 인데 tripmarble prod 5종과
-BossPickSeoul prod 9종이 함께 올라간다. 혼디가개 7종을 더하면 여유가 거의 없다.
-`{SVC}_MEM_LIMIT_PROD` 를 낮춰 잡거나, 운영 전에 호스트 증설을 검토한다.
+**prod 호스트는 prod 전용이다.** 2026-10-01 에 prod 가 `backend-1`(`.13`)에서 신규 미니PC 로 옮겨졌고,
+2026-10-10 에 `backend-server`(`192.168.0.9`, x86_64, 메모리 15Gi · available 13Gi)로 세팅했다. dev 와 호스트를 나눠
+dev 배포의 OOM 이 운영으로 번지지 않는다. 같은 호스트에 다른 프로젝트 prod 가 함께 올라가므로 `{SVC}_MEM_LIMIT_PROD` 는 기본값(768m)을 유지한다.
 
 ## 서비스 간 통신
 
@@ -141,6 +141,28 @@ BossPickSeoul 규칙 `{project}_{service}_{env}` 그대로다.
 dev 는 `ddl-auto: update` 라 테이블은 첫 기동 때 애플리케이션이 만든다. 사람이 미리 만드는 것은
 스키마와 계정뿐이다. prod 는 `ddl-auto: none` 이므로 별도 마이그레이션 런북이 필요하다.
 
+### prod 스키마 · 초기 데이터 (2026-10-10, #1323)
+
+prod 는 같은 MySQL 인스턴스(`.11`)에 `hondigagae_{auth,tour,plan}_prod` 로 만들었다. 한 일은 셋이다.
+
+1. **구조** — dev 3개 스키마를 `mysqldump --no-data` 로 떠서 `_prod` 로 만들었다(테이블 30 · 컬럼 325 ·
+   인덱스 111 · FK 5, dev 와 `information_schema` 대조 일치). `AUTO_INCREMENT` 값은 지웠다.
+   mysqldump 는 테이블을 알파벳순으로 내보내 `BATCH_*` FK 대상보다 먼저 만들 수 있으므로
+   `SET FOREIGN_KEY_CHECKS=0` 으로 감싸 적용한다.
+2. **Spring Batch 시퀀스** — `BATCH_{STEP_EXECUTION,JOB_EXECUTION,JOB}_SEQ` 에 공식 `schema-mysql.sql` 과
+   같은 초기 행 `(0, '0')` 을 넣었다. 구조만 복제하면 이 셋이 비어 **첫 잡 실행이 실패한다.**
+3. **tour 데이터** — 장소 · 이미지 · 소개 · 반려동물 정보 · 응급시설 · 올레 · 혼잡도 · 이름 링크 ·
+   `import_source_snapshot` 9개 테이블을 dev 에서 이관했다(약 4.2만 행, 테이블별 건수 · `place` 체크섬 일치).
+   회원 · 일정(auth · plan)과 `BATCH_*` 실행 이력은 옮기지 않았다.
+
+**배치로 채우지 않고 이관한 이유** — TourAPI 개발계정은 상품당 하루 1,000콜이라 상세 커버리지를
+채우는 데 5~6일이 걸리고, **dev 와 prod 가 같은 API 키를 써서** 그동안 dev 배치까지 쿼터를 잃는다.
+이관하면 placeId(TourAPI contentId 축)가 dev 와 같아 프론트 대표 지점(`126454`)도 그대로 유효하다.
+이후 갱신은 배치가 맡는다 — 적재가 자연키 기준 멱등이라 이관한 행 위에서 그대로 수렴한다.
+
+이 순서로 새 스키마를 다시 만들어야 하면(재구축 · 새 환경) 위 1 → 2 → 3 을 그대로 따른다.
+**스키마 변경(컬럼 추가 등)은 이 절차가 아니라** dev 에서 확인한 DDL 을 prod 에 사람이 적용한다.
+
 ### batch 스냅샷 테이블 (`import_source_snapshot`, #379)
 
 batch-service 는 JPA 를 쓰지 않아 이 테이블만 `spring.sql.init` 이 만든다. local·dev·test 는
@@ -205,7 +227,7 @@ FLUSH PRIVILEGES;
 
 ## 배포 후 점검
 
-`{host}` 는 dev 면 `192.168.0.11`, prod 면 `192.168.0.13` 이다.
+`{host}` 는 dev 면 `192.168.0.11`, prod 면 `192.168.0.9`(backend-server) 다.
 
 ```bash
 # 1. Eureka 등록 확인 (dev 7761 / prod 5761)
