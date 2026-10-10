@@ -269,13 +269,15 @@ gh pr edit <번호> --add-assignee @me --add-label frontend-web
 
 ## 7. 머지
 
-**`Rebase and merge` 를 쓴다.** develop 을 선형으로 유지한다.
+**develop 으로 가는 PR 은 `Rebase and merge` 를 쓴다.** develop 을 선형으로 유지한다.
+(develop → main 릴리스만 예외다 — 아래 "릴리스" 절)
 
 ```bash
 gh pr merge <번호> --rebase --delete-branch
 ```
 
-- `Create a merge commit` / `Squash and merge` 는 **저장소 설정에서 껐다** — UI 에 뜨지 않는다 (§8-1).
+- `Squash and merge` 는 **저장소 설정에서 껐다.** `Create a merge commit` 은 릴리스 때문에 켜 두었지만
+  **develop 에는 ruleset 이 머지 커밋을 막는다** (§8-1) — 기능 PR 에서 눌러도 머지되지 않는다.
 - `--delete-branch` 는 그대로 쓴다. 저장소 자동 삭제를 켜 뒀지만(§8-1) 명령에 남겨 두면
   **로컬에서 바로 결과를 확인할 수 있고**, 설정이 되돌려져도 브랜치가 남지 않는다.
 - 로컬 정리:
@@ -284,6 +286,29 @@ gh pr merge <번호> --rebase --delete-branch
 git checkout develop && git pull --ff-only origin develop
 git branch -d feature/fe/12-place-detail
 ```
+
+### 릴리스 (develop → main) — merge commit 으로 머지한다
+
+운영 배포는 `main` 에 들어간 커밋이 부른다 (`main` → `deployEnv=prod`). 릴리스 PR 은 **`Create a merge commit`** 으로 머지한다.
+
+```bash
+gh pr merge <릴리스 PR 번호> --merge     # --delete-branch 를 붙이지 않는다 (head 가 develop 이다)
+```
+
+- **라벨**: 릴리스 PR 에 **이번에 배포할 서비스 라벨을 전부** 붙인다. 파이프라인은 배포 대상을 이 PR 의
+  라벨로 정한다 — 기능 PR 에 붙어 있던 라벨은 develop 으로 머지된 PR 이라 `main` 배포에서 세지 않는다.
+- **왜 merge commit 인가** — 두 가지 이유다.
+  1. **rebase 머지가 실패한다.** 첫 릴리스 #1325(1,568 커밋)가 "This branch cannot be rebased due to
+     conflicts" 로 막혔다. `main` 이 develop 의 조상이고 범위 안 머지 커밋도 0개라 내용 충돌은 없었다.
+     GitHub 의 rebase 머지는 커밋을 하나씩 다시 적용해 새 SHA 를 만드는데, 그 재적용이 실패한 것이다.
+     매 릴리스가 같은 위험을 지고, 성공해도 `main` 과 develop 의 SHA 가 갈라져 다음 릴리스가 더 어려워진다.
+  2. **배포 라벨이 정확히 읽힌다.** 파이프라인은 `main` 빌드의 HEAD 커밋에서 `merge_commit_sha` 가 같은
+     PR 을 배포 근거로 고른다(`Jenkinsfile.*-common.groovy` `resolveDeployLabelContext`). merge commit 이면
+     그 PR 이 릴리스 PR 이다. **fast-forward 로 올리면** HEAD 가 develop 의 마지막 커밋이라 그 커밋을 만든
+     **기능 PR 의 라벨만** 읽혀 일부 서비스만 배포된다.
+- `main` 에만 머지 커밋이 쌓인다. develop 은 계속 선형이고, 머지 커밋은 내용을 바꾸지 않아 다음 릴리스에
+  충돌을 만들지 않는다.
+- 라벨을 빠뜨렸거나 일부만 다시 내보내야 하면 해당 잡의 `main` 빌드를 **`FORCE_DEPLOY=true`** 로 수동 실행한다.
 
 ### 머지 후 이슈 갱신 (필수)
 
@@ -375,13 +400,16 @@ GET /repos/8llow8llowMe/hondigagae/branches/develop/protection
 
 | 규약                    | 강제 수단                                            |
 | ----------------------- | ---------------------------------------------------- |
-| Rebase and merge 만 쓴다 | 저장소 설정에서 **Squash · Merge commit 을 껐다**     |
+| develop 은 Rebase and merge 만 쓴다 | 저장소 설정 **Squash 끔** + ruleset `develop-linear-history`(`required_linear_history`) — develop 에 머지 커밋이 들어가지 못한다 |
+| 릴리스(develop → main)는 merge commit | 저장소 설정 **Merge commit 켬** (제목 `PR_TITLE` · 본문 비움, 2026-10-10 #1328) |
+| develop 삭제 금지       | ruleset `develop-linear-history`(`deletion`) — 릴리스 PR 의 head 가 develop 이라 자동 삭제를 이중으로 막는다 |
 | 머지 후 브랜치 삭제      | 저장소 설정 **Automatically delete head branches** 켬 |
 | PR 라벨 (배포 대상)      | `.github/workflows/label.yml` — **경로 기반 자동 부여** |
 | CI 빨간불을 develop 에 올리지 않기 | `.githooks/pre-push` (§8-3) — push 단계에서 끊는다 |
 
-머지 방식은 이제 GitHub UI 에도 `Rebase and merge` 하나만 뜬다. **머지 커밋이 섞여 선형
-히스토리가 깨지는 일이 설정으로 막혀 있다.**
+GitHub UI 에는 `Rebase and merge` 와 `Create a merge commit` 이 뜬다. 후자는 릴리스용이고,
+develop 으로 가는 PR 에서는 ruleset 이 막으므로 **develop 에 머지 커밋이 섞여 선형 히스토리가 깨지는 일은
+여전히 설정으로 막혀 있다.**
 
 ### 8-2. 아직 규칙으로만 지킨다
 
