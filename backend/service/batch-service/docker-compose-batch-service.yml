@@ -74,6 +74,10 @@ x-batch-service-environment: &batch_service_environment
   # BATCH_SCHEDULE_ENABLED 는 이 공통 anchor 에 두지 않는다. dev/prod 기본값이 다르고,
   # compose 의 `:-` 는 값을 부재가 아니라 빈 문자열로 만들어 Spring 기본값이 먹지 않기 때문이다.
   # 각 서비스의 environment 에서 실제 값을 준다.
+  # 장소 파이프라인 cron 도 같은 이유로 각 서비스에 둔다 — dev/prod 기본 요일이 다르다 (#1326).
+  # [선택] 올레 적재 cron (Quartz, 초부터 6~7 필드). 기본 월 05:00 KST — application.yml 기본값과 같다.
+  # 전에는 여기서 넘기지 않아 .env.example 의 BATCH_SCHEDULE_OLLE_CRON 이 효과가 없었다 (#1326).
+  BATCH_SCHEDULE_OLLE_CRON: "${BATCH_SCHEDULE_OLLE_CRON:-0 0 5 ? * MON}"
   # [선택] 포털 자동 다운로드 스위치 (#379). 기본은 켬.
   # .env 에 키만 있고 값이 비면 컨테이너에 빈 문자열이 들어가 yml 의 ${...:true} 가 아니라 "" 가
   # 이긴다. 그 빈 문자열은 래퍼 타입 Boolean 에 null 로 떨어지고 CultureFacilityProperties 가
@@ -132,6 +136,8 @@ services:
       # compose 의 `:-` 는 값을 빈 문자열로 만들어 Spring 쪽 `${...:false}` 기본값이 먹지 않으므로
       # 여기서 실제 값을 준다. "true" 가 아닌 값은 전부 꺼짐이다.
       BATCH_SCHEDULE_ENABLED: ${BATCH_SCHEDULE_ENABLED:-true}
+      # 장소 파이프라인 cron. dev 는 월 03:00 KST — prod(화)와 TourAPI 일 한도를 같은 날 나눠 쓰지 않게 한다 (#1326).
+      BATCH_SCHEDULE_PLACE_PIPELINE_CRON: "${BATCH_SCHEDULE_PLACE_PIPELINE_CRON_DEV:-0 0 3 ? * MON}"
     volumes:
       # 포털 실패 시 우회용 CSV. 읽기 전용으로만 붙인다 - 내려받은 파일은 여기에 쓰지 않는다.
       # 값이 비면 볼륨 스펙이 ':/app/data:ro' 가 돼 compose config 가 원인을 말하지 않는 에러로 죽는다.
@@ -165,9 +171,13 @@ services:
       - "${BATCH_SERVICE_PORT_PROD}:${BATCH_SERVICE_PORT}" # host:container
     environment:
       <<: *batch_service_environment
-      # prod 는 기본 끔 — dev 에서 몇 주기를 관찰한 뒤 켠다.
+      # prod 기본은 끔이고, 켜는 것은 Vault 가 정한다 (2026-10-10 에 켰다, #1323).
       # dev 와 같은 이유로 여기서 실제 값을 준다(빈 문자열이면 Spring 기본값이 먹지 않는다).
       BATCH_SCHEDULE_ENABLED: ${BATCH_SCHEDULE_ENABLED:-false}
+      # 장소 파이프라인 cron. prod 는 화 03:00 KST (#1326).
+      # dev 와 prod 가 같은 TourAPI 키를 쓰고 한도는 상품당 일 1,000콜이다. 같은 날 돌면 둘이 한도를
+      # 나눠 써 한쪽이 상세(운영시간 · 이미지) 수집을 덜 하고 끝난다. 한도는 하루 단위라 요일만 갈라도 겹치지 않는다.
+      BATCH_SCHEDULE_PLACE_PIPELINE_CRON: "${BATCH_SCHEDULE_PLACE_PIPELINE_CRON_PROD:-0 0 3 ? * TUE}"
     volumes:
       # 포털 실패 시 우회용 CSV. 읽기 전용으로만 붙인다 - 내려받은 파일은 여기에 쓰지 않는다.
       # 값이 비면 볼륨 스펙이 ':/app/data:ro' 가 돼 compose config 가 원인을 말하지 않는 에러로 죽는다.
