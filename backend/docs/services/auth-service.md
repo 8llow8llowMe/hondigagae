@@ -61,6 +61,8 @@
 - `GET /api/v1/auth/{provider}/login?code=&state=` — 소셜 로그인. `oauthState` 쿠키가 쿼리 state 와 일치해야 한다 (없거나 다르면 `AUTH_010`)
 - `POST /api/v1/auth/email/send-code`, `POST /api/v1/auth/email/verify-code`
 - `POST /api/v1/auth/password/reset/send-code`, `POST /api/v1/auth/password/reset` — 비밀번호 재설정
+  - 두 send-code 는 `dataBody` 에 `codeExpiresInSeconds` · `resendAvailableInSeconds` 를 싣고, 429 에는
+    `Retry-After` 헤더를 단다 (아래 "발송 응답 타이밍 · 429 Retry-After")
 - `GET /api/v1/auth/sessions` — 로그인 기기 목록 (최근 갱신순, current 는 refresh 쿠키로 판별)
 - `DELETE /api/v1/auth/sessions/{sessionId}` — 특정 기기 로그아웃 (멱등)
 - `POST /api/v1/auth/token/reissue`, `POST /api/v1/auth/logout` (현재 기기만)
@@ -179,6 +181,30 @@
   보냈나"는 API 구분 없이 센다.
 - 클라이언트 IP 는 `ClientIpResolver`(X-Forwarded-For → X-Real-IP → remoteAddr)로 얻고
   Redis 고정 윈도우 카운터(장애 시 fail-open — 상한은 남용 방어지 정합성 장치가 아니다)로 센다.
+
+## 발송 응답 타이밍 · 429 Retry-After (#1293)
+
+- 두 send-code 의 응답 `dataBody` 는 `AuthCodeSendResponse{codeExpiresInSeconds, resendAvailableInSeconds}`
+  (지금 300 · 60)다. 값의 단일 출처는 각 프로세서의 `CODE_TTL` · `RESEND_COOLDOWN` 상수 — 같은 상수로 코드를
+  저장하고 쿨다운을 걸며, 응답(`VerificationCodeSendInfo` → `AuthPresenter.toCodeSendResponse`)도 그 상수에서 만든다.
+- **계정 열거 방지**: 이 값은 분기(기가입 · 미가입 · 탈퇴 · 소셜 전용) **전에** 한 번 만들고 모든 성공 경로가
+  그대로 돌려준다. 코드를 실제로 저장했는지와 무관하므로 응답으로 가입 여부를 알 수 없다
+  (`EmailVerificationProcessorTest` · `PasswordResetProcessorTest` 의 `...SameTiming...` 가 고정).
+- 429 `AUTH_003` · `AUTH_015` · `AUTH_016` 은 표준 `Retry-After`(정수 초) 헤더를 싣는다. 본문 봉투 · 코드 · 상태는
+  그대로다. 값은 제한을 건 Redis 키의 **남은 TTL**(`PTTL`, 초 올림, 최소 1초)이다.
+
+  | 코드 | 키 | 남은 TTL 을 못 읽을 때 대체값 |
+  | --- | --- | --- |
+  | `AUTH_003` (가입 인증) | `{prefix}:auth:emailVerificationCooldown:{email}` | 60초 (`RESEND_COOLDOWN`) |
+  | `AUTH_003` (재설정) | `{prefix}:auth:passwordResetCooldown:{email}` | 60초 (`RESEND_COOLDOWN`) |
+  | `AUTH_016` | `{prefix}:auth:emailSendIp:{ip}` | `auth.email-send.ip-window` (기본 1시간) |
+  | `AUTH_015` | `{prefix}:auth:loginLock:{email}` | `auth.login.lock-duration` (기본 10분) |
+
+- "못 읽음" = 키 없음(`-2`) · TTL 없음(`-1`) · Redis 장애. 어댑터(`RedisRemainingTtlReader`)가 셋을 모두 빈 값으로
+  접고 장애는 삼킨다 — 이미 확정된 429 의 안내값을 읽다가 500 이 되면 안 된다. 대체값 결정과 초 변환은
+  application 의 `RetryAfterResolver` 가 한다. 대체값은 실제보다 길 수는 있어도 짧지는 않다.
+- 임계값에 도달해 **방금 잠근** 로그인 응답(`AUTH_015`)은 TTL 을 다시 읽지 않고 잠금 기간을 그대로 싣는다.
+- 전달 경로: `AuthException.withRetryAfter(code, seconds)` → `AuthExceptionHandler` 가 값이 있을 때만 헤더를 단다.
 
 ## 메일 템플릿 (#1062)
 
