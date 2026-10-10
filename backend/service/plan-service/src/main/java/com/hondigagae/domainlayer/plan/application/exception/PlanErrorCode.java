@@ -1,0 +1,70 @@
+package com.hondigagae.domainlayer.plan.application.exception;
+
+import com.hondigagae.domainlayer.plan.domain.model.Plan;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+
+@Getter
+@RequiredArgsConstructor
+public enum PlanErrorCode {
+
+    NOT_FOUND_PLAN("PLAN_001", "존재하지 않는 여행 일정입니다.", HttpStatus.NOT_FOUND),
+    PLAN_DAY_OUT_OF_RANGE("PLAN_002", "여행 기간을 벗어난 일자입니다.", HttpStatus.BAD_REQUEST),
+    PLAN_DATE_RANGE_INVALID("PLAN_003", "여행 시작일은 종료일보다 늦을 수 없습니다.", HttpStatus.BAD_REQUEST),
+    NOT_FOUND_PLAN_PLACE("PLAN_004", "일정 항목의 장소를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST),
+    NOT_FOUND_PLAN_ITEM("PLAN_005", "존재하지 않는 일정 항목입니다.", HttpStatus.NOT_FOUND),
+    ITEM_DAY_REQUIRED("PLAN_006", "일정 항목의 일차는 필수입니다.", HttpStatus.BAD_REQUEST),
+    ITEM_SEQUENCE_DUPLICATED("PLAN_007", "같은 일차에 순서가 중복된 항목이 있습니다.", HttpStatus.BAD_REQUEST),
+    PLAN_PERIOD_TOO_LONG("PLAN_009", "여행 기간은 최대 30일까지 만들 수 있습니다.", HttpStatus.BAD_REQUEST),
+    PLAN_PERIOD_SHRINK_CONFLICT("PLAN_008", "줄어든 여행 기간 밖에 일정 항목이 남아 있습니다. 해당 일차의 항목을 먼저 정리해 주세요.", HttpStatus.BAD_REQUEST),
+    PET_REQUIRED("PLAN_010", "동행할 반려견을 지정하거나 대표 반려견을 등록해 주세요.", HttpStatus.BAD_REQUEST),
+    NOT_FOUND_PET("PLAN_011", "존재하지 않거나 본인 소유가 아닌 반려견이 있습니다.", HttpStatus.BAD_REQUEST),
+    PACKING_ITEM_NAME_DUPLICATED("PLAN_012", "이미 같은 이름의 준비물이 있습니다.", HttpStatus.CONFLICT),
+    PACKING_ITEM_LIMIT_EXCEEDED("PLAN_013", "준비물은 일정당 최대 50개까지 저장할 수 있습니다.", HttpStatus.BAD_REQUEST),
+    NOT_FOUND_PACKING_ITEM("PLAN_014", "존재하지 않는 준비물 항목입니다.", HttpStatus.NOT_FOUND),
+    // 수정(PUT)할 후기가 없을 때만 던진다. 조회(GET)의 "아직 안 씀" 은 200 + dataBody null 이다 (#979).
+    REVIEW_NOT_FOUND("PLAN_015", "작성한 여행 후기가 없습니다.", HttpStatus.NOT_FOUND),
+    REVIEW_PLAN_NOT_COMPLETED("PLAN_016", "완료된 일정만 후기를 쓰거나 볼 수 있습니다.", HttpStatus.BAD_REQUEST),
+    REVIEW_ALREADY_EXISTS("PLAN_017", "이미 이 일정의 후기를 작성했습니다.", HttpStatus.CONFLICT),
+    REVIEW_ITEM_NOT_ELIGIBLE("PLAN_018", "다녀온 장소 항목만 후기에 담을 수 있습니다.", HttpStatus.BAD_REQUEST),
+    PLAN_COMPLETED_PET_LOCKED("PLAN_019", "완료된 일정의 동행 반려견은 바꿀 수 없습니다.", HttpStatus.BAD_REQUEST),
+    REVIEW_ITEM_DUPLICATED("PLAN_020", "같은 일정 항목을 후기에 두 번 넣을 수 없습니다.", HttpStatus.BAD_REQUEST),
+    // 원본 일수를 문구에 끼운다 (#721). 프론트는 서버 resultMessage 를 그대로 띄우므로,
+    // "같아야 한다" 만 말하고 며칠인지 빼면 사용자는 시행착오로 찾아야 한다.
+    // %d 를 채우는 것은 PlanException(errorCode, args) 오버로드다 — 인자 없이 던지면
+    // 문구에 %d 가 그대로 남으니 이 코드는 반드시 그 생성자로 던진다.
+    PLAN_COPY_PERIOD_MISMATCH("PLAN_021", "복사할 여행 기간은 원본과 같은 %d일이어야 합니다.", HttpStatus.BAD_REQUEST),
+    // 공유 링크 (#627). 없음·폐기·삭제된 일정·비공유 상태는 전부 PLAN_023 404 로 같게 답한다 —
+    // 어느 쪽인지 알려 주면 토큰을 찍어 보는 쪽에 "이 토큰은 있었다" 를 흘리게 된다.
+    // 만료만 PLAN_024 410 으로 가른다. 받는 쪽이 "새 링크를 달라" 고 말할 수 있어야 하기 때문이다.
+    // PLAN_023 은 공개 토큰 조회 전용이다 — 소유자의 링크 조회는 유효한 링크가 없으면 200 + dataBody null 이다 (#979).
+    SHARE_PLAN_NOT_SHAREABLE("PLAN_022", "확정되거나 완료된 일정만 공유할 수 있습니다.", HttpStatus.BAD_REQUEST),
+    SHARE_LINK_NOT_FOUND("PLAN_023", "유효하지 않은 공유 링크입니다.", HttpStatus.NOT_FOUND),
+    SHARE_LINK_EXPIRED("PLAN_024", "만료된 공유 링크입니다. 링크를 만든 사람에게 새 링크를 요청해 주세요.", HttpStatus.GONE),
+    // 산책 코스 타깃 검증 (#715). PLAN_004(장소)를 재사용하지 않는다 — 문구가 "장소를 찾을 수
+    // 없습니다" 라 코스에 대해서는 사실이 아니고, 코드가 있는 이유는 클라이언트가 **무엇이**
+    // 잘못됐는지 알기 위해서다. 성격은 PLAN_004 와 같아 프론트는 둘 다 재시도 없는 400 으로 다룬다.
+    NOT_FOUND_PLAN_WALK_COURSE("PLAN_025", "일정 항목의 산책 코스를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST),
+    // 여행 전 상태 가드 (#971). 떠나지 않은 여행을 다녀온 기록으로 남기지 않는다. 시작일 당일부터는
+    // 허용한다 — 당일치기 여행이 있다. 완료된 일정의 시작일을 미래로 옮기는 것도 같은 코드로 막는다.
+    PLAN_NOT_STARTED_COMPLETE("PLAN_026", "여행 시작일 전에는 여행을 완료할 수 없습니다.", HttpStatus.BAD_REQUEST),
+    // 다녀옴 표시 가드 (#983). PLAN_026 과 같은 선 — 판정은 Plan.hasStarted 하나, 당일부터 허용, 일정 상태는 보지 않는다.
+    // 해제(visited=false)는 막지 않는다 — 가드 이전에 찍힌 표시나 일정을 미래로 옮긴 뒤 남은 표시를 풀 수 있어야 한다.
+    PLAN_NOT_STARTED_VISIT("PLAN_027", "여행 시작일 전에는 다녀옴으로 표시할 수 없습니다.", HttpStatus.BAD_REQUEST),
+    // 일정 전체 항목 수 상한 (#1243). 하루 교체가 다른 날 항목에 더해져 넘을 때 던진다 — 한 요청만으로 넘는 것은
+    // 요청 검증(PLAN_136)이 먼저 막는다. 상한 전에 이미 넘은 일정은 늘리지 않는 편집(줄이기 · 같은 수)을 받는다.
+    // 숫자는 Plan.MAX_ITEMS 에서 온다 — 값을 바꾸면 문구도 함께 바뀐다.
+    PLAN_ITEM_LIMIT_EXCEEDED("PLAN_028", "일정에는 항목을 최대 " + Plan.MAX_ITEMS + "개까지 담을 수 있습니다.", HttpStatus.BAD_REQUEST),
+    INVALID_REQUEST("PLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+    // 프레임워크 공통 2종은 검증 대역 끝에 둔다 (coding-conventions §8-2). PLAN_115 가 petIds 필드 코드로
+    // 쓰이면서 한 칸씩 밀렸고, 준비물 필드 코드가 PLAN_116~123 을 가져가면서 다시 밀었다.
+    // FE 가 참조하는 것은 PLAN_101~107·PLAN_114 뿐이라 이 이동에 걸리는 곳은 없다.
+    PARAMETER_TYPE_INVALID("PLAN_124", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+    PARAMETER_REQUIRED("PLAN_125", "필수 요청 파라미터가 누락되었습니다.", HttpStatus.BAD_REQUEST),
+    INTERNAL_SERVICE_UNAVAILABLE("PLAN_900", "내부 서비스 연동에 실패했습니다. 잠시 후 다시 시도해주세요.", HttpStatus.SERVICE_UNAVAILABLE);
+
+    private final String code;
+    private final String message;
+    private final HttpStatus httpStatus;
+}

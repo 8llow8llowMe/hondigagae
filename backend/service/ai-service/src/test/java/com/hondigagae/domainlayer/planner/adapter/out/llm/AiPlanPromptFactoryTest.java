@@ -1,0 +1,610 @@
+package com.hondigagae.domainlayer.planner.adapter.out.llm;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
+import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
+import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
+import com.hondigagae.domainlayer.planner.application.model.PetCondition;
+import com.hondigagae.domainlayer.planner.application.model.PetLifeStage;
+import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
+import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+/**
+ * 프롬프트에 반려견 특성이 실리는지 검증. 이 절이 빠지면 "반려견 맞춤"은
+ * 시스템 프롬프트의 빈 구호가 된다 — 모델이 어떤 반려견인지 모른 채 일정을 짠다.
+ */
+class AiPlanPromptFactoryTest {
+
+    private final AiPlanPromptFactory factory = new AiPlanPromptFactory();
+
+    @Test
+    @DisplayName("생애 단계를 값으로 적는다 — 나이와 무관한 \"노령견\" 단정을 막는다 (#493)")
+    void writesLifeStageForAge() {
+        String prompt = factory.userPrompt(query(List.of(PetCondition.builder()
+            .ageText("6년")
+            .lifeStage(PetLifeStage.ADULT)
+            .build())));
+
+        assertThat(prompt).contains("- 나이: 6년 (성견)");
+        // 성견에는 활동 제약이 없다 — 괄호 뒤에 아무것도 붙지 않는다
+        assertThat(prompt).doesNotContain("노령견");
+    }
+
+    @Test
+    @DisplayName("노령견에는 단계와 함께 활동 제약을 적는다")
+    void writesSeniorGuidance() {
+        String prompt = factory.userPrompt(query(List.of(PetCondition.builder()
+            .ageText("11년 2개월")
+            .lifeStage(PetLifeStage.SENIOR)
+            .build())));
+
+        assertThat(prompt).contains("- 나이: 11년 2개월 (노령견) - 이동과 도보를 줄이고 휴식을 자주 둘 것");
+    }
+
+    @Test
+    @DisplayName("나이는 있는데 단계를 모르면 단계를 지어 적지 않는다")
+    void omitsLifeStageWhenUnknown() {
+        String prompt = factory.userPrompt(query(List.of(PetCondition.builder()
+            .ageText("6년")
+            .build())));
+
+        assertThat(prompt).contains("- 나이: 6년");
+        assertThat(prompt).doesNotContain("(성견)");
+        assertThat(prompt).doesNotContain("노령견");
+    }
+
+    @Test
+    @DisplayName("시스템 프롬프트가 말투·조사·생애 단계를 못 박는다 (#493)")
+    void systemPromptPinsTextRules() {
+        String system = factory.systemPrompt();
+
+        assertThat(system).contains("~해요");
+        assertThat(system).contains("조사");
+        assertThat(system).contains("생애 단계는 입력에 적힌 표현만");
+    }
+
+    /*
+     * #570. 1일차·2일차가 둘 다 `애월한담공원` 으로 시작한 초안이 나왔는데, 프롬프트에 회피
+     * 지시가 **아예 없었다.** 숙소까지 함께 못박지 않으면 모델이 숙소를 날마다 바꾼다.
+     */
+    @Test
+    @DisplayName("시스템 프롬프트가 일자 간 장소 중복을 막고 숙소는 그날의 lodging 으로 이어 묵게 한다 (#570 · #1128)")
+    void systemPromptForbidsRepeatingPlacesAcrossDays() {
+        String system = factory.systemPrompt();
+
+        assertThat(system).contains("같은 장소를 여러 날에 넣지 않습니다");
+        assertThat(system).contains("그날의 lodging 에 적습니다");
+        assertThat(system).contains("마지막 날 lodging 은 null");
+    }
+
+    /*
+     * #1128. 출력 스키마를 후보 번호 + 메모로 줄였는데 시스템 프롬프트가 옛 스키마(placeId 옮기기, title 채우기,
+     * 장소 없는 식사 항목)를 가르치면 모델이 둘 사이에서 갈린다. 새 스키마의 규칙이 실리고 옛 지시가 사라졌는지 본다.
+     */
+    @Test
+    @DisplayName("시스템 프롬프트가 후보 번호 · 장소 없는 항목 금지 · 짧은 메모 · 근거 3개를 지시하고 옛 스키마 지시는 없다 (#1128)")
+    void systemPromptMatchesTheCompactSchema() {
+        String system = factory.systemPrompt();
+
+        assertThat(system).contains("후보 줄 앞의 번호로 적습니다");
+        assertThat(system).contains("장소가 없는 항목(빈 식사 자리, 이동)은");
+        assertThat(system).contains("음식점 후보가 있을 때만");
+        assertThat(system).contains("25자 안팎");
+        assertThat(system).contains("최대 3개");
+        assertThat(system).doesNotContain("placeId").doesNotContain("title").doesNotContain("점심 식사");
+    }
+
+    @Test
+    @DisplayName("반려견 특성이 있으면 크기·체중·민감성·산책 선호가 프롬프트에 실린다")
+    void petSectionCarriesTraits() {
+        String prompt = factory.userPrompt(query(List.of(PetCondition.builder()
+            .breed("골든 리트리버")
+            .sizeName("대형견")
+            .weightText("28.5")
+            .ageText("11년 2개월")
+            .heatSensitive(true)
+            .walkPreferred(true)
+            .lowSociality(true)
+            .build())));
+
+        assertThat(prompt).contains("함께 여행하는 반려견");
+        assertThat(prompt).contains("대형견");
+        assertThat(prompt).contains("체중: 28.5kg");
+        // 나이가 있어야 노령견과 퍼피가 다른 일정을 받는다 (#367)
+        assertThat(prompt).contains("나이: 11년 2개월");
+        assertThat(prompt).contains("더위에 민감함");
+        assertThat(prompt).contains("산책을 좋아함");
+        // 필수 입력인 사회성을 받아 놓고 버리면 안 된다 (#380). 낮음일 때만 제약으로 싣는다
+        assertThat(prompt).contains("사회성이 낮음");
+        // 켜지 않은 특성은 지어 적지 않는다
+        assertThat(prompt).doesNotContain("추위에 민감함");
+        // 한 마리일 때는 다중 판정 규칙이 붙지 않는다
+        assertThat(prompt).doesNotContain("가장 큰 크기와 가장 무거운 체중");
+    }
+
+    @Test
+    @DisplayName("나이를 모르면 나이 줄을 지어 적지 않는다")
+    void unknownAgeOmitsAgeLine() {
+        String prompt = factory.userPrompt(query(List.of(PetCondition.builder()
+            .sizeName("소형견")
+            .build())));
+
+        assertThat(prompt).doesNotContain("나이:");
+        // 사회성 보통/높음은 제약이 아니다 - 줄을 만들지 않는다
+        assertThat(prompt).doesNotContain("사회성이 낮음");
+    }
+
+    @Test
+    @DisplayName("여러 마리면 각 반려견 특성과 '가장 제약이 큰 기준' 규칙이 실린다")
+    void multiplePetsCarryPerPetTraitsAndStrictestRule() {
+        String prompt = factory.userPrompt(query(List.of(
+            PetCondition.builder().sizeName("소형견").weightText("3.5").noiseSensitive(true).build(),
+            PetCondition.builder().sizeName("대형견").weightText("28").heatSensitive(true).build())));
+
+        assertThat(prompt).contains("함께 여행하는 반려견 2마리");
+        // 이유 문장이 가리킬 이름이라 대괄호 없이 쓴다 — 표기가 그대로 화면에 새기 때문 (#233)
+        assertThat(prompt).contains("\n반려견 1\n");
+        assertThat(prompt).contains("\n반려견 2\n");
+        assertThat(prompt).doesNotContain("[반려견");
+        assertThat(prompt).contains("소음에 민감함");
+        assertThat(prompt).contains("더위에 민감함");
+        assertThat(prompt).contains("가장 큰 크기와 가장 무거운 체중 기준으로 판정할 것");
+    }
+
+    @Test
+    @DisplayName("특성이 없으면(조회 실패·프로필 부재) 반려견 절 자체를 생략한다")
+    void missingConditionOmitsSection() {
+        String prompt = factory.userPrompt(query(List.of()));
+
+        assertThat(prompt).doesNotContain("함께 여행하는 반려견");
+        // 후보 목록 등 나머지 절은 그대로 있어야 한다
+        assertThat(prompt).contains("후보 장소");
+    }
+
+    @Test
+    @DisplayName("필수 포함 장소는 후보 줄에 표시되고 배치 지시가 실린다")
+    void pinnedPlacesAreMarkedAndInstructed() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .areaCode("39")
+            .startDate("2026-09-01")
+            .endDate("2026-09-02")
+            .pinnedPlaceIds(List.of(1L))
+            .placeCandidates(List.of(
+                PlaceCandidate.builder().placeId(1L).title("꼭갈곳").lat(33.5).lng(126.5).build(),
+                PlaceCandidate.builder().placeId(2L).title("보통후보").lat(33.4).lng(126.4).build()))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        // 번호가 줄 맨 앞이다 — 모델이 적을 값이 태그에 가려지지 않는다
+        assertThat(prompt).contains("\n- 1. [필수 포함] 꼭갈곳 | ");
+        assertThat(prompt).contains("\n- 2. 보통후보 | ");
+        assertThat(prompt).doesNotContain("[필수 포함] 보통후보");
+        assertThat(prompt).contains("1곳을 빠짐없이 일정에 배치할 것");
+    }
+
+    @Test
+    @DisplayName("선호 장소는 [선호]로 표시되고, 필수 포함과 겹치면 필수 표시가 이긴다")
+    void favoritePlacesAreMarkedSoftly() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .areaCode("39")
+            .startDate("2026-09-01")
+            .endDate("2026-09-02")
+            .pinnedPlaceIds(List.of(1L))
+            .favoritePlaceIds(List.of(1L, 2L))
+            .placeCandidates(List.of(
+                PlaceCandidate.builder().placeId(1L).title("필수이자선호").lat(33.5).lng(126.5).build(),
+                PlaceCandidate.builder().placeId(2L).title("선호만").lat(33.4).lng(126.4).build()))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        assertThat(prompt).contains("- 1. [필수 포함] 필수이자선호 | ");
+        assertThat(prompt).contains("- 2. [선호] 선호만 | ");
+        assertThat(prompt).doesNotContain("[선호] 필수이자선호");
+        assertThat(prompt).contains("우선 배치할 것. 필수는 아님");
+    }
+
+    @Test
+    @DisplayName("날씨 전망이 있으면 일차별 예보와 배치 지시가 실리고, 없으면 절을 생략한다")
+    void weatherSectionCarriesOutlookAndInstruction() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .areaCode("39")
+            .startDate("2026-09-01")
+            .endDate("2026-09-02")
+            .weatherOutlook(List.of(
+                DayWeatherOutlook.builder()
+                    .date(java.time.LocalDate.parse("2026-09-01"))
+                    .skyStateName("맑음").maxPrecipitationProbability(10)
+                    .minTemperature(24.0).maxTemperature(31.0)
+                    .build(),
+                DayWeatherOutlook.builder()
+                    .date(java.time.LocalDate.parse("2026-09-02"))
+                    .skyStateName("흐림").precipitationTypeName("비").maxPrecipitationProbability(80)
+                    .build()))
+            .placeCandidates(List.of(
+                PlaceCandidate.builder().placeId(1L).title("장소").lat(33.5).lng(126.5).build()))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        assertThat(prompt).contains("여행 기간 날씨 전망");
+        assertThat(prompt).contains("- 1일차 2026-09-01 | 맑음");
+        assertThat(prompt).contains("- 2일차 2026-09-02 | 흐림 | 강수형태: 비 | 강수확률 80%");
+        assertThat(prompt).contains("기온 24.0~31.0℃");
+        assertThat(prompt).contains("실내 후보 위주로 배치할 것");
+        assertThat(prompt).contains("지어내지 말 것");
+
+        // 전망이 없으면 절 자체를 생략한다
+        String withoutWeather = factory.userPrompt(query(List.of()));
+        assertThat(withoutWeather).doesNotContain("여행 기간 날씨 전망");
+    }
+
+    @Test
+    @DisplayName("하루 재생성이면 기존 일정은 중복 회피 맥락으로만 싣고 그날 하루만 출력하게 한다 (#1128)")
+    void regenerateSectionCarriesOutlineAndInstruction() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .areaCode("39")
+            .startDate("2026-09-01")
+            .endDate("2026-09-02")
+            .regenerateDay(2)
+            .planOutline(PlanOutline.builder()
+                .planId(7L)
+                .days(List.of(
+                    PlanOutline.PlanOutlineDay.builder().day(1).items(List.of(
+                        PlanOutline.PlanOutlineItem.builder().title("사려니숲길").placeId(11L).build())).build(),
+                    PlanOutline.PlanOutlineDay.builder().day(2).items(List.of()).build()))
+                .build())
+            .placeCandidates(List.of(
+                PlaceCandidate.builder().placeId(11L).title("사려니숲길").lat(33.4).lng(126.6).build()))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        assertThat(prompt).contains("기존 일정 (겹치지 않게 참고만 할 것)");
+        // 기존 일정 줄은 이름만 싣는다 — 출력은 후보 번호라 아이디가 쓸 데가 없다
+        assertThat(prompt).contains("\n1일차 · 사려니숲길\n");
+        assertThat(prompt).doesNotContain("placeId");
+        assertThat(prompt).contains("2일차만 새로 짜서 그날 하루만 출력할 것. days 에는 2일차 하나만 담을 것");
+        assertThat(prompt).contains("다른 날에 있는 장소는 넣지 말 것");
+        // 전체를 다시 출력하라던 옛 지시와, 그와 맞서는 "N일 일정" 마무리가 남지 않는다
+        assertThat(prompt).doesNotContain("전체 일정을 출력할 것");
+        assertThat(prompt).doesNotContain("2일 일정을 만들어 주세요");
+        assertThat(prompt).endsWith("2일차 하루 일정만 만들어 주세요.");
+    }
+
+    @Test
+    @DisplayName("후보 줄은 1부터 시작하는 번호로 싣고 18자리 placeId 를 싣지 않는다 (#1128)")
+    void candidateLinesUseNumbersInsteadOfIds() {
+        String prompt = factory.userPrompt(query(List.of()));
+
+        assertThat(prompt).contains("\n- 1. 장소 | 관광지 | 실내 | 입장크기: 소형견 | 체중제한: 10kg | 분류: 여행지 | 권역: 북부\n");
+        assertThat(prompt).doesNotContain("placeId");
+        assertThat(prompt).endsWith("2일 일정을 만들어 주세요.");
+    }
+
+    @Test
+    @DisplayName("후보 줄에 좌표의 권역을 주소 앞에 싣고, 제주 밖 좌표면 권역을 지어 붙이지 않는다 (#1171)")
+    void candidateLinesCarryJejuZone() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-15")
+            .placeCandidates(List.of(
+                zoned(1L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631),
+                zoned(2L, "제주올레하우스", "제주특별자치도 제주시 구좌읍", 33.5260, 126.8630),
+                zoned(3L, "해운대", "부산광역시 해운대구", 35.1587, 129.1604)))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        // 전체 주소 대신 권역 · 읍면동 (#1246). 제주 밖은 권역이 없고, 읍면동이 없는 주소는 위치를 싣지 않는다
+        assertThat(prompt).contains("- 1. 수월봉 | 관광지 | 실외 | 권역: 남서부 · 한경면\n");
+        assertThat(prompt).contains("- 2. 제주올레하우스 | 관광지 | 실외 | 권역: 북동부 · 구좌읍\n");
+        assertThat(prompt).contains("- 3. 해운대 | 관광지 | 실외\n");
+    }
+
+    @Test
+    @DisplayName("후보 목록이 요청 조건보다 앞에 온다 — 같은 지역 요청이 이어지면 Ollama 가 후보 목록까지 캐시를 쓴다 (#1246)")
+    void candidatesComeBeforeRequestConditions() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-15")
+            .requestNote("오후엔 실내 카페에서 쉬고 싶어요")
+            .placeCandidates(List.of(zoned(1L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631)))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        assertThat(prompt).startsWith("후보 장소 (");
+        assertThat(prompt.indexOf("- 1. 수월봉")).isLessThan(prompt.indexOf("여행 조건"));
+        assertThat(prompt.indexOf("여행 조건")).isLessThan(prompt.indexOf("- 사용자 요청:"));
+        assertThat(prompt).endsWith("3일 일정을 만들어 주세요.");
+    }
+
+    @Test
+    @DisplayName("같은 조회 조건이면 시스템 · 사용자 프롬프트가 두 번 만들어도 같다 — 캐시 접두사가 흔들리지 않는다 (#1321)")
+    void promptsAreDeterministic() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-15")
+            .requestNote("오후엔 실내 카페에서 쉬고 싶어요")
+            .placeCandidates(List.of(
+                zoned(1L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631),
+                zoned(2L, "성산일출봉", "제주특별자치도 서귀포시 성산읍", 33.4580, 126.9425)))
+            .build();
+
+        assertThat(factory.systemPrompt()).isEqualTo(factory.systemPrompt());
+        assertThat(factory.userPrompt(query)).isEqualTo(factory.userPrompt(query));
+    }
+
+    @Test
+    @DisplayName("후보 목록이 같으면 여행 조건 · 날씨가 달라도 후보 목록 끝까지의 접두사가 같다 — 고정 부분을 앞에 둔다 (#1246 · #1321)")
+    void prefixBeforeTripConditionsIgnoresRequestConditions() {
+        List<PlaceCandidate> candidates = List.of(
+            zoned(1L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631),
+            zoned(2L, "성산일출봉", "제주특별자치도 서귀포시 성산읍", 33.4580, 126.9425));
+        AiPlanGenerationQuery first = AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-15")
+            .requestNote("오후엔 실내 카페에서 쉬고 싶어요")
+            .placeCandidates(candidates)
+            .build();
+        AiPlanGenerationQuery second = AiPlanGenerationQuery.builder()
+            .startDate("2026-11-02")
+            .endDate("2026-11-03")
+            .requestNote("바다 보며 산책하고 싶어요")
+            .weatherOutlook(List.of(DayWeatherOutlook.builder()
+                .date(java.time.LocalDate.parse("2026-11-02"))
+                .precipitationTypeName("비").maxPrecipitationProbability(80)
+                .build()))
+            .placeCandidates(candidates)
+            .build();
+
+        String firstPrompt = factory.userPrompt(first);
+        String secondPrompt = factory.userPrompt(second);
+        String conditionsHead = "\n여행 조건\n";
+
+        assertThat(firstPrompt).isNotEqualTo(secondPrompt);
+        int firstCut = firstPrompt.indexOf(conditionsHead);
+        int secondCut = secondPrompt.indexOf(conditionsHead);
+        assertThat(firstCut).isPositive();
+        assertThat(firstPrompt.substring(0, firstCut)).isEqualTo(secondPrompt.substring(0, secondCut));
+    }
+
+    @Test
+    @DisplayName("동반 가능은 목록 머리에 한 번만 적고, 다른 동반 조건만 줄에 남긴다 (#1246)")
+    void petAllowanceOnlyWhenNotAllowed() {
+        PlaceCandidate partial = PlaceCandidate.builder()
+            .placeId(2L).title("일부 동반 카페").contentTypeName("음식점").petAllowanceName("부분 동반 가능")
+            .indoor(true).lat(33.4600).lng(126.3100).build();
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-13")
+            .placeCandidates(List.of(zoned(1L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631), partial))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        assertThat(prompt).contains("동반 조건을 따로 적지 않은 후보는 동반 가능)");
+        assertThat(prompt).contains("- 1. 수월봉 | 관광지 | 실외 | 권역: 남서부 · 한경면\n");
+        assertThat(prompt).contains("- 2. 일부 동반 카페 | 음식점 | 실내 | 동반: 부분 동반 가능 | 권역: 북서부\n");
+    }
+
+    @Test
+    @DisplayName("주소에서 읍 · 면 · 동 이름만 꺼낸다 — 도로명 · 건물 동은 아니다 (#1246)")
+    void extractsLocality() {
+        assertThat(AiPlanPromptFactory.localityOf("제주특별자치도 제주시 한경면 노을해안로 1013-70")).isEqualTo("한경면");
+        assertThat(AiPlanPromptFactory.localityOf("제주특별자치도 제주시 애월읍 곽지리 1565")).isEqualTo("애월읍");
+        assertThat(AiPlanPromptFactory.localityOf("제주특별자치도 서귀포시 색달동 2950-3")).isEqualTo("색달동");
+        assertThat(AiPlanPromptFactory.localityOf("제주특별자치도 제주시 용담2동 2580")).isEqualTo("용담2동");
+        assertThat(AiPlanPromptFactory.localityOf("제주특별자치도 제주시 첨단동길 23")).isNull();
+        assertThat(AiPlanPromptFactory.localityOf("제주특별자치도 제주시 연동 101동")).isEqualTo("연동");
+        assertThat(AiPlanPromptFactory.localityOf("서울 아파트 101동")).isNull();
+        assertThat(AiPlanPromptFactory.localityOf(null)).isNull();
+    }
+
+    @Test
+    @DisplayName("후보가 섬 전체를 덮으면 일자별 권역 순서를 제안한다 — 바꿔도 된다고 함께 적는다 (#1257)")
+    void suggestsZoneOrderAroundTheIsland() {
+        String prompt = factory.userPrompt(islandQuery("2026-10-13", "2026-10-15").build());
+
+        assertThat(prompt).contains(
+            "- 권역 순서 제안: 1일차 북서부 → 2일차 남서부 → 3일차 남부. 그날 장소와 숙소를 그 권역이나 맞닿은 권역에서 고를 것.");
+        assertThat(prompt).contains("날씨 · 요청에 맞지 않으면 맞닿은 권역으로 바꿔도 됨");
+        // 요청마다 다른 조건이라 후보 목록 뒤(캐시가 끝난 뒤)에 온다 (#1246)
+        assertThat(prompt.indexOf("- 권역 순서 제안")).isGreaterThan(prompt.indexOf("여행 조건"));
+    }
+
+    @Test
+    @DisplayName("하루짜리 · 필수 포함 · 일부 권역만 덮는 후보 · 하루 재생성에는 권역 순서를 제안하지 않는다 (#1257)")
+    void skipsZoneOrderWhenItDoesNotApply() {
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-13").build()))
+            .doesNotContain("권역 순서 제안");
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-15").pinnedPlaceIds(List.of(11L)).build()))
+            .doesNotContain("권역 순서 제안");
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-15")
+                .placeCandidates(List.of(zoned(11L, "곽지", "제주특별자치도 제주시 애월읍", 33.4505, 126.3053)))
+                .build()))
+            .doesNotContain("권역 순서 제안");
+        PlanOutline outline = PlanOutline.builder().planId(7L)
+            .days(List.of(PlanOutline.PlanOutlineDay.builder().day(1).items(List.of()).build())).build();
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-15")
+                .regenerateDay(2).planOutline(outline).build()))
+            .doesNotContain("권역 순서 제안");
+    }
+
+    @Test
+    @DisplayName("방문 장소 없이 숙박 · 음식점만 있는 권역은 덮은 것으로 보지 않는다 — 그 권역의 날에 갈 곳이 없다 (#1312)")
+    void skipsZoneOrderWhenAZoneHasNoVisit() {
+        PlaceCandidate southEastStay = PlaceCandidate.builder()
+            .placeId(14L).title("모두올레 애견펜션").contentTypeName("숙박").addr("제주특별자치도 서귀포시 표선면")
+            .petAllowanceName("동반 가능").indoor(true).lat(33.3300).lng(126.8000)
+            .build();
+        PlaceCandidate southEastCafe = PlaceCandidate.builder()
+            .placeId(17L).title("표선 카페").contentTypeName("음식점").addr("제주특별자치도 서귀포시 표선면")
+            .petAllowanceName("동반 가능").indoor(true).sourceCategory("카페").lat(33.3260).lng(126.8420)
+            .build();
+        List<PlaceCandidate> withoutSouthEastVisit = List.of(
+            zoned(11L, "곽지해수욕장", "제주특별자치도 제주시 애월읍", 33.4505, 126.3053),
+            zoned(12L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631),
+            zoned(13L, "정방폭포", "제주특별자치도 서귀포시 동홍동", 33.2448, 126.5715),
+            southEastStay,
+            zoned(15L, "용눈이오름", "제주특별자치도 제주시 구좌읍", 33.4592, 126.8317),
+            zoned(16L, "용두암", "제주특별자치도 제주시 용담2동", 33.5163, 126.5119));
+
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-19").placeCandidates(withoutSouthEastVisit).build()))
+            .doesNotContain("권역 순서 제안");
+
+        // 음식점만 더해도 덮지 않는다 — 방문 조회가 실패하면 그 권역에 식사 자리만 남을 수 있다
+        List<PlaceCandidate> withSouthEastCafe = new ArrayList<>(withoutSouthEastVisit);
+        withSouthEastCafe.add(southEastCafe);
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-19").placeCandidates(withSouthEastCafe).build()))
+            .doesNotContain("권역 순서 제안");
+
+        List<PlaceCandidate> withSouthEastVisit = new ArrayList<>(withSouthEastCafe);
+        withSouthEastVisit.add(zoned(18L, "표선해수욕장", "제주특별자치도 서귀포시 표선면", 33.3260, 126.8420));
+        assertThat(factory.userPrompt(islandQuery("2026-10-13", "2026-10-19").placeCandidates(withSouthEastVisit).build()))
+            .contains("4일차 남동부");
+    }
+
+    /** 6권역에 하나씩 후보가 있는 질의 — 섬 전체를 덮는다. */
+    private static AiPlanGenerationQuery.AiPlanGenerationQueryBuilder islandQuery(String start, String end) {
+        return AiPlanGenerationQuery.builder()
+            .startDate(start)
+            .endDate(end)
+            .placeCandidates(List.of(
+                zoned(11L, "곽지해수욕장", "제주특별자치도 제주시 애월읍", 33.4505, 126.3053),
+                zoned(12L, "수월봉", "제주특별자치도 제주시 한경면", 33.2955, 126.1631),
+                zoned(13L, "정방폭포", "제주특별자치도 서귀포시 동홍동", 33.2448, 126.5715),
+                zoned(14L, "녹산로", "제주특별자치도 서귀포시 표선면", 33.3523, 126.7470),
+                zoned(15L, "용눈이오름", "제주특별자치도 제주시 구좌읍", 33.4592, 126.8317),
+                zoned(16L, "용두암", "제주특별자치도 제주시 용담2동", 33.5163, 126.5119)));
+    }
+
+    @Test
+    @DisplayName("시스템 프롬프트가 하루와 그날 숙소를 한 권역 · 맞닿은 권역 안에서 고르게 한다 (#1171)")
+    void systemPromptKeepsDayAndStayWithinNeighboringZones() {
+        String system = factory.systemPrompt();
+
+        assertThat(system).contains("하루는 한 권역, 많아야 맞닿은");
+        assertThat(system).contains("그날 밤 숙소(lodging)도 그날 마지막 장소와 다음 날 첫 장소의");
+        // 일자 사이 이동 (#1254) — 7일 일정이 4일차 북동부 숙소에서 5일차 남서부로 61.5km 를 건넜다
+        assertThat(system).contains("다음 날은 전날 숙소의 권역이나 맞닿은 권역에서");
+        assertThat(system).contains("섬을 한 방향으로 돕니다");
+        // 맞닿음 정의는 JejuZone#adjacentTo 와 같은 문장이어야 한다 — 북부-남부(한라산 너머)는 없다
+        assertThat(system).contains("북서부-남서부, 북동부-남동부");
+        assertThat(system).doesNotContain("북부-남부");
+    }
+
+    private static PlaceCandidate zoned(long id, String title, String addr, double lat, double lng) {
+        return PlaceCandidate.builder()
+            .placeId(id)
+            .title(title)
+            .contentTypeName("관광지")
+            .addr(addr)
+            .petAllowanceName("동반 가능")
+            .indoor(false)
+            .lat(lat)
+            .lng(lng)
+            .build();
+    }
+
+    @Test
+    @DisplayName("후보의 입장 크기·체중 제한이 있으면 후보 줄에 실린다")
+    void candidateEntranceLimitsAppear() {
+        String prompt = factory.userPrompt(query(List.of()));
+
+        assertThat(prompt).contains("입장크기: 소형견");
+        assertThat(prompt).contains("체중제한: 10kg");
+    }
+
+    @Test
+    @DisplayName("준비물 프롬프트에 기간·반려견·날씨·일정 근거가 함께 실린다")
+    void packingPromptCarriesAllEvidence() {
+        PackingChecklistQuery query = PackingChecklistQuery.builder()
+            .startDate("2026-09-01")
+            .endDate("2026-09-02")
+            .petConditions(List.of(PetCondition.builder()
+                .sizeName("소형견").weightText("3.5").heatSensitive(true).build()))
+            .weatherOutlook(List.of(DayWeatherOutlook.builder()
+                .date(java.time.LocalDate.parse("2026-09-02"))
+                .precipitationTypeName("비").maxPrecipitationProbability(80)
+                .build()))
+            .planOutline(PlanOutline.builder()
+                .planId(7L)
+                .days(List.of(PlanOutline.PlanOutlineDay.builder().day(1).items(List.of(
+                    PlanOutline.PlanOutlineItem.builder().title("해안 산책로").placeId(11L).build())).build()))
+                .build())
+            .build();
+
+        String prompt = factory.packingUserPrompt(query);
+
+        assertThat(prompt).contains("기간: 2026-09-01 ~ 2026-09-02");
+        assertThat(prompt).contains("함께 여행하는 반려견");
+        assertThat(prompt).contains("체중: 3.5kg");
+        assertThat(prompt).contains("- 2일차 2026-09-02 | 강수형태: 비 | 강수확률 80%");
+        // 일정 줄은 재생성 프롬프트와 공유한다 — 준비물은 아이디를 쓰지 않아 이름만 싣는다 (#1128)
+        assertThat(prompt).contains("\n1일차 · 해안 산책로\n");
+        assertThat(prompt).contains("여행 일정");
+        assertThat(prompt).doesNotContain("placeId");
+        assertThat(prompt).contains("준비물 목록을 만들어 주세요");
+        // 배치 지시는 일정 생성 전용 — 준비물 프롬프트에는 실리지 않는다
+        assertThat(prompt).doesNotContain("실내 후보 위주로 배치할 것");
+    }
+
+    @Test
+    @DisplayName("실내·카페 요청은 후보의 사실로만 맞추라고 적는다 (#1170)")
+    void requestNotePinsIndoorCafeToCandidateFacts() {
+        String noted = factory.userPrompt(AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-15")
+            .requestNote("오후엔 실내 카페에서 쉬고 싶어요")
+            .build());
+        String plain = factory.userPrompt(AiPlanGenerationQuery.builder()
+            .startDate("2026-10-13")
+            .endDate("2026-10-15")
+            .requestNote("바다 보며 산책하고 싶어요")
+            .build());
+
+        assertThat(noted).contains("사용자 요청: 오후엔 실내 카페에서 쉬고 싶어요");
+        assertThat(noted).contains("숙소는 대신하지 말 것");
+        assertThat(plain).contains("사용자 요청: 바다 보며 산책하고 싶어요");
+        assertThat(plain).doesNotContain("숙소는 대신하지 말 것");
+        assertThat(factory.systemPrompt()).contains("숙소는 그 요청을 대신하지 않습니다");
+    }
+
+    @Test
+    @DisplayName("후보 줄에 없는 지형 · 시설을 이름만 보고 짐작하지 말라고 적는다 (#1172)")
+    void forbidsGuessingFeaturesFromPlaceNames() {
+        assertThat(factory.systemPrompt())
+            .contains("후보 줄에 없는 지형 · 시설(동굴, 수영장, 정상,")
+            .contains("장소 이름만 보고 짐작해 적지 않습니다");
+    }
+
+    private AiPlanGenerationQuery query(List<PetCondition> petConditions) {
+        return AiPlanGenerationQuery.builder()
+            .areaCode("39")
+            .startDate("2026-09-01")
+            .endDate("2026-09-02")
+            .petConditions(petConditions)
+            .placeCandidates(List.of(PlaceCandidate.builder()
+                .placeId(1L)
+                .title("장소")
+                .contentTypeName("관광지")
+                .addr("제주")
+                .petAllowanceName("동반 가능")
+                .allowedPetSizeName("소형견")
+                .maxPetWeightKg(10)
+                .indoor(true)
+                .sourceCategory("여행지")
+                .lat(33.5)
+                .lng(126.5)
+                .build()))
+            .build();
+    }
+}

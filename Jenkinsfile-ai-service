@@ -1,0 +1,29 @@
+// 혼디가개 ai-service 배포 잡.
+// LLM 전담. 일정을 소유하지 않고 plan-service 에 넘긴다.
+//
+// Jenkins 멀티브랜치 파이프라인 이름: hondigagae-ai-service
+// 배포 대상 PR 라벨:                  backend-ai-service
+//   dev  -> main-server (192.168.0.11), 호스트 포트 7085
+//   prod -> backend-1   (192.168.0.13), 호스트 포트 5085
+def backendPipeline
+node('builder-backend') {
+    checkout scm
+    backendPipeline = load 'Jenkinsfile.backend-common.groovy'
+}
+
+backendPipeline.run([
+    serviceGroup       : 'service',
+    serviceName        : 'ai-service',
+    modulePath         : 'service:ai-service',
+    fsPath             : 'backend/service/ai-service',
+    dockerfile         : 'ai-service.Dockerfile',
+    composeFile        : 'docker-compose-ai-service.yml',
+    composeServiceName : 'ai-service',
+    containerNamePrefix: 'hondigagae-ai-service',
+    deploySubdir       : 'service/ai-service',
+    buildAgentLabel    : 'builder-backend',
+    deployAgentLabels  : [
+        dev : 'deploy-backend-dev',
+        prod: 'deploy-backend-prod'
+    ]
+])

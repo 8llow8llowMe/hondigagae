@@ -1,0 +1,253 @@
+# 혼디가개 백엔드 기능 현황
+
+> 무엇이 되고 무엇이 안 되는지의 단일 기준. 기능을 추가·제거하면 여기부터 고친다.
+> 기준일: 2026-09-02 / 브랜치 `develop` (+ #152). 이슈 단위 대응은 맨 아래 "이슈 대응 현황".
+
+## 한눈에
+
+| 서비스 | 컨텍스트 | 상태 |
+| --- | --- | --- |
+| auth-service | `auth`, `member`, `pet` | 구현 |
+| tour-service | `place`, `emergency`, `insight` | 구현 |
+| tour-service | `walkcourse` | 구현 (조회 API. 적재 배치는 #383) |
+| plan-service | `plan` | 구현 (날씨 브리핑·후기 v1 포함) |
+| ai-service | `planner` | 구현 (Spring AI + 로컬 LLM(Ollama), 기본값은 스텁) |
+| batch-service | `placeimport`, `congestionimport` | 구현 |
+| api-gateway / service-discovery | — | 구현 (공유 링크 공개 경로 레이트 리밋 포함, #1244) |
+
+## 구현된 API
+
+### auth-service
+
+| 메서드 | 경로 | 비고 |
+| --- | --- | --- |
+| POST | `/api/v1/auth/login` | 일반 로그인 |
+| POST | `/api/v1/auth/logout` | 현재 기기만. 다른 기기 로그인 유지 |
+| GET | `/api/v1/auth/{provider}/authorize` | 소셜 인가 URL |
+| GET | `/api/v1/auth/{provider}/login` | `code`, `state` 쿼리 파라미터 |
+| POST | `/api/v1/auth/email/send-code` · `/verify-code` | 이메일 인증 |
+| POST | `/api/v1/auth/password/reset/send-code` · `/password/reset` | 재설정 (계정 열거 방지, 5회 오입력 무효화) |
+| POST | `/api/v1/auth/token/reissue` | 세션별 회전, 이전 refresh 즉시 무효 |
+| GET·DELETE | `/api/v1/auth/sessions[/{sessionId}]` | 로그인 기기 목록·특정 기기 로그아웃 |
+| POST | `/api/v1/members/signup` | |
+| POST | `/api/v1/members/signup/dev` | **개발 전용** — 이메일 인증 생략. 운영 프로필에서는 404 |
+| GET·PATCH | `/api/v1/members/me` | |
+| POST·DELETE | `/api/v1/members/me/profile-image` | |
+| POST | `/api/v1/members/me/password` · `/password/setup` · DELETE `/password` · `/me/withdraw` | 변경/최초 설정/소셜 전용 전환/탈퇴 |
+| GET·POST·PUT·DELETE | `/api/v1/members/me/pets[/{petId}]` | 반려견 프로필 |
+| POST·DELETE | `/api/v1/members/me/pets/{petId}/profile-image` | 반려견 프로필 사진 (MinIO) |
+| PUT | `/api/v1/members/me/pets/{petId}/representative` | 대표 반려견 지정 (회원당 하나) |
+
+소셜 로그인은 provider 를 경로 변수로 받아 kakao·naver 를 같은 흐름으로 처리한다.
+
+### tour-service
+
+| 메서드 | 경로 | 비고 |
+| --- | --- | --- |
+| GET | `/api/v1/places` | 지역·타입·동반조건·실내·크기·원본분류·반려견 크기/체중·**키워드** 필터. 키워드는 최대 5단어를 이름·주소에 단어별 AND 적용, 커서 기반. 선택 `lat`·`lng` 를 함께 주면 (반올림 m, placeId) 거리순 + `distanceMeters` — 하나만 오면 `PLACE_109`, 커서 복원 실패는 `PLACE_110` (#1202) |
+| GET | `/api/v1/places/nearby` | 좌표 반경 검색 (식당·카페 포함). **keyword** 는 목록과 같은 최대 5단어 이름·주소 AND 검색. 선택 `sigunguCode` 는 목록과 같은 시군구 필터 (#1316) |
+| GET | `/api/v1/places/{placeId}` | intro·petInfo·images 결합 상세. `indoor`·`sourceCategory`·`sourceName` 포함(목록과 같은 매핑), `contentId` 는 원천이 TourAPI 가 아니면 **null** |
+| GET | `/api/v1/emergencies/facilities` | 동물병원·동물약국 반경 검색, `openNowOnly` 지금 영업 중 필터 |
+| GET | `/api/v1/emergencies/facilities/{facilityId}` | 긴급 시설 상세. delisted 시설은 404 |
+| GET | `/api/v1/places/{placeId}/congestions` | 기간 혼잡도(기본 7일, 최대 30일). 데이터 없는 날짜도 UNKNOWN 으로 남긴다 |
+| GET | `/api/v1/insights/regional-weather` | 제주 권역(5곳) 날씨 비교 + 나가기 좋은 권역 추천 |
+| GET | `/api/v1/insights/walk-times` | 좌표 기준 오늘 산책 안전 곡선 + 골든타임 |
+| GET | `/api/v1/places/{placeId}/suitability` | 날씨+동반조건+혼잡도 적합도. 단기+중기 합쳐 약 11일. `score` 가 null 이면 판단 근거 없음. `headline` 서술형 결론 한 문장 — 동반 불가 > 기상특보 > 크기 제한 > 동반 미확인이 먼저, 없으면 등급 문구, "오늘" 은 기준 일자가 오늘일 때만, 결정적 사실 없이 `INSUFFICIENT` 면 null. 산책 위험도에는 두지 않는다 (#1234) |
+| GET | `/api/v1/places/{placeId}/walk-safety` | 추정 노면온도·열지수 기반 산책 위험도 + 안전 시간대 |
+
+### plan-service
+
+| 메서드 | 경로 |
+| --- | --- |
+| POST·GET | `/api/v1/plans` | 생성은 `petIds`(최대 5, 첫 번째 = 대표) — ai-plans 와 같은 우선순위. `sourceAiJobId` 를 실으면 AI 초안 담기 멱등(이미 담았으면 200 + 기존 일정, #970). `petId` 필터 = 반려견별 히스토리(한 마리라도 동행이면 히트). 목록 항목은 `itemCount`(전체 항목 수, 빈 일정 0)를 싣는다 — 페이지 일정 id `in` 절 한 번 집계(#1242) |
+| GET·PUT·DELETE | `/api/v1/plans/{planId}` | 항목마다 장소 요약(주소·실내·대표 이미지·좌표) 포함. `petIds` 동행 목록 |
+| PUT | `/api/v1/plans/{planId}/days/{day}/items` | 그날 항목 통째 교체. **일정 전체 항목 최대 100개**(`Plan.MAX_ITEMS`) — 생성 `items` 도 같은 상한(`PLAN_136`), 교체 뒤 전체가 넘으면 `PLAN_028`. 상한 전에 넘은 일정은 늘리지 않는 교체만 받는다 (#1243) |
+| GET | `/api/v1/plans/{planId}/weather` | 일자별 날씨 브리핑 + 비 오는 날 실내 대안. 여러 마리는 아이별 판정 → 가장 낮은 아이 기준(`basisPetId`·`petSuitabilities`) |
+| GET·POST·DELETE | `/api/v1/favorites/places[/{placeId}]` | 장소 즐겨찾기 (멱등, 회원당 100곳, GET {placeId} = 여부 확인, 목록 항목에 저장일 `savedAt`) |
+| PUT | `/api/v1/plans/{planId}/items/{planItemId}/visited` | 항목 방문 체크 (다녀옴) |
+| GET | `/api/v1/plans/{planId}/emergency` | 일자별 방문 장소 주변 동물병원·약국 브리핑 |
+| GET·POST·PUT | `/api/v1/plans/{planId}/reviews` | 완료된 일정당 후기 하나. 전체 만족도 + 방문 장소별 한 줄. 사진·공개 없음 |
+| GET | `/api/v1/shared-plans/{token}` | 공유 링크로 일정 열기 (**비인증**). 게이트웨이가 링크(토큰 해시)당 초당 2 · 버스트 20 으로 제한 — 넘으면 429 `GATEWAY_001`, Redis 장애 시 통과 (#1244) |
+
+일정의 소유권은 이 서비스에 있다. ai-service 는 제안만 하고 저장·확정은 여기서만 일어난다.
+
+### ai-service
+
+| 메서드 | 경로 | 상태 |
+| --- | --- | --- |
+| POST | `/api/v1/ai-plans` | 일정 생성 제출 (202 + jobId, 멱등). 다중 반려견·대표견 기본값·필수 포함 장소·하루 재생성(planId+regenerateDay) 지원 |
+| GET | `/api/v1/ai-plans/jobs/{jobId}` | 폴링 (SSE 폴백). 상태·초안과 함께 제출 조건 `conditions` (#488) |
+| GET | `/api/v1/ai-plans/jobs/{jobId}/stream` | SSE — 상태 변경 시에만 이벤트, 종결 시 서버가 닫음. 페이로드는 폴링과 동일(`conditions` 포함) |
+| POST | `/api/v1/ai-plans/packing-list/{planId}` | 반려견 여행 준비물 AI 생성 (동기, 예보·특성·일정 근거) |
+
+LLM 연동 완료(**Spring AI + Ollama**, 공유 인프라 로컬 LLM, 구조화 출력).
+모델 교체는 `AI_LLM_MODEL` 값 하나, provider 교체는 어댑터·모델 빈 추가로 끝난다.
+on/off 스위치와 스텁 어댑터는 두지 않는다(2026-09-03 제거). 프론트 개발자가 백엔드를 로컬에
+띄우지 않고 dev 서버에 직접 붙기로 해서, LLM 없는 환경을 위한 분기가 필요 없어졌다.
+
+환각 방지는 **후보 장소 목록을 먼저 주는 방식**이다. tour-service 에서 동반 가능으로
+확인된 장소를 받아 프롬프트에 싫고, 돌아온 `placeId` 를 다시 후보 집합과 대조해
+밖에 있는 것은 장소 연결을 끊는다 (항목 자체는 일정 흐름으로 남긴다).
+
+### batch-service (웹 API 없음)
+
+| 잡 | 대상 | 상태 |
+| --- | --- | --- |
+| `placeDataPipelineJob` | 장소 적재 6단계를 순서대로 잇는 flow job(#877 로 동반 조건 적재가 마지막에 붙었다). 자식 실패에도 계속 가고 부모는 FAILED (#377) | 구현 |
+| `placeImportJob` | TourAPI 관광 장소 + 추가 이미지(detailImage2, place_image) | 구현 |
+| `placeImageBackfillJob` | 문화정보원·식약처 장소의 대표 이미지 백필 (TourAPI 검색, 제목+좌표 검증) | 구현 |
+| `cultureFacilityImportJob` | 문화정보원 문화시설 + 긴급 시설 | 구현 |
+| `petRestaurantImportJob` | 식약처 음식점 + VWorld 지오코딩 | 구현 |
+| `placeMergeJob` | 원천이 다른 같은 장소 병합 (`merged_into_id`). 적재 잡들 뒤에 한 번. 병합 뒤 동반 가능 여부 재계산(#886) | 구현 |
+| `congestionImportJob` | 관광지 집중률 예측 + 명칭 매칭 | 구현 |
+
+`congestionImportJob` 은 **`placeImportJob` 이후에 돌려야 한다.** 장소가 비어 있으면
+전부 UNMATCHED 로 적재되고 적합도 응답에서 혼잡도가 계속 빠진다. 30일 rolling 원천이라
+일 1회 주기 실행이 전제다.
+
+## 데이터 현황 (제주)
+
+| 대상 | 규모 | 원천 |
+| --- | --- | --- |
+| 장소 마스터 (노출) | **2,328곳** | TourAPI 2,099 + 문화정보원 127 + 식약처 102 |
+| ├ TourAPI | 활성 2,099 / 전체 2,117 | 관광지(12) 560 · 문화시설(14) 98 · 레포츠(28) 137 · 숙박(32) 210 · 쇼핑(38) 395 · 음식점(39) 699 (#726 지역코드 이관 뒤) |
+| ├ 문화정보원 | 228 중 101 은 TourAPI 로 병합 | 노출은 127 (`merged_into_id IS NULL`) |
+| └ 식약처 | 102 | 반려동물 동반 음식점 |
+| 동반 가능 여부 | ALLOWED 194 · PARTIALLY 5 · NOT_ALLOWED 30 · **UNKNOWN 2,099** | 실측 시점에는 **TourAPI 장소가 전부 UNKNOWN** 이었다. #886 이 재계산 스텝을 넣어 코드로는 반영된다 — `place_pet_info` 와 흡수 행에서 가장 제한적인 값. 2026-09-28 모의로 TourAPI 노출 2,095곳이 ALLOWED 342 · PARTIALLY 39 · NOT_ALLOWED 29 · UNKNOWN 1,685 가 된다. **dev 는 배포 뒤 `petTourImportJob` 한 번으로 반영되고, 그때 다시 잰다** |
+| 긴급 시설 | 214곳 | 동물병원 + 동물약국 (#569 중복 접기 후) |
+
+> 기준: 2026-09-23 dev DB(`hondigagae_tour_dev`) 읽기 전용 실측 (#885). 다시 잴 때:
+>
+> ```sql
+> SELECT source, COUNT(*) total, SUM(delisted_at IS NULL) active,
+>        SUM(merged_into_id IS NOT NULL) merged,
+>        SUM(delisted_at IS NULL AND merged_into_id IS NULL) visible
+>   FROM place GROUP BY source;
+> SELECT pet_allowance_type, COUNT(*) FROM place
+>  WHERE delisted_at IS NULL AND merged_into_id IS NULL GROUP BY pet_allowance_type;
+> ```
+
+### 날씨·혼잡도
+
+| 대상 | 방식 | 커버리지 |
+| --- | --- | --- |
+| 기상청 단기예보 | 실시간 호출 + Redis 격자별 캐시 | 오늘 포함 **약 5일** (실측) |
+| 기상청 중기예보 | 실시간 호출 + Redis 지역별 캐시 | **~ D+10** (실측) |
+| 합계 | 두 예보를 이어 붙임 | **약 11일, 빈 날짜 없음** |
+| 관광지 집중률 | 배치 적재 + DB 조회 | **30일 rolling** |
+
+둘의 커버리지가 다르다. 날씨는 없고 혼잡도만 있는 날짜가 흔하며, 적합도 응답은
+`weatherApplied` / `congestionApplied` 플래그로 그 차이를 감추지 않는다.
+
+**적재는 2026-09-04 부터 dev 에 들어가 있다 — 다만 전부 사람이 손으로 돌린 것이다.** 27회 실행 중 스케줄이
+부른 것은 0회다(#878). 상세 커버리지는 이미지 380 / 2,099 · 운영시간 300 / 2,099 로 실행당 상한 1회분에
+머물러 있다. 운영 절차는 `batch-dev-runbook.md`.
+
+## 미착수 / 보류
+
+| 기능 | 상태 | 막는 것 |
+| --- | --- | --- |
+| `walkcourse` 적재 배치 | **구현** | `olleCourseImportJob` (#383). 원천은 두루누비가 아니라 제주올레 — 두루누비 걷기 142개는 코리아둘레길 축이라 제주 0개(실호출 검증). 29코스 전부 시작점 좌표·대표 이미지를 갖는다(#722). 종점 좌표는 계약에 있고 코드 기준 29 / 29 (2026-07-31 판 — 체이닝 23 #816 + 공식 좌표로 검증한 별칭 2 · 공식 좌표 수기 4 #960). dev 는 2026-09-28 기준 23 / 29 (2026-07-31 판 재적재, #960 전 코드). 원천 파일이 같아 #960 배포 뒤 `olleCourseImportJob forceImport=true` 1회가 필요하다(`batch-dev-runbook.md` §4-3) |
+| 기상특보 연동 | **구현 (조회)** | #156 — 적합도·권역 날씨·산책 안전 응답에 `weatherWarnings`. 카카오 메시지 알림 연계는 후속 |
+| 항목 단위 산책 위험도 | 미착수 | 일정 날씨 브리핑은 일자별로 그날 장소 전체를 판정해 가장 힘든 곳을 싣는다(#1045) — 시각 단위 판정은 아니다 |
+| 일정 브리핑 체감온도 | **구현** | #88. `weather.maxFeelsLikeTemperature` — tour `DailyWeather` 가 시각별 열지수의 하루 최대를 내고 plan 이 그대로 전달. 중기예보는 null |
+| AI 초안 WALK 항목 `placeId` 불일치 | 해결됨 | #89. 초안에 `WALK` 를 내리지 않고 `PlanItemType` 을 `shared-travel` 로 올렸다. **FE 우회(WALK 의 `targetId` 미전송) 해제 가능** |
+| AI 작업 세부 단계·취소·`sigunguCode` | **구현** | #90. 4단계(`step`/`stepOrder`/`totalSteps`) · `POST /jobs/{jobId}/cancel`(협조적) · `sigunguCode` 후보 좁히기. 일자 재생성은 #77 로 됨 |
+| 다견 일정의 준비물 생성 | 구현 | 동행 반려견 전체 특성을 벌크 조회해 근거로 삼는다. 프롬프트는 합집합 규칙 |
+| 반려견 프로필 매칭 | **구현** | `petSizeType`/`petWeightKg` 필터. 프로필 체중 입력은 FE 몫 |
+| 영업시간 구조화 | **구현 (긴급 시설 + 여행 장소)** | 긴급 시설은 `openNowOnly` + 항목별 `openNow`. 여행 장소는 상세 `intro.openNow`·`open24` — 문화정보원 + TourAPI `detailIntro2`(#361) 두 출처. TourAPI 는 쿼터 때문에 실행당 최대 300곳씩 증분 수집(intro 없는 곳 먼저)이라 전량 커버는 2,099곳 기준 약 7회 실행(주 1회면 약 7주). 2026-09-23 현재 300 / 2,099. 같은 잡의 이미지 단계가 남은 예산으로 돌며 한도에서 멈춘다. 목록 필터(`openNowOnly`)는 후속 |
+| 데이터 delisting | **구현** | `delisted_at` 표시 + 급감 가드. `data-refresh-guide.md` 2절 |
+| 배포 파이프라인 | **구현** | #21 — 서비스별 `docker-compose-*.yml` + Jenkins. `deploy-guide.md`·`jenkins-cicd-dev-deploy-guide.md` |
+| 배치 메트릭 | **구현** | `place_import_rows` 게이지 + `place_import_last_success_timestamp` (기동 씨딩 포함). Prometheus 경보 rule 등록은 인프라 후속 |
+| 배치 주기 실행 | **구현 — dev 미가동** | #378 — batch-service 프로세스 안 Quartz. 장소 파이프라인 매주 월 03:00 / 혼잡도 매일 06:00 KST, 실행 중 가드 + `batch_schedule_*` 지표. prod 는 2026-10-10 에 Vault `BATCH_SCHEDULE_ENABLED=true` 로 켰다(#1323). **dev 에서 스케줄은 아직 한 번도 돌지 않았다** — 컨테이너 미기동(#878) |
+
+### 데이터가 없어 못 하는 것
+
+- **리뷰·평점** — 공공데이터에 없다. 자체 축적은 공모전 기간에 쌓이지 않는다
+- **실시간 예약·빈자리** — 소스 없음
+- **비 오는 날 실내 식당 추천** — 식약처 원천이 실내 여부를 주지 않아 `indoor` 가 NULL.
+  문화정보원 장소에서만 동작한다
+- **제주 전체 식당 커버리지** — 7,704곳 중 동반 가능이 확인된 곳은 102곳뿐이다.
+  카카오 로컬을 걷어내면서 택한 교환이다 (`place-data-integration.md` §6-5)
+
+## 알려진 제약
+
+| 항목 | 내용 |
+| --- | --- |
+| 식약처 다운로드 경로 | 공개 오픈API 가 아니라 화면이 쓰는 경로. 규격 변경 시 끊긴다 |
+| 문화정보원 갱신 | 포털에서 자동 다운로드(#379). 다만 오픈API 가 아니라 상세 페이지 JSON-LD 를 읽는 방식이라 페이지 개편 시 끊긴다 — 그때는 `/app/data` 우회 파일로 물러난다 |
+| 동물병원 운영시간 | 51% 만 제공. `operatingHoursKnown=false` 로 구분해 내려보낸다 |
+| 좌표 반경 검색 | 사각 범위 + 애플리케이션 정렬. 수백 곳 규모 전제. 전국 확대 시 공간 인덱스 필요 |
+| 중복 병합 | `placeMergeJob` 독립 잡. 적재 잡 단독 실행 시 병합되지 않으므로 이어 돌린다 |
+
+## 이슈 대응 현황 (백엔드)
+
+> GitHub 이슈는 클론한 저장소에서 보이지 않는다. 백엔드 라벨이 붙은 이슈 46개가 코드에 어떻게 대응됐는지 여기 남긴다.
+> 갱신 기준: 2026-09-02. 이슈를 닫거나 새로 열면 이 표도 같이 고친다 (`docs/git-workflow.md` §7).
+> "완료" 는 코드가 `develop` 에 있고 이슈가 닫혔다는 뜻이다. 닫혔는데 체크박스가 비어 있던 14개(#4 #5 #25 #28 #34 #35 #40 #41 #57 #77 #86 #104 #106 #108)는
+> 코드로 대조해 전부 구현을 확인했다 — #40 의 "Swagger 400 응답 추가" 만 근거가 없다.
+
+**열린 것 (8)**
+
+| 이슈 | 영역 | 제목 | 상태 |
+| --- | --- | --- | --- |
+| #233 | ai | 준비물 근거에 프롬프트 표기 "[N일차]" 가 그대로 노출된다 | 구현 완료, PR 대기 — 프롬프트 일차·반려견 표기에서 대괄호 제거 + 시스템 프롬프트 출력 규칙 + `LlmTextCleaner` 후처리(이유·근거·메모) |
+| #87 | plan | 여행 기간을 줄여도 범위 밖 일정 항목이 정리되지 않는다 | 해결됨 — `PLAN_008` 거부(99c6a41f) + 회귀 테스트·규칙 문서화. 이슈 닫기 대상 |
+| #88 | plan | 일정 날씨 브리핑에 체감온도 추가 | 구현 — `PlanDailyWeatherItem.maxFeelsLikeTemperature` (tour 적합도 응답 `weather` 에도 같은 필드) |
+| #89 | ai | AI 초안의 WALK 항목 placeId 가 walk_course.id 와 어긋난다 | 해결됨 — `PlanItemType` 공유 + 어댑터 교정. FE 후속: WALK `targetId` 우회 해제 |
+| #90 | ai | AI 일정 작업 세부 단계·일자 재생성·취소·sigunguCode | 해결됨 — 4건 모두 완료(재생성 #77, 나머지 3건). 이슈 닫기 대상 |
+| #232 | ai | dev 에서 AI 일정 생성이 실패한다 (AIPLAN_007 · AIPLAN_010) | 해결됨 — `num_ctx` 미지정으로 프롬프트가 잘리고 있었다(실측 11,160자 vs 기본 2,048). `context-tokens` 명시 + 파싱 실패 진단 로그 + `LLM_TIMEOUT` 분리 |
+| #152 | plan | 일정 저장·판정의 다중 반려견 지원 (PlanCreateRequest.petIds) | 머지됨 — 이슈 닫기 대상 (`features/152-plan-multi-pet.md`) |
+| #202 | api-gateway·plan | 게이트웨이가 /api/v1/favorites 를 라우팅하지 않는다 | 구현 완료, PR 대기 — 세 프로파일 라우트 + `GatewayRouteCoverageTest`. FE 실기기 확인은 plan-service 배포 후 |
+| #214 | auth·core | 디코딩 불가 서명 JWT 가 401 이 아니라 500 을 준다 (래퍼 없는 본문) | 머지됨 — 이슈 닫기 대상. 토큰 없음 403→401 `SECURITY_001`, `HttpMessageNotReadableException` 핸들러 4 서비스 |
+| #231 | tour | 추가 요금 원문 "없음" 이 요금 있음으로 판정돼 적합도가 3점 깎인다 | 구현 완료, PR 대기 — `PetExtraFee` 가 원문 뜻(CHARGED/NONE/UNKNOWN)을 읽고 CHARGED 만 감점 |
+| #417 | tour | 적합도·권역 점수 고온 규칙에 체감온도 반영 | 구현 — `applyHeatRule` 이 `max(최고기온, 최고 체감온도)` 에 반려견 기준 28/31℃ 를 건다(감점은 한 번). 30℃ 습도 95% = −30, 30℃ 습도 40% = −15. 응답 스키마 변경 없음. #407 답 |
+| #508 | ai | 동시 제출 2건이면 AI 일정 생성이 **둘 다** LLM 타임아웃으로 실패한다 | 구현 — 실효 동시성을 1로 통일(`aiPlanTaskExecutor` 2→1, 대기열 4→1 — **동시 수용량 6건→2건**)하고 `LlmCallGate`(공정 세마포어 1)로 **기다림을 HTTP 호출 밖으로** 뺐다. read timeout 이 차례를 받은 뒤부터 돈다. 혼잡은 새 코드 `AIPLAN_021`(LLM_BUSY)로 가르고 `AIPLAN_020` 문구가 참이 됐다. 타임아웃 산술을 동시성 1 기준으로 재계산. **dev 동시 2건 재현 확인이 남았다.** `OLLAMA_NUM_PARALLEL` 은 재측정 없이 올리지 않는다(인프라 저장소). FE 문구는 #495 |
+| #488 | ai | 작업 조회·SSE 응답에 생성 조건이 없어 다른 브라우저에서 초안을 담지 못한다 | 구현 — `conditions` 블록(지역·기간·반려견·예산·메모)을 폴링·SSE 양쪽에 싣는다. 저장은 그대로(`requestParams` 재사용), `petIds` 는 문자열. **담기는 복원되지만 실패 화면의 "조건 바꾸기" 는 `pinnedPlaceIds`·`preferFavorites` 가 빠져 아직 반쪽**(넓히려면 계약 변경). FE 대응은 #498 |
+
+**완료 (41)**
+
+| 이슈 | 영역 | 제목 | 비고 |
+| --- | --- | --- | --- |
+| #1 | docs | 프로젝트 기반 문서 및 개발 컨벤션 세팅 | |
+| #3 | service-discovery·api-gateway | 백엔드 MSA 기반 구축 (Gradle 멀티모듈 + core + 게이트웨이) | |
+| #4 | auth·core·plan·tour | 도메인 서비스 5종 스캐폴딩 (auth/tour/plan/ai/batch) | |
+| #5 | auth | 멀티 소셜 로그인 회원 도메인 적용 및 원본 구조 정합화 | |
+| #8 | tour | 긴급 시설 facilityId 가 JS 안전 정수 범위를 초과해 정밀도가 손상됨 | |
+| #16 | tour | 장소 상세 응답에 indoor·sourceName·sourceCategory 추가 | |
+| #17 | tour | 장소 상세 응답의 contentId 가 문자열 "null" 로 직렬화됨 | |
+| #21 | 전 서비스 | dev/prod 배포 파이프라인 구축 (컨테이너 정의·Jenkins) | |
+| #22 | docs | 프로젝트 소개와 시스템 아키텍처 다이어그램 작성 | |
+| #25 | core | 여행 도메인 enum 을 shared-travel 공유 모듈로 이관 | |
+| #26 | core·tour | 기상청 단기예보 조회 기반 구축 | |
+| #27 | plan·tour | 장소 여행 적합도 조회 | |
+| #28 | plan·tour | 장소 산책 위험도 조회 | |
+| #29 | plan·tour | 관광지 집중률 예측 적재 배치 | |
+| #30 | ai·tour | AI 여행 플래너 Claude 어댑터 연동 | 이후 #57 로 Ollama 전환 |
+| #31 | auth·plan·tour | 일정 날씨 브리핑 | |
+| #32 | auth·api-gateway | CORS 허용 목록 정리와 FE 로컬 포트 5174 | |
+| #34 | tour | 원천에서 사라진 장소를 조회에서 내리는 delisting | |
+| #35 | plan·tour | 반려견 크기·체중으로 입장 가능한 장소 매칭 | |
+| #37 | docs·tour | 영업시간 구조화와 긴급 시설 "지금 영업 중" 판정 | |
+| #38 | ai·auth·plan·tour | 동적 검색 QueryDSL 전환과 @Param·예외 캐논 정리 | |
+| #39 | plan·tour | 일정 항목 검증의 원격 N+1 제거 | |
+| #40 | auth | POST /auth/login 에 @Valid 가 없어 서버 검증이 무효 | Swagger 400 명시는 미반영 |
+| #41 | auth | 비밀번호 재설정(찾기) API 추가 | |
+| #42 | auth | 인증코드 TTL·재전송 쿨다운을 응답과 Swagger 에 노출 | |
+| #52 | 전 서비스 | Redis Sentinel 접속 배선과 설정 누락 기동 실패 | |
+| #53 | core·tour | 예보 캐시 쿼터 방어 — 발표 유예·격자 묶기·갱신 락 | |
+| #55 | auth | 인증/회원 보안 보완 — 다중 기기 세션, 비밀번호 재설정, 계정 연결/전환 | |
+| #57 | ai | AI 플래너 로컬 LLM 전환과 SSE 상태 스트리밍 | |
+| #77 | ai·docs·plan·tour | AI 일정 생성 제어 — 다중 반려견·필수 포함 장소·하루 재생성 | 저장 측 다견화는 #152 |
+| #86 | plan | 일정 상세 항목에 장소 요약(주소·실내·이미지·좌표) 포함 | |
+| #104 | plan | 여행 동행 기능 — 방문 체크·응급 브리핑·반려견별 히스토리 | |
+| #106 | auth·docs | 반려견 프로필 보강 — 사진(MinIO)·체중·대표견·고아 이미지 청소 | |
+| #108 | tour | numOfRows 가 단기예보를 잘라 최고기온(TMX)이 유실되던 문제 | |
+| #121 | ai·auth·plan | 전 서비스 감사 반영 — 경계 위반·예외 응답 누수 수정과 보완 기능 5종 | |
+| #134 | batch·tour | batch-service 공공 API 방어와 포트 명명을 컨벤션에 맞춘다 | |
+| #135 | tour | tour-service 응답 봉투·인덱스·metadata 컨벤션 위반을 고친다 | |
+| #136 | tour | 명칭 매칭 구분값을 shared enum 으로 올린다 | |
+| #137 | plan·tour | 긴급 시설 상세와 기간 혼잡도 조회 API 를 추가한다 | |
+| #155 | ai·tour | AI 일정 생성 날씨 접목과 반려견 준비물 목록 생성 | |
+| #156 | docs·api-gateway·tour | 제주 특색 × 기상청 API 날씨 인사이트 3종 | |
+| #421 | tour | 장소 목록·주변 조회에 키워드 검색 (DB LIKE + Redis 캐시) | ES 는 인프라 미구성. 검색 UI 는 FE 후속 |

@@ -1,0 +1,137 @@
+server:
+  port: ${API_GATEWAY_PORT}
+  shutdown: graceful
+
+spring:
+  cloud:
+    config:
+      enabled: false
+    gateway:
+      routes:
+        - id: auth-service-auth
+          uri: lb://${AUTH_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: auth-service-members
+          uri: lb://${AUTH_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/members/**
+        - id: tour-service-places
+          uri: lb://${TOUR_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/places/**
+        - id: tour-service-walk-courses
+          uri: lb://${TOUR_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/walk-courses/**
+        - id: tour-service-emergencies
+          uri: lb://${TOUR_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/emergencies/**
+        # 장소에 매이지 않은 인사이트(권역 날씨 비교, 산책 골든타임).
+        # /api/v1/places/** 와 달리 장소 아이디로 시작하지 않아 경로가 따로다.
+        - id: tour-service-insights
+          uri: lb://${TOUR_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/insights/**
+        - id: plan-service-plans
+          uri: lb://${PLAN_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/plans/**
+        # 장소 즐겨찾기. plan-service 안에 있지만 /api/v1/plans/** 로 시작하지 않아 경로가 따로다 (#202).
+        - id: plan-service-favorites
+          uri: lb://${PLAN_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/favorites/**
+        # 일정 읽기 전용 공유 링크 (#627). 비인증으로 열리는 공개 경로라 인증이 필요한
+        # /api/v1/plans/** 와 접두어를 나눴다 — "이 접두어는 공개" 가 경로만 보고 읽혀야 한다.
+        - id: plan-service-shared-plans
+          uri: lb://${PLAN_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/shared-plans/**
+          # 공유 링크 레이트 리밋 (#1244). 링크(토큰 해시)당 초당 2개 보충 · 버스트 20. 이유는 application-local.yml.
+          filters:
+            - name: SharedPlanRateLimit
+              args:
+                redis-rate-limiter.replenishRate: 2
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedTokens: 1
+        - id: ai-service-ai-plans
+          uri: lb://${AI_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/ai-plans/**
+        - id: ai-service-assistant
+          uri: lb://${AI_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/assistant/**
+        - id: auth-service-docs
+          uri: lb://${AUTH_SERVICE_APP_NAME}
+          predicates:
+            - Path=/auth-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+        - id: tour-service-docs
+          uri: lb://${TOUR_SERVICE_APP_NAME}
+          predicates:
+            - Path=/tour-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+        - id: plan-service-docs
+          uri: lb://${PLAN_SERVICE_APP_NAME}
+          predicates:
+            - Path=/plan-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+        - id: ai-service-docs
+          uri: lb://${AI_SERVICE_APP_NAME}
+          predicates:
+            - Path=/ai-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+  client:
+    serviceUrl:
+      defaultZone: http://${SERVICE_DISCOVERY_HOSTNAME}:${SERVICE_DISCOVERY_PORT}/eureka/
+
+jwt:
+  access-key: ${JWT_ACCESS_KEY}
+  blacklist-fail-open: ${JWT_BLACKLIST_FAIL_OPEN}
+
+infra:
+  redis:
+    mode: ${REDIS_MODE}
+    # standalone 에서만 쓴다. sentinel 모드에서는 master-name 과 sentinel-nodes 로 접속한다.
+    host: ${REDIS_HOST}
+    port: ${REDIS_PORT}
+    password: ${REDIS_PASSWORD}
+    # sentinel 모드 필수. 둘 중 하나라도 비면 기동 시점에 실패한다.
+    master-name: ${REDIS_MASTER_NAME:}
+    sentinel-nodes: ${REDIS_SENTINEL_NODES:}
+    key-prefix: ${REDIS_KEY_PREFIX}
+    # Redis 먹통일 때 빨리 실패하게 짧게 둔다 (#1253). 비우면 Lettuce 기본(명령 60초 · 리액티브 무제한, 연결 10초).
+    # 이유는 application-local.yml.
+    command-timeout: 1s
+    connect-timeout: 2s
+
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    config-url: /v3/api-docs/swagger-config
+    urls:
+      - name: 인증/회원 서비스 API
+        url: /auth-service/v3/api-docs
+      - name: 관광 데이터 서비스 API
+        url: /tour-service/v3/api-docs
+      - name: 여행 일정 서비스 API
+        url: /plan-service/v3/api-docs
+      - name: AI 서비스 API
+        url: /ai-service/v3/api-docs
+    operationsSorter: none
+    displayRequestDuration: true

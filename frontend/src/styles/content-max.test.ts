@@ -1,0 +1,157 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+import { describe, expect, it } from 'vitest'
+
+import { readDesignMd, readGlobalsCss, readTokensCss } from '@/test/tokens'
+
+/**
+ * 콘텐츠 컨테이너 회귀 검사 — 이슈 #376.
+ *
+ * `token-sync.test.ts` 는 **색 토큰만** 본다. 레이아웃 토큰은 기계 동기 대상이 아니라
+ * `tokens.css` 와 `DESIGN.md` 가 조용히 갈라질 수 있다. 여기서 그 갈라짐을 잡는다.
+ */
+
+const tokens = readTokensCss()
+const globals = readGlobalsCss()
+const design = readDesignMd()
+
+describe('콘텐츠 컨테이너 — 토큰 (#376)', () => {
+  it('--content-max 가 1440px 로 선언돼 있다', () => {
+    expect(tokens).toMatch(/--content-max:\s*1440px;/)
+  })
+
+  it('1584 에서 레일을 480 으로 넓히던 규칙이 남아 있지 않다', () => {
+    // 컨테이너가 1440 에서 멈추므로 99rem(1584) 미디어쿼리는 발동할 수 없다
+    expect(tokens).not.toMatch(/--rail-context:\s*480px/)
+    expect(tokens).not.toContain('99rem')
+  })
+
+  it('--rail-context 는 400 고정이다', () => {
+    expect(tokens).toMatch(/--rail-context:\s*400px;/)
+  })
+})
+
+/*
+  **두 클래스가 캡을 다르게 표현한다 — 값만 같다** (이슈 #553).
+
+  `.content-container` 는 배경을 칠하지 않는 것에 붙어 폭을 직접 줄이고,
+  `.rail-layout` 은 **스스로 L0 바닥을 칠하는 `Canvas`** 에도 붙어 전폭으로 남아야 한다
+  (1600 실측에서 좌우 각 77px 이 흰 `body` 로 남았다). 그래서 후자는 좌우 패딩으로 캡한다.
+
+  검사가 지키는 것은 "한 규칙" 이 아니라 **값이 갈라지지 않는 것**이다 — 둘 다
+  `var(--content-max)` 를 쓰는지, 그리고 `.rail-layout` 이 폭을 직접 줄이지 않는지를 본다.
+*/
+describe('콘텐츠 컨테이너 — 캡 규칙 (#376 · #553)', () => {
+  const container = globals.match(/^\.content-container\s*\{[^}]*\}/m)?.[0]
+  const rail = globals.match(/^\.rail-layout\s*\{[^}]*\}/m)?.[0]
+
+  it('.content-container 는 폭으로 캡한다', () => {
+    expect(container).toBeDefined()
+    expect(container).toContain('max-inline-size: var(--content-max)')
+    expect(container).toContain('margin-inline: auto')
+  })
+
+  it('.rail-layout 은 좌우 패딩으로 캡한다 — 바닥이 1440 에서 끊기지 않게', () => {
+    expect(rail).toBeDefined()
+    expect(rail).toContain('padding-inline: max(0px, calc((100% - var(--content-max)) / 2))')
+    // 폭을 직접 줄이면 `Canvas` 의 회색 바닥이 그 폭에서 끝나고 바깥이 흰색으로 남는다
+    expect(rail).not.toContain('max-inline-size')
+  })
+
+  it('토큰으로 캡한다 — 리터럴 1440 을 다시 적지 않는다', () => {
+    expect(container).not.toContain('1440')
+    expect(rail).not.toContain('1440')
+  })
+
+  it('캡 규칙이 @media 밖 최상위에 있다', () => {
+    /*
+      헤더는 lg 미만에서도 이 클래스를 쓰고, 레일의 grid 선언만 lg 안에 남는다.
+      최상위 규칙은 들여쓰기가 0 이고 @media 안은 2 다 (prettier 가 강제한다).
+    */
+    expect(globals).toMatch(/^\.content-container\s*\{/m)
+    expect(globals).toMatch(/^\.rail-layout\s*\{/m)
+  })
+})
+
+describe('콘텐츠 컨테이너 — 문서 동기 (#376)', () => {
+  it('DESIGN.md §7 레이아웃 토큰 표에 --content-max 가 있다', () => {
+    expect(design).toContain('--content-max')
+  })
+
+  it('DESIGN.md 에 400 → 480 서술이 남아 있지 않다', () => {
+    expect(design).not.toContain('480(1584~)')
+    expect(design).not.toContain('좌측만 480까지')
+  })
+})
+
+/*
+  소스를 문자열로 읽어 본다 — `GlobalHeader` 는 client 자식(`NavLinks` · `AccountMenu` ·
+  `PetSwitcherSlot`)을 안고 있어 node 환경에서 통째로 렌더하려면 mock 이 여럿 필요하다.
+  여기서 지키려는 것은 렌더 결과가 아니라 **어느 요소가 캡을 갖는가** 하나다.
+  `token-usage.test.ts` 가 화면 코드를 문자열로 훑는 것과 같은 방식이다.
+*/
+function repoSource(relative: string): string {
+  return readFileSync(fileURLToPath(new URL(`../../${relative}`, import.meta.url)), 'utf8')
+}
+
+describe('콘텐츠 컨테이너 — 헤더 (#376)', () => {
+  const header = repoSource('src/features/nav/global-header.tsx')
+
+  it('바(<header>)는 캡하지 않는다 — 캡하면 border-b 가 화면 가운데서 끊긴다', () => {
+    const barClasses = header.match(/<header className="([^"]*)"/)?.[1]
+
+    expect(barClasses).toBeDefined()
+    expect(barClasses).not.toContain('content-container')
+  })
+
+  it('안쪽 div 가 content-container 를 쓴다', () => {
+    expect(header).toContain("'content-container")
+  })
+
+  /*
+    #386 — 헤더는 인셋 문자열을 다시 적지 않고 `INSET_CLASS.main` 을 참조한다.
+    다시 적어 두면 `inset.ts` 가 바뀌어도 헤더만 옛 값에 남아 왼쪽 기준선이 갈라진다.
+  */
+  it('인셋을 INSET_CLASS.main 으로 참조한다 — px-4 md:px-10 을 다시 적지 않는다', () => {
+    expect(header).toContain('INSET_CLASS.main')
+    expect(header).not.toMatch(/className="[^"]*px-4 md:px-10/)
+  })
+
+  it('Tailwind arbitrary 로 캡하지 않는다 — eslint noComplexArbitrary', () => {
+    expect(header).not.toContain('max-w-[var(')
+  })
+})
+
+/*
+  #1287 → #1300 — 지도 아일랜드 알약은 **콘텐츠 열의 오른쪽 끝 − 40** 에 매단다. 지도 조작 카드(#412)와 같은 기준이라
+  1920 에서 알약 · 카드 오른쪽 끝이 같은 x(1640)에 선다. 뷰포트 끝을 잡으면 243px 벌어진다. #1300 부터 그 자리는
+  JSX 열(`content-container`)이 아니라 허용 상자(`.island-bar`, `fixed`)의 CSS 가 갖는다 — 왼쪽도 지도 경계로 잡아야 해서다.
+*/
+describe('콘텐츠 컨테이너 — 지도 아일랜드 알약 (#1287 · #1300)', () => {
+  const island = repoSource('src/features/nav/island-header.tsx')
+  const bar = /(?:^|\n)\.island-bar\s*\{[^}]*\}/.exec(globals)?.[0] ?? ''
+
+  it('허용 상자 오른쪽이 --content-max 로 콘텐츠 열 끝 − 40 이다', () => {
+    expect(bar).toContain(
+      'inset-inline-end: max(40px, calc((100% - var(--content-max)) / 2 + 40px))',
+    )
+  })
+
+  it('바(<header>)는 캡하지 않는다 — 전폭 fixed 줄이다', () => {
+    const barClasses = island.match(/<header className="([^"]*)"/)?.[1]
+
+    expect(barClasses).toBeDefined()
+    expect(barClasses).not.toContain('content-container')
+  })
+})
+
+describe('콘텐츠 컨테이너 — 레일 밖 형제 (#376)', () => {
+  it('장소 상세의 폐업 안내가 컨테이너에 가입한다', () => {
+    const section = repoSource('src/features/place/place-detail-section.tsx')
+    const notice = section.match(/function DelistedNotice\(\)[\s\S]{0,200}/)?.[0]
+
+    expect(notice).toBeDefined()
+    expect(notice).toContain('content-container')
+  })
+})

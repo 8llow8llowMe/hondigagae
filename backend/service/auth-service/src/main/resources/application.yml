@@ -1,0 +1,73 @@
+spring:
+  application:
+    name: ${SPRING_APPLICATION_NAME:auth-service}
+  config:
+    import: optional:classpath:observability-common.yml
+  profiles:
+    active: local
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            # 기본 read timeout 60초는 장애 전파에 취약하므로 공통 타임아웃을 명시한다.
+            # 반려견 삭제 응답이 plan-service 를 기다리는 최대 시간이기도 하다 (#972).
+            connectTimeout: ${INTERNAL_CLIENT_CONNECT_TIMEOUT_MS:2000}
+            readTimeout: ${INTERNAL_CLIENT_READ_TIMEOUT_MS:5000}
+  servlet:
+    multipart:
+      # 업로드 상한. 스토리지 자체 검증(infra.storage.max-file-bytes)과 함께 2중으로 막는다.
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:5MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:30MB}
+
+infra:
+  redis:
+    key-prefix: ${REDIS_KEY_PREFIX:hondigagae}
+
+# 일반 로그인 brute-force 방어. 프로필별 override 가 없어도 동작하도록 공통 기본값을 둔다.
+auth:
+  login:
+    max-failure-count: ${AUTH_LOGIN_MAX_FAILURE_COUNT:5}
+    lock-duration: ${AUTH_LOGIN_LOCK_DURATION:PT10M}
+  # 인증 메일 발신자 표시·로고 (#1062). 전부 선택 — 비면 "혼디가개" / SMTP 계정 주소 / 인라인(CID) 로크업 로고.
+  # 프로필 yml 의 auth: 블록은 키 단위로 병합되므로 여기 한 곳에 두면 모든 프로필에 적용된다.
+  mail:
+    from-name: ${MAIL_FROM_NAME:혼디가개}
+    from-address: ${MAIL_FROM_ADDRESS:}
+    logo-url: ${MAIL_LOGO_URL:}
+
+logging:
+  level:
+    # Eureka 클라이언트가 주기적으로 Eureka 서버 엔드포인트를 확인할 때 출력하는 반복 로그를 줄이기 위한 설정
+    com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
+
+# 소셜 로그인 provider(OAuth) 호출과 plan-service 내부 호출 서킷브레이커.
+# 4xx(인가코드 만료·재사용 등 사용자 조작 문제)는 OAuthApiCallSupport가 서킷 안에서
+# AuthException으로 변환하므로, ignore 처리해 provider 장애로 집계하지 않는다.
+# plan-service 호출(#972)은 서킷이 Feign 호출만 감싸고 도메인 예외 변환은 서킷 밖(PetInternalResponseSupport)에서
+# 일어나므로, 서킷을 실제로 통과하는 4xx 는 FeignClientException 으로 제외한다 - plan-service yml 과 같은 이유다.
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 5s
+        slow-call-rate-threshold: 80
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - com.hondigagae.domainlayer.auth.application.exception.AuthException
+          - com.hondigagae.domainlayer.pet.application.exception.PetException
+          - feign.FeignException$FeignClientException
+    instances:
+      kakao:
+        base-config: default
+      naver:
+        base-config: default
+      # 반려견 삭제 직후 동행 목록 대사 트리거(내부 경로). 실패해도 삭제는 성공하고 04:10 배치가 이어받는다.
+      plan-service:
+        base-config: default

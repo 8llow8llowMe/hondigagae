@@ -1,0 +1,51 @@
+server:
+  port: 8083
+  shutdown: graceful
+
+spring:
+  cloud:
+    config:
+      enabled: false  # 로컬에서만 Config Server 비활성화
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/hondigagae?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul&zeroDateTimeBehavior=convertToNull&rewriteBatchedStatements=true
+    username: ${DB_USERNAME:hondigagae}
+    password: ${DB_PASSWORD:hondigagae123!}
+
+  jpa:
+    open-in-view: false
+    defer-datasource-initialization: true
+    generate-ddl: true
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        show_sql: true
+        jdbc:
+          batch_size: 100
+        default_batch_fetch_size: 100
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+
+snowflake:
+  datacenter-id: 1
+  worker-id: 3
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+
+# Resource Server 검증 키. 바인딩 prefix는 app.security.jwt.resource 이므로
+# auth-service 의 jwt.access-key 와 이름이 다르지만 값은 반드시 동일해야 한다.
+# 이 값이 없으면 jwtDecoder 생성 시 NPE로 기동에 실패한다.
+app:
+  security:
+    jwt:
+      resource:
+        access-key: ${JWT_ACCESS_KEY:hondigagae-local-jwt-access-key-0123456789abcdef0123456789abcdef0123456789abcdef}

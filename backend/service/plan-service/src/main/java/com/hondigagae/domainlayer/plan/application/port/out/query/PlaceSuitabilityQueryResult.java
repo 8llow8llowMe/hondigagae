@@ -1,0 +1,63 @@
+package com.hondigagae.domainlayer.plan.application.port.out.query;
+
+import java.time.LocalDate;
+import java.util.List;
+import lombok.Builder;
+
+/**
+ * tour-service 가 산출한 적합도 결과.
+ *
+ * <p>이 서비스는 점수를 <b>다시 계산하지 않는다.</b> 판정 규칙의 소유자는 tour-service 이고,
+ * 같은 규칙을 두 곳에서 구현하면 일정 화면과 장소 화면이 같은 날 같은 곳을 다르게 말하게 된다.
+ * 여기서는 받아서 옮기기만 한다.
+ *
+ * @param levelScoreDescription 등급 점수 해석 문장. 등급 설명({@code levelDescription})과 다르다 —
+ *                              이쪽은 "점수가 높을수록 …" 처럼 점수를 어떻게 읽어야 하는지를
+ *                              말한다. 원천이 주는 값을 그대로 옮긴다 (#759)
+ */
+@Builder
+public record PlaceSuitabilityQueryResult(
+    long placeId,
+    String placeTitle,
+    LocalDate targetDate,
+    // null 이면 판단 근거가 없다는 뜻이다. 0 으로 바꾸지 않는다.
+    Integer score,
+    String levelCode,
+    String levelName,
+    String levelDescription,
+    String levelScoreDescription,
+    List<ReasonQueryResult> reasons,
+    DailyWeatherQueryResult weather,
+    List<AlternativeQueryResult> indoorAlternatives,
+    boolean weatherApplied,
+    boolean congestionApplied
+) {
+
+    public record ReasonQueryResult(String code, String name, String description, int scoreDelta) {
+
+    }
+
+    public record DailyWeatherQueryResult(
+        LocalDate date,
+        // 단기/중기 구분. 사용자가 신뢰도를 알아야 한다.
+        String forecastSourceCode,
+        String forecastSourceName,
+        Double minTemperature,
+        Double maxTemperature,
+        Integer maxPrecipitationProbability,
+        String precipitationTypeName,
+        String skyStateName,
+        Double maxWindSpeed,
+        Integer maxHumidity,
+        // 하루 최고 체감온도(열지수). 중기예보는 null. 계산은 tour-service 가 한다 — 여기서 다시 내지 않는다.
+        Double maxFeelsLikeTemperature
+    ) {
+
+    }
+
+    public record AlternativeQueryResult(
+        long placeId, String title, double lat, double lng, int distanceMeters
+    ) {
+
+    }
+}

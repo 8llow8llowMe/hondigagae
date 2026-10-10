@@ -1,0 +1,962 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+
+import { describe, expect, it } from 'vitest'
+
+import type { PlaceCongestionPanelProps } from '@/features/place/place-congestion-panel'
+import type { PlaceDetailActions } from '@/features/place/place-detail-action-bar'
+import {
+  PlaceDetailSection,
+  type PlaceDetailSectionProps,
+} from '@/features/place/place-detail-section'
+import type { PlaceSuitabilityPanelProps } from '@/features/place/place-suitability-panel'
+import type { PlaceWalkSafetyPanelProps } from '@/features/place/place-walk-safety-panel'
+import { CONGESTION_DEFAULT_DAYS } from '@/lib/insight/congestion'
+import { messages } from '@/lib/messages'
+import {
+  congestion as congestionFixture,
+  suitability as suitabilityFixture,
+  walkSafety as walkSafetyFixture,
+} from '@/test/fixtures/insight'
+import {
+  placeDetail,
+  placeDetailDelisted,
+  placeDetailFromTourApi,
+  placeDetailWithoutOptionalSections,
+} from '@/test/fixtures/place'
+import type { PlaceDetail } from '@/types/place'
+
+/** 판정이 이미 도착한 상태. 판정 분기 자체는 `place-suitability-panel.test.ts` 가 본다 */
+const suitability: PlaceSuitabilityPanelProps = {
+  data: suitabilityFixture,
+  loading: false,
+  failed: false,
+  onRetry: () => undefined,
+  petName: '몽실이',
+  authed: true,
+}
+
+/** 산책 위험도도 도착한 상태. 분기 자체는 `place-walk-safety-panel.test.ts` 가 본다 */
+const walkSafety: PlaceWalkSafetyPanelProps = {
+  data: walkSafetyFixture,
+  loading: false,
+  failed: false,
+  onRetry: () => undefined,
+  petName: '몽실이',
+}
+
+/** 기간 혼잡도도 도착한 상태 (#430). 분기는 `place-congestion-panel.test.ts` 가 본다 */
+const congestion: PlaceCongestionPanelProps = {
+  data: congestionFixture,
+  loading: false,
+  failed: false,
+  onRetry: () => undefined,
+  days: CONGESTION_DEFAULT_DAYS,
+  onDaysChange: () => undefined,
+}
+
+/** 하단 바의 기본 상태 — 로그인 · 미저장 · 아직 담지 않음 */
+const actions: PlaceDetailActions = {
+  authed: true,
+  saved: false,
+  savePending: false,
+  saveError: null,
+  onToggleSave: () => undefined,
+  added: false,
+  onAddToPlan: () => undefined,
+  onLogin: () => undefined,
+  delisted: false,
+}
+
+function render(overrides: Partial<PlaceDetailSectionProps> = {}) {
+  const props: PlaceDetailSectionProps = {
+    place: placeDetail,
+    loading: false,
+    errorStatus: null,
+    onRetry: () => undefined,
+    suitability,
+    walkSafety,
+    congestion,
+    petName: '몽실이',
+    petSizeCode: 'SMALL',
+    petSizeName: '소형견',
+    actions,
+    ...overrides,
+  }
+
+  return renderToStaticMarkup(createElement(PlaceDetailSection, props))
+}
+
+describe('PlaceDetailSection — 상태 배타성', () => {
+  it('로딩 중에는 skeleton 만 보이고 본문이 함께 나오지 않는다', () => {
+    const markup = render({ loading: true })
+
+    expect(markup).toContain('animate-pulse')
+    expect(markup).not.toContain(placeDetail.title)
+    expect(markup).not.toContain(messages.common.retry)
+  })
+
+  it('성공 시 장소명과 기본 정보를 렌더한다', () => {
+    const markup = render()
+
+    expect(markup).toContain(placeDetail.title)
+    expect(markup).toContain('제주특별자치도 제주시 한림읍 용금로 906-107')
+    expect(markup).not.toContain(messages.common.retry)
+  })
+})
+
+/*
+  **진단 D-2 의 바로 그 배지다.** 390 실측에서 이름 옆 `보통`(적합도)과 혼잡도 카드의
+  `보통`(혼잡도)이 문구·폭 38.74px·tint·글자색까지 같았고, 두 배지를 가르는 단서가 화면에
+  없었다. 이 절이 그 회귀를 잠근다 (#652 · 등급배지-축라벨-세부명세 D5).
+*/
+describe('PlaceDetailSection — 이름 옆 등급 배지가 축을 밝힌다 (#652)', () => {
+  it('제목 옆 배지가 적합도 축임을 말한다', () => {
+    const markup = render()
+    const axis = messages.common.metricAxisSuitability
+
+    /*
+      **마크업 전체에서 `적합도` 를 찾지 않는다** — 같은 화면의 판정 패널·요약 줄이 그 낱말을
+      이미 쓸 수 있어 배지에서 축이 사라져도 통과한다. `<h1>` 부터 그 다음 닫는 태그까지로
+      범위를 좁힌다 (testing-guide.md §5).
+    */
+    const nameRow = markup.slice(markup.indexOf('<h1'), markup.indexOf('</header>'))
+
+    expect(nameRow).toContain(`>${axis} </span>`)
+    expect(nameRow).toContain(`</span>${suitabilityFixture.suitabilityLevel.name}</span>`)
+  })
+
+  /* 등급어는 서버 값 그대로다 — 축 라벨을 붙이는 것이 어휘를 다시 쓰는 일이 되면 안 된다 */
+  it('축 라벨을 붙여도 등급어는 서버 name 그대로다', () => {
+    const markup = render()
+
+    expect(markup).toContain(suitabilityFixture.suitabilityLevel.name)
+    expect(markup).not.toContain(
+      `${messages.common.metricAxisSuitability} ${suitabilityFixture.suitabilityLevel.name}`,
+    )
+  })
+
+  /* 속성 배지는 등급이 아니다 — 문구가 스스로 무엇인지 말하므로 접두어를 붙이지 않는다 */
+  it('실내 여부 미확인 배지에는 축 라벨을 붙이지 않는다', () => {
+    const markup = render({ place: { ...placeDetail, indoor: null } })
+    const badge = markup.slice(
+      markup.indexOf(messages.place.rowIndoorUnknown) - 200,
+      markup.indexOf(messages.place.rowIndoorUnknown),
+    )
+
+    expect(markup).toContain(messages.place.rowIndoorUnknown)
+    expect(badge).not.toContain(`>${messages.common.metricAxisSuitability} </span>`)
+    expect(badge).not.toContain(`>${messages.common.metricAxisCongestion} </span>`)
+  })
+})
+
+describe('PlaceDetailSection — 에러 분기', () => {
+  it('데이터 부재(404)에서는 재시도 버튼을 노출하지 않는다', () => {
+    const markup = render({ place: null, errorStatus: 404 })
+
+    expect(markup).not.toContain(messages.common.retry)
+    expect(markup).toContain(messages.place.backToList)
+  })
+
+  it('데이터 부재(404)에서는 서버 resultMessage 를 그대로 노출한다', () => {
+    const markup = render({
+      place: null,
+      errorStatus: 404,
+      errorMessage: '존재하지 않는 장소입니다.',
+    })
+
+    expect(markup).toContain('존재하지 않는 장소입니다.')
+  })
+
+  it('resultMessage 가 문자열이 아니면 기본 문구로 대체한다', () => {
+    const markup = render({ place: null, errorStatus: 404, errorMessage: { placeId: '형식 오류' } })
+
+    expect(markup).toContain(messages.place.detailNotFoundTitle)
+    expect(markup).not.toContain('[object Object]')
+  })
+
+  it('일시 장애(5xx)에서는 재시도 버튼을 노출한다', () => {
+    const markup = render({ place: null, errorStatus: 503 })
+
+    expect(markup).toContain(messages.common.retry)
+    expect(markup).toContain(messages.place.detailErrorTitle)
+  })
+
+  it('무응답(status 0)도 일시 장애로 처리해 재시도를 제공한다', () => {
+    expect(render({ place: null, errorStatus: 0 })).toContain(messages.common.retry)
+  })
+
+  it('입력 오류(400)에서는 재시도 대신 목록으로 안내한다 — 같은 주소는 다시 불러도 400 이다', () => {
+    const markup = render({ place: null, errorStatus: 400 })
+
+    expect(markup).toContain(messages.common.validationErrorTitle)
+    expect(markup).toContain(messages.place.backToList)
+    expect(markup).not.toContain(messages.common.retry)
+  })
+})
+
+describe('PlaceDetailSection — nullable 섹션은 숨긴다', () => {
+  it('intro / images / overview 가 없으면 해당 묶음이 렌더되지 않는다', () => {
+    const markup = render({ place: placeDetailWithoutOptionalSections })
+
+    expect(markup).not.toContain(messages.place.detailSectionIntro)
+    // 소개는 제목 카드 안 문단이라 절 이름이 없다 — 본문 자체가 없는지로 본다
+    expect(placeDetailWithoutOptionalSections.overview).toBeNull()
+    expect(render()).toContain('제주 자연을 그대로 살린 공간이다.')
+    expect(markup).not.toContain('제주 자연을 그대로 살린 공간이다.')
+  })
+
+  it('petInfo 가 없어도 반려견 동반 정보 섹션은 숨기지 않는다 (아트보드 04-①)', () => {
+    const markup = render({ place: placeDetailWithoutOptionalSections })
+
+    // 동반 여부는 이 서비스의 핵심 질문이다. 섹션이 사라지면 "확인해 봤는데 없더라" 와
+    // "확인조차 안 했다" 를 구분할 수 없다 — 대신 없는 것이 무엇인지 드러내고 전화로 안내한다.
+    //
+    // **이 픽스처는 `petAllowanceType` 이 `PARTIALLY_ALLOWED` 다.** 즉 동반 여부는
+    // 등록돼 있고 세부 조건만 없는 상태라, "동반 가능 여부가 등록되지 않았어요" 라고
+    // 말하면 제목 옆 배지와 다른 말을 한다. `UNKNOWN` 갈래는 place-pet-info.test.ts 가 잠근다.
+    expect(markup).toContain(messages.place.detailSectionPet)
+    expect(markup).toContain(placeDetailWithoutOptionalSections.petAllowanceType.description)
+    expect(markup).toContain(messages.place.detailPetInfoDetailsMissingText)
+    expect(markup).not.toContain(messages.place.detailPetInfoEmptyText)
+  })
+
+  it('결합 데이터가 없어도 에러가 아니라 장소명이 그대로 보인다', () => {
+    const markup = render({ place: placeDetailWithoutOptionalSections })
+
+    expect(markup).toContain(placeDetailWithoutOptionalSections.title)
+    expect(markup).not.toContain(messages.common.retry)
+  })
+
+  it('intro 객체는 있지만 내부 값이 전부 없으면 섹션을 만들지 않는다', () => {
+    const markup = render({
+      place: {
+        ...placeDetail,
+        intro: {
+          infoCenter: null,
+          useTime: null,
+          open24: null,
+          openNow: null,
+          restDate: null,
+          parking: null,
+          chkPet: null,
+          chkBabyCarriage: null,
+          chkCreditCard: null,
+        },
+      },
+    })
+
+    expect(markup).not.toContain(messages.place.detailSectionIntro)
+  })
+
+  it('주소가 없으면 주소 줄을 렌더하지 않는다', () => {
+    const markup = render({ place: { ...placeDetail, addr1: null, addr2: null } })
+
+    expect(markup).not.toContain(messages.place.detailAddress)
+  })
+
+  it('홈페이지 원문이 링크로 볼 수 없는 값이면 줄을 렌더하지 않는다', () => {
+    const markup = render({ place: { ...placeDetail, homepage: '전화로 문의해 주세요' } })
+
+    expect(markup).not.toContain(messages.place.detailHomepage)
+  })
+
+  it('저작권 코드도 출처명도 없으면 출처 줄을 숨긴다', () => {
+    const markup = render({ place: { ...placeDetail, cpyrhtDivCd: null, sourceName: null } })
+
+    expect(markup).not.toContain(messages.place.detailCopyrightPrefix)
+    expect(markup).not.toContain('정보 출처')
+  })
+
+  it('분류가 없으면 분류 줄을 렌더하지 않는다', () => {
+    const markup = render({ place: { ...placeDetail, sourceCategory: null } })
+
+    expect(markup).not.toContain(messages.place.detailSourceCategory)
+  })
+})
+
+describe('PlaceDetailSection — 실내 여부 (#112)', () => {
+  it('메타 줄에 실내 낱말을 붙인다', () => {
+    expect(render()).toContain(`문화시설 · ${messages.place.rowIndoor}`)
+  })
+
+  it('야외면 야외라고 쓴다 — 서버 값을 그대로 옮긴다', () => {
+    const markup = render({ place: { ...placeDetail, indoor: false } })
+
+    expect(markup).toContain(`문화시설 · ${messages.place.rowOutdoor}`)
+  })
+
+  it('모르면 메타 줄에서 빼고 "미확인" 배지로 드러낸다 — 야외라고 단정하지 않는다', () => {
+    const markup = render({ place: { ...placeDetail, indoor: null } })
+
+    expect(markup).not.toContain(`문화시설 · ${messages.place.rowOutdoor}`)
+    // 숨기면 실내 필터에서 이 장소가 왜 사라지는지 설명할 길이 없다 (목록 행과 같은 처리)
+    expect(markup).toContain(messages.place.rowIndoorUnknown)
+  })
+
+  it('실내 여부를 알면 미확인 배지를 붙이지 않는다', () => {
+    expect(render()).not.toContain(messages.place.rowIndoorUnknown)
+  })
+})
+
+describe('PlaceDetailSection — 분류와 정보 출처 (#112)', () => {
+  it('원천이 준 분류를 기본 정보에 낸다 — contentType 으로는 카페·펜션이 갈리지 않는다', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.place.detailSourceCategory)
+    expect(markup).toContain('미술관')
+  })
+
+  it('저작권 코드가 없는 원천은 sourceName 으로 출처를 밝힌다 — 그전에는 줄이 없었다', () => {
+    const markup = render({ place: { ...placeDetail, cpyrhtDivCd: null } })
+
+    expect(markup).toContain('정보 출처: 문화정보원')
+  })
+
+  it('저작권 코드가 있으면 기관명과 유형을 쓰고 sourceName 을 겹쳐 쓰지 않는다 (D5-2)', () => {
+    // 공공누리 출처 표시 의무는 기관명(한국관광공사)이어야 성립한다 —
+    // sourceName 의 "관광정보 API" 로 바꾸면 표기 의무를 만족하지 못한다
+    const markup = render({ place: placeDetailFromTourApi })
+
+    expect(markup).toContain(messages.place.detailCopyrightPrefix)
+    expect(markup).toContain(messages.place.detailCopyrightType1)
+    expect(markup).not.toContain('정보 출처: 관광정보 API')
+  })
+
+  it('출처명이 공백뿐이면 줄을 만들지 않는다', () => {
+    const markup = render({ place: { ...placeDetail, cpyrhtDivCd: null, sourceName: '   ' } })
+
+    expect(markup).not.toContain('정보 출처')
+  })
+})
+
+describe('PlaceDetailSection — 서버 문구를 그대로 쓴다', () => {
+  it('enum metadata 의 name 을 렌더한다', () => {
+    const markup = render()
+
+    expect(markup).toContain(placeDetail.contentType.name)
+    expect(markup).toContain(placeDetail.petAllowanceType.name)
+    expect(markup).toContain(placeDetail.petInfo?.allowedPetSize.name ?? '')
+    // 동반 가능 구역은 배지가 아니라 조건 문장으로 들어간다 — 서버 description 그대로다
+    expect(markup).toContain(placeDetail.petInfo?.allowanceScope.description ?? '')
+  })
+
+  it('모르는 petAllowanceType code 에서도 화면이 비지 않는다', () => {
+    const markup = render({
+      place: {
+        ...placeDetail,
+        petAllowanceType: { code: 'BRAND_NEW_CODE', name: '새 등급', description: null },
+      },
+    })
+
+    expect(markup).toContain('새 등급')
+    expect(markup).toContain(placeDetail.title)
+  })
+})
+
+/*
+  #530 — 헤더의 동반 배지가 서버 `name` 그대로 `정보 없음` 이라, `중소형견 가능` ·
+  `목줄 필요` 옆에서 **무엇의 정보가 없다는 것인지** 말하지 않는 배지가 됐다.
+  목록 행 · 홈 행과 같은 처리다 (`place-row.tsx` 의 `PlaceBadges` 주석이 근거다).
+
+  **#1226 이후 머리에는 어떤 code 에서도 동반 배지가 없다** (아래 #1226 describe 가 잠근다).
+  여기 남은 것은 `UNKNOWN` 이어도 동반 절이 사라지지 않는다는 것이다.
+*/
+describe('PlaceDetailSection — 동반 정보 없음 (#530)', () => {
+  const unknown: PlaceDetail = {
+    ...placeDetail,
+    petAllowanceType: { code: 'UNKNOWN', name: '동반 정보 없음', description: null },
+  }
+
+  /*
+    **동반 조건을 감추는 것이 아니다.** 아래 `반려견 동반` 섹션이 같은 `allowance` 를
+    받아 문장으로 말한다 (`place-pet-info.tsx`) — 헤더에서 뺀 것은 배지 한 칸뿐이다.
+  */
+  it('동반 섹션은 그대로 남는다', () => {
+    const markup = render({ place: unknown })
+
+    expect(markup).toContain(messages.place.detailSectionPet)
+    expect(markup).toContain(placeDetail.petInfo?.allowedPetSize.description ?? '')
+  })
+})
+
+/*
+  #1226 — #1066 이 `lg` 미만에서 걷은 동반 칩을 `lg` 부터도 걷는다. 데스크톱은 칩 바로 아래
+  `반려견 동반 정보` 절이 같은 사실을 문장으로 말했다. 머리에는 실내 `모름` 배지만 남는다.
+*/
+describe('PlaceDetailSection — 머리는 동반을 말하지 않는다 (#1226)', () => {
+  /** 머리(`<header>`)만 떼어 본다 — 동반 문구는 아래 체크리스트에도 있다 */
+  function header(markup: string): string {
+    return markup.slice(markup.indexOf('<header'), markup.indexOf('</header>'))
+  }
+
+  it('동반 등급 · 허용 크기 칩을 어느 폭에서도 그리지 않는다', () => {
+    const head = header(render())
+
+    expect(head).not.toContain(placeDetail.petAllowanceType.name)
+    expect(head).not.toContain(placeDetail.petInfo?.allowedPetSize.name ?? '')
+    expect(head).not.toContain('lg:contents')
+  })
+
+  it('실내 여부를 모르면 모름 배지가 서고, 동반 칩은 여전히 없다', () => {
+    const head = header(render({ place: { ...placeDetail, indoor: null } }))
+
+    expect(head).toContain(messages.place.rowIndoorUnknown)
+    expect(head).not.toContain(placeDetail.petAllowanceType.name)
+  })
+
+  it('실내 여부를 알면 태그 줄을 만들지 않는다 — 빈 줄이 gap 을 먹는다', () => {
+    const head = header(render({ place: { ...placeDetail, indoor: true } }))
+
+    expect(head).not.toContain(messages.place.rowIndoorUnknown)
+    // 배지를 감싸는 줄 자체가 없어야 한다 — 빈 `div` 가 머리의 `gap-3` 을 한 번 더 먹는다
+    expect(head).not.toContain('<div class="flex">')
+  })
+
+  it('목줄은 체크리스트 줄로 옮겨 간다 — 칩을 걷어도 사라지지 않는다', () => {
+    const petInfo = placeDetail.petInfo
+    if (petInfo === null) throw new Error('fixture 에 petInfo 가 있어야 한다')
+
+    const required = render({
+      place: { ...placeDetail, petInfo: { ...petInfo, leashRequired: true } },
+    })
+    const notRequired = render({
+      place: { ...placeDetail, petInfo: { ...petInfo, leashRequired: false } },
+    })
+
+    expect(required).toContain(messages.place.detailPetLeashRequired)
+    expect(notRequired).not.toContain(messages.place.detailPetLeashRequired)
+  })
+})
+
+describe('PlaceDetailSection — 방문 핵심 줄 (#1226)', () => {
+  function header(markup: string): string {
+    return markup.slice(markup.indexOf('<header'), markup.indexOf('</header>'))
+  }
+
+  it('제목 머리 안에 전화 · 길찾기를 세운다', () => {
+    const head = header(render({ place: { ...placeDetail, tel: '064-710-6043' } }))
+
+    expect(head).toContain('tel:0647106043')
+    expect(head).toContain(messages.map.directions)
+  })
+
+  /*
+    동반 정보가 비면 절이 `방문 전 전화로 확인해 주세요` 라고 말한다. 예전에는 그 아래 `{tel} 전화`
+    링크가 따로 서서 핵심 줄과 같은 카드에 번호가 두 번 섰다. 이제 전화는 핵심 줄 · 방문 정보 카드
+    두 곳뿐이다.
+  */
+  it('동반 정보가 비어도 전화 링크는 핵심 줄 · 방문 정보 두 곳뿐이다', () => {
+    const markup = render({ place: { ...placeDetail, petInfo: null, tel: '064-710-6043' } })
+
+    expect(markup.match(/href="tel:0647106043"/g)).toHaveLength(2)
+  })
+
+  it('판정이 없으면 운영시간 원문 첫 줄을 쓴다', () => {
+    const intro = placeDetail.intro
+    if (intro === null) throw new Error('fixture 에 intro 가 있어야 한다')
+
+    const head = header(
+      render({
+        place: {
+          ...placeDetail,
+          intro: { ...intro, openNow: null, open24: false, useTime: '상시 개방' },
+        },
+      }),
+    )
+
+    expect(head).toContain('상시 개방')
+  })
+})
+
+describe('PlaceDetailSection — 분류 낱말뿐인 소개는 그리지 않는다 (#1226 · #1216)', () => {
+  /* 소개가 없는 장소와 **같은 마크업**이어야 한다 — 낱말 하나짜리 절이 남지 않는다 */
+  it('개요가 분류명과 같으면 소개가 없는 장소와 같다', () => {
+    const word = render({ place: { ...placeDetail, overview: placeDetail.contentType.name } })
+
+    expect(word).toBe(render({ place: { ...placeDetail, overview: null } }))
+  })
+
+  it('원천 분류와 같아도 같다', () => {
+    const place = { ...placeDetail, sourceCategory: '박물관' }
+
+    expect(render({ place: { ...place, overview: '박물관' } })).toBe(
+      render({ place: { ...place, overview: null } }),
+    )
+  })
+
+  it('분류 낱말이 섞인 문장은 그대로 그린다', () => {
+    expect(render({ place: { ...placeDetail, overview: '바다를 낀 관광지' } })).toContain(
+      '바다를 낀 관광지',
+    )
+  })
+})
+
+describe('PlaceDetailSection — 외부 원문 처리', () => {
+  it('개요의 br 태그를 개행으로 바꿔 평문으로 렌더한다', () => {
+    const markup = render()
+
+    expect(markup).toContain('제주 자연을 그대로 살린 공간이다.')
+    expect(markup).not.toContain('&lt;br&gt;')
+  })
+
+  it('홈페이지 anchor 원문에서 href 만 뽑아 새 탭 링크로 만든다', () => {
+    const markup = render()
+
+    expect(markup).toContain('href="https://www.visitjeju.net/kr"')
+    expect(markup).toContain('rel="noopener noreferrer"')
+  })
+
+  it('javascript 스킴 홈페이지는 링크로 만들지 않는다', () => {
+    const markup = render({
+      place: { ...placeDetail, homepage: '<a href="javascript:alert(1)">클릭</a>' },
+    })
+
+    expect(markup).not.toContain('javascript:alert(1)')
+    expect(markup).not.toContain(messages.place.detailHomepage)
+  })
+
+  it('사진이 없으면 카테고리 일러스트로 자리를 채운다 (DESIGN.md §7-3)', () => {
+    // fixture 의 contentType 은 CULTURE — 일러스트 자산이 있는 코드다
+    const markup = render({ place: { ...placeDetail, images: [], firstImage: null } })
+
+    expect(markup).toContain('/illustrations/place-culture.webp')
+    // 없애려던 것은 자리가 아니라 **회색 벽**이었다. 그것은 여전히 그리지 않는다
+    expect(markup).not.toContain(messages.place.noImage)
+    // 일러스트는 한국관광공사가 준 사진이 아니다 — 사진 출처를 달지 않는다
+    expect(markup).not.toContain(messages.place.photoSource)
+    expect(markup).toContain(placeDetail.title)
+  })
+
+  it('사진이 있으면 갤러리 바로 아래에 사진 출처를 붙인다', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.place.photoSource)
+  })
+
+  it('전폭 히어로를 쓰지 않는다 — 표시 폭에 상한이 있다', () => {
+    const markup = render()
+
+    // 전폭으로 늘리지 않는다 — 표시 폭이 토큰 상한에 묶여 있다.
+    // 장수별 분기는 photo-gallery.test.ts 가 본다.
+    expect(markup).not.toContain('aspect-video')
+    expect(markup).toContain('--gallery-w-mobile')
+  })
+})
+
+describe('PlaceDetailSection — 모바일 하단 바의 바닥 오프셋', () => {
+  /**
+   * 바는 `lg` 미만에서 보이지만 그것이 비켜야 할 **고정 탭바는 `md:hidden`** 이다.
+   * 두 breakpoint 를 같은 값으로 묶어 `bottom-16` 만 두었더니 768~1023 에서 바가
+   * 바닥에서 64px 떠 그 아래로 본문이 비쳤다(실측: 900×800).
+   */
+  it('탭바가 사라지는 md 부터는 바닥에 붙는다', () => {
+    const markup = render()
+
+    expect(markup).toContain('bottom-16')
+    expect(markup).toContain('md:bottom-0')
+  })
+})
+
+describe('원천에서 사라진 장소 — 안내를 먼저 보여 준다 (#146)', () => {
+  it('delisted 면 제목·설명이 함께 나온다', () => {
+    const markup = render({ place: placeDetailDelisted })
+
+    expect(markup).toContain(messages.place.detailDelistedTitle)
+    expect(markup).toContain(messages.place.detailDelistedDescription)
+  })
+
+  it('delisted 여도 상세 정보는 그대로 남는다 — 200 응답이라 빈 화면이 아니다', () => {
+    const markup = render({ place: placeDetailDelisted })
+
+    expect(markup).toContain(placeDetailDelisted.title)
+    expect(markup).toContain(messages.place.detailSectionVisit)
+  })
+
+  it('평소에는 안내가 없다', () => {
+    expect(render()).not.toContain(messages.place.detailDelistedTitle)
+  })
+
+  it('404 는 이 경로가 아니다 — 없는 장소는 빈 화면으로 간다', () => {
+    const markup = render({ place: null, errorStatus: 404 })
+
+    expect(markup).not.toContain(messages.place.detailDelistedTitle)
+    expect(markup).toContain(messages.place.detailNotFoundDescription)
+  })
+})
+
+/*
+  모바일 섹션 순서를 고정한다 — **DOM 순서 = 모바일 순서**다.
+
+  **DOM 순서 하나로 두 폭을 만든다.** 데스크톱은 grid 가 판정을 좌측 열로 보내지만
+  (`.rail-layout-detail-head`), 모바일은 이 순서 그대로 쌓인다. 그래서 여기서 순서가
+  뒤집히면 모바일이 곧바로 회귀한다 — 트리를 폭마다 나누면 스크린리더가 같은 내용을 두 번 읽는다.
+
+  **#909 가 판정을 갤러리·제목 바로 뒤로 올렸고**, 제안 A(#935)가 반려견 동반을 제목
+  카드 안으로 올렸다. 지금은 갤러리 → 제목 → 반려견 동반 → 판정 → 혼잡도 → 방문 정보다.
+*/
+describe('PlaceDetailSection — 모바일 섹션 순서 (#909 · 제안 A)', () => {
+  function positions() {
+    const markup = render()
+    return {
+      title: markup.indexOf(placeDetail.title),
+      pet: markup.indexOf(messages.place.detailSectionPet),
+      // 판정 패널의 첫 줄 — `{name}에게 적합해요` (`place-suitability-panel.tsx`)
+      verdict: markup.indexOf(messages.place.detailSuitabilitySpeaker.replace('{name}', '몽실이')),
+      congestion: markup.indexOf(messages.place.detailCongestionTitle),
+      visit: markup.indexOf(messages.place.detailSectionVisit),
+    }
+  }
+
+  it('모든 표지를 찾는다 — 못 찾으면 -1 이라 아래 비교가 아무것도 증명하지 못한다', () => {
+    for (const [name, at] of Object.entries(positions())) {
+      expect(at, name).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  /* "데려가도 되나" 가 이 서비스의 첫 질문이다 — 예전에는 다섯 번째 카드였다 */
+  it('반려견 동반이 제목 다음, 판정보다 먼저 온다', () => {
+    const { title, pet, verdict } = positions()
+
+    expect(pet).toBeGreaterThan(title)
+    expect(pet).toBeLessThan(verdict)
+  })
+
+  it('판정이 혼잡도보다 먼저 온다', () => {
+    const { verdict, congestion } = positions()
+
+    expect(verdict).toBeLessThan(congestion)
+  })
+
+  /*
+    **혼잡도가 방문 정보보다 앞이다** (#603) — "지금"(판정) → "언제"(혼잡도) → "가려면"
+    (방문 정보) 순이다.
+  */
+  it('혼잡도가 판정과 방문 정보 사이에 선다', () => {
+    const { verdict, congestion, visit } = positions()
+
+    expect(congestion).toBeGreaterThan(verdict)
+    expect(congestion).toBeLessThan(visit)
+  })
+
+  /*
+    **판정 레일이 우측 블록 사이에 있어야 grid 가 두 행으로 나눈다.** 레일이 앞이나 끝으로
+    가면 데스크톱에서 우측 블록이 행을 잘못 잡는다 — 클래스 순서로 잠근다.
+  */
+  it('스택이 본문 · 레일 · 본문 순이고 행 변형을 쓴다', () => {
+    const markup = render()
+
+    expect(markup).toContain('rail-layout rail-layout-detail rail-layout-detail-head')
+    const stacks = [
+      ...markup.matchAll(
+        /class="flex flex-col gap-2 md:gap-6 md:p-6 (rail-detail-(?:main|aside))/g,
+      ),
+    ].map((match) => match[1])
+    expect(stacks).toEqual(['rail-detail-main', 'rail-detail-aside', 'rail-detail-main'])
+  })
+
+  it('좌표가 있으면 방문 정보 안에 길찾기가 함께 선다 (#14)', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.map.directions)
+    // 제목 머리의 방문 핵심 줄(#1226)에도 길찾기가 있다 — 방문 정보 쪽은 마지막 것이다
+    expect(markup.indexOf(messages.place.detailSectionVisit)).toBeLessThan(
+      markup.lastIndexOf(messages.map.directions),
+    )
+  })
+
+  /* 좌표가 없으면 지도가 스스로 사라진다 — 열을 나눠 두면 오른쪽이 빈 열로 남는다 */
+  it('좌표가 있을 때만 방문 정보를 두 열로 나눈다', () => {
+    const split = 'place-visit-split'
+
+    expect(render()).toContain(split)
+    const markup = render({ place: { ...placeDetail, lat: null, lng: null } })
+    expect(markup).not.toContain(split)
+    expect(markup).not.toContain(messages.map.directions)
+  })
+})
+
+/*
+  방문 정보 = 기본 정보 + 이용 안내 (#935 · 제안 A). 운영시간과 휴무일이 한 목록에
+  서고, 같은 번호가 전화·문의처로 두 번 서지 않는다.
+*/
+describe('PlaceDetailSection — 방문 정보', () => {
+  it('휴무일은 운영시간과 같은 목록, 이용 안내 묶음보다 앞이다', () => {
+    const markup = render({
+      place: { ...placeDetail, intro: { ...placeDetail.intro!, restDate: '매주 월요일' } },
+    })
+    const useTime = markup.indexOf(messages.place.detailUseTime)
+    const restDate = markup.indexOf(messages.place.detailRestDate)
+
+    expect(useTime).toBeGreaterThan(-1)
+    expect(restDate).toBeGreaterThan(useTime)
+    const intro = markup.indexOf(messages.place.detailSectionIntro)
+    if (intro > -1) expect(restDate).toBeLessThan(intro)
+  })
+
+  it('문의처가 전화와 같은 번호면 한 번만 선다', () => {
+    const markup = render({
+      place: {
+        ...placeDetail,
+        tel: '064-772-3701',
+        intro: { ...placeDetail.intro!, infoCenter: '064)772-3701' },
+      },
+    })
+
+    expect(markup).not.toContain(messages.place.detailInfoCenter)
+  })
+
+  it('문의처에 번호 말고 더 적혀 있으면 남긴다', () => {
+    const markup = render({
+      place: {
+        ...placeDetail,
+        tel: '064-772-3701',
+        intro: { ...placeDetail.intro!, infoCenter: '관리사무소 064-772-3701' },
+      },
+    })
+
+    expect(markup).toContain(messages.place.detailInfoCenter)
+    expect(markup).toContain('관리사무소 064-772-3701')
+  })
+
+  /* 휴무일만 있고 편의 항목이 비면 제목만 남은 빈 묶음이 된다 */
+  it('편의 항목이 전부 비면 이용 안내 묶음을 만들지 않는다 — 휴무일은 위로 올라갔다', () => {
+    const markup = render({
+      place: {
+        ...placeDetail,
+        tel: '064-772-3701',
+        intro: {
+          ...placeDetail.intro!,
+          restDate: '연중무휴',
+          parking: null,
+          chkBabyCarriage: null,
+          chkCreditCard: null,
+          infoCenter: '064-772-3701',
+        },
+      },
+    })
+
+    expect(markup).toContain('연중무휴')
+    expect(markup).not.toContain(messages.place.detailSectionIntro)
+  })
+})
+
+/*
+  **#294.** 영업 상태는 `운영시간` 원문 **위**에 서는 판정값이다.
+
+  **`openNow: null` 을 드러내지 않는 것이 이 묶음의 요점이다.** 긴급 시설은 같은 `null` 을
+  점선 배지("영업 여부 확인 필요")로 드러내지만, 그 화면에는 원문조차 없는 곳이 있어 "모름"
+  이 정보였다. 장소는 원문이 항상 함께 있어 정보가 아니다 — dev 실측 2026-09-08 로 장소
+  200곳의 `openNow` 가 전부 `null` 이라, 드러냈다면 131곳 전부가 그 배지 하나만 달았다.
+*/
+describe('PlaceDetailSection — 영업 상태 (#294)', () => {
+  function withIntro(overrides: Partial<NonNullable<PlaceDetail['intro']>>) {
+    return render({
+      place: {
+        ...placeDetail,
+        intro: { ...placeDetail.intro!, ...overrides },
+      },
+    })
+  }
+
+  it('openNow 가 true 면 영업 중을 쓴다', () => {
+    const markup = withIntro({ open24: false, openNow: true })
+
+    expect(markup).toContain(messages.place.detailOpenNow)
+    expect(markup).not.toContain(messages.place.detailOpenClosed)
+  })
+
+  it('openNow 가 false 면 영업 시간 아님을 쓴다', () => {
+    const markup = withIntro({ open24: false, openNow: false })
+
+    expect(markup).toContain(messages.place.detailOpenClosed)
+    expect(markup).not.toContain(messages.place.detailOpenNow)
+  })
+
+  /*
+    #1160 — `openNow` 는 참/거짓뿐이라 개점 전과 마감 후를 가르지 못한다. "영업 종료" 는 09:29 에
+    `10:00~18:00` 인 곳을 "오늘은 끝났다" 로 읽혔다. 끝·마감을 말하는 낱말이 돌아오면 걸린다.
+  */
+  it('openNow false 문구는 시점을 말하지 않는다 — 개점 전에도 맞아야 한다', () => {
+    for (const word of ['종료', '마감', '끝']) {
+      expect(messages.place.detailOpenClosed).not.toContain(word)
+      expect(messages.emergency.statusClosed).not.toContain(word)
+    }
+  })
+
+  /*
+    24시간인 곳에 "지금 영업 중" 은 동어반복이고 "영업 시간 아님" 은 모순이다. 그 모순이 실제로
+    오므로(긴급 시설 dev 응답의 청사약국 — `10:00~24:00` 인데 `open24: true`/`openNow: false`)
+    화면은 `24시간` 하나만 말한다.
+  */
+  it('open24 면 openNow 가 어긋나도 24시간만 쓴다', () => {
+    const markup = withIntro({ open24: true, openNow: false })
+
+    expect(markup).toContain(messages.place.detailOpen24)
+    expect(markup).not.toContain(messages.place.detailOpenClosed)
+    expect(markup).not.toContain(messages.place.detailOpenNow)
+  })
+
+  it('open24 이고 openNow 가 null 이어도 24시간을 쓴다', () => {
+    expect(withIntro({ open24: true, openNow: null })).toContain(messages.place.detailOpen24)
+  })
+
+  /* 이 갈래가 회귀하면 dev 의 모든 장소에 쓸모없는 배지가 붙는다 */
+  it('openNow 가 null 이면 배지를 아예 그리지 않는다', () => {
+    const markup = withIntro({ open24: false, openNow: null })
+
+    expect(markup).not.toContain(messages.place.detailOpenNow)
+    expect(markup).not.toContain(messages.place.detailOpenClosed)
+    expect(markup).not.toContain(messages.place.detailOpen24)
+  })
+
+  it('open24 가 null 이어도 같다 — false 와 구분해 다루지 않는다', () => {
+    const markup = withIntro({ open24: null, openNow: null })
+
+    expect(markup).not.toContain(messages.place.detailOpen24)
+  })
+
+  /* 판정값은 원문을 대체하지 않는다 — 위계를 가르는 것이지 감추는 것이 아니다 */
+  it('어느 갈래에서도 운영시간 원문이 남는다', () => {
+    const useTime = placeDetail.intro!.useTime!
+
+    expect(withIntro({ open24: false, openNow: true })).toContain(useTime)
+    expect(withIntro({ open24: false, openNow: false })).toContain(useTime)
+    expect(withIntro({ open24: true, openNow: false })).toContain(useTime)
+    expect(withIntro({ open24: false, openNow: null })).toContain(useTime)
+  })
+
+  /*
+    `useTime` 이 없으면 `운영시간` 행 자체가 사라지는 기존 동작을 그대로 둔다.
+    근거 없이 판정만 오는 갈래는 계약상 없다 (`types/place.ts` 의 `openNow` 주석).
+  */
+  it('운영시간 원문이 없으면 행이 사라져 판정값도 함께 사라진다', () => {
+    const markup = withIntro({ useTime: null, open24: false, openNow: true })
+
+    expect(markup).not.toContain(messages.place.detailUseTime)
+    expect(markup).not.toContain(messages.place.detailOpenNow)
+  })
+})
+
+describe('3층 표면 (#443) — 절마다 카드 판정', () => {
+  /** `Surface`(L1) 의 클래스 — `surface.test.ts` 가 값을 잠근다. 여기서는 개수만 센다 */
+  const SURFACE = /<section[^>]*class="bg-bg border-border border-y md:rounded-lg md:border"/g
+
+  it('2a 밴드와 열 구분선을 쓰지 않는다 — 카드 간격과 바닥이 경계다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain('bg-band h-2')
+    expect(markup).not.toContain('lg:border-l')
+  })
+
+  /*
+    **여섯에서 일곱이 됐다** (#430). 갤러리 + 제목이 한 장의 카드로 묶여 다섯에서 여섯이
+    됐고(#531), 기간 혼잡도가 판정 카드 **밖**의 새 카드로 서면서 하나 더 늘었다.
+
+    혼잡도를 판정 카드 안에 넣지 않은 이유는 §0 의 "카드 경계는 이야기 단위" 다 — 저 카드는
+    "오늘 가도 되나 → 지금 걷기 안전한가 → 그러면 담을까" 이고, 이쪽은 다른 시간 축
+    ("이번 주엔 언제")이다.
+  */
+  /*
+    **일곱에서 넷이 됐다** (#935 · 제안 A). 반려견 동반·장소 소개가 머리 카드 안으로,
+    이용 안내가 방문 정보(옛 기본 정보) 안으로 들어갔다 — "무엇이고 데려가도 되나" ·
+    "지금" · "언제" · "가려면" 네 이야기에 카드 넷이다.
+  */
+  it('머리(+소개·동반) · 판정 · 기간 혼잡도 · 방문 정보가 각각 카드라 넷이다', () => {
+    const markup = render()
+
+    expect(markup.match(SURFACE)).toHaveLength(4)
+    // 방문 정보는 카드 제목, 동반 정보는 머리 카드 안 절 제목 — 둘 다 h2 다
+    for (const title of [messages.place.detailSectionVisit, messages.place.detailSectionPet]) {
+      expect(markup).toMatch(new RegExp(`<h2[^>]*>${title}</h2>`))
+    }
+    // 이용 안내는 방문 정보 안 묶음이라 한 단계 아래(h3)다
+    expect(markup).toMatch(new RegExp(`<h3[^>]*>${messages.place.detailSectionIntro}</h3>`))
+  })
+
+  it('반려견 동반은 머리 카드 안이다 — 첫 카드가 닫히기 전에 선다', () => {
+    const markup = render()
+    const first = markup.search(SURFACE)
+    const firstEnd = markup.indexOf('</section>', markup.indexOf(messages.place.detailSectionPet))
+    const pet = markup.indexOf(messages.place.detailSectionPet)
+    // 머리 카드 안의 동반 절은 자기 `section` 이다 — 그것이 닫힌 뒤 머리 카드가 닫힌다
+    const headEnd = markup.indexOf('</section>', firstEnd + 1)
+
+    expect(pet).toBeGreaterThan(first)
+    expect(markup.indexOf(messages.place.detailVerdictCardLabel)).toBeGreaterThan(headEnd)
+  })
+
+  /*
+    **#531 이 뒤집었다.** 예전에는 "전폭 미디어 · 페이지 머리는 카드가 아니다"(§0)를 근거로
+    `h1` 이 첫 카드보다 **앞**에 있는지를 잠갔다. 이 화면은 그 아래가 전부 흰 카드라 제목만
+    회색 바닥에 얹혀 있었고, 판정 3문을 다시 물으면 셋 다 "예" 다 (자기 제목 `h1` · 혼자
+    떼어도 말이 됨 · 갤러리와 제목 블록 둘).
+
+    이제 `h1` 은 **첫 카드 안**이고, 그 카드는 `aria-label` 이 아니라 `aria-labelledby` 로
+    이 `h1` 을 가리킨다 — 같은 문자열을 속성에 다시 적으면 두 곳이 갈린다.
+  */
+  it('갤러리와 제목 줄이 첫 카드다 — h1 이 그 안에 있고 카드가 그것을 이름으로 쓴다', () => {
+    const markup = render()
+    const firstSection = markup.search(SURFACE)
+    const h1 = markup.indexOf('<h1')
+
+    expect(firstSection).toBeGreaterThan(-1)
+    expect(h1).toBeGreaterThan(firstSection)
+
+    // 카드의 접근성 이름이 그 h1 이다 (문자열 사본이 아니라 참조)
+    const headingId = /<h1[^>]*\bid="([^"]+)"/.exec(markup)?.[1]
+    expect(headingId).toBeDefined()
+    expect(markup).toContain(`aria-labelledby="${headingId}"`)
+  })
+
+  it('적합도 · 산책 위험도 · 데스크톱 하단 바가 한 카드다 — 같은 화자가 이어 말한다', () => {
+    const markup = render()
+    const start = markup.indexOf(`aria-label="${messages.place.detailVerdictCardLabel}"`)
+    expect(start).toBeGreaterThan(-1)
+    const card = markup.slice(start, markup.indexOf('</section>', start))
+
+    expect(card).toContain(messages.place.detailSectionSuitability)
+    expect(card).toContain(messages.place.detailWalkSafetyLabel)
+    expect(card).toContain(messages.plan.addToPlanAction)
+    expect(card).toContain('hidden lg:block')
+    // 카드 안 자식은 자기 배경을 갖지 않는다 — 배경은 sticky 갈래(카드 밖)만
+    expect(card).not.toContain('bg-bg sticky')
+  })
+
+  it('폐업 안내는 채움 상자가 아니라 스트립이다 — L0 위에서 --band 는 대비 1.06 으로 보이지 않는다', () => {
+    const markup = render({ place: placeDetailDelisted })
+    const start = markup.indexOf(messages.place.detailDelistedTitle)
+    // 안내는 브레드크럼 다음, 첫 카드 앞이다 — 그 앞 300자 안에 감싸는 두 div 가 있다
+    const strip = markup.slice(Math.max(0, start - 300), start)
+
+    expect(strip).toContain('border-b')
+    expect(strip).not.toContain('bg-band')
+    expect(strip).not.toContain('rounded-md')
+  })
+
+  it('카드 안은 카드 인셋(16/20)이다 — 페이지 인셋 40 은 브레드크럼 한 곳뿐이다', () => {
+    const markup = render()
+
+    expect(markup.match(/md:px-10/g)).toHaveLength(1)
+    expect((markup.match(/md:px-5/g) ?? []).length).toBeGreaterThanOrEqual(6)
+  })
+
+  it('로딩 스켈레톤도 같은 표면이다 — 밴드가 아니라 카드 리듬', () => {
+    const markup = render({ loading: true, place: null })
+
+    expect(markup).not.toContain('bg-band h-2')
+    /*
+      **카드 수가 완료 화면과 같다** (#1037 후속) — 제목 카드 · 판정 레일 · 혼잡도 · 방문 정보.
+      예전 한 열 골격은 카드가 여섯 장이라, 데이터가 오는 순간 장수와 열이 함께 바뀌었다.
+    */
+    expect((markup.match(SURFACE) ?? []).length).toBe((render().match(SURFACE) ?? []).length)
+  })
+
+  it('로딩 스켈레톤도 완료 화면과 같은 2단 grid 다', () => {
+    const markup = render({ loading: true, place: null })
+
+    expect(markup).toContain('rail-layout rail-layout-detail rail-layout-detail-head')
+    expect(markup.match(/rail-detail-main/g)).toHaveLength(2)
+    expect(markup).toContain('rail-detail-aside')
+  })
+})

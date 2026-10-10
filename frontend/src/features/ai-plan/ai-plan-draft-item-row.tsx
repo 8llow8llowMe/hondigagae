@@ -1,0 +1,163 @@
+import { Badge } from '@/components/badge'
+import { ThumbnailTile } from '@/components/thumbnail-tile'
+import type { DraftThumbnail } from '@/lib/ai-plan/draft-thumbnail'
+import { itemTypeLabel } from '@/lib/ai-plan/item-type'
+import { formatDistance } from '@/lib/format/distance'
+import { isLongTrip } from '@/lib/geo/distance'
+import { messages } from '@/lib/messages'
+import { planItemIllustration } from '@/lib/plan/illustration'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
+import type { AiPlanScheduleItem } from '@/types/ai-plan'
+
+export type AiPlanDraftItemRowProps = {
+  item: AiPlanScheduleItem
+  /** 그 일자 안의 1부터 시작하는 번호 (아트보드 03 의 원형 숫자) */
+  ordinal: number
+  /**
+   * 썸네일 src (#1127). **`null` 은 사진 없음(확정) → 유형 일러스트, `undefined` 는 보강 중 →
+   * 회색 타일**이다. 판정은 `lib/ai-plan/draft-thumbnail.ts` 가 한다.
+   *
+   * **optional 이 아니다** — `undefined` 가 "보강 중" 이라는 뜻을 가져서, prop 을 빠뜨린
+   * 호출부가 영영 회색 타일로 남는 것을 타입이 막게 한다.
+   */
+  thumbnail: DraftThumbnail
+  /**
+   * 보강으로 얻은 메타 줄 (`제주시 한림읍 · 야외`). **초안에 없어 항목당
+   * `GET /places/{placeId}` 로 채운다** (명세 S6). 아직 못 받았거나 `placeId` 가 null 이면
+   * undefined. 조립은 `use-draft-places.ts` 가 한다.
+   */
+  meta?: string | undefined
+  /**
+   * 담을 수 없는 장소인가 — 상세 응답의 `delisted: true`(원천에서 사라짐) 또는 **404**
+   * (병합). `PLAN_004` 로 담기가 막힐 때의 원인 후보다 (명세 S5 함정 3 · 일자편집 명세 E1).
+   *
+   * **404 만으로 판정하지 않는다** — delisted 장소의 상세는 200 으로 온다 (#146).
+   */
+  delisted?: boolean
+  /** 담기에서 빼기로 표시된 항목 */
+  excluded?: boolean
+  /**
+   * 직전 항목으로부터의 **직선**거리(m). 기준이나 좌표가 없으면 `null` 이고 그때 줄이
+   * 사라진다 — 계산과 그 판정은 `lib/ai-plan/draft-distance.ts` 가 한다 (#100).
+   */
+  distanceMeters?: number | null
+}
+
+/**
+ * 초안 항목 한 줄 — 아트보드 03.
+ *
+ * 메타 줄은 `주소 · 실내` 다 — `indoor` 가 #16 으로 상세 응답에 들어왔다 (#112).
+ * **`null` 이면 낱말이 빠진다**: 여기에는 실내 필터가 없어 "미확인" 배지를 둘 자리가 없고,
+ * `false`(야외)로 단정하지도 않는다 (`lib/place/indoor.ts`).
+ *
+ * 거리는 붙인다 (#100). **문구·임계값을 일정 상세와 공유한다** — 두 화면이 같은 초안을
+ * 두 말로 말하지 않게 `messages.plan` 과 `lib/geo/distance.ts` 를 그대로 쓴다.
+ *
+ * 표시 전용이라 node 환경에서 렌더 테스트가 된다.
+ */
+export function AiPlanDraftItemRow({
+  item,
+  ordinal,
+  thumbnail,
+  meta,
+  delisted = false,
+  excluded = false,
+  distanceMeters = null,
+}: AiPlanDraftItemRowProps) {
+  const typeLabel = itemTypeLabel(item.itemType)
+  // **`title`/`note` 는 nullable 이다** — 서버 DTO 에 제약이 없다 (`types/ai-plan.ts`)
+  const title = (item.title ?? '').trim()
+  const note = (item.note ?? '').trim()
+  /*
+    **사진이 없다고 확정된 뒤에만 일러스트를 고른다.** 보강 중에 먼저 그리면 사진이 있는
+    장소가 일러스트 → 사진으로 깜박인다. 초안의 `itemType` 은 LLM 산출 raw string 이라
+    모르는 값이 올 수 있고, 그때는 `null` 이 와서 회색 타일로 남는다 (공통명세 S6).
+  */
+  const illustration = thumbnail === null ? planItemIllustration(item.itemType) : null
+
+  /*
+    **L1 카드 안의 L2 항목이다** (`DESIGN.md §0`, #473). 구분선은 `SurfaceList` 가 항목
+    **사이에만** 긋는다 — 그래서 `border-b … last:border-b-0` 이 사라졌다. 좌우 인셋은
+    항목이 갖고(세로 여백이 항목마다 달라 목록이 정할 수 없다) 값은 카드 안 `card`(16/20)다.
+    예전 `md:px-10` 은 페이지 인셋이라 카드 안에서 쓰면 내용이 두 번 밀린다.
+  */
+  return (
+    <li
+      className={cn(
+        'flex gap-3 py-3',
+        INSET_CLASS.card,
+        // 빼기로 표시한 항목은 취소선으로 남긴다 — 지우면 무엇을 뺐는지 알 수 없다
+        excluded && 'opacity-60',
+      )}
+    >
+      {/*
+        **썸네일 타일 — 일정 상세 행과 같은 공통 `ThumbnailTile` 이다** (#1127 · #1151). 담기 전과
+        담은 뒤가 같은 항목을 같은 얼굴로 보여 준다. 보강 중(`undefined`)이면 사진도 일러스트도
+        주지 않아 회색 타일로 기다린다.
+
+        빼기로 표시한 항목은 행 전체가 `opacity-60` 이라 타일에 따로 주지 않는다.
+      */}
+      <ThumbnailTile
+        src={typeof thumbnail === 'string' ? thumbnail : null}
+        illustration={illustration}
+        ordinal={ordinal}
+      />
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className={cn('text-body-1 text-fg font-medium', excluded && 'line-through')}>
+            {title === '' ? messages.aiPlan.itemTitleUnknown : title}
+          </p>
+          {typeLabel !== null && (
+            <Badge tone="neutral" size="sm">
+              {typeLabel}
+            </Badge>
+          )}
+          {delisted && (
+            <Badge tone="danger" size="sm">
+              {messages.aiPlan.itemPlaceDelisted}
+            </Badge>
+          )}
+        </div>
+
+        {meta !== undefined && <p className="text-caption text-fg-muted mt-1">{meta}</p>}
+
+        <DraftItemDistance meters={distanceMeters} />
+
+        {/* 항목별 이유 — 서버 문구를 그대로 쓴다 */}
+        {note !== '' && <p className="text-body-2 text-fg-muted mt-1">{note}</p>}
+      </div>
+    </li>
+  )
+}
+
+/**
+ * 거리 한 줄 — `PlanItemDistance` 와 **같은 문구·같은 임계값**이다.
+ *
+ * **"직선" 을 반드시 붙인다.** 제주는 산간·해안도로가 많아 직선거리와 주행거리가 크게
+ * 다르다 — `4.1km` 만 쓰면 주행거리로 읽힌다 (일정상세-세부명세 D3).
+ *
+ * 30km 이상이면 **그 행만** 경고 톤이다. 색만으로 전달하지 않으려고 문장
+ * (`— 하루 이동이 길어요.`)이 함께 간다.
+ *
+ * **기준 문구가 `숙소에서` 로 갈리지 않는다** — 초안은 직전 항목만 기준으로 삼는다
+ * (`draft-distance.ts` 주석).
+ */
+function DraftItemDistance({ meters }: { meters: number | null }) {
+  if (meters === null) return null
+
+  const long = isLongTrip(meters)
+
+  return (
+    <p
+      className={cn(
+        'text-caption mt-1 font-medium tabular-nums',
+        long ? 'text-metric-low-700' : 'text-fg-muted',
+      )}
+    >
+      {messages.plan.distanceFromPrevious.replace('{distance}', formatDistance(meters))}
+      {long && messages.plan.longTripSuffix}
+    </p>
+  )
+}

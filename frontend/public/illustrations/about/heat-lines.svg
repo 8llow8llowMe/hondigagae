@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 119 131" role="img" aria-hidden="true">
+  <defs>
+    <filter id="g-hl"><feTurbulence type="fractalNoise" baseFrequency="0.168" numOctaves="4" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.18"/></feComponentTransfer>
+      <feComposite in2="SourceGraphic" operator="in"/></filter>
+    <g id="hl">
+    <g fill="none" stroke="#d54040" stroke-width="9" stroke-linecap="round">
+      <path transform="translate(0 0)" d="M22 10C16 20 10 32 10 44C10 60 30 74 30 92C30 106 22 116 17 125"/>
+      <path transform="translate(39.5 0)" d="M22 10C16 20 10 32 10 44C10 60 30 74 30 92C30 106 22 116 17 125"/>
+      <path transform="translate(79 0)" d="M22 10C16 20 10 32 10 44C10 60 30 74 30 92C30 106 22 116 17 125"/>
+    </g>
+    </g>
+  </defs>
+  <use href="#hl"/>
+  <use href="#hl" filter="url(#g-hl)" opacity="0.7"/>
+</svg>

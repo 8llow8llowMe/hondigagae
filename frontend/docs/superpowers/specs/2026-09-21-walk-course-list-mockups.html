@@ -1,0 +1,1015 @@
+<title>산책 코스 목록 시안</title>
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap"
+/>
+<style>
+  /*
+    이 페이지는 `/walk-courses` 목록의 레이아웃 시안이다. 색·간격·타이포는 앱의
+    실제 토큰(`app/globals.css`)을 옮겨 온 값이고, 데이터는 dev 게이트웨이 실응답
+    29건이다 — 시안이 실제보다 예뻐 보이지 않게 하려는 것이 이 두 가지의 목적이다.
+
+    **라이트 단일 테마다.** 앱의 라이트 팔레트를 그대로 보여 주는 것이 이 문서의 일이라
+    다크에서도 같은 색을 낸다. 모든 색과 배경을 명시해 호스트 배경을 빌리지 않는다.
+  */
+  :root {
+    --page: #eef1f4;
+    --page-fg: #1b2026;
+    --page-muted: #5b646f;
+    --page-line: #d7dce3;
+    --bg: #ffffff;
+    --band: #f1f3f5;
+    --border: #e5e7eb;
+    --fg: #111827;
+    --fg-muted: #6b7280;
+    --fg-subtle: #9ca3af;
+    --brand: #2f9e5f;
+    --ink:
+      'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui,
+      sans-serif;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--page-fg);
+    font-family: var(--ink);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .doc {
+    max-width: 1480px;
+    margin: 0 auto;
+    padding: 40px 20px 72px;
+  }
+
+  /* ---------- 문서 머리 ---------- */
+  .intro {
+    max-width: 62ch;
+  }
+  .eyebrow {
+    margin: 0 0 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    color: var(--brand);
+  }
+  h1 {
+    margin: 0;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  .intro p {
+    margin: 12px 0 0;
+    color: var(--page-muted);
+  }
+  .intro code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.88em;
+    background: #e3e8ee;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .facts {
+    display: grid;
+    gap: 1px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    margin: 28px 0 0;
+    background: var(--page-line);
+    border: 1px solid var(--page-line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .facts div {
+    background: var(--page);
+    padding: 14px 16px;
+  }
+  .facts dt {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--page-muted);
+  }
+  .facts dd {
+    margin: 4px 0 0;
+    font-size: 19px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .facts .was {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--page-muted);
+  }
+
+  /* ---------- 시안 전환 ---------- */
+  .switch {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: 36px 0 14px;
+    padding: 12px 0;
+    background: linear-gradient(var(--page) 72%, rgba(238, 241, 244, 0));
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .switch button {
+    font-family: inherit;
+    height: 38px;
+    padding: 0 15px;
+    border: 1px solid var(--page-line);
+    background: #fff;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--page-muted);
+    cursor: pointer;
+  }
+  .switch button:hover {
+    border-color: #b9c1cc;
+    color: var(--page-fg);
+  }
+  .switch button:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+  .switch button[aria-pressed='true'] {
+    background: var(--page-fg);
+    border-color: var(--page-fg);
+    color: #fff;
+  }
+  .hint {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--page-muted);
+  }
+
+  .caption {
+    margin: 0 0 14px;
+    padding: 12px 16px;
+    border-left: 3px solid var(--brand);
+    background: #fff;
+    border-radius: 0 8px 8px 0;
+    font-size: 14px;
+    color: var(--page-muted);
+    max-width: 78ch;
+  }
+  .caption b {
+    color: var(--page-fg);
+    font-weight: 700;
+  }
+
+  /* ---------- 앱 화면 (실제 토큰) ---------- */
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    color: var(--fg);
+  }
+  .head {
+    padding: 20px 24px 12px;
+  }
+  .head h2 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .head .meta {
+    margin: 6px 0 0;
+    font-size: 14px;
+    color: var(--fg-muted);
+  }
+  .head .meta em {
+    font-style: normal;
+    color: var(--fg-subtle);
+  }
+  .tools {
+    display: flex;
+    gap: 24px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .tools .lbl {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg-muted);
+    margin-bottom: 6px;
+  }
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .seg button {
+    font-family: inherit;
+    height: 40px;
+    padding: 0 16px;
+    font-size: 14px;
+    white-space: nowrap;
+    border: 0;
+    background: transparent;
+    color: var(--fg-muted);
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .seg button + button {
+    border-left: 1px solid var(--border);
+  }
+  .seg button[aria-checked='true'] {
+    background: var(--band);
+    color: var(--fg);
+    font-weight: 600;
+  }
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .card a {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+  .card a:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+  .src {
+    margin: 0;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--fg-subtle);
+  }
+
+  /* ---------- A. 사진 카드 그리드 ---------- */
+  .gridA {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 16px;
+    padding: 8px 16px 24px;
+  }
+  @media (min-width: 768px) {
+    .gridA {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+      padding: 8px 24px 24px;
+    }
+  }
+  @media (min-width: 1280px) {
+    .gridA {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .ca {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    height: 100%;
+    background: var(--bg);
+  }
+  .ca .ph {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    background: var(--band);
+  }
+  .ca .ph img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .ca .bd {
+    padding: 12px 14px 14px;
+  }
+  .ca .n {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    word-break: keep-all;
+    line-height: 1.4;
+  }
+  .ca .m {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .ca .s {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--fg-subtle);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* A4 — 채택안. 번호 왼쪽, 구간명 오른쪽 (한 줄) */
+  .a4 .ttl {
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    line-height: 1.35;
+  }
+  .a4 .lab {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--brand);
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+  .a4 .nm {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fg);
+    word-break: keep-all;
+    min-width: 0;
+  }
+
+  /* A1 — 사진 위 브랜드 배지 */
+  .a1 .lab {
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    background: var(--brand);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 5px 11px;
+    border-radius: 999px;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  }
+
+  /* A2 — 번호가 본문 첫 줄 */
+  .a2 .lab {
+    display: block;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--brand);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+  .a2 .n {
+    margin-top: 2px;
+  }
+
+  /* A3 — 사진 아래 경계에 걸친 칩 */
+  .ca.a3 {
+    overflow: visible;
+  }
+  .a3 .ph {
+    overflow: visible;
+  }
+  .a3 .ph .imgwrap {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: 11px 11px 0 0;
+  }
+  .a3 .lab {
+    position: absolute;
+    left: 12px;
+    bottom: -15px;
+    z-index: 2;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    font-size: 15px;
+    font-weight: 800;
+    padding: 5px 12px;
+    border-radius: 999px;
+    line-height: 1.2;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  }
+  .a3 .bd {
+    padding: 24px 14px 14px;
+  }
+
+  /* ---------- B. 가로형 사진 행 ---------- */
+  .gridB {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 12px;
+    padding: 8px 16px 24px;
+  }
+  @media (min-width: 768px) {
+    .gridB {
+      padding: 8px 24px 24px;
+      gap: 14px;
+    }
+  }
+  @media (min-width: 1280px) {
+    .gridB {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px 20px;
+    }
+  }
+  .cb {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+  }
+  .cb .ph {
+    position: relative;
+    flex: none;
+    width: 112px;
+    aspect-ratio: 4 / 3;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--band);
+  }
+  .cb .ph img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .cb .bd {
+    min-width: 0;
+    flex: 1;
+  }
+  .cb .n {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 500;
+    word-break: keep-all;
+  }
+  .cb .n b {
+    font-weight: 700;
+    margin-right: 4px;
+  }
+  .cb .m {
+    margin: 5px 0 0;
+    font-size: 14px;
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .cb .s {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: var(--fg-subtle);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ---------- C. 지금 (텍스트 표) ---------- */
+  .rowC {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+  .rowC + .rowC {
+    border-top: 1px solid var(--border);
+  }
+  .headC {
+    display: none;
+    padding: 0 24px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg-muted);
+  }
+  @media (min-width: 768px) {
+    .rowC {
+      padding: 16px 24px;
+    }
+  }
+  @media (min-width: 1280px) {
+    .rowC,
+    .headC {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 5rem 6rem minmax(0, 1fr) 5rem 1.25rem;
+      align-items: center;
+      gap: 20px;
+    }
+  }
+  .headC .r {
+    text-align: right;
+  }
+  .rowC .t {
+    min-width: 0;
+    flex: 1;
+  }
+  .rowC .t .n {
+    margin: 0;
+    font-size: 15px;
+  }
+  .rowC .t .n b {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .rowC .t .m {
+    margin: 4px 0 0;
+    font-size: 14px;
+    color: var(--fg-muted);
+  }
+  .rowC .t .s {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: var(--fg-subtle);
+  }
+  @media (min-width: 1280px) {
+    .rowC .t .m,
+    .rowC .t .s {
+      display: none;
+    }
+  }
+  .rowC .d,
+  .rowC .u {
+    display: none;
+    margin: 0;
+    font-size: 14px;
+    color: var(--fg-muted);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .rowC .e {
+    display: none;
+    margin: 0;
+    font-size: 12px;
+    color: var(--fg-subtle);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  @media (min-width: 1280px) {
+    .rowC .d,
+    .rowC .u,
+    .rowC .e {
+      display: block;
+    }
+  }
+  .rowC .ph {
+    width: 64px;
+    height: 64px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--band);
+    flex: none;
+  }
+  @media (min-width: 768px) {
+    .rowC .ph {
+      width: 80px;
+      height: 80px;
+    }
+  }
+  .rowC .ph img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .rowC .ch {
+    color: var(--fg-subtle);
+    flex: none;
+  }
+  .hide {
+    display: none !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+</style>
+
+<div class="doc">
+  <div class="intro">
+    <p class="eyebrow">/walk-courses · 목록 레이아웃 시안</p>
+    <h1>산책 코스 목록 시안</h1>
+    <p>
+      색·간격·타이포는 앱의 실제 토큰(<code>app/globals.css</code>)이고, 데이터는 dev 게이트웨이
+      실응답 29건이다. 시안이 실제보다 좋아 보이지 않게 하려는 것이 이 둘의 목적이다.
+    </p>
+    <p>
+      다시 그리는 이유는 취향이 아니라 <b>전제가 바뀌었기 때문</b>이다. 목록을 텍스트 표로 고른
+      근거(<code>코스목록-세부명세.md</code> D1-1)는 “이미지가 29개 중 4개뿐이라 사진 카드를 쓰면
+      25장이 회색 플레이스홀더”였다. 2026-09-21 실측에서 그 분포가 뒤집혔다.
+    </p>
+  </div>
+
+  <dl class="facts">
+    <div>
+      <dt>대표 이미지</dt>
+      <dd>29 / 29</dd>
+      <dd class="was">진단 시점 4 / 29</dd>
+    </div>
+    <div>
+      <dt>시작점 좌표</dt>
+      <dd>29 / 29</dd>
+      <dd class="was">진단 시점 4 / 29</dd>
+    </div>
+    <div>
+      <dt>1280+ 표에서 글자가 찬 폭</dt>
+      <dd>약 40%</dd>
+      <dd class="was">행 1350px 중 열 2개가 각 487px</dd>
+    </div>
+    <div>
+      <dt>채택안</dt>
+      <dd>A4</dd>
+      <dd class="was">번호 + 구간명 한 줄</dd>
+    </div>
+  </dl>
+
+  <div class="switch">
+    <button data-v="A4" aria-pressed="true">A4 · 번호 + 구간명 한 줄</button>
+    <button data-v="A1" aria-pressed="false">A1 · 사진 위 배지</button>
+    <button data-v="A2" aria-pressed="false">A2 · 번호가 첫 줄</button>
+    <button data-v="A3" aria-pressed="false">A3 · 사진에 걸친 칩</button>
+    <button data-v="B" aria-pressed="false">B · 가로형</button>
+    <button data-v="C" aria-pressed="false">C · 지금</button>
+    <span class="hint">창 폭을 줄였다 늘렸다 해 보세요 — 768 · 1280 에서 열 수가 바뀝니다</span>
+  </div>
+
+  <p class="caption" id="caption"></p>
+
+  <div class="card">
+    <div class="head">
+      <h2>산책 코스</h2>
+      <p class="meta">코스 29개 · <em>몽이(낮음) 기준 4시간 이내로 좁혔어요</em></p>
+      <div class="tools">
+        <div>
+          <span class="lbl">활동량</span>
+          <div class="seg" role="radiogroup" aria-label="걷는 시간">
+            <button role="radio" aria-checked="true">전체</button>
+            <button role="radio" aria-checked="false">4시간 이내</button>
+            <button role="radio" aria-checked="false">6시간 이내</button>
+          </div>
+        </div>
+        <div>
+          <span class="lbl">정렬</span>
+          <div class="seg" role="radiogroup" aria-label="정렬">
+            <button role="radio" aria-checked="true">코스 순</button>
+            <button role="radio" aria-checked="false">짧은 순</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="headC" id="headC" aria-hidden="true">
+      <span>코스</span><span class="r">거리</span><span class="r">소요시간</span><span>시종점</span
+      ><span></span><span></span>
+    </div>
+    <ul id="list"></ul>
+    <p class="src">제주특별자치도 올레코스현황 · 한국관광공사 TourAPI</p>
+  </div>
+</div>
+
+<script id="data" type="application/json">
+  [
+    {
+      "walkCourseId": "6844072848938676555",
+      "courseLabel": "1코스",
+      "name": "시흥-광치기",
+      "distanceKm": 15.1,
+      "durationText": "4~5시간",
+      "startEndPoint": "시흥리정류장-광치기해변",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/82/3550482_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "4905906886499176834",
+      "courseLabel": "1-1코스",
+      "name": "우도",
+      "distanceKm": 11.3,
+      "durationText": "4~5시간",
+      "startEndPoint": "천진항.하우목동항-천진항.하우목동항",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/75/3554375_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "6911167100216303304",
+      "courseLabel": "2코스",
+      "name": "광치기-온평",
+      "distanceKm": 15.6,
+      "durationText": "4~5시간",
+      "startEndPoint": "광치기해변-온평포구",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/02/3550002_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "5108392282522244300",
+      "courseLabel": "3코스 (A)",
+      "name": "온평-표선(A)",
+      "distanceKm": 20.9,
+      "durationText": "6~7시간",
+      "startEndPoint": "온평포구-제주민속촌주차장입구",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/16/3550516_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "4694595851669258581",
+      "courseLabel": "3코스 (B)",
+      "name": "온평-표선(B)",
+      "distanceKm": 14.6,
+      "durationText": "4~5시간",
+      "startEndPoint": "온평포구-제주민속촌주차장입구",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/66/3550266_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "6257205577555408907",
+      "courseLabel": "4코스",
+      "name": "표선-남원",
+      "distanceKm": 19.0,
+      "durationText": "5~6시간",
+      "startEndPoint": "제주민속촌주차장 입구-남원포구",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/91/3549791_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "5532439751879043377",
+      "courseLabel": "5코스",
+      "name": "남원-쇠소깍",
+      "distanceKm": 13.4,
+      "durationText": "4~5시간",
+      "startEndPoint": "남원포구-쇠소깍다리",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/30/3550230_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "5013877544349990504",
+      "courseLabel": "6코스",
+      "name": "쇠소깍-제주올레여행자센터",
+      "distanceKm": 11.0,
+      "durationText": "3~4시간",
+      "startEndPoint": "쇠소깍다리-제주올레여행자센터",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/33/3550333_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "5176587622365097433",
+      "courseLabel": "7코스",
+      "name": "제주올레여행자센터-월평",
+      "distanceKm": 17.6,
+      "durationText": "5~6시간",
+      "startEndPoint": "제주올레여행자센터-월평아왜낭목쉼터",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/69/3549769_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "5327351643257329750",
+      "courseLabel": "7-1코스",
+      "name": "서귀포버스터미널-제주올레여행자센터",
+      "distanceKm": 15.7,
+      "durationText": "4~5시간",
+      "startEndPoint": "서귀포버스터미널앞-제주올레여행자센터",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/01/3549901_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "4751737897822655283",
+      "courseLabel": "8코스",
+      "name": "월평-대평",
+      "distanceKm": 19.6,
+      "durationText": "5~6시간",
+      "startEndPoint": "월평아왜낭목-대평포구",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/15/3549815_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "6336632574793402435",
+      "courseLabel": "9코스",
+      "name": "대평-화순",
+      "distanceKm": 11.8,
+      "durationText": "3~4시간",
+      "startEndPoint": "대평포구-화순금모래해수욕장",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/60/3549960_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "5486007165054820597",
+      "courseLabel": "10코스",
+      "name": "화순-모슬포",
+      "distanceKm": 15.6,
+      "durationText": "5~6시간",
+      "startEndPoint": "제주올레공식안내소-하모체육공원",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/37/3549637_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "6133199428931192261",
+      "courseLabel": "10-1코스",
+      "name": "가파도",
+      "distanceKm": 4.2,
+      "durationText": "1~2시간",
+      "startEndPoint": "상동포구-가파치안센터",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/86/3549886_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "5751810845687477079",
+      "courseLabel": "11코스",
+      "name": "모슬포-무릉",
+      "distanceKm": 17.3,
+      "durationText": "5~6시간",
+      "startEndPoint": "하모체육공원-무릉외갓집",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/72/3549972_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "6557197991675854750",
+      "courseLabel": "12코스",
+      "name": "무릉-용수",
+      "distanceKm": 17.5,
+      "durationText": "5~6시간",
+      "startEndPoint": "무릉외갓집-용수포구",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/96/3550396_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "6020428712786551995",
+      "courseLabel": "13코스",
+      "name": "용수-저지",
+      "distanceKm": 16.2,
+      "durationText": "4~5시간",
+      "startEndPoint": "용수포구-저지예술정보화마을",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/23/3554423_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "6205405827577484326",
+      "courseLabel": "14코스",
+      "name": "저지-한림",
+      "distanceKm": 19.1,
+      "durationText": "6~7시간",
+      "startEndPoint": "저지예술정보화마을-한림항",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/05/3554305_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "5519818962588363489",
+      "courseLabel": "14-1코스",
+      "name": "저지-서광",
+      "distanceKm": 9.3,
+      "durationText": "3~4시간",
+      "startEndPoint": "저지예술정보화마을-오설록녹차밭",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/52/3554152_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "5179459777241798958",
+      "courseLabel": "15코스 (A)",
+      "name": "한림-고내(A)",
+      "distanceKm": 16.5,
+      "durationText": "5~6시간",
+      "startEndPoint": "한림항-고내포구",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/96/3554196_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "4649865667136049213",
+      "courseLabel": "15코스 (B)",
+      "name": "한림-고내(B)",
+      "distanceKm": 13.0,
+      "durationText": "4~5시간",
+      "startEndPoint": "한림항-고내포구",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/85/3554485_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "6072353951094379335",
+      "courseLabel": "16코스",
+      "name": "고내-광령",
+      "distanceKm": 15.8,
+      "durationText": "5~6시간",
+      "startEndPoint": "고내포구-광령1리사무소",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/23/3554323_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "5661991692378039411",
+      "courseLabel": "17코스",
+      "name": "광령-제주원도심",
+      "distanceKm": 18.1,
+      "durationText": "6~7시간",
+      "startEndPoint": "광령1리사무소-간세라운지X관덕정분식",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/06/3554106_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "6162773985546419176",
+      "courseLabel": "18코스",
+      "name": "제주원도심-조천",
+      "distanceKm": 19.7,
+      "durationText": "6~7시간",
+      "startEndPoint": "간세라운지X관덕정분식-조천만세동산",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/10/3554210_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "5349520595550271507",
+      "courseLabel": "18-1코스",
+      "name": "상추자",
+      "distanceKm": 11.4,
+      "durationText": "4~5시간",
+      "startEndPoint": "추자면사무소-신앙항",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/15/3554515_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "4886014074118431250",
+      "courseLabel": "18-2코스",
+      "name": "하추자",
+      "distanceKm": 9.7,
+      "durationText": "3~4시간",
+      "startEndPoint": "신앙항-추자면사무소",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/05/3545605_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "6193987489639327935",
+      "courseLabel": "19코스",
+      "name": "조천-김녕",
+      "distanceKm": 19.4,
+      "durationText": "6~7시간",
+      "startEndPoint": "조천만세동산-김녕 서포구",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/19/3554119_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "6752511356439019683",
+      "courseLabel": "20코스",
+      "name": "김녕-하도",
+      "distanceKm": 17.6,
+      "durationText": "5~6시간",
+      "startEndPoint": "김녕서포구-제주해녀박물관",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/54/3554454_image2_1.jpg"
+    },
+    {
+      "walkCourseId": "6819401997524256245",
+      "courseLabel": "21코스",
+      "name": "하도-종달",
+      "distanceKm": 11.3,
+      "durationText": "3~4시간",
+      "startEndPoint": "제주해녀박물관-종달바당",
+      "firstImage": "https://tong.visitkorea.or.kr/cms/resource/64/3554264_image2_1.jpg"
+    }
+  ]
+</script>
+<script>
+  const C = JSON.parse(document.getElementById('data').textContent)
+  const esc = (s) =>
+    String(s).replace(
+      /[&<>"]/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c],
+    )
+  const km = (n) => Number(n).toFixed(1) + 'km'
+  const chev =
+    '<svg class="ch" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>'
+  const meta = (c) =>
+    `<p class="m">${km(c.distanceKm)} \u00b7 ${esc(c.durationText)}</p><p class="s" title="${esc(c.startEndPoint)}">${esc(c.startEndPoint)}</p>`
+  const photo = (c) => `<img loading="lazy" src="${esc(c.firstImage)}" alt="">`
+
+  const V = {
+    A4: {
+      grid: 'gridA',
+      note: '<b>A4 — 채택안.</b> 번호(브랜드색 800)와 구간명(600)이 한 줄에 나란히 선다. 사진 위에 아무것도 얹지 않아 사진 밝기와 무관하게 대비가 유지되고, <code>3코스 (A)</code>·<code>7-1코스</code> 같은 변칙 이름표도 배지 폭에 눌리지 않는다. 실측: 1280+ 3열에서 29개 전부 한 줄, 375px 에서 <code>7-1코스</code> 하나만 2줄.',
+      tpl: (c) =>
+        `<li><a class="ca a4" href="#"><div class="ph">${photo(c)}</div><div class="bd"><p class="ttl"><span class="lab">${esc(c.courseLabel)}</span><span class="nm">${esc(c.name)}</span></p>${meta(c)}</div></a></li>`,
+    },
+    A1: {
+      grid: 'gridA',
+      note: '<b>A1 — 사진 위 브랜드 배지.</b> 번호가 가장 멀리서도 보인다. 다만 하늘이 밝은 사진에서 배지가 화면의 유일한 색 덩어리로 튀고, 사진의 좌상단 피사체를 가린다.',
+      tpl: (c) =>
+        `<li><a class="ca a1" href="#"><div class="ph">${photo(c)}<span class="lab">${esc(c.courseLabel)}</span></div><div class="bd"><p class="n">${esc(c.name)}</p>${meta(c)}</div></a></li>`,
+    },
+    A2: {
+      grid: 'gridA',
+      note: '<b>A2 — 번호가 본문 첫 줄.</b> 번호와 구간명이 위아래로 짝지어 읽힌다. 세로 공간을 한 줄 더 쓰고, 번호가 제목보다 커서 시선이 번호에 먼저 머문다.',
+      tpl: (c) =>
+        `<li><a class="ca a2" href="#"><div class="ph">${photo(c)}</div><div class="bd"><span class="lab">${esc(c.courseLabel)}</span><p class="n">${esc(c.name)}</p>${meta(c)}</div></a></li>`,
+    },
+    A3: {
+      grid: 'gridA',
+      note: '<b>A3 — 사진 아래 경계에 걸친 칩.</b> 사진과 정보 블록을 잇는 느낌이 난다. 카드에 <code>overflow: visible</code> 이 필요해 구현이 셋 중 가장 까다롭고, 칩이 사진의 아래쪽을 가린다.',
+      tpl: (c) =>
+        `<li><a class="ca a3" href="#"><div class="ph"><div class="imgwrap">${photo(c)}</div><span class="lab">${esc(c.courseLabel)}</span></div><div class="bd"><p class="n">${esc(c.name)}</p>${meta(c)}</div></a></li>`,
+    },
+    B: {
+      grid: 'gridB',
+      note: '<b>B — 가로형 사진 행.</b> 112px 썸네일을 왼쪽에 두고 1280+ 에서 2열. 밀도가 가장 높지만(1화면 10개) 사진이 작아 29/29 라는 새 사실을 덜 쓴다.',
+      tpl: (c) =>
+        `<li><a class="cb" href="#"><div class="ph">${photo(c)}</div><div class="bd"><p class="n"><b>${esc(c.courseLabel)}</b>${esc(c.name)}</p>${meta(c)}</div></a></li>`,
+    },
+    C: {
+      grid: 'listC',
+      note: '<b>C — 지금 화면.</b> 1280 이상에서 코스 열 487px · 시종점 열 487px 인데 실제 글자는 각 150px 남짓이다. 거리·소요시간이 화면 한복판에 떠서 이름에서 값으로 가는 시선이 끊긴다.',
+      tpl: (c) =>
+        `<li><a class="rowC" href="#"><div class="t"><p class="n"><b>${esc(c.courseLabel)}</b> ${esc(c.name)}</p><p class="m">${km(c.distanceKm)} \u00b7 ${esc(c.durationText)}</p><p class="s">${esc(c.startEndPoint)}</p></div><p class="d">${km(c.distanceKm)}</p><p class="u">${esc(c.durationText)}</p><p class="e" title="${esc(c.startEndPoint)}">${esc(c.startEndPoint)}</p><div class="ph">${photo(c)}</div>${chev}</a></li>`,
+    },
+  }
+
+  const list = document.getElementById('list')
+  const headC = document.getElementById('headC')
+  const caption = document.getElementById('caption')
+  const buttons = [...document.querySelectorAll('.switch button')]
+
+  function render(v) {
+    const spec = V[v]
+    list.className = spec.grid
+    headC.classList.toggle('hide', v !== 'C')
+    caption.innerHTML = spec.note
+    list.innerHTML = C.map(spec.tpl).join('')
+    buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)))
+  }
+
+  buttons.forEach((b) => b.addEventListener('click', () => render(b.dataset.v)))
+  render('A4')
+</script>

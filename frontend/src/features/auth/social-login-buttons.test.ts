@@ -1,0 +1,150 @@
+/**
+ * 소셜 로그인 버튼의 **브랜드 계약** — 공식 마크 도입 (소셜콜백-세부명세 D8-1 ②).
+ *
+ * 상호작용(클릭 → `authorize` → 이동)은 이 환경에서 검증할 수 없다(testing-guide.md §1).
+ * 여기서 잠그는 것은 **회귀하면 브랜드 가이드나 WCAG 를 어기는 값들**이다 — 사람이
+ * 리뷰에서 눈으로 세던 것이고, 눈은 `bg-kakao-bg` 가 `bg-brand-600` 으로 바뀌어도 놓친다.
+ */
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+
+import { describe, expect, it } from 'vitest'
+
+import { SocialLoginButtons } from '@/features/auth/social-login-buttons'
+import { NO_SIGNUP_CONSENT, type SignupConsent } from '@/lib/auth/signup-consent'
+import { messages } from '@/lib/messages'
+
+const markup = renderToStaticMarkup(createElement(SocialLoginButtons, { returnTo: '/' }))
+
+/** 버튼 하나의 여는 태그부터 닫는 태그까지 — 라벨과 클래스를 같은 조각에서 본다 */
+function buttonWith(label: string): string {
+  const labelAt = markup.indexOf(label)
+  expect(labelAt).toBeGreaterThan(-1)
+
+  const open = markup.lastIndexOf('<button', labelAt)
+  return markup.slice(open, markup.indexOf('</button>', labelAt) + '</button>'.length)
+}
+
+describe('소셜 로그인 버튼 — 제공자 이름은 텍스트로 남는다 (D6)', () => {
+  /*
+    마크를 달았다고 라벨을 떼면 D6 *"로고만 두지 않는다"* 를 어긴다. 마크는 `aria-hidden`
+    이라 라벨이 사라지면 **접근 가능한 이름 자체가 없는 버튼**이 된다.
+  */
+  it('두 버튼 다 제공자 이름을 글자로 담는다', () => {
+    expect(markup).toContain('카카오 로그인')
+    expect(markup).toContain('네이버 로그인')
+  })
+
+  it('마크는 이름을 주지 않는다 — 라벨이 이미 말한다', () => {
+    const marks = markup.match(/<svg[^>]*>/g) ?? []
+
+    expect(marks).toHaveLength(2)
+    for (const mark of marks) {
+      expect(mark).toContain('aria-hidden="true"')
+      expect(mark).not.toContain('aria-label')
+    }
+  })
+})
+
+describe('소셜 로그인 버튼 — 브랜드 예외는 토큰으로만 (DESIGN.md §2-8)', () => {
+  it('카카오는 브랜드 예외 토큰 둘을 쓴다', () => {
+    const kakao = buttonWith('카카오 로그인')
+
+    expect(kakao).toContain('bg-kakao-bg')
+    expect(kakao).toContain('text-kakao-fg')
+  })
+
+  /*
+    **이 테스트가 이 파일의 존재 이유다.** Figma 의 기본 변형은 초록 채움 + 흰 글자이고
+    그것이 **2.25:1 로 AA 미달**이다 (§2-8 실측). "디자인대로" 돌리는 순간 이 값이
+    되살아나므로, 네이버 버튼 배경에 초록이 오는 것을 잠근다 — 초록은 마크에만 산다.
+  */
+  it('네이버는 초록으로 채우지 않는다 — 흰 배경 변형이다', () => {
+    const naver = buttonWith('네이버 로그인')
+    const openTag = naver.slice(0, naver.indexOf('>') + 1)
+
+    expect(openTag).not.toContain('naver-mark')
+    expect(openTag).toContain('bg-bg')
+    expect(openTag).toContain('border-border-strong')
+    // 초록은 마크 안에만 있다
+    expect(naver).toContain('var(--naver-mark)')
+  })
+
+  /* 값을 박으면 토큰과 두 곳으로 갈린다 — 린트가 className 만 보므로 여기서 마크까지 본다 */
+  it('마크에 raw 색상값이 없다', () => {
+    expect(markup).not.toMatch(/#[0-9A-Fa-f]{3,8}\b/)
+  })
+})
+
+/**
+ * 가입 화면에서만 동의로 잠근다 — 이슈 #688.
+ *
+ * **잠그는 자리가 여기뿐이다.** `/authorize` 는 동의가 비어도 성공하고, 거부는 인가코드를
+ * 태운 뒤인 콜백에서 일어난다 — 그 코드는 1회용이라 되돌릴 수 없다.
+ */
+describe('소셜 로그인 버튼 — 가입 동의 게이트 (#688)', () => {
+  function withConsent(consent: SignupConsent): string {
+    return renderToStaticMarkup(createElement(SocialLoginButtons, { returnTo: '/', consent }))
+  }
+
+  /*
+    `disabled` 라는 글자만 보면 안 된다 — `Button` 의 클래스에 `disabled:opacity-50` 이
+    들어 있어 항상 참이 된다. 실제 속성은 `disabled=""` 로 직렬화된다.
+  */
+  const DISABLED_ATTRIBUTE = 'disabled=""'
+
+  it('로그인 화면(동의를 넘기지 않음)은 잠그지 않는다 — 기존 회원 전용이다', () => {
+    expect(markup).not.toContain(DISABLED_ATTRIBUTE)
+    expect(markup).not.toContain(messages.auth.socialConsentRequired)
+  })
+
+  it('동의가 비면 두 버튼을 잠그고 이유를 글자로 말한다', () => {
+    const blocked = withConsent(NO_SIGNUP_CONSENT)
+
+    expect(blocked.match(/disabled=""/g) ?? []).toHaveLength(2)
+    expect(blocked).toContain(messages.auth.socialConsentRequired)
+  })
+
+  it('하나라도 비면 잠긴다', () => {
+    const blocked = withConsent({
+      termsAgreed: true,
+      privacyAgreed: true,
+      ageOver14Confirmed: false,
+    })
+
+    expect(blocked).toContain(DISABLED_ATTRIBUTE)
+  })
+
+  it('셋 다 켜지면 열리고 안내도 사라진다', () => {
+    const allowed = withConsent({
+      termsAgreed: true,
+      privacyAgreed: true,
+      ageOver14Confirmed: true,
+    })
+
+    expect(allowed).not.toContain(DISABLED_ATTRIBUTE)
+    expect(allowed).not.toContain(messages.auth.socialConsentRequired)
+  })
+})
+
+/*
+  #1084 L2 — 이메일 로그인이 도는 동안 아래 소셜 버튼이 그대로 눌렸다. 누르면 이메일 응답을
+  기다리는 사이 제공자 화면으로 떠난다. 잠그는 배선은 `LoginMethods` 이고 이 prop 이 받는다.
+*/
+describe('소셜 로그인 버튼 — 다른 로그인이 도는 동안 잠근다 (#1084)', () => {
+  it('disabled 면 두 버튼 다 비활성이다', () => {
+    const locked = renderToStaticMarkup(
+      createElement(SocialLoginButtons, { returnTo: '/', disabled: true }),
+    )
+    const buttons = locked.match(/<button[^>]*>/g) ?? []
+
+    expect(buttons).toHaveLength(2)
+    for (const button of buttons) expect(button).toContain('disabled=""')
+  })
+
+  it('기본은 잠그지 않는다', () => {
+    for (const button of markup.match(/<button[^>]*>/g) ?? []) {
+      expect(button).not.toContain('disabled=""')
+    }
+  })
+})

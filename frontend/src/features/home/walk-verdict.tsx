@@ -1,0 +1,334 @@
+'use client'
+
+import { useState } from 'react'
+
+import { BasisFootnote } from '@/components/basis-footnote'
+import { ChevronDownIcon } from '@/components/icons'
+import { InfoTip } from '@/components/info-tip'
+import { MetricValue, MetricWord } from '@/components/metric'
+import { ReasonList } from '@/components/reason-list'
+import { formatStandaloneCelsius } from '@/lib/format/celsius'
+import { walkSafetyTone } from '@/lib/insight/tone'
+import { withoutWarningReason } from '@/lib/insight/verdict-reasons'
+import { messages } from '@/lib/messages'
+import { cn } from '@/lib/utils/cn'
+import type { WalkSafetyResponse } from '@/types/insight'
+
+/**
+ * 오늘 산책 판정 — 아트보드 `01 홈 · P1 아래` / `02 홈` 좌측 / `04 ①`.
+ *
+ * **프로필 바로 아래에 1px 선으로 붙인다.** 밴드로 끊거나 별도 블록으로 분리하지 않는다 —
+ * 판정의 화자(누구 기준인가)가 사라진다.
+ *
+ * 접힘/펼침이 폭마다 다르다.
+ * - **모바일**: 접힌 한 줄(등급 + 수치 + 기준 장소). 누르면 펼친다
+ * - **데스크톱**: 펼친 패널이 기본
+ *
+ * **`위험`(DANGER)은 유일하게 접지 않는다** — 자동 펼침이고, 그 줄만 tint 로 강조한다.
+ *
+ * 등급어는 세로 바 없이 **라벨 16/600 `--fg-muted` + 등급어 20/800 등급 색**으로 구분한다.
+ *
+ * **아래에 밴드를 그리지 않는다** (#305). 예전에는 이 섹션이 끝에서 8px 밴드를 그렸고,
+ * 접었을 때 tint 줄 아래 회색 줄만 남는 문제 때문에 그것을 `open` 에 묶어 두어야 했다.
+ *
+ * 밴드는 "여기서 **다른 이야기**가 시작된다" 는 유일한 신호인데(DESIGN.md §0), 바로 아래
+ * 골든타임은 다른 이야기가 아니다 — "지금 나가도 되나" 다음 질문이 "그럼 언제 나가나" 이고
+ * 둘은 같은 판정 규칙을 쓴다. 같은 이야기 안은 1px 선으로 잇고, 그 선은
+ * `WalkTimesSection` 의 `border-t` 가 이미 그린다. 여기서 또 그리면 선이 두 겹이 된다.
+ *
+ * 접힘에 따라 경계의 굵기가 바뀌던 것도 함께 사라진다.
+ *
+ * **이 섹션만 시각 `h2` 가 없다** (#348). 형제 섹션들이 `title-2`→`md:title-1` 로 제목을 다는
+ * 동안 여기는 `오늘 산책` + 등급어 한 줄이 그 자리를 겸한다. 라벨을 heading 으로 올리지
+ * 않는 이유는 셋이다 — 그 줄은 제목이 아니라 **값**이고(등급어가 답이다), 모바일 쪽은
+ * `<button>` 안이라 heading 이 버튼에 들어가며, 모바일/데스크톱 두 벌이라 같은 `h2` 가
+ * DOM 에 둘 생긴다. 접근성 이름은 `<section aria-label>` 이 이미 준다.
+ */
+export function WalkVerdict({
+  data,
+  petName,
+  todayLabel,
+  basisIsDefault,
+  busy = false,
+}: {
+  data: WalkSafetyResponse
+  petName: string | null
+  /**
+   * `2026-09-10 (목) · 제주시` — **이 카드가 날짜 줄을 겸한다** (#428 · #530).
+   *
+   * 예전에는 레일 맨 위 바닥 위에 홀로 떠 있었다. 3a 로 바닥이 회색이 되면서 그 줄만
+   * 카드 밖에 남아 **어느 카드의 날짜인지 붙을 곳이 없어졌다.** 판정이 "오늘" 의
+   * 이야기이고 체감온도 라벨과 같은 줄에 설 자리가 비어 있어 여기로 들인다.
+   *
+   * **모바일도 받는다** (#530). #428 은 여기를 데스크톱 전용으로 두고 모바일은
+   * `home-view` 가 카드 밖에 그리게 했는데 — **접힌 줄에도 날짜를 놓을 자리가 있었다.**
+   * 등급 줄 바로 위 caption 이 데스크톱과 같은 자리이고, 패널을 접든 펼치든 그 줄은
+   * 늘 보인다. 폭에 따라 날짜가 다른 물건이 되던 분기가 함께 사라진다.
+   */
+  todayLabel: string
+  /**
+   * 기준이 사용자가 고른 장소가 아니라 **대표 지점**인가 (홈-첫방문-판정-세부명세 D3-1).
+   *
+   * 참이면 기준 줄(`{장소} 기준`) 아래에 한 줄이 더 붙어 그 사실을 말한다. 기준 줄만
+   * 두면 화면이 **사용자가 고른 적 없는 장소를 고른 것처럼** 말하게 된다 — 판정의
+   * 화자가 누구 기준인지 밝히는 이 카드에서 가장 하면 안 되는 일이다.
+   *
+   * **`placeId` 를 받아 여기서 판별하지 않는다.** 판별은 `isDefaultBasis()` 한 곳에
+   * 두고, 이 컴포넌트는 답만 받는다 — 기준 결정은 호출부(`home-view`)의 일이다.
+   *
+   * 기본값을 두지 않는다. 빠뜨리면 캡션이 **조용히 사라지는데**, 그것이 바로 이 카드가
+   * 고치려던 상태다.
+   */
+  basisIsDefault: boolean
+  busy?: boolean
+}) {
+  const tone = walkSafetyTone(data.walkSafetyLevel.code)
+  // 위험은 접지 않는다 — 자동 펼침 (아트보드 04-①)
+  const [open, setOpen] = useState(tone === 'critical')
+
+  /*
+    **`heatIndexCelsius` 가 아니라 `feelsLikeCelsius` 다** (#292). 판정 기준이 NOAA 열지수에서
+    기상청 체감온도로 바뀌었고(BE `46f35e4`), 열지수는 판정에 쓰이지 않는 참고값으로 내려갔다.
+    이 줄이 옛 필드를 읽는 동안 화면은 `체감온도` 라벨로 **판정에 쓰이지 않는 숫자**를 말했다 —
+    서늘한 날은 차이가 작지만 33℃/85% 에서 48 vs 35.5 로 갈린다.
+
+    **참고 열지수를 여기 곁들이지 않는다.** 홈은 요약면이고 이 줄은 접힌 상태에서 한 줄이다.
+    참고값과 그것을 참고값이라 말하는 문장은 장소 상세의 펼침 근거가 함께 맡는다.
+
+    **혼자 서는 값이다** (#1067) — 정수면 `.0` 을 뗀다. 같은 카드의 시간대 표는 칸이 늘어서
+    소수 1자리를 유지한다(`formatCelsius`, DESIGN.md §3-3).
+  */
+  const feelsLike = formatStandaloneCelsius(data.feelsLikeCelsius)
+  const summary = [
+    feelsLike === null ? null : `${messages.home.feelsLikeLabel} ${feelsLike}℃`,
+    `${data.placeTitle} ${messages.home.basisSuffix}`,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(' · ')
+
+  return (
+    /*
+      **카드가 되지 않는다** (#428). 3a 로 옮기면서 이 섹션을 `Surface` 로 올릴까 했는데,
+      그러면 위 머리주석이 막아 둔 것을 그대로 하게 된다 — 프로필과 갈라지면 **판정의
+      화자(누구 기준인가)가 사라진다.** 골든타임과 갈라지면 "지금 나가도 되나 → 그럼
+      언제" 가 같은 판정 규칙이라는 것이 안 읽힌다.
+
+      그래서 카드는 이 셋을 **함께 감싼다** (`home-view.tsx` 좌측 레일). 이 섹션은 그
+      카드 안의 한 블록으로 남고, 위 1px 선이 형제와 잇는 역할을 계속한다.
+    */
+    <section
+      aria-busy={busy || undefined}
+      aria-label={messages.home.walkTodayLabel}
+      className={cn('border-border border-t', busy && 'opacity-55')}
+    >
+      {/* 모바일 — 접힌 한 줄. 누르면 펼친다 */}
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className={cn(
+          'focus-visible:ring-brand-500 flex w-full items-center gap-2 px-4 py-3 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:hidden',
+          /*
+            위험만 그 줄을 tint 로 강조한다. **다섯 톤 표를 만들지 않는다** — 이 조건이
+            `critical` 로 좁혀 실제로 쓰이는 값은 하나뿐이고, 표로 두면 나머지 넷도
+            쓰이는 것처럼 읽힌다.
+          */
+          tone === 'critical' && 'bg-metric-critical-100',
+        )}
+      >
+        <span className="min-w-0 flex-1">
+          {/*
+            **날짜는 등급 줄 위 caption 이다** (#530) — 아래 데스크톱 패널과 같은 자리,
+            같은 서체다. 접힘/펼침과 무관하게 이 버튼은 늘 렌더되므로, 패널이 닫혀 있어도
+            날짜가 사라지지 않는다.
+          */}
+          <span className="text-caption text-fg-muted block font-medium tabular-nums">
+            {todayLabel}
+          </span>
+          {/*
+            **특보 배지를 걷었다** (#349). 예전에는 이 줄이 모바일의 특보 표시를 겸했는데
+            (아래 데스크톱 등급 줄이 `md:flex` 라 모바일에서 렌더되지 않는다), 이제
+            페이지 최상단 `WeatherWarningStrip` 이 폭과 무관하게 항상 그 자리에 선다.
+          */}
+          <span className="text-body-1 flex flex-wrap items-center gap-x-1 gap-y-1 font-semibold">
+            <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>
+            <MetricWord tone={tone}>{data.walkSafetyLevel.name}</MetricWord>
+          </span>
+          <span className="text-caption text-fg-muted block font-medium tabular-nums">
+            {summary}
+          </span>
+          {/*
+            **대표 지점 캡션** (#636). 위 `summary` 가 `{장소} 기준` 이라고 말한 그 장소를
+            사용자가 고른 적이 없을 때, 이 줄이 그 사실을 밝힌다. 데스크톱 패널의 같은
+            자리(기준 줄 바로 아래)와 같은 서체다.
+
+            **접힘 밖이다.** 기준을 설명하는 줄이 기준 줄과 떨어져 있으면 읽히지 않는다 —
+            모바일 기본 상태는 접힘이고, 그때 보이는 것은 이 버튼뿐이다.
+          */}
+          {basisIsDefault && (
+            <span className="text-caption text-fg-muted block font-medium">
+              {messages.home.basisDefaultNote}
+            </span>
+          )}
+        </span>
+        <ChevronDownIcon
+          size={20}
+          className={cn('text-fg-muted shrink-0 transition-transform', open && 'rotate-180')}
+        />
+      </button>
+
+      {/*
+        데스크톱 — 펼친 패널이 기본. 모바일은 접힘 상태에 따른다.
+
+        **모바일 `pt-4` 를 준다.** 없으면 위 버튼(위험이면 tint 면)에 첫 문장이 붙어
+        같은 덩어리로 읽힌다. 데스크톱은 `md:py-5` 가 위아래를 함께 잡는다.
+      */}
+      <div
+        className={cn(
+          'flex-col gap-3 pt-4 pb-4 md:flex md:py-5',
+          // 카드 안이라 페이지 인셋(40)이 아니라 카드 인셋(20)이다 (#428)
+          'px-4 md:px-5',
+          open ? 'flex' : 'hidden',
+        )}
+      >
+        {/*
+          데스크톱에만 보이는 등급 줄 — 모바일은 위 버튼이 이미 말했다.
+
+          **`items-baseline` 이다** (#428). 양쪽이 caption + 값 두 줄로 같은 모양이 되면서,
+          날짜와 `체감온도` 라벨이 **같은 줄에 서야** 한다. `items-end` 로 두면 값 줄의
+          높이가 갈려(16 vs 28) 위 라벨 두 개가 어긋난다 — baseline 은 각 항목의 첫 줄
+          기준선을 맞추므로 caption 끼리 정확히 선다.
+        */}
+        <div className="hidden items-baseline justify-between gap-3 md:flex">
+          {/*
+            **특보 배지가 여기 없다** (#349). 경보면 서버가 이미 `DANGER` 로 끊어 이 섹션이
+            자동 펼침 + tint 인 상태이고, **그 tint 가 곧 배지가 말하던 이유**다. 특보 자체는
+            페이지 최상단 스트립이 한 번 말한다.
+          */}
+          <span className="flex min-w-0 flex-col gap-1">
+            {/* 오른쪽 `체감온도` 라벨과 같은 줄. 둘 다 caption/muted 라 무게가 같다 */}
+            <span className="text-caption text-fg-muted font-medium tabular-nums">
+              {todayLabel}
+            </span>
+            <span className="text-body-1 flex flex-wrap items-center gap-x-1 gap-y-2 font-semibold">
+              <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>
+              <MetricWord tone={tone}>{data.walkSafetyLevel.name}</MetricWord>
+            </span>
+          </span>
+          {/*
+            **라벨을 붙인다** (#259). 모바일 접힌 줄은 `feelsLikeLabel` 을 이미 달고 있는데
+            데스크톱 hero 만 맨 숫자였다 — 같은 화면의 같은 값이 폭에 따라 이름을 잃었다.
+            아래 기준 줄(`{장소} 기준`)은 어디의 값인지만 말하고 무엇인지는 말하지 않는다.
+          */}
+          {feelsLike !== null && (
+            <MetricValue
+              label={
+                <span className="inline-flex items-center gap-1">
+                  {messages.home.feelsLikeLabel}
+                  {/*
+                    **`33.0℃` 가 무슨 척도인지 말하는 자리가 홈에 없었다** (#313).
+                    `feelsLikeBasis` 는 응답에 이미 있고 장소 상세는 접힘 서랍으로 내보내는데,
+                    홈은 숫자만 있었다. 상시 노출로 세우지 않고 원할 때 여는 채널로 둔다 —
+                    홈 첫 화면의 밀도를 키우면서 행동은 하나도 바꾸지 않는 문장이다.
+
+                    **`null` 이면 아이콘 자체를 렌더하지 않는다.** 눌러도 빈 말풍선이 뜨는
+                    물음표를 두지 않는다.
+                  */}
+                  {data.feelsLikeBasis !== null && (
+                    <InfoTip label={messages.home.feelsLikeBasisLabel}>
+                      {data.feelsLikeBasis}
+                      {/*
+                        출처와 계산 입력 (#317). **상시 노출 줄을 새로 만들지 않는다** —
+                        홈 첫 화면의 밀도를 키우면서 행동은 하나도 바꾸지 않는 값이라,
+                        근거를 여는 이 자리 안에서만 산다.
+                      */}
+                      <BasisFootnote
+                        humidity={data.humidity}
+                        providerName={data.weatherProviderName}
+                        className="mt-2"
+                      />
+                    </InfoTip>
+                  )}
+                </span>
+              }
+              value={feelsLike}
+              unit="℃"
+              tone={tone}
+              size="hero"
+              className="shrink-0"
+            />
+          )}
+        </div>
+        {/*
+          기준 줄. **캡션이 붙으면 둘이 한 덩어리다** (#636) — 바깥 `gap-3` 이 두 줄을
+          갈라 놓으면 안내가 어느 줄에 대한 말인지 멀어진다. 그래서 같은 래퍼 안에서
+          `gap-1` 로 붙인다. 위 `<p>` 안에 이어 쓰지 않는 이유는 성격이 달라서다 — 위는
+          값(어디 기준인가)이고 아래는 그 값이 어떻게 정해졌는지에 대한 안내다.
+        */}
+        <div className="hidden flex-col gap-1 md:flex">
+          <p className="text-caption text-fg-muted font-medium">
+            {data.placeTitle} {messages.home.basisSuffix}
+            {petName !== null && ` · ${petName} ${messages.home.basisSuffix}`}
+          </p>
+          {basisIsDefault && (
+            <p className="text-caption text-fg-muted font-medium">
+              {messages.home.basisDefaultNote}
+            </p>
+          )}
+        </div>
+
+        {/*
+          **등급이 권하는 행동.** `walkSafetyLevel.description` 은 "짧게 걷고 물과 그늘을
+          챙기는 편이 좋습니다" 같은 완성형 문장인데, 화면은 지금까지 등급어(`주의`) 두
+          글자만 쓰고 이 문장을 버리고 있었다. 이 서비스는 판정이 아니라 **판단을 돕는**
+          쪽이고, 그 일을 하는 문장이 응답에 이미 들어 있었다.
+
+          **`reasons` 위에 둔다.** 근거("왜 주의인가")보다 조치("그럼 어떻게 하나")가
+          먼저 읽혀야 한다 — 근거는 그 조치를 뒷받침하는 자리다.
+
+          **`scoreDescription` 은 쓰지 않는다.** "위험 요인이 하나 이상 확인되었습니다" 는
+          아래 `reasons` 가 그 요인을 낱낱이 세는 것과 같은 말이고, 행동을 바꾸지 않는다.
+        */}
+        {data.walkSafetyLevel.description !== null && (
+          <p className="text-body-2 text-fg">{data.walkSafetyLevel.description}</p>
+        )}
+
+        {/*
+          **공용 `ReasonList` 다** (#840). 예전에는 여기 자체 구현(`VerdictReasons`)이 있었는데,
+          그것이 존재하던 유일한 이유는 **앞 2개만 보이고 나머지를 펼침 버튼 뒤에 두는 접기**
+          였다. 접기가 사라지자 남은 것은 `ReasonList` 와 글자 하나까지 같은 코드였고,
+          다른 점은 목록 시맨틱 없이 `<div>/<p>` 를 쓴다는 손해뿐이었다.
+
+          저장소의 다른 근거 목록 넷(일정 하루 판정 · 장소 적합도 · 장소 산책 위험도 ·
+          AI 초안)은 모두 이것을 쓴다.
+
+          **특보 줄은 홈에서 뺀다** (#1065, `withoutWarningReason`). 최상단 띠가 배지로 종류까지
+          이미 말하고 이 카드가 바로 아래라 같은 사실이 한눈에 두 번 보였다 (DESIGN.md §1
+          "기상특보는 화면당 1회" 의 홈 예외). 서버 문장은 그대로이고 여기서 표시만 거른다.
+        */}
+        <ReasonList reasons={withoutWarningReason(data.reasons, data.weatherWarning)} />
+
+        {/*
+          **`saferWindow` 줄을 홈에서 걷었다** (#349). 이 섹션은 "지금 나가도 되나" 만
+          답하고, "오늘 언제 나가나" 는 바로 아래 `WalkTimesSection` 이 답한다. 두 섹션이
+          같은 질문에 각자 답하는 동안 **서로를 부정했다** — 폭염 경보 날 화면 세로 200px
+          안에서 이 초록 박스가 `더 안전한 시간대는 18:00 – 21:00` 이라고 말하고, 골든타임이
+          `경보가 발효 중이라 추천하지 않아요` 라고 말했다.
+
+          두 값의 출처가 다른 엔드포인트다. `WalkSafetyEvaluator` 는 `level == SAFE` 일 때만
+          `saferWindow` 를 비우고 **경보를 보지 않는데**, `GoldenWindowStatus.of` 는 경보면
+          `SUPPRESSED_BY_WARNING` 으로 억제한다.
+
+          **여기서 `weatherWarning` 을 보고 조건을 세우지 않는다.** 그러면 화면이 서버의
+          판정 순서를 다시 짜는 것이 되고, 한쪽만 고쳐져 같은 상태에 다른 문구가 나간다
+          (`WalkTimesSection` 머리주석 — 경보/주의보 구분도 서버 몫이다). 조건 대신 **자리**로
+          푼다: 시간축은 골든타임 하나가 맡는다 (DESIGN.md §7-1).
+
+          **`place-walk-safety-panel` 의 같은 줄은 남는다** — 장소 상세에는 골든타임 섹션이
+          없어 거기서는 이 줄이 그 질문의 유일한 답이다. 근본 수정(경보일 때 서버가
+          `saferWindow` 를 비우는 것)은 BE 몫으로 남겨 두었다.
+        */}
+      </div>
+    </section>
+  )
+}

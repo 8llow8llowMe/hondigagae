@@ -1,0 +1,90 @@
+/**
+ * 일정 query key.
+ *
+ * **key 에 필터를 넣지 않는다.** 장소 목록은 필터가 서버 조회 파라미터라 필터마다 key 가
+ * 갈려야 하지만, 일정 필터는 서버 파라미터가 아예 없어 **같은 조회 결과를 화면에서 거를
+ * 뿐**이다 (공통명세 S3). 필터를 key 에 넣으면 조건을 바꿀 때마다 같은 요청을 다시 보낸다.
+ */
+export const planKeys = {
+  all: ['plans'] as const,
+  list: () => [...planKeys.all, 'list'] as const,
+  detail: (planId: string) => [...planKeys.all, 'detail', planId] as const,
+  /**
+   * 일자별 판정. **상세와 key 를 나눈다** — 판정만 5xx 로 실패해도 일정 본문은
+   * 그대로 남아야 하고(D5), 그 섹션만 따로 재조회할 수 있어야 한다.
+   */
+  weather: (planId: string) => [...planKeys.weatherAll(), planId] as const,
+  /** 모든 일정의 판정 — 반려견 특성을 고쳤을 때의 prefix (#1058, `briefingAll` 과 같은 판단) */
+  weatherAll: () => [...planKeys.all, 'weather'] as const,
+  /**
+   * 항목 산책 위험도 (#625). **상세·판정과 또 나눈다** — 한쪽이 5xx 로 죽어도 다른 쪽은
+   * 살아 있어야 하고(D5), 일괄 교체 뒤 이 절만 무효화할 수 있어야 한다 (D15-6).
+   */
+  walkSafety: (planId: string) => [...planKeys.walkSafetyAll(), planId] as const,
+  /** 모든 일정의 산책 위험도 — 반려견 특성을 고쳤을 때의 prefix (#1058) */
+  walkSafetyAll: () => [...planKeys.all, 'walkSafety'] as const,
+  /**
+   * 응급 브리핑 (#125). **상세·판정과 key 를 또 나눈다** — 별도 화면이고 한쪽이 실패해도
+   * 다른 쪽은 살아 있어야 한다.
+   */
+  emergency: (planId: string) => [...planKeys.all, 'emergency', planId] as const,
+  /**
+   * 출발 전 여행 브리핑 (#626). **날짜가 key 에 들어간다** — `date` 마다 다른 응답이고
+   * (특보·골든타임은 `today=true` 에서만 온다) 화면이 여는 시점에 따라 날짜가 바뀐다.
+   *
+   * **`staleTime` 은 일정(30초)이 아니라 인사이트(5분)를 쓴다** — 내용이 예보 판정이고
+   * 예보 단위가 1시간이다 (`api-integration-guide.md` §7 `장소 인사이트` 행과 같은 근거).
+   *
+   * **다만 `schedule`(첫/마지막 항목 시각 · 방문 수 · 대표 장소)은 예보가 아니라 그날 항목
+   * 그대로다** (`PlanBriefingProcessor.toScheduleInfo`). 5분을 믿고 두면 일정을 고친 뒤 옛
+   * 시각이 보인다 — 일정 쓰기가 `invalidatePlanBriefing` 으로 버린다 (#1055).
+   */
+  briefing: (planId: string, date: string) => [...planKeys.briefings(planId), date] as const,
+  /** 한 일정의 브리핑 전부 — 날짜를 가리지 않고 버릴 때의 prefix (#1055) */
+  briefings: (planId: string) => [...planKeys.briefingAll(), planId] as const,
+  /** 모든 일정의 브리핑 — 반려견 특성을 고쳤을 때의 prefix (#1055) */
+  briefingAll: () => [...planKeys.all, 'briefing'] as const,
+  /**
+   * 저장된 여행 준비물 (#586). **상세와 key 를 나눈다** — 준비물만 실패해도 일정 본문은
+   * 그대로 남아야 하고, 체크·추가·삭제 뒤에 그 절만 갱신할 수 있어야 한다.
+   *
+   * 예전에는 key 가 아예 없었다. 생성 결과를 서버가 보관하지 않아 `useMutation` 이었고,
+   * 캐시할 것이 없었다 — 저장이 생기면서 조회가 됐다.
+   */
+  packing: (planId: string) => [...planKeys.all, 'packing', planId] as const,
+  /**
+   * 여행 후기 (#615). **상세와 key 를 나눈다** — 후기 조회만 실패해도 일정 본문은
+   * 그대로 남아야 하고, 쓰기·고친 뒤에는 이 절만 갱신하면 된다. 후기가 없으면 캐시 값이
+   * `null` 이다 (#979 — 서버가 200 + `dataBody: null` 로 답한다).
+   *
+   * 목록에는 `hasReview` 가 없어 목록 key 를 건드리지 않는다.
+   */
+  review: (planId: string) => [...planKeys.all, 'review', planId] as const,
+  /**
+   * 공유 링크 (#628). **상세와 key 를 나눈다** — 링크 조회만 실패해도 일정 본문은
+   * 그대로 남아야 하고, 발급·폐기 뒤에는 이 key 만 갱신하면 된다. 공유 중이 아니면 캐시
+   * 값이 `null` 이다 (#979 — 서버가 200 + `dataBody: null` 로 답한다. 폐기 뒤
+   * `setQueryData(null)` 도 같은 모양이다).
+   *
+   * **상세 응답에 공유 여부가 없어** 상세 key 를 건드릴 일이 없다 (후기와 같은 판단).
+   */
+  shareLink: (planId: string) => [...planKeys.all, 'share-link', planId] as const,
+  /**
+   * 반려견 기준 동행 일정 집계 (#1042) — 반려견 삭제 확인창이 읽는다.
+   *
+   * **일정 key 아래에 둔다.** 원천이 plan-service 이고 값이 일정 구성에 딸린다 — 일정을
+   * 만들거나 동행견을 바꾸면(`planKeys.all` 무효화) 이 집계도 함께 낡아야 맞다.
+   */
+  companions: (petId: string) => [...planKeys.all, 'companions', petId] as const,
+}
+
+/** api-integration-guide.md §7 표준값 — 일정 목록·상세는 30초 / 10분 (mutation 빈번) */
+export const PLAN_QUERY_OPTIONS = {
+  staleTime: 30_000,
+  gcTime: 10 * 60_000,
+} as const
+
+export const planListQueryOptions = {
+  ...PLAN_QUERY_OPTIONS,
+  initialPageParam: null as string | null,
+} as const

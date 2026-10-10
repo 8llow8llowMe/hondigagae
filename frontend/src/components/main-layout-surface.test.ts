@@ -1,0 +1,175 @@
+/**
+ * 앱 셸의 세로 뼈대 — 이슈 #456③ · #494.
+ *
+ * **뼈대는 `src/features/nav/app-shell.tsx` 가 갖는다.** 원래 `(main)` 레이아웃 안에
+ * 있었는데, 전역 404 가 같은 헤더·푸터를 써야 하면서 뽑아냈다 (#494) — 주소가 어느
+ * 라우트와도 안 맞으면 Next 는 **루트 레이아웃 안에서** 루트 `not-found.tsx` 만 그려
+ * 그룹 레이아웃이 닿지 않는다. **뼈대가 두 벌이 되면 한쪽만 고쳐지므로** 여기서 한 벌임을
+ * 함께 잠근다.
+ *
+ * **소스를 문자열로 읽는다.** 셸을 쓰는 `app/(main)/layout.tsx` 는 `readSession()` 을 부르고
+ * `prefetchQuery` 를 기다리는 async 서버 컴포넌트라 node 환경에서 렌더할 방법이 없다
+ * (`testing-guide.md` §1). 여기서 지키려는 것도 렌더 결과가 아니라 **높이 계약**이다 —
+ * 누가 뷰포트 높이를 잡고, 누가 그 남는 높이를 먹고, 탭바 자리는 어디가 비우는가.
+ * `route-state-surface.test.ts` 와 같은 방식이다.
+ *
+ * **주석을 걷은 사본에 대해 단언한다 — 다만 지금은 어느 단언도 그것에 기대지 않는다.**
+ * 확인한 결과를 그대로 적는다: `strip` 을 항등함수로 바꿔 돌려도 다섯 단언이 그대로
+ * 통과하고, `pb-16` 을 되돌린 뮤테이션도 그대로 잡힌다. `layout.tsx` 의 주석이
+ * `pb-16 md:pb-0` 을 걷어낸 이유로 인용하긴 하지만 `id="main"` 뒤가 아니라 **앞**에
+ * 있어서, 자리를 보는 정규식(`/id="main"[^>]*\bpb-/`)에 걸리지 않는다.
+ *
+ * **그래도 걷는다.** 가장 노출된 것은 `min-h-dvh` 를 **한 번만** 세는 단언이다 —
+ * 지금 주석은 `min-h` 까지만 적고 있지만 누가 근거를 적으며 `min-h-dvh` 를 그대로
+ * 인용하는 순간 그 단언이 코드와 무관하게 깨진다. 이 저장소 주석은 근거를 길게 적어
+ * 클래스명이 그대로 등장하고, 형제 파일(`route-state-surface.test.ts` · `plan-create-surface`)
+ * 은 실제로 그것에 속은 전례(#451)가 있다.
+ *
+ * ### 여기서 잠그는 결정 셋
+ *
+ * 1. **뷰포트 높이는 셸이 한 번 잡는다** (`flex min-h-dvh flex-col`). 내용이 짧은
+ *    화면에서 L0 회색이 콘텐츠 높이에서 끊기고 그 아래로 흰 `body` 가 보이던 것이
+ *    이 이슈의 출발이다 — 1280×900 `/places/<없는 id>` 실측: 회색이 274 에서 끝나고
+ *    푸터 아래 **366px 가 맨 흰색**. `DESIGN.md §0` 의 "흰색은 바닥이 아니라 섹션의 색" 이
+ *    거기서 뒤집힌다. **페이지마다 붙이지 않는다** — 그러면 같은 규칙이 열두 곳으로
+ *    갈린다 (`route-state-surface.test.ts` 가 이 이슈로 미뤄 둔 결정이다).
+ * 2. **남는 높이는 `Canvas` 가 `flex-1` 로 받는다.** `min-h: 100dvh - 헤더` 를 박는 안은
+ *    같은 흰 공백을 없애지만 **없던 스크롤을 짧은 화면마다 만든다** — 푸터(260)가 통째로
+ *    접힘 아래로 내려가기 때문이다. `flex-1` 은 푸터 자리를 남기고 나머지만 먹는다.
+ * 3. **탭바 자리를 본문 래퍼가 비우지 않는다.** 예전 `pb-16 md:pb-0` 은 `Canvas` **밖**
+ *    이라 모바일에서 회색 바닥과 푸터 사이에 흰 띠 64px 을 만들었다 (375×812 실측:
+ *    회색이 266 에서 끝나고 푸터가 330 에서 시작). 그 자리는 이미 둘이 비우고 있다 —
+ *    푸터는 자기 `padding-block-end`, 푸터가 빠지는 지도 화면은 `.map-canvas-height`.
+ *
+ * ### 실측 (이 커밋 뒤)
+ *
+ * | 화면 | 뷰포트 | 회색 바닥 | 푸터 | 문서 높이 |
+ * | --- | --- | --- | --- | --- |
+ * | `/places/<없는 id>` | 1280×900 | 64–640 | 640–900 | 900 (스크롤 없음) |
+ * | `/places/<없는 id>` | 375×812 | 56–460 | 460–812 | 812 (스크롤 없음) |
+ * | 지도(모바일) | 375×812 | 56–812 | 빠짐 | 812 (스크롤 없음) |
+ */
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+
+import { describe, expect, it } from 'vitest'
+
+import { Canvas } from '@/components/surface'
+import { readSource, readSourceWithoutComments } from '@/test/source'
+
+const SHELL = 'src/features/nav/app-shell.tsx'
+const LAYOUT = 'app/(main)/layout.tsx'
+const NOT_FOUND = 'app/not-found.tsx'
+
+describe('앱 셸 — 세로 뼈대', () => {
+  it('뷰포트 높이를 셸이 한 번 잡는다 — 페이지마다 min-h 를 붙이지 않는다', () => {
+    const source = readSourceWithoutComments(SHELL)
+
+    expect(source).toContain('flex min-h-dvh flex-col')
+    // 뼈대는 하나여야 한다. 둘이 되면 어느 쪽이 높이를 잡는지 화면마다 갈린다
+    expect(source.match(/min-h-dvh/g)).toHaveLength(1)
+  })
+
+  it('머리 · 본문 · 푸터가 그 열 안에 있다 — 탭바만 fixed 라 밖이다', () => {
+    const source = readSourceWithoutComments(SHELL)
+    const skeleton = source.indexOf('flex min-h-dvh flex-col')
+    const closing = source.indexOf('</div>', source.indexOf('<SiteFooter />'))
+
+    for (const inside of ['<GlobalHeader', '<IslandHeader', 'id="main"', '<SiteFooter />']) {
+      const at = source.indexOf(inside)
+      expect(at).toBeGreaterThan(skeleton)
+      expect(at).toBeLessThan(closing)
+    }
+
+    // 탭바가 열 안에 들어가면 `fixed` 인데도 자리를 한 번 더 차지한다
+    expect(source.indexOf('<MobileTabBar')).toBeGreaterThan(closing)
+  })
+
+  /*
+    **헤더 두 벌이 셸에 있다** (#1287). 지도 아일랜드 알약은 띠 바로 다음, 오프라인 띠 · 본문 앞이다 —
+    `<main>` 밖이어야 `banner` 랜드마크이고 스킵 링크가 건너뛴다. 둘 중 하나만 보이는 것은 CSS 가 정한다.
+  */
+  it('셸 순서가 띠 헤더 → 아일랜드 헤더 → 오프라인 띠 → 본문이다', () => {
+    const source = readSourceWithoutComments(SHELL)
+    const order = ['<GlobalHeader', '<IslandHeader', '<OfflineBanner', 'id="main"'].map((tag) =>
+      source.indexOf(tag),
+    )
+
+    expect(order[0]).toBeGreaterThan(-1)
+    expect(order).toEqual([...order].sort((a, b) => a - b))
+  })
+
+  it('본문 래퍼가 남는 높이를 먹고 Canvas 에 넘긴다', () => {
+    expect(readSourceWithoutComments(SHELL)).toMatch(
+      /<div id="main" tabIndex=\{-1\} className="flex flex-1 flex-col">/,
+    )
+  })
+
+  /*
+    **스킵 링크의 목적지는 포커스를 받을 수 있어야 한다** (#558).
+
+    `tabIndex={-1}` 이 없으면 `본문으로 바로가기` 를 눌러도 포커스가 `body` 에 남는다 —
+    dev 실측에서 다섯 화면 전부 Enter 직후 `document.activeElement` 가 `BODY` 였다.
+    **문자열 단언인 이유**: vitest 는 `environment: 'node'` 라 실제 포커스를 못 본다
+    (`docs/testing-guide.md §1`). 포커스 자체는 `e2e/skip-link.spec.ts` 가 잰다.
+  */
+  it('스킵 링크가 가리키는 본문이 포커스를 받을 수 있다', () => {
+    const source = readSourceWithoutComments(SHELL)
+
+    expect(source).toContain('href="#main"')
+    expect(source).toMatch(/<div id="main" tabIndex=\{-1\}/)
+  })
+
+  /*
+    **셸을 쓰는 곳이 둘이고, 둘 다 뼈대를 다시 그리지 않는다** (#494).
+
+    404 는 저장소에서 **가장 짧은 화면**이라 `min-h-dvh` + `flex-1` 짝이 깨지면 푸터 아래
+    흰 띠가 가장 먼저 거기서 난다. 그때 레이아웃만 보는 단언은 아무것도 못 잡는다.
+  */
+  it('셸을 쓰는 곳이 둘이고 어느 쪽도 뼈대를 베껴 쓰지 않는다', () => {
+    for (const path of [LAYOUT, NOT_FOUND]) {
+      const source = readSourceWithoutComments(path)
+
+      expect(source).toContain('<AppShell')
+      // 뼈대 조각을 여기서 다시 적으면 셸과 갈린다
+      expect(source).not.toContain('min-h-dvh')
+      expect(source).not.toContain('<GlobalHeader')
+      expect(source).not.toContain('<MobileTabBar')
+    }
+  })
+
+  /*
+    **`pb-*` 가 `Canvas` 밖에 있으면 회색과 푸터 사이에 흰 띠가 생긴다.** 탭바 자리를
+    비워야 한다는 요구 자체는 살아 있고, 그것을 비우는 두 곳을 아래에서 함께 잠근다 —
+    한쪽이 사라지면 모바일 마지막 줄이 탭바 뒤로 들어간다.
+
+    **비우는 쪽이 푸터에서 `Canvas` 로 옮겨 갔다.** 푸터가 768 미만에서 통째로 빠지면서
+    그 `padding-block-end` 도 같이 사라졌기 때문이다 — 감춘 요소는 여백을 주지 못한다.
+    `.page-canvas` 는 `Canvas` **자신**이라 위 규칙(바깥이면 흰 띠)을 깨지 않는다.
+  */
+  it('탭바 자리를 본문 래퍼가 비우지 않는다 — Canvas 와 지도가 각자 비운다', () => {
+    expect(readSourceWithoutComments(SHELL)).not.toMatch(/id="main"[^>]*\bpb-/)
+
+    const css = readSource('app/globals.css')
+    expect(css).toMatch(/\.page-canvas\s*\{[^}]*padding-block-end:\s*calc\(var\(--tabbar-h\)/)
+    expect(css).toMatch(
+      /\.map-canvas-height\s*\{[^}]*100dvh - var\(--header-h\) - var\(--tabbar-h\)/,
+    )
+  })
+
+  /*
+    **높이를 주는 쪽과 받는 쪽을 한 파일에서 쌍으로 잠근다.** 한쪽만 보는 단언은
+    드리프트를 못 잡는다 — 레이아웃에서 `flex-1` 을 떼든 `Canvas` 에서 떼든 회색 바닥은
+    똑같이 끊기는데, 그때 깨지는 단언이 없으면 아무도 모른다 (#464 폭 드리프트를 잡은 방식).
+  */
+  it('Canvas 가 그 높이를 flex-1 로 받는다 — min-h 로 받지 않는다', () => {
+    const markup = renderToStaticMarkup(createElement(Canvas, { as: 'main', children: '내용' }))
+
+    expect(markup).toContain('flex-1')
+    /*
+      `min-h` 로 받으면 푸터가 통째로 접힘 아래로 내려가 **없던 스크롤이 짧은 화면마다
+      생긴다.** 그 안을 기각한 근거는 `surface.tsx` 의 `Canvas` 주석에 있다.
+    */
+    expect(markup).not.toMatch(/min-h-/)
+  })
+})

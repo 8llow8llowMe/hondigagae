@@ -1,0 +1,34 @@
+# 컨텍스트 로딩 테스트 전용 프로파일 (BatchServiceApplicationTests).
+# 목적은 "빈 정의가 서로 충돌하지 않고 잡 배선(Step 이름 해소·JobStep·리스너·검증기)이 조립되는가" 하나다.
+# 외부 의존은 전부 끊는다.
+#   - DB: H2 인메모리 (testRuntimeOnly). Spring Batch 메타 테이블은 initialize-schema:always 로 만든다.
+#   - Eureka / Config Server: 비활성. CI 에서 네트워크로 죽는다.
+#   - 잡은 자동 실행하지 않는다(spring.batch.job.enabled=false 기본). 원천 키·파일이 없어도 컨텍스트는 뜬다.
+server:
+  port: 0
+
+spring:
+  cloud:
+    config:
+      enabled: false
+    discovery:
+      enabled: false
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:batch-context;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  batch:
+    jdbc:
+      initialize-schema: always
+  # import_source_snapshot DDL 이 H2(MODE=MySQL)에서도 도는지가 이 게이트의 확인 항목이다 (#379).
+  # 스크립트는 prod 런북과 같은 파일 하나다 — 여기서 깨지면 배포 전에 드러난다.
+  sql:
+    init:
+      mode: always
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false

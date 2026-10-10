@@ -1,0 +1,105 @@
+spring:
+  application:
+    name: ${SPRING_APPLICATION_NAME:tour-service}
+  config:
+    import: optional:classpath:observability-common.yml
+  profiles:
+    active: local
+
+infra:
+  redis:
+    key-prefix: ${REDIS_KEY_PREFIX:hondigagae}
+
+logging:
+  level:
+    # Eureka 클라이언트가 주기적으로 Eureka 서버 엔드포인트를 확인할 때 출력하는 반복 로그를 줄이기 위한 설정
+    com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 3s
+        slow-call-rate-threshold: 80
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          # 사용자 요청 문제(좌표 없음 등)로 생긴 도메인 예외가 서킷을 열지 않게 한다.
+          - com.hondigagae.domainlayer.insight.application.exception.InsightException
+    instances:
+      # 기상청 단기예보. 제공처 단위로 인스턴스를 분리한다 (coding-conventions §10).
+      kma:
+        base-config: default
+        # 사용자 요청 경로에서 부르는 호출이라 느린 응답을 빨리 실패로 본다.
+        slow-call-duration-threshold: 2s
+      # 기상특보. 예보(kma)와 나눈다 - 활용신청이 별개라 승인 전에는 이쪽만 계속 실패한다.
+      # 서킷을 공유하면 아직 신청도 안 한 API 가 이미 잘 도는 예보 서킷을 열어 버린다.
+      kma-warning:
+        base-config: default
+        slow-call-duration-threshold: 2s
+
+# 기상청 예보. serviceKey 는 공공데이터포털 "디코딩(원문)" 키를 그대로 넣는다 -
+# 인코딩은 어댑터가 한다. 관광공사(B551011) 키와 같은 키를 쓸 수 있음이 실호출로 확인되어 있다.
+kma-api:
+  base-url: ${KMA_API_BASE_URL:https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0}
+  # 중기예보. 단기예보가 닿지 않는 D+3 ~ D+10 을 덮는다. 키는 같은 것을 쓴다.
+  mid-term-base-url: ${KMA_MID_TERM_BASE_URL:https://apis.data.go.kr/1360000/MidFcstInfoService}
+  service-key: ${KMA_API_SERVICE_KEY:}
+  publish-delay-minutes: ${KMA_PUBLISH_DELAY_MINUTES:10}
+  # 중기예보는 1일 2회(06, 18시) 발표라 회차 간격이 12시간이다.
+  mid-term-publish-delay-minutes: ${KMA_MID_TERM_PUBLISH_DELAY_MINUTES:20}
+  # 한 회차 전체를 받는 데 필요한 행 수. 실측 907~1052행이라 1000 으로는 잘린다.
+  # 잘리면 마지막 날이 반쪽으로 와서 최고기온이 실제보다 낮게 나온다 - 여유를 둔다.
+  num-of-rows: ${KMA_NUM_OF_ROWS:1500}
+  # 신선도가 지난 뒤에도 스테일 폴백용으로 키를 남겨 두는 기간.
+  stale-cache-seconds: ${KMA_STALE_CACHE_SECONDS:21600}
+  mid-term-stale-cache-seconds: ${KMA_MID_TERM_STALE_CACHE_SECONDS:129600}
+  # --- 쿼터 지렛대 (개발계정 일 1,000건) ---
+  # 발표 이후에도 이전 회차를 계속 쓸 시간. 발표 직후에는 일부 category 가 비어 오기도 해서,
+  # 유예를 두면 호출을 아끼면서 부실한 응답도 피한다. 늘릴수록 최신성을 내준다.
+  cache-grace-minutes: ${KMA_CACHE_GRACE_MINUTES:30}
+  mid-term-cache-grace-minutes: ${KMA_MID_TERM_CACHE_GRACE_MINUTES:60}
+  # 인접 격자를 몇 칸씩 묶을지. 1 이면 묶지 않는다.
+  # 기본을 끔으로 둔 이유는 제주 지형이다 - 한라산과 해안이 한 격자로 뭉개지면 고온 판정이
+  # 틀어진다. 쿼터가 실제로 빠듯해졌을 때만 켠다 (KmaGridPoint.coarsenedBy 참고).
+  grid-coarsen-factor: ${KMA_GRID_COARSEN_FACTOR:1}
+  # 발표 직후 여러 인스턴스가 같은 격자를 동시에 부르는 것을 막는 락의 수명.
+  # 원천 왕복보다 길고, 락 주인이 죽었을 때 남들이 오래 막히지 않을 만큼 짧아야 한다.
+  refresh-lock-seconds: ${KMA_REFRESH_LOCK_SECONDS:10}
+  # --- 기상특보 (WthrWrnInfoService) ---
+  # 예보와 별개로 활용신청해야 하는 서비스다(2026-09-01 신청·승인 확인).
+  # 신청이 안 된 환경에서는 false 로 꺼 둔다 - 켜 두면 10분마다 실패 로그만 쌓인다.
+  warning-base-url: ${KMA_WARNING_BASE_URL:https://apis.data.go.kr/1360000/WthrWrnInfoService}
+  warning-enabled: ${KMA_WARNING_ENABLED:true}
+  warning-num-of-rows: ${KMA_WARNING_NUM_OF_ROWS:20}
+  # 특보는 발효/해제가 예고 없이 일어나 발표 주기에 맞출 수 없다. 짧은 고정 TTL 을 쓴다.
+  # 키가 지역 하나(제주=184)라 10분 TTL 이어도 하루 144건이다.
+  warning-cache-seconds: ${KMA_WARNING_CACHE_SECONDS:600}
+  warning-station-id: ${KMA_WARNING_STATION_ID:184}
+
+# 여행 적합도 / 산책 위험도 임계값.
+# 확정된 수의학 기준이 아니라 현재의 판단이므로 배포 없이 조정할 수 있게 프로퍼티로 둔다.
+# 장소 키워드 검색 캐시. 원천은 DB 이고 Redis 는 같은 조건의 반복 조회만 줄인다.
+# Elasticsearch 가 붙기 전까지 LIKE + TTL 로 간다. 장소는 batch 적재라 즉시 무효화는 두지 않는다.
+place:
+  search-cache-seconds: ${PLACE_SEARCH_CACHE_SECONDS:300}
+
+insight:
+  rain-probability-percent: ${INSIGHT_RAIN_PROBABILITY_PERCENT:60}
+  hot-temperature: ${INSIGHT_HOT_TEMPERATURE:28.0}
+  very-hot-temperature: ${INSIGHT_VERY_HOT_TEMPERATURE:31.0}
+  cold-temperature: ${INSIGHT_COLD_TEMPERATURE:5.0}
+  very-cold-temperature: ${INSIGHT_VERY_COLD_TEMPERATURE:0.0}
+  strong-wind-speed: ${INSIGHT_STRONG_WIND_SPEED:9.0}
+  pavement-caution-celsius: ${INSIGHT_PAVEMENT_CAUTION_CELSIUS:42.0}
+  pavement-danger-celsius: ${INSIGHT_PAVEMENT_DANGER_CELSIUS:52.0}
+  # 기상청 여름철 체감온도 기준 — 폭염주의보(33℃)·폭염경보(35℃)와 같은 척도
+  feels-like-caution-celsius: ${INSIGHT_FEELS_LIKE_CAUTION_CELSIUS:33.0}
+  feels-like-danger-celsius: ${INSIGHT_FEELS_LIKE_DANGER_CELSIUS:35.0}
+  alternative-radius-meters: ${INSIGHT_ALTERNATIVE_RADIUS_METERS:5000}
+  alternative-size: ${INSIGHT_ALTERNATIVE_SIZE:5}

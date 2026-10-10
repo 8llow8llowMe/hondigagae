@@ -1,0 +1,205 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+
+import { describe, expect, it } from 'vitest'
+
+import {
+  AiPlanCommitPanel,
+  type AiPlanCommitPanelProps,
+  AiPlanCommittedPanel,
+} from '@/features/ai-plan/ai-plan-commit-panel'
+import { toAiPlanCommitErrors } from '@/lib/ai-plan/commit-error'
+import { ApiError } from '@/lib/api/error'
+import { apiErrorToFormErrors, NO_FORM_ERRORS } from '@/lib/form/field-errors'
+import { messages } from '@/lib/messages'
+
+function render(overrides: Partial<AiPlanCommitPanelProps> = {}) {
+  const props: AiPlanCommitPanelProps = {
+    title: '몽실이와 제주 2박 3일',
+    errors: NO_FORM_ERRORS,
+    submitting: false,
+    delistedBlocked: false,
+    hasDelisted: true,
+    excludedCount: 0,
+    onTitleChange: () => undefined,
+    onSubmit: () => undefined,
+    onExcludeDelisted: () => undefined,
+    onResetExcluded: () => undefined,
+    onDiscard: () => undefined,
+    againHref: '/ai-plans/new?from=job-1',
+    ...overrides,
+  }
+
+  return renderToStaticMarkup(createElement(AiPlanCommitPanel, props))
+}
+
+describe('AiPlanCommitPanel — 세 갈래 (아트보드 03 하단 바)', () => {
+  it('담기 · 전체 다시 만들기 · 버리기를 준다', () => {
+    const html = render()
+
+    expect(html).toContain(messages.aiPlan.commitSubmit)
+    expect(html).toContain(messages.aiPlan.commitAgain)
+    expect(html).toContain(messages.aiPlan.commitDiscard)
+  })
+
+  it('저장 시점을 다시 말한다 — 담기가 곧 초안 생성이다', () => {
+    expect(render()).toContain(messages.aiPlan.commitHint)
+  })
+
+  it('제목 기본값을 채워 둔다 — 빈 칸을 마주하게 하지 않는다 (명세 S8 미결 1)', () => {
+    expect(render()).toContain('몽실이와 제주 2박 3일')
+  })
+
+  it('제목을 60자로 제한한다 (PLAN_104)', () => {
+    expect(render()).toContain('maxLength="60"')
+  })
+
+  it('담는 중에는 버튼을 잠근다', () => {
+    expect(render({ submitting: true })).toContain('aria-busy="true"')
+  })
+})
+
+describe('AiPlanCommitPanel — PLAN_004 (명세 S5 함정 3)', () => {
+  it('막히면 항목을 빼고 담으라고 안내한다', () => {
+    const html = render({ delistedBlocked: true })
+
+    expect(html).toContain(messages.aiPlan.commitDelistedTitle)
+    expect(html).toContain(messages.aiPlan.commitDelistedAction)
+  })
+
+  it('`다시 시도` 를 주지 않는다 — 같은 본문을 다시 보내면 같은 400 이다', () => {
+    const html = render({ delistedBlocked: true })
+
+    expect(html).not.toContain(messages.common.retry)
+    expect(html).not.toContain('다시 시도')
+  })
+
+  it('서버 문구와 전용 안내를 겹쳐 내지 않는다', () => {
+    const html = render({
+      delistedBlocked: true,
+      errors: { fields: {}, form: '일부 장소를 담을 수 없습니다.' },
+    })
+
+    expect(html).not.toContain('일부 장소를 담을 수 없습니다.')
+    expect(html).toContain(messages.aiPlan.commitDelistedTitle)
+  })
+
+  it('막히지 않았으면 폼 오류를 그대로 낸다', () => {
+    const html = render({ errors: { fields: {}, form: '요청 값이 올바르지 않습니다.' } })
+
+    expect(html).toContain('role="alert"')
+    expect(html).toContain('요청 값이 올바르지 않습니다.')
+  })
+})
+
+describe('AiPlanCommitPanel — 빼기 표시', () => {
+  it('빼기로 표시한 개수를 말하고 되돌릴 수 있게 한다', () => {
+    const html = render({ excludedCount: 2 })
+
+    expect(html).toContain('2개 항목을 빼고 담아요.')
+    expect(html).toContain(messages.aiPlan.commitExcludedReset)
+  })
+
+  it('뺀 것이 없으면 안내를 내지 않는다', () => {
+    expect(render({ excludedCount: 0 })).not.toContain('빼고 담아요.')
+  })
+})
+
+describe('AiPlanCommitPanel — 뺄 항목을 짚지 못하면 CTA 를 주지 않는다', () => {
+  it('delisted 항목이 없으면 "빼고 담기" 를 숨긴다 — 눌러도 같은 400 이다', () => {
+    const html = render({ delistedBlocked: true, hasDelisted: false })
+
+    expect(html).not.toContain(messages.aiPlan.commitDelistedAction)
+    expect(html).toContain(messages.aiPlan.commitDelistedUnknown)
+  })
+
+  it('짚을 수 없을 때는 다른 갈래로 안내한다 — 없는 근거로 "빼면 된다" 고 말하지 않는다', () => {
+    const html = render({ delistedBlocked: true, hasDelisted: false })
+
+    expect(html).not.toContain(messages.aiPlan.commitDelistedDescription)
+    expect(html).toContain(messages.aiPlan.commitAgain)
+  })
+
+  it('짚을 수 있으면 CTA 를 준다', () => {
+    const html = render({ delistedBlocked: true, hasDelisted: true })
+
+    expect(html).toContain(messages.aiPlan.commitDelistedAction)
+    expect(html).toContain(messages.aiPlan.commitDelistedDescription)
+  })
+})
+
+/*
+  **판정 기준 선택 라디오 테스트가 여기 있었다** (#128 · 명세 D4). #152 가 `petIds` 를
+  받으면서 컨트롤을 걷었고(#174), 담기가 동반한 아이를 전부 싣는지는
+  `draft-to-plan.test.ts` 가 검증한다 — 이 패널은 더 이상 반려견을 다루지 않는다.
+*/
+describe('담기 패널 — 반려견 선택이 없다 (#174)', () => {
+  it('반려견 라디오를 렌더하지 않는다', () => {
+    expect(render()).not.toContain('type="radio"')
+  })
+})
+
+describe('AiPlanCommittedPanel — 이미 담은 작업 (#1041)', () => {
+  function renderCommitted() {
+    return renderToStaticMarkup(
+      createElement(AiPlanCommittedPanel, {
+        planId: '223456789012000009',
+        againHref: '/ai-plans/new?from=job-1',
+      }),
+    )
+  }
+
+  it('담기 대신 담은 일정으로 보낸다', () => {
+    const html = renderCommitted()
+
+    expect(html).toContain(messages.aiPlan.committedAction)
+    expect(html).toContain('href="/plans/223456789012000009"')
+  })
+
+  /*
+    **다시 담기를 주지 않는다.** 서버가 멱등이라 눌러도 같은 일정이 열릴 뿐인데, 버튼이
+    남아 있으면 "또 저장했다" 로 읽힌다. 다시 담아도 반영되지 않는 제목 입력도 걷는다.
+  */
+  it('담기 버튼 · 제목 입력 · 버리기를 그리지 않는다', () => {
+    const html = renderCommitted()
+
+    expect(html).not.toContain(messages.aiPlan.commitSubmit)
+    expect(html).not.toContain(messages.aiPlan.commitFieldTitle)
+    expect(html).not.toContain(messages.aiPlan.commitDiscard)
+    expect(html).not.toContain('<form')
+  })
+
+  it('전체 다시 만들기는 남긴다 — 새 작업이다', () => {
+    const html = renderCommitted()
+
+    expect(html).toContain(messages.aiPlan.commitAgain)
+    expect(html).toContain('href="/ai-plans/new?from=job-1"')
+  })
+})
+
+/*
+  #1251 — 항목 수 상한(`PLAN_136`)은 `fieldErrors: [{ field: 'items' }]` 로 온다. 이 폼에는
+  `items` 칸이 없어 공용 매핑대로면 문구가 렌더되지 않는다. `toAiPlanCommitErrors` 가 폼
+  전체 오류로 올리고, 패널은 그것을 `FormAlert` 로 그린다.
+*/
+describe('AiPlanCommitPanel — 항목 수 상한 PLAN_136 (#1251)', () => {
+  const LIMIT_MESSAGE = '일정 항목은 최대 100개까지 담을 수 있습니다.'
+  const limitError = new ApiError(400, 'PLAN_136', LIMIT_MESSAGE, [
+    { code: 'PLAN_136', field: 'items', message: LIMIT_MESSAGE },
+  ])
+
+  it('전제 — 공용 매핑 결과를 그대로 주면 어떤 문구도 안 보인다', () => {
+    const html = render({ errors: apiErrorToFormErrors(limitError, messages.form.submitFailed) })
+
+    expect(html).not.toContain(LIMIT_MESSAGE)
+    expect(html).not.toContain('role="alert"')
+  })
+
+  it('담기 오류 매핑을 거치면 상한 문구가 알림으로 보이고 새로고침 안내는 없다', () => {
+    const html = render({ errors: toAiPlanCommitErrors(limitError) })
+
+    expect(html).toContain('role="alert"')
+    expect(html).toContain(messages.aiPlan.commitItemLimitError)
+    expect(html).not.toContain(messages.plan.saveStaleError)
+  })
+})

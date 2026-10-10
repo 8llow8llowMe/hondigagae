@@ -1,0 +1,1101 @@
+'use client'
+
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
+
+import {
+  JEJU_MAP_ANCHOR,
+  JEJU_MAP_LEVEL,
+  JEJU_MAP_SEA_RATIO,
+  type LatLng,
+  toLatLng,
+} from '@/lib/geo/coord'
+import { createAlwaysDrawnOverlay } from '@/lib/map/always-drawn-overlay'
+import { clusterForLevel } from '@/lib/map/cluster'
+import { type MapOffset, offsetCenter } from '@/lib/map/offset-center'
+import {
+  clusterContent,
+  focusMarkerContent,
+  hasMixedPinShapes,
+  MAP_PIN_SHAPES,
+  MAP_SHAPES_MIXED_CLASS,
+  type MapPinShape,
+  PIN_NAME_MAX_LEVEL,
+  type PinContent,
+  pinContent,
+  pinShape,
+} from '@/lib/map/pin-content'
+import { type MapPinIcon, pinIconSvg } from '@/lib/map/pin-icons'
+import type { MapRouteSegment } from '@/lib/map/route'
+import { loadKakaoMaps, MapSdkError, type MapSdkFailure } from '@/lib/map/sdk'
+import { MAP_LAYER_Z, markerZIndex } from '@/lib/map/stacking'
+import {
+  framedCamera,
+  framedCenterLat,
+  type MapBounds,
+  shouldRefit,
+  type SpanBox,
+} from '@/lib/map/viewport'
+import { messages } from '@/lib/messages'
+import { cn } from '@/lib/utils/cn'
+import type {
+  KakaoCustomOverlay,
+  KakaoLatLng,
+  KakaoMap,
+  KakaoMaps,
+  KakaoPolyline,
+  KakaoStrokeStyle,
+} from '@/types/kakao-maps'
+
+/**
+ * MapCanvas — SDK 수명주기를 감당하는 유일한 곳.
+ *
+ * **반드시 `dynamic(..., { ssr: false })` 로 임포트한다.** 직접 임포트하면
+ * 빌드/런타임이 깨진다 (docs/external-api-guide.md §1).
+ *
+ * 담당하는 것
+ *  - SDK 1회 로드와 실패 폴백 통지 (`onFailure`)
+ *  - 오버레이 생성과 **이전 오버레이 `setMap(null)` 제거** — 이 SDK 의 대표 누수다
+ *  - 선택 강조: **크기와 라벨로 구분한다. 등급 색을 마커에 쓰지 않는다**
+ *    (아트보드 05 "목록↔지도 대응은 색이 아니라 크기와 라벨로 만든다")
+ *  - 묶음 마커 — `lib/map/cluster.ts` 가 계산하고 여기서는 그리기만 한다
+ *
+ * 담당하지 않는 것: 데이터 조회, 목록 렌더, 시트/패널 레이아웃.
+ *
+ * 오버레이 내용을 JSX 가 아니라 DOM API 로 만드는 이유: `CustomOverlay` 는 문자열이나
+ * `HTMLElement` 만 받는다. React 트리 밖이므로 **정리 책임이 전부 이 컴포넌트에 있다.**
+ *
+ * ### 갈래가 둘이다 — `onSelect` 를 주는가 (#789)
+ *
+ * 이 컴포넌트를 쓰는 화면은 두 종류다. 목록형(`/places` · `/emergency` · 일정 동선)은
+ * 핀을 골라 목록과 대응시키고, 단일 핀형(`PlaceMiniMap` · `WalkCourseStartMap`)은
+ * **"여기가 어디쯤이냐" 한 가지만 답한다** — 핀이 하나뿐이라 고를 것이 없고, 지도를
+ * 옮겨도 보여 줄 다른 것이 없다.
+ *
+ * 그 둘을 **`onSelect` 의 유무**로 가른다 (판정 1). 명시 prop(`interactive={false}`)이
+ * 말은 더 분명하지만, 그것으로는 `onSelect={() => undefined}` 를 넘길 길이 남는다 —
+ * 실제로 두 화면 다 그렇게 하고 있었고, 그 no-op 이 **눌러도 아무 일 없는 포커서블
+ * 버튼**을 만들었다. 옵셔널로 두면 그 길 자체가 막힌다.
+ *
+ * 미지정이면 한꺼번에 셋이 걸린다 (판정 3 — 지금 갈릴 이유가 없어 묶었다):
+ *  - 핀을 `<button>` 이 아니라 `<div role="img">` 로 그린다 (판정 2)
+ *  - 오버레이를 `clickable: false` 로 둔다
+ *  - `setDraggable(false)` · `setZoomable(false)` — 지도가 세로 스크롤을 가로채지 않는다
+ *
+ * **셋을 가를 조건**: "핀 하나인데 지도는 끌고 싶은" 화면이 생기면 그때 이동/확대를
+ * 별도 prop 으로 뺀다. 핀의 버튼 여부는 그때도 `onSelect` 를 따른다 — 고를 것이 없는데
+ * 버튼인 것과, 끌 수 있는데 못 끄는 것은 서로 다른 문제다.
+ */
+
+/**
+ * 확대 애니메이션 길이. 뒤따르는 중심 이동은 **이 시간이 아니라 확대가 끝났다는 SDK 신호**
+ * (`zoom_changed`)를 받고 시작한다 (#1297) — `zoomToward` 머리주석.
+ */
+const ZOOM_MS = 300
+
+/** 어지럼을 줄여야 하는 사용자인가. 모르면 `false` — 기본은 부드러운 이동이다 */
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+/**
+ * **확대하며 그 지점으로 간다** — 핀을 고를 때와 묶음 마커를 누를 때가 같이 쓴다 (#873).
+ *
+ * **둘을 동시에 걸 수 없다.** 같은 변환을 두 애니메이션이 함께 밀면 중간에서 튄다.
+ * 그래서 순서를 둬야 하는데, 순서가 틀어졌을 때 **덜 나쁜 쪽**을 고른다.
+ *
+ * 이동 먼저(`panTo` → `setLevel`)는 위험하다. 이동이 실행되지 않은 채 확대만 걸리면
+ * **옛 중심을 확대**해서 목표가 화면에서 아예 사라진다 (dev 실측: 목록이 "지도에 보이는
+ * 0곳" 이 됐다). 그래서 `anchor` 로 **목표를 화면에 붙여 둔 채** 확대한다 — 뒤따르는
+ * 중심 맞추기가 실행되지 않아도 목표는 화면 안에 남는다. 가운데가 아닐 뿐이다.
+ *
+ * **뒤따르는 이동은 확대가 끝난 신호(`zoom_changed`)를 받고 건다** (#1297). 예전에는
+ * `setTimeout(ZOOM_MS)` 로 걸었는데, **카카오 SDK 는 확대 애니메이션이 끝나기 전에 들어온
+ * `panTo` 를 조용히 버린다**(실측: 300ms 확대에 0–300ms 의 `panTo` 는 전부 버려지고 320ms 부터
+ * 먹힌다). 타이머와 마지막 프레임 중 무엇이 먼저 오는지는 메인 스레드 부하가 정해, 핀이 수백 개인
+ * 화면에서 자주 졌다 — 그러면 고른 핀이 확대 전 화면 자리(`anchor`)에 남아, 미리보기 오프셋(#1227)
+ * 이 있는 데스크톱에서는 패널 밑에 가려졌다. `zoom_changed` 는 애니메이션 확대가 **끝날 때 한 번**
+ * 온다(시작 때 오지 않는다 — 실측). 그 사이 사용자가 다른 단계로 확대했으면 옮기지 않는다.
+ * 확대 후에는 같은 화면 거리가 좁은 실거리라 `panTo` 도 부드럽게 움직인다
+ * (`panTo` 는 이동 거리가 화면보다 크면 애니메이션 없이 순간 이동한다).
+ *
+ * **묶음 마커가 이 결론을 안 물려받고 있었다** (#873). `setLevel(level - 2)` 를 **옵션
+ * 없이** 부르고 2ms 뒤에 `panTo` 를 걸어서, 확대는 지도 중심 기준으로 즉시 점프하고
+ * (누른 묶음이 커서에서 멀어진다) 곧바로 성격이 다른 애니메이션이 이어졌다. 실측한
+ * 호출이 `setLevel(6) opts: null` → 2ms → `panTo` 였다. 같은 일을 하는 코드가 둘이면
+ * 한쪽만 고쳐진다 — 그래서 사본을 늘리지 않고 이 함수로 합친다.
+ *
+ * **어지럼을 줄여야 하는 사용자에게는 즉시 옮긴다.** `app/globals.css` 의
+ * `prefers-reduced-motion` 규칙은 CSS 애니메이션·전환만 끈다 — 지도의 이동·확대는 SDK 가
+ * JS 로 그리는 것이라 그 규칙이 닿지 않아 여기서 직접 판정해야 한다.
+ *
+ * 되돌려 주는 것은 **뒷정리 함수**다. 확대가 끝나기 전에 언마운트되거나 다음 조작이
+ * 들어오면 걸어 둔 중심 맞추기(리스너)를 떼야 한다 — 빨리 연달아 고르면 앞 핀으로 되감긴다.
+ */
+function zoomToward(params: {
+  map: KakaoMap
+  maps: KakaoMaps
+  target: KakaoLatLng
+  /** 목표 확대 단계. 지금이 이미 그만큼 가까우면 확대 없이 이동만 한다 */
+  level: number
+  /** 예약된 이동 시점에 지도가 아직 살아 있는지 다시 확인할 곳 */
+  mapRef: RefObject<KakaoMap | null>
+  /** 목표를 정중앙이 아니라 이만큼(px) 옮긴 자리에 둔다 — `selectedOffset` 주석. 없으면 정중앙 */
+  offset?: MapOffset | null
+}): () => void {
+  const { map, maps, target, level, mapRef, offset = null } = params
+  const current = map.getLevel()
+  const zoomIn = current > level
+
+  /*
+    오프셋 중심은 **확대 전에, 지금 단계로** 잰다 (`offsetCenter` 머리주석). 확대가 끝난 뒤 투영을
+    읽으면 예약이 마지막 프레임보다 먼저 오거나 숨겨진 탭에서 애니메이션이 멈췄을 때 배율이 틀어진다.
+  */
+  const shifted = offsetCenter({
+    projection: map.getProjection(),
+    point: (x, y) => new maps.Point(x, y),
+    target,
+    offset,
+    scale: 2 ** ((zoomIn ? level : current) - current),
+  })
+  const center = shifted === null ? target : new maps.LatLng(shifted.lat, shifted.lng)
+
+  if (prefersReducedMotion()) {
+    // 옵션 없는 `setLevel` 은 지금 중심을 기준으로 확대하므로 중심이 그대로 남는다
+    map.setCenter(center)
+    if (zoomIn) map.setLevel(level)
+    return () => undefined
+  }
+
+  if (!zoomIn) {
+    map.panTo(center)
+    return () => undefined
+  }
+
+  const onZoomed = () => {
+    maps.event.removeListener(map, 'zoom_changed', onZoomed)
+    // 지도가 사라졌거나(언마운트·SDK 실패) 사이에 사용자가 다른 단계로 확대했으면 옮기지 않는다
+    if (mapRef.current === map && map.getLevel() === level) map.panTo(center)
+  }
+  maps.event.addListener(map, 'zoom_changed', onZoomed)
+  map.setLevel(level, { animate: { duration: ZOOM_MS }, anchor: target })
+
+  return () => maps.event.removeListener(map, 'zoom_changed', onZoomed)
+}
+
+export type MapPin = {
+  id: string
+  title: string
+  lat: number | null
+  lng: number | null
+  /** 선택됐을 때 라벨에 함께 붙는 보조 문구 (예: `480m`). 없으면 `null` */
+  caption?: string | null
+  /** 낮춤 표현. 긴급 시설의 약국이 쓴다 — 판정 색이 아니라 톤 낮춤이다 */
+  muted?: boolean
+  /**
+   * 동선의 순번(#743). 주면 **이름표 대신 숫자 원**으로 그린다.
+   *
+   * 4~6곳이 1km 안에 몰리는 하루 동선에서 이름표를 다 펴면 서로 덮어 아무것도 못 읽는다
+   * — `/places` 가 이름표를 쓰는 이유(어느 곳인지 눌러봐야 안다)가 여기서는 성립하지
+   * 않는다. **순서가 곧 그 핀의 신원**이고, 이름은 고르면 붙는다.
+   */
+  order?: number
+  /**
+   * 카테고리 아이콘(#1280). 주면 이름표 대신 **아이콘 원**으로 그린다. 무엇을 고를지는
+   * 장소 도메인이 정하고(`lib/place/pin-icon.ts`) 지도는 받은 값을 그리기만 한다.
+   * 없으면 예전 이름표 그대로다.
+   */
+  icon?: MapPinIcon
+  /**
+   * 모양 (#1286). `square` 면 아이콘 원 대신 **둥근 사각**이고, 묶음도 사각 묶음으로 **따로** 접힌다 — 한
+   * 묶음 숫자는 한 종류만 센다. 무엇을 사각으로 그릴지는 호출부 도메인이 정한다(`lib/emergency/facility-pin.ts`).
+   * 아이콘이 없으면 무시한다(`pinShape`).
+   */
+  shape?: MapPinShape
+}
+
+/**
+ * 선 톤별 그리기 값. **색은 하나고 굵기·패턴만 다르다** (`lib/map/route.ts` 주석).
+ *
+ * `dashed` 는 어제 잔 숙소에서 들어오는 구간이라 한 단계 낮춘다 — 오늘의 이동이 아니다.
+ */
+const ROUTE_STROKE: Record<
+  MapRouteSegment['tone'],
+  { weight: number; style: KakaoStrokeStyle; opacity: number }
+> = {
+  default: { weight: 4, style: 'solid', opacity: 0.9 },
+  dashed: { weight: 3, style: 'shortdash', opacity: 0.7 },
+  emphasis: { weight: 7, style: 'solid', opacity: 0.9 },
+}
+
+/**
+ * 선색을 토큰에서 읽는다. **선은 캔버스라 CSS 가 닿지 않는다** — `strokeColor` 는
+ * 계산된 색 문자열이어야 하고 `var(--brand-500)` 을 넘기면 SDK 가 조용히 무시한다.
+ *
+ * 그래서 값을 런타임에 읽어 쓴다. 상수로 박으면 `DESIGN.md` 팔레트가 바뀔 때 여기만
+ * 남는다 — `lib/brand/chrome-colors.ts` 가 meta 태그 속성에서 같은 문제를 겪는다.
+ *
+ * 아래 폴백은 **토큰을 못 읽었을 때만** 쓰인다(스타일시트가 아직 안 붙은 순간). 선이
+ * 통째로 사라지는 것보다 한 톤 어긋난 초록이 낫다.
+ */
+// eslint-disable-next-line no-restricted-syntax -- 위 주석 참고: 캔버스는 CSS 변수를 못 읽는다. `--brand-500` 의 값과 같게 유지한다
+const ROUTE_COLOR_FALLBACK = '#2e9b6b'
+
+function routeColor(): string {
+  if (typeof window === 'undefined') return ROUTE_COLOR_FALLBACK
+
+  const token = window
+    .getComputedStyle(document.documentElement)
+    .getPropertyValue('--brand-500')
+    .trim()
+
+  return token === '' ? ROUTE_COLOR_FALLBACK : token
+}
+
+export function MapCanvas({
+  pins,
+  route,
+  selectedId,
+  onSelect,
+  onBoundsChange,
+  onUserMove,
+  onCameraApplied,
+  center,
+  camera,
+  selectedLevel,
+  selectedOffset,
+  focusMarker,
+  squareClusterLabel,
+  copyrightPosition = 'left',
+  onFailure,
+  className,
+}: {
+  pins: MapPin[]
+  /**
+   * 순서대로 이을 선. 구간마다 하나씩이고 **핀과 따로 그려진다**.
+   *
+   * 모델은 `lib/map/route.ts` 가 만든다 — 여기서는 그리기만 한다 (`cluster.ts` 와 같은
+   * 역할 분담이다).
+   */
+  route?: MapRouteSegment[] | null
+  selectedId: string | null
+  /**
+   * 핀을 고르면 알린다. **주지 않으면 "고를 것이 없는 지도" 갈래로 들어간다** (#789) —
+   * 핀이 버튼에서 떨어지고, 지도가 이동·확대를 받지 않는다 (머리주석의 갈래 참고).
+   *
+   * **`() => undefined` 를 넘기지 않는다.** 그것이 정확히 이 prop 을 옵셔널로 만든
+   * 이유다 — 핀 하나뿐인 지도 둘이 그렇게 넘겨서, 키보드로 Tab 이 멈추는데 Enter 를
+   * 눌러도 아무 일이 없고 스크린리더는 **눌린 토글**로 읽는 정류장이 생겼다.
+   */
+  onSelect?: (id: string) => void
+  /**
+   * 지도가 멈춘 뒤(`idle`) 현재 영역을 알린다. "보이는 곳" 개수와 재검색이 쓴다.
+   *
+   * **`userMoved` 가 첫 영역과 사용자의 이동을 가른다.** 지도를 만들면 `idle` 이 한 번
+   * 그냥 발생하는데 그것을 이동으로 세면, 화면에 들어오자마자 프리페치한 목록 캐시를
+   * 버리고 주변 검색으로 갈아탄다 (architecture-guide.md §9 "지도 뷰: 별도 조회 금지").
+   */
+  onBoundsChange?: (bounds: MapBounds, userMoved: boolean) => void
+  /**
+   * **사용자가 지도를 직접 옮기기 시작했다** (#933) — 끌기·휠·두 손가락·더블클릭 확대.
+   *
+   * `onBoundsChange` 의 `userMoved` 로는 이것을 알 수 없다: 그 값은 첫 `idle` 이후
+   * **전부** `true` 라, 핀을 고를 때 우리가 건 확대·이동(`zoomToward`)이 낸 `idle` 도
+   * 사용자의 이동으로 센다. `idle` 이 오는 시점도 SDK 가 정해 이동 거리마다 다르다
+   * (실측: 300ms ~ 1.3s) — 시간으로 가를 수도 없다. 그래서 **입력 쪽에서 잡는다.**
+   * 카카오 `dragstart` 는 사용자의 끌기에서만 나고, 확대 입력은 컨테이너의 DOM 이벤트로
+   * 받는다(카카오 `zoom_start` 는 우리의 `setLevel` 에서도 난다).
+   *
+   * 이동이 **끝난** 영역은 여전히 뒤따르는 `onBoundsChange` 가 알린다.
+   */
+  onUserMove?: () => void
+  /**
+   * **카메라가 지도 중심을 어디에 놓았는지** 알린다 — 이슈 #578.
+   *
+   * `camera` 는 기준점을 화면 정중앙이 아니라 위쪽 `seaRatio` 지점에 놓으므로
+   * (`framedCamera`) **실제 지도 중심은 기준점과 다르다.** 그 차이를 모르는 바깥에서는
+   * "지도가 옮겨졌는지" 를 기준점과 비교해 재게 되고, 그러면 **우리가 만든 프레이밍
+   * 오프셋이 사용자의 이동으로 읽힌다.**
+   *
+   * 그래서 놓은 자리를 그대로 돌려준다 — 이것을 아는 곳이 여기뿐이다
+   * (컨테이너 크기와 확대 단계가 여기에만 있다).
+   */
+  onCameraApplied?: (center: LatLng) => void
+  /** 지도 중심을 밖에서 옮길 때 (현재 위치 버튼). 같은 값을 다시 주면 움직이지 않는다 */
+  center?: LatLng | null
+  /**
+   * **기준점 + 담고 싶은 폭으로 카메라를 확정한다.** `center` 와 달리 확대 단계까지 함께
+   * 옮긴다.
+   *
+   * 좌표를 비동기로 얻는 화면(`/emergency`)이 쓴다. 지도는 모듈 상수 기준으로 **먼저**
+   * 만들고, 좌표가 도착하면 이것으로 한 번 옮긴다 — `position` 을 기다렸다가 만들면
+   * 위치 타임아웃(10초)만큼 지도가 비어 있다.
+   *
+   * **호출부는 반드시 `useMemo` 로 만든다.** 렌더 중에 새 객체를 만들면 참조가 매번
+   * 바뀌어 필터를 누를 때마다 카메라가 되돌아간다.
+   */
+  camera?: {
+    anchor: LatLng
+    /**
+     * 담을 폭(m). 원이면 **지름** 숫자, 여러 점을 담는 사각형이면 두 변(`SpanBox`) —
+     * 사각형이어야 축마다 맞춘다 (`framedCamera`, #982)
+     */
+    spanMeters: number | SpanBox
+    /**
+     * 기준점이 화면 위쪽 몇 할 지점에 올지. 생략하면 `JEJU_MAP_SEA_RATIO`(0.35) —
+     * 제주 전체를 담는 화면에서 위쪽을 바다로 여는 값이다.
+     *
+     * **한 곳만 담는 지도는 `0.5` 를 넘긴다.** 그 화면에는 바다도 맥락도 없고 주인공이
+     * 하나라, 0.35 면 핀이 이유 없이 위로 치우쳐 보인다 (`PlaceMiniMap`).
+     */
+    anchorRatio?: number
+    /**
+     * **확대 단계를 건드리지 않는다** (#873). 기본은 `false` — `spanMeters` 에서 역산한
+     * 단계로 맞춘다.
+     *
+     * "이 지역에서 재검색" 처럼 **기준점만 옮기는 조작**이 쓴다. 그 조작에서 사용자는
+     * 이미 자기가 볼 배율을 골라 둔 상태이고, 우리가 옮기는 것은 조회 기준점뿐이다 —
+     * 그런데 단계까지 다시 맞추면 반경 기준으로 **줌이 풀린다** (실측: level 4 → 8).
+     *
+     * **중심 맞추기와 `onCameraApplied` 보고는 그대로 돈다.** 보고를 끊으면 바깥이
+     * "우리가 놓은 자리" 를 갱신하지 못해 재검색 버튼이 사라지지 않는다 (#578).
+     */
+    keepLevel?: boolean
+    /**
+     * **컨테이너 크기가 바뀌면 다시 맞춘다** (#982). 기본은 `false`.
+     *
+     * 사각형 카메라는 컨테이너 **폭**으로 단계를 정하므로, 창을 줄이거나 기기를 돌리면
+     * 처음 맞춘 단계가 새 폭에서 틀린다 (동선 카드). 원 카메라는 짧은 변만 보고, 그
+     * 화면들(`/emergency` 등)은 시트·패널이 크기를 자주 바꿔 되잡으면 사용자의 화면이
+     * 튄다 — 그래서 켜는 쪽이 고른다.
+     *
+     * **사용자가 지도를 옮겼거나 핀을 골랐으면 되잡지 않는다.** 그때 화면은 우리가 맞춘
+     * 틀이 아니라 사용자가 보고 있는 곳이다.
+     */
+    refitOnResize?: boolean
+  } | null
+  /**
+   * 핀을 고르면 이 단계까지 **확대**한다. 주지 않으면 이동만 한다.
+   *
+   * 이미 이 단계보다 가까우면 건드리지 않는다 — 사용자가 맞춰 둔 확대를 되돌리는 것은
+   * 고르는 일과 무관하다.
+   */
+  selectedLevel?: number
+  /**
+   * 고른 핀을 **정중앙이 아니라 이만큼 옮긴 자리**에 둔다 (#1227). 지도 위에 뜬 표면(미리보기)이
+   * 정중앙을 덮을 때 호출부가 덮인 크기의 절반을 돌려준다. **고르는 순간 부른다** — 폭마다
+   * 배치가 갈리고 시트 높이는 내용만큼이라 값으로 넘기면 늘 한 박자 늦다. 없으면 정중앙이다.
+   */
+  selectedOffset?: (() => MapOffset | null) | undefined
+  /** SDK 를 못 쓰면 호출부가 목록으로 되돌린다 */
+  /**
+   * **지도를 연 기준점** (#1223) — 누를 수 없는 이름표 하나를 그 자리에 세운다. 담기 지도만 넘긴다;
+   * 없으면(`/places` 등) 한 글자도 다르지 않다.
+   *
+   * **호출부는 참조를 안정적으로 넘긴다** (`useMemo`) — 이 값이 바뀌면 오버레이를 지우고 다시 그린다.
+   */
+  focusMarker?: { lat: number; lng: number; name: string } | null
+  /**
+   * 사각 묶음의 접근 이름 문구 틀 (#1286) — `{n}` 자리에 보이는 숫자가 들어간다. 사각 핀을 그리는 화면이
+   * 무엇을 세는지 넘긴다(`이 지역 병원·약국 {n}곳`). 주지 않으면 원 묶음과 같은 `이 지역 {n}곳` 이다.
+   */
+  squareClusterLabel?: string | undefined
+  /**
+   * 카카오 축척 · 로고 막대의 자리 (#1232). 기본은 SDK 그대로 좌하단이다.
+   *
+   * **왼쪽을 덮는 도킹 패널이 있는 지도만 `right` 를 준다** — 로고는 가리면 안 되는 표시다.
+   * 축척이 로고와 함께 옮겨지는 것을 실측했다(지도패널-도킹-세부명세 D5). 마운트 때 값만 쓴다.
+   */
+  copyrightPosition?: 'left' | 'right'
+  onFailure?: (reason: MapSdkFailure) => void
+  className?: string
+}) {
+  /*
+    **고를 것이 있는 지도인가** (#789 · 머리주석의 갈래). 핀의 모양, 오버레이의 클릭
+    수용, 지도의 이동·확대가 전부 이 하나에서 갈린다.
+
+    `onSelect` 의 **참조**가 아니라 **유무**만 본다 — 부모가 인라인 함수를 넘겨도 값은
+    안 바뀐다. 갈래가 뒤집히는 일은 사실상 없지만 렌더마다 다시 세는 값이라
+    의존성 배열에 그대로 실을 수 있다.
+  */
+  const interactive = onSelect !== undefined
+
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<KakaoMap | null>(null)
+  const mapsRef = useRef<KakaoMaps | null>(null)
+  const overlaysRef = useRef<KakaoCustomOverlay[]>([])
+  /*
+    **오버레이와 같은 배열에 태우지 않는다.** 핀 effect 는 매번 `overlaysRef` 를 통째로
+    비우고 다시 그리는데(`pins` 는 조회 결과라 자주 새 배열이 된다), 선이 거기 섞여 있으면
+    핀이 갱신될 때마다 선도 함께 지워졌다 그려져 깜빡인다. 정리 책임은 아래 언마운트
+    정리에서 **두 배열 모두** 진다.
+  */
+  const polylinesRef = useRef<KakaoPolyline[]>([])
+  /**
+   * 기준점 마커 (#1223). **핀 배열에 태우지 않는다** — 선과 같은 이유다: 핀 effect 는 선택 · 확대 ·
+   * 조회마다 `overlaysRef` 를 통째로 비우고 다시 그리는데, 기준점은 마운트 때 정해져 바뀌지 않는다.
+   */
+  const focusOverlayRef = useRef<KakaoCustomOverlay | null>(null)
+
+  const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
+  /* 오프셋은 고르는 순간(핀 선택 · 묶음 클릭)에 잰다 — 함수 참조가 바뀌어도 카메라를 다시 움직이지 않게 ref 로 둔다 */
+  const selectedOffsetRef = useRef(selectedOffset)
+  selectedOffsetRef.current = selectedOffset
+  /* 생성 effect 는 의존성이 비어 있어야 한다 — 마운트 때 값을 ref 로 들고 들어간다 */
+  const copyrightPositionRef = useRef(copyrightPosition)
+  /** 확대 단계 — 묶음 셀 크기가 여기서 갈린다 */
+  const [level, setLevel] = useState(JEJU_MAP_LEVEL)
+  /** 지도 생성 직후의 첫 `idle` 인가. 그것은 사용자의 이동이 아니다 */
+  const settledRef = useRef(false)
+
+  // 콜백을 ref 로 들고 다닌다 — 부모가 인라인 함수를 넘겨도 지도를 재생성하지 않는다.
+  // 재생성은 사용자가 맞춰 둔 확대·위치를 통째로 날리는 사고다
+  const selectRef = useRef(onSelect)
+  const boundsRef = useRef(onBoundsChange)
+  const failureRef = useRef(onFailure)
+  const cameraAppliedRef = useRef(onCameraApplied)
+  const userMoveRef = useRef(onUserMove)
+  /** 마지막 카메라 뒤에 사용자가 지도를 옮겼거나 핀을 골랐는가 (`refitOnResize`) */
+  const movedSinceCameraRef = useRef(false)
+  useEffect(() => {
+    selectRef.current = onSelect
+    boundsRef.current = onBoundsChange
+    userMoveRef.current = onUserMove
+    failureRef.current = onFailure
+    cameraAppliedRef.current = onCameraApplied
+  })
+
+  // ── 지도 생성. **의존성이 비어 있어야 한다** ──────────────────────────────
+  useEffect(() => {
+    let disposed = false
+    const container = containerRef.current
+    if (container === null) return
+
+    let idleHandler: (() => void) | null = null
+
+    void loadKakaoMaps()
+      .then((maps) => {
+        if (disposed) return
+
+        mapsRef.current = maps
+
+        /*
+          **첫 중심은 지도를 만들기 전에 정한다.** 만든 뒤에 `setCenter` 로 옮기면 그
+          이동이 `idle` 을 한 번 더 부르고, 아래 `settledRef` 판정에서 그것이 사용자의
+          이동으로 세어져 첫 화면부터 주변 검색으로 갈아탄다.
+
+          그래서 컨테이너 높이와 확대 단계로 위도 폭을 환산해 역산한다
+          (`framedCenterLat`) — 화면 위쪽 35% 가 바다, 그 아래가 육지로 열린다.
+        */
+        const map = new maps.Map(container, {
+          center: new maps.LatLng(
+            framedCenterLat(
+              JEJU_MAP_ANCHOR.lat,
+              container.clientHeight,
+              JEJU_MAP_LEVEL,
+              JEJU_MAP_SEA_RATIO,
+            ),
+            JEJU_MAP_ANCHOR.lng,
+          ),
+          level: JEJU_MAP_LEVEL,
+        })
+        mapRef.current = map
+        /*
+          순서는 SDK 기본(축척 → 로고)을 둔다 — 로고가 모서리에 선다. **SDK 가 메서드를 거두어도 지도를
+          죽이지 않는다** — 여기서 던지면 아래 `idle` 등록 · `ready` 를 건너뛰고 실패 폴백으로 떨어진다.
+        */
+        if (
+          copyrightPositionRef.current === 'right' &&
+          typeof map.setCopyrightPosition === 'function'
+        )
+          map.setCopyrightPosition(maps.CopyrightPosition.BOTTOMRIGHT, false)
+
+        idleHandler = () => {
+          setLevel(map.getLevel())
+          const bounds = map.getBounds()
+          const userMoved = settledRef.current
+          settledRef.current = true
+          boundsRef.current?.(toMapBounds(bounds.getSouthWest(), bounds.getNorthEast()), userMoved)
+        }
+        maps.event.addListener(map, 'idle', idleHandler)
+
+        setStatus('ready')
+        // 탭·시트 뒤에서 생성되면 컨테이너 크기가 0 이다. 노출 직후 되잡는다
+        map.relayout()
+        idleHandler()
+      })
+      .catch((error: unknown) => {
+        if (disposed) return
+        setStatus('failed')
+        failureRef.current?.(error instanceof MapSdkError ? error.reason : 'script')
+      })
+
+    return () => {
+      disposed = true
+      settledRef.current = false
+
+      const map = mapRef.current
+      const maps = mapsRef.current
+      if (map !== null && maps !== null && idleHandler !== null) {
+        maps.event.removeListener(map, 'idle', idleHandler)
+      }
+
+      for (const overlay of overlaysRef.current) overlay.setMap(null)
+      overlaysRef.current = []
+
+      // 선도 마커와 같은 누수 경로를 갖는다 — 지우지 않으면 지도를 다시 만들 때 남는다
+      for (const polyline of polylinesRef.current) polyline.setMap(null)
+      polylinesRef.current = []
+
+      focusOverlayRef.current?.setMap(null)
+      focusOverlayRef.current = null
+
+      mapRef.current = null
+      mapsRef.current = null
+    }
+  }, [])
+
+  /*
+    ── 지도가 사용자의 손을 받는가 ──────────────────────────────────────────
+
+    **지도를 만드는 effect 안에서 하지 않는다.** 그쪽은 의존성이 비어 있어야 하고
+    (재생성은 사용자가 맞춰 둔 확대·위치를 통째로 날린다), 이 값은 props 에서 온다.
+    여기서 걸면 지도는 그대로 두고 옵션만 바뀐다.
+
+    **끄는 쪽만이 아니라 양쪽을 다 건다.** `true` 는 카카오 기본값이라 목록형 지도에는
+    아무 변화가 없고(#789 의 절반은 "기본값을 바꾸지 않는다" 다), 한 방향만 걸어 두면
+    갈래가 뒤집힐 때 지도가 잠긴 채로 남는다.
+
+    끄는 이유: 단일 핀 지도는 **재조회도 선택도 없어 옮겨서 얻을 것이 없는데**, 코스
+    상세의 176px 띠처럼 아래에 콘텐츠가 더 있는 중간 위치에 앉으면 그 위에서 시작한
+    세로 스와이프를 지도가 먹는다. 전체 보기는 길찾기 딥링크가 맡는다.
+  */
+  useEffect(() => {
+    const map = mapRef.current
+    if (map === null || status !== 'ready') return
+
+    map.setDraggable(interactive)
+    map.setZoomable(interactive)
+  }, [interactive, status])
+
+  // ── 오버레이 동기화 ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current
+    const maps = mapsRef.current
+    if (map === null || maps === null || status !== 'ready') return
+
+    // **먼저 지운다.** 새로 그린 뒤에 지우면 한 프레임 동안 두 배로 겹치고,
+    // 아예 안 지우면 필터를 만질 때마다 마커가 누적된다 — 이 SDK 의 대표 누수
+    for (const overlay of overlaysRef.current) overlay.setMap(null)
+    overlaysRef.current = []
+
+    const positioned = pins.flatMap((pin) => {
+      const coord = toLatLng(pin)
+      // 좌표가 없거나 0 이면 그리지 않는다 — 기니 만에 핀이 찍힌다
+      return coord === null ? [] : [{ item: pin, coord }]
+    })
+
+    /*
+      **순번 핀은 묶지 않는다** (#743). 묶음은 "이 구역에 여럿" 을 한 원으로 접는 장치인데,
+      동선에서는 그 여럿의 **순서**가 내용이다. 접는 순간 선은 그대로 남고 핀만 사라져
+      "선이 지나가는데 점이 없는" 지도가 된다.
+
+      하루 동선은 4~6곳이라 묶을 이유도 없다 — 묶음이 푸는 문제(밀집 구간의 겹침)는
+      수백 곳을 한 화면에 그리는 `/places` 의 것이다.
+    */
+    const ordered = pins.some((pin) => pin.order !== undefined)
+
+    /*
+      **모양별로 따로 접는다** (#1286 D1-1). 장소 원과 시설 사각을 한 격자에 넣으면 묶음 숫자가 둘을 함께
+      세어 `12` 가 무엇을 세는지 흐려진다. 겹침은 묶음끼리 합치지 않고 쌓임 순서(`markerZIndex`)로 푼다.
+      판정은 `pinShape` 하나다 — 그리는 모양(`pinContent`)과 접는 모양이 갈리면 사각이 원 묶음에 접힌다.
+    */
+    const groups = MAP_PIN_SHAPES.flatMap((shape) =>
+      clusterForLevel(
+        positioned.filter((input) => pinShape(input.item) === shape),
+        ordered ? null : level,
+        // 고른 핀은 접지 않는다 (#1286 리뷰 4) — 고른 단계(level 5)에도 묶음이 있어 이웃과 접히면 사라진다
+        { keep: (item) => item.id === selectedId },
+      ).map((group) => ({ ...group, shape })),
+    )
+    const created: KakaoCustomOverlay[] = []
+
+    for (const group of groups) {
+      const isCluster = group.items.length > 1
+      // 사각 묶음만 호출부의 문구 틀을 쓴다 — 원 묶음은 늘 `이 지역 {n}곳` 이다
+      const clusterLabel = group.shape === 'square' ? squareClusterLabel : undefined
+      const first = group.items[0]
+      if (first === undefined) continue
+
+      const content = isCluster
+        ? /*
+            **묶음도 `pinElement` 과 같은 applier 를 거친다** (#671 F-5). 예전에는
+            `clusterElement` 가 따로 있어 `textContent` 와 `aria-label` 을 직접 꽂았고,
+            그 배선은 어느 테스트도 보지 않았다.
+          */
+          markerElement(clusterContent(group.items.length, group.shape, clusterLabel), () => {
+            /*
+              묶음을 누르면 그 구역으로 확대한다 (아트보드 05).
+
+              **핀을 고를 때와 같은 함수를 쓴다** (#873) — 끝 상태도 같다: 누른 자리가
+              화면 중앙에 온다. 예전에는 여기서 `setLevel` 을 옵션 없이 부르고 2ms 뒤에
+              `panTo` 를 걸어, 확대가 **지도 중심** 기준으로 즉시 점프하며 누른 묶음이
+              커서에서 멀어졌다 (`zoomToward` 머리주석에 실측이 있다).
+
+              **두 단계 확대를 유지한다.** 한 단계면 같은 묶음이 다시 묶여 두 번 눌러야
+              풀리는 구역이 생긴다 (`cellSizeFor` 가 단계에 비례한다).
+
+              뒷정리 함수는 버린다 — 이 지도는 클릭 뒤에도 살아 있고, 예약된 이동은
+              `mapRef` 로 생존을 다시 확인한다. 언마운트되면 그쪽에서 걸러진다.
+
+              **옮김으로 센다** (`refitOnResize`) — 사용자가 누른 확대라, 뒤이은 크기
+              변화가 그 구역을 버리고 처음 틀로 되돌리면 안 된다.
+            */
+            movedSinceCameraRef.current = true
+            zoomToward({
+              map,
+              maps,
+              target: new maps.LatLng(group.center.lat, group.center.lng),
+              level: Math.max(1, map.getLevel() - 2),
+              mapRef,
+              // 펼친 자리도 미리보기 뒤로 보내지 않는다 (#1227) — 미리보기가 없으면 `null` 이다
+              offset: selectedOffsetRef.current?.() ?? null,
+            })
+          })
+        : /*
+            **`onSelect` 를 안 받았으면 핸들러가 `null` 이고, 그러면 버튼이 아니다**
+            (#789). 여기서 `() => selectRef.current?.(id)` 로 감싸 넘기면 `pinElement`
+            쪽에서는 늘 핸들러가 있는 것으로 보여 갈래가 사라진다.
+          */
+          pinElement(
+            first,
+            first.id === selectedId,
+            level <= PIN_NAME_MAX_LEVEL,
+            interactive ? () => selectRef.current?.(first.id) : null,
+          )
+
+      const options = {
+        position: new maps.LatLng(group.center.lat, group.center.lng),
+        content,
+        /*
+          **핀과 묶음이 좌표를 잡는 자리가 다르다.**
+
+          핀은 이름표라 아래 끝이 그 자리를 가리킨다(`yAnchor: 1`). 묶음은 원이고
+          가리킬 뾰족한 끝이 없어서 **원의 중심**을 좌표에 놓는다(`0.5`) — 1 로 두면
+          원이 좌표 위쪽에 통째로 떠서, 이웃한 묶음끼리 가로로 어긋난 것처럼 읽힌다.
+
+          **고르지 않은 순번 핀도 원이라 같은 자리를 쓴다** (#743). 여기서 1 로 두면 선은
+          좌표를 잇는데 원은 그 위에 떠서, 선이 핀 아래를 스쳐 지나가는 것처럼 보인다.
+          고르면 이름표로 바뀌므로 그때는 다시 1 이다.
+
+          **아이콘 원 핀(#1280)도 원의 중심이 좌표다.** 이름 알약은 상자 밖에 매달려(CSS)
+          앵커를 옮기지 않는다.
+        */
+        yAnchor:
+          isCluster ||
+          first.icon !== undefined ||
+          (first.order !== undefined && first.id !== selectedId)
+            ? 0.5
+            : 1,
+        /*
+          **묶음 > 선택 핀 > 일반 핀.** 순서와 근거는 `lib/map/stacking.ts` 에 있다 —
+          축이 둘 섞인 삼항을 여기 인라인으로 두었던 탓에 *"원이 통째로 덮여 누를 수 없는
+          묶음이 된다"* 는 근거를 적어 두고도 **선택 핀 축만 빠뜨린 채** 살아남았다
+          (#671 A-1). 순수 함수로 빼서 `stacking.test.ts` 가 부등식을 잠근다.
+        */
+        zIndex: markerZIndex({ isCluster, selected: first.id === selectedId, shape: group.shape }),
+        /*
+          **고를 것이 없는 핀은 클릭을 받지 않는다** (#789). `clickable: true` 인
+          오버레이는 자기 위에서 난 포인터 이벤트를 지도에 넘기지 않는데, 단일 핀
+          지도에서는 그 핀이 **띠의 한가운데**를 차지한다 — 받아 봐야 할 일이 없는 데다,
+          거기서 시작한 세로 스와이프가 페이지에 닿는 길까지 막을 수 있다.
+
+          묶음은 갈래와 무관하게 받는다. 누르면 확대라는 **할 일이 있다.**
+        */
+        clickable: isCluster || interactive,
+      }
+      /*
+        **순번 핀은 화면 밖에서도 그려 둔다** (#1015). `CustomOverlay` 는 보이는 영역 밖의
+        오버레이를 떼어 두고 지도가 멈춘 뒤에야 붙여서, 처음 화면 밖에 있던 순번이 끄는
+        동안 내내 보이지 않았다 — 동선에서는 그 순번이 내용이다. 핀 수가 적어(하루 4~6곳)
+        늘 그려 둬도 비용이 없다. 수백 곳을 그리는 `/places` 는 SDK 의 떼어 두기가 이득이라
+        그대로 둔다 (근거와 실측은 `lib/map/always-drawn-overlay.ts` 머리주석).
+      */
+      const overlay = ordered
+        ? createAlwaysDrawnOverlay(maps, options)
+        : new maps.CustomOverlay(options)
+      overlay.setMap(map)
+      created.push(overlay)
+    }
+
+    overlaysRef.current = created
+  }, [pins, selectedId, status, level, interactive, squareClusterLabel])
+
+  // ── 기준점 마커 (#1223) ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current
+    const maps = mapsRef.current
+    if (map === null || maps === null || status !== 'ready') return
+
+    // 먼저 지운다 — 핀과 같은 이유다
+    focusOverlayRef.current?.setMap(null)
+    focusOverlayRef.current = null
+
+    if (focusMarker === null || focusMarker === undefined) return
+    // 좌표가 없거나 0 이면 그리지 않는다 — 핀과 같은 판단(`toLatLng`)
+    const coord = toLatLng(focusMarker)
+    if (coord === null) return
+
+    const overlay = new maps.CustomOverlay({
+      position: new maps.LatLng(coord.lat, coord.lng),
+      content: markerElement(focusMarkerContent(focusMarker.name), null),
+      /*
+        **점 아래에 선다** (`yAnchor: 0`). 장소 핀은 좌표에 중심을 둔 원이라(`yAnchor: 0.5`, #1280)
+        기준점(대개 앞 일정 항목)과 같은 좌표에 원이 겹쳐 선다. 원이 위층이므로 이름표는 CSS
+        (`.map-pin-focus` 의 `translateY`)로 가장 큰 원의 아랫변 밖까지 내려 둘 다 읽히게 한다.
+      */
+      yAnchor: 0,
+      zIndex: MAP_LAYER_Z.focus,
+      // 누를 수 없는 표시다 — 클릭을 받으면 그 위에서 시작한 끌기가 지도에 닿지 않는다 (#789)
+      clickable: false,
+    })
+    overlay.setMap(map)
+    focusOverlayRef.current = overlay
+  }, [focusMarker, status])
+
+  // ── 동선 선 ──────────────────────────────────────────────────────────────
+  /*
+    **핀 effect 와 합치지 않는다.** 둘은 갱신 주기가 다르다 — 핀은 선택·확대 단계마다
+    다시 그려지고(묶음이 풀리고 맺힌다), 선은 일자가 바뀔 때만 바뀐다. 한 effect 에 두면
+    핀을 건드리는 모든 이유가 선을 다시 그리게 되어, 도로 경로처럼 늦게 오는 좌표를
+    얹을 때(레인 B) 한 프레임씩 깜빡인다.
+
+    **선은 묶지 않는다.** `cluster` 는 핀의 겹침을 푸는 장치인데, 선은 겹쳐도 읽히고
+    묶으면 순서가 사라진다.
+  */
+  useEffect(() => {
+    const map = mapRef.current
+    const maps = mapsRef.current
+    if (map === null || maps === null || status !== 'ready') return
+
+    // 먼저 지운다 — 핀과 같은 이유다. 새로 그린 뒤 지우면 한 프레임 겹친다
+    for (const polyline of polylinesRef.current) polyline.setMap(null)
+    polylinesRef.current = []
+
+    if (route === null || route === undefined) return
+
+    const color = routeColor()
+
+    polylinesRef.current = route.map((segment) => {
+      const stroke = ROUTE_STROKE[segment.tone]
+
+      const polyline = new maps.Polyline({
+        path: segment.path.map((coord) => new maps.LatLng(coord.lat, coord.lng)),
+        strokeWeight: stroke.weight,
+        strokeColor: color,
+        strokeOpacity: stroke.opacity,
+        strokeStyle: stroke.style,
+        // 모든 마커 아래다. 선이 핀을 덮으면 이름표가 잘려 읽히지 않는다
+        zIndex: MAP_LAYER_Z.route,
+      })
+      polyline.setMap(map)
+
+      return polyline
+    })
+  }, [route, status])
+
+  /*
+    ── 선택 핀으로 부드럽게 이동 ────────────────────────────────────────────
+
+    **`pins` 를 의존성에 넣으면 지도가 되돌아온다** (#240). `pins` 는 조회 결과라
+    지도를 옮길 때마다 새 배열이 되는데, 그것이 이 effect 를 다시 돌려 **선택된 핀으로
+    `panTo`** 하고, 그 이동이 또 `idle` → 재조회 → 새 `pins` 를 만들어 사용자가 지도를
+    옮길 수 없게 된다 (실측: '지도 이동 시 재검색' 을 켜면 같은 자리로 계속 돌아왔다).
+
+    그래서 **`selectedId` 가 바뀔 때만** 움직인다. 좌표는 ref 로 최신 `pins` 에서 읽는다 —
+    선택은 사용자 행동이고 조회 결과 갱신은 아니다.
+  */
+  const pinsRef = useRef(pins)
+  pinsRef.current = pins
+
+  useEffect(() => {
+    const map = mapRef.current
+    const maps = mapsRef.current
+    if (map === null || maps === null || selectedId === null) return
+
+    const pin = pinsRef.current.find((candidate) => candidate.id === selectedId)
+    const coord = pin === undefined ? null : toLatLng(pin)
+    if (coord === null) return
+
+    // 확대 단계를 안 받았으면 이동만 한다 — `zoomToward` 가 "이미 가깝다" 로 읽게 둔다
+    const level = selectedLevel ?? map.getLevel()
+    movedSinceCameraRef.current = true
+
+    return zoomToward({
+      map,
+      maps,
+      target: new maps.LatLng(coord.lat, coord.lng),
+      level,
+      mapRef,
+      offset: selectedOffsetRef.current?.() ?? null,
+    })
+    /*
+      **`status` 도 본다** (#1227). `?place=` 로 들어오면 선택이 **첫 렌더부터** 있는데, 그때는 SDK 를
+      받는 중이라 지도가 없어 위에서 돌아간다. 선택이 바뀌지 않으니 다시 돌 일이 없어, 미리보기는
+      열렸는데 지도는 제주 전체 구도에 머물렀다. 지도가 준비되는 순간 한 번 더 돈다 — `status` 는
+      `loading → ready` 한 번만 바뀌므로 #240 같은 되돌림 고리가 생기지 않는다.
+    */
+  }, [selectedId, selectedLevel, status])
+
+  // ── 밖에서 중심을 옮길 때 (현재 위치 버튼) ───────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current
+    const maps = mapsRef.current
+    if (map === null || maps === null || center === null || center === undefined) return
+
+    map.setCenter(new maps.LatLng(center.lat, center.lng))
+  }, [center])
+
+  /*
+    ── 밖에서 카메라를 확정할 때 (좌표가 늦게 도착하는 화면) ────────────────
+
+    **`center` effect 와 나란히 두고 합치지 않는다.** 둘이 하는 일이 다르다 —
+    `center` 는 확대를 건드리지 않고 옮기기만 하고(사용자가 맞춰 둔 확대를 지킨다),
+    이쪽은 확대까지 확정한다(조회 범위와 보이는 범위를 맞춘다). 한 effect 로 묶으면
+    어느 쪽 의도로 불렸는지 알 수 없다.
+
+    컨테이너 크기를 여기서 읽는다 — 이 컴포넌트가 그것을 아는 유일한 곳이다.
+  */
+  useEffect(() => {
+    const map = mapRef.current
+    const maps = mapsRef.current
+    const container = containerRef.current
+    if (map === null || maps === null || container === null) return
+    if (camera === null || camera === undefined) return
+
+    /** 마지막으로 맞춘 컨테이너 크기 — 되잡기가 "정말 바뀌었나" 를 이것으로 잰다 */
+    let fitted = { width: -1, height: -1 }
+
+    const apply = () => {
+      fitted = { width: container.clientWidth, height: container.clientHeight }
+
+      const next = framedCamera({
+        anchor: camera.anchor,
+        spanMeters: camera.spanMeters,
+        width: fitted.width,
+        height: fitted.height,
+        seaRatio: camera.anchorRatio ?? JEJU_MAP_SEA_RATIO,
+      })
+
+      /*
+        **`keepLevel` 이면 지금 단계로 프레이밍한다** (#873). `framedCamera` 가 계산한
+        단계는 버리지만 **위도 폭 환산에는 단계가 필요하므로**(`framedCenterLat`) 지금
+        값을 대신 넣는다 — `next.lat` 을 그대로 쓰면 다른 배율로 잰 오프셋이 걸려 중심이
+        어긋난다. `anchorRatio` 가 0.5 면 어느 단계든 기준점과 같아 차이가 없지만,
+        0.35 갈래에서는 실제로 갈린다.
+      */
+      const level = camera.keepLevel === true ? map.getLevel() : next.level
+      const lat =
+        camera.keepLevel === true
+          ? framedCenterLat(
+              camera.anchor.lat,
+              fitted.height,
+              level,
+              camera.anchorRatio ?? JEJU_MAP_SEA_RATIO,
+            )
+          : next.lat
+
+      // **단계를 먼저, 중심을 나중에.** 순서가 뒤집히면 옛 중심을 확대한 뒤 옮기게 되어
+      // 한 프레임 동안 엉뚱한 곳이 보인다 (선택 핀 확대에서 같은 판단을 했다)
+      if (camera.keepLevel !== true) map.setLevel(next.level)
+      map.setCenter(new maps.LatLng(lat, next.lng))
+
+      // 놓은 자리를 알린다 — 바깥이 "사용자가 옮겼는지" 를 이 자리 기준으로 잰다 (#578)
+      cameraAppliedRef.current?.({ lat, lng: next.lng })
+    }
+
+    movedSinceCameraRef.current = false
+    apply()
+
+    if (camera.refitOnResize !== true) return
+
+    /*
+      판정은 `shouldRefit` 이 한다 — 옮겼으면 · 크기가 그대로면(`observe` 직후 첫 알림) ·
+      칸이 숨었으면 맞추지 않는다.
+
+      **한 프레임에 한 번만 맞춘다.** 창을 끄는 동안 관찰자는 매 프레임 불리는데, 그때마다
+      단계·중심을 놓으면 지도가 끌리는 내내 떨린다. 마지막 크기만 보면 된다.
+
+      **`relayout()` 을 여기서 직접 먼저 부른다.** 아래 `relayout` effect 의 관찰자도 같은
+      컨테이너를 보지만, 관찰자는 만들어진 순서로 불리고 이 effect 는 카메라가 바뀔 때마다
+      관찰자를 새로 만든다 — 일자를 한 번 바꾸면 그쪽이 먼저 불린다는 보장이 사라진다.
+      SDK 가 옛 크기를 든 채 단계·중심을 놓으면 새 크기에서 중심이 어긋난다.
+    */
+    let frame: number | null = null
+
+    const observer = new ResizeObserver(() => {
+      if (frame !== null) return
+
+      frame = window.requestAnimationFrame(() => {
+        frame = null
+
+        const next = { width: container.clientWidth, height: container.clientHeight }
+        if (!shouldRefit({ fitted, next, moved: movedSinceCameraRef.current })) return
+
+        map.relayout()
+        apply()
+      })
+    })
+    observer.observe(container)
+
+    return () => {
+      observer.disconnect()
+      if (frame !== null) window.cancelAnimationFrame(frame)
+    }
+  }, [camera, status])
+
+  // ── 사용자의 직접 이동 (`onUserMove` 머리주석) ────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current
+    const maps = mapsRef.current
+    const container = containerRef.current
+    if (status !== 'ready' || map === null || maps === null || container === null) return
+
+    const notify = () => {
+      movedSinceCameraRef.current = true
+      userMoveRef.current?.()
+    }
+    // 한 손가락 터치는 끌기라 `dragstart` 가 잡는다 — 여기서는 두 손가락(핀치)만 센다
+    const onTouchStart = (event: TouchEvent) => {
+      if (event.touches.length >= 2) notify()
+    }
+
+    maps.event.addListener(map, 'dragstart', notify)
+    container.addEventListener('wheel', notify, { passive: true })
+    container.addEventListener('dblclick', notify)
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+
+    return () => {
+      maps.event.removeListener(map, 'dragstart', notify)
+      container.removeEventListener('wheel', notify)
+      container.removeEventListener('dblclick', notify)
+      container.removeEventListener('touchstart', onTouchStart)
+    }
+  }, [status])
+
+  // 패널을 접거나 시트를 올리면 컨테이너 폭이 바뀐다 → 되잡지 않으면 지도가 잘린다
+  const relayout = useCallback(() => mapRef.current?.relayout(), [])
+  useEffect(() => {
+    if (status !== 'ready') return
+
+    window.addEventListener('resize', relayout)
+    const container = containerRef.current
+    const observer = container === null ? null : new ResizeObserver(relayout)
+    if (container !== null) observer?.observe(container)
+
+    return () => {
+      window.removeEventListener('resize', relayout)
+      observer?.disconnect()
+    }
+  }, [status, relayout])
+
+  return (
+    <div
+      className={cn(
+        'bg-bg-sunken relative isolate',
+        /*
+          원 · 사각이 함께 서면(시설 층을 켠 `/places`) 원의 투명한 것(상시 알약 · 44 확장)이 아래 사각 몸체를
+          덮지 않게 한다 — 규칙은 `globals.css` 의 `.map-shapes-mixed`, 판정과 근거는 `hasMixedPinShapes` (#1286 D2-4)
+        */
+        hasMixedPinShapes(pins) && MAP_SHAPES_MIXED_CLASS,
+        className,
+      )}
+    >
+      <div ref={containerRef} className="size-full" />
+
+      {status === 'loading' && (
+        <p
+          role="status"
+          className="text-caption text-fg-muted absolute inset-0 flex items-center justify-center font-medium"
+        >
+          {messages.map.loading}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * 개별 핀. 아이콘 원 · 사각이면 이름 알약은 `named`(가까운 줌 · `PIN_NAME_MAX_LEVEL`) · 선택 · 호버 · 포커스 때만
+ * 선다(#1280 · #1286) — 멀리서는 모양과 아이콘만 남는다. 아이콘이 없는 핀(예전 이름표 · 정적 핀)은 이름표 그대로다.
+ *
+ * **판단은 여기 없다.** 무엇으로 그릴지는 `pinContent` 가 정하고 `pin-content.test.ts` 가
+ * 잠근다 — 이 함수는 `interactive` 와 `onClick` 이 **같은 사실을 두 번 말하지 않게** 묶는
+ * 매듭이다. 둘이 어긋나면 `role="img"` 인 요소에 클릭 리스너가 붙는다.
+ */
+function pinElement(
+  pin: MapPin,
+  selected: boolean,
+  named: boolean,
+  onClick: (() => void) | null,
+): HTMLElement {
+  return markerElement(
+    pinContent({ ...pin, named }, { selected, interactive: onClick !== null }),
+    onClick,
+  )
+}
+
+/**
+ * `PinContent` 서술자를 DOM 으로 **바르기만 한다** — 핀도 묶음도 이 하나를 거친다.
+ *
+ * ### 왜 하나인가
+ *
+ * 예전에는 묶음이 `clusterElement` 로 따로 조립돼 `textContent` 와 `aria-label` 을 직접
+ * 꽂았고, **그 배선을 보는 테스트가 없었다** — 둘을 바꿔 꽂아도 초록이었다 (#671 F-5).
+ * DOM API 로 만드는 이 자리는 `document` 가 없는 node 환경 테스트에서 볼 수 없으므로
+ * (`docs/testing-guide.md` §1), 잠그는 방법은 **판단을 전부 밖으로 빼고 통로를 하나로
+ * 좁히는 것**뿐이다. 통로가 하나면 `pin-content.test.ts` 가 잠근 규칙이 묶음에도 그대로
+ * 적용되고, 남는 위험("묶음이 이 통로를 안 거침")은 `map-canvas-marker-wiring.test.ts` 의
+ * 소스 그렙이 막는다.
+ *
+ * `onClick` 이 `null` 이면 **버튼이 아니다** (#789 — 고를 것이 없는 지도). 그 갈래에서는
+ * `type` 도 클릭 리스너도 붙지 않는다.
+ */
+function markerElement(content: PinContent, onClick: (() => void) | null): HTMLElement {
+  const element = document.createElement(content.tag)
+  element.className = content.className
+
+  /*
+    **원 핀의 아이콘은 고정 SVG 문자열이다** (#1280, `lib/map/pin-icons.ts`). 사용자 데이터(이름)는 아래
+    `textContent` 로만 들어간다 — HTML 로 들어가는 것은 이 상수뿐이다(`map-canvas-marker-wiring.test.ts`).
+  */
+  if (content.icon !== null) element.insertAdjacentHTML('afterbegin', pinIconSvg(content.icon))
+
+  if (content.role !== null) element.setAttribute('role', content.role)
+  if (content.ariaLabel !== null) element.setAttribute('aria-label', content.ariaLabel)
+  if (content.ariaPressed !== null) {
+    element.setAttribute('aria-pressed', String(content.ariaPressed))
+  }
+  if (content.text !== null) element.textContent = content.text
+
+  if (content.label !== null) {
+    // 이름표는 `span` 안에 둔다 — 말줄임을 거는 자리가 여기다 (`.map-pin > span`)
+    const label = document.createElement('span')
+    label.textContent = content.label
+    element.appendChild(label)
+  }
+
+  if (onClick !== null) {
+    ;(element as HTMLButtonElement).type = 'button'
+    element.addEventListener('click', onClick)
+  }
+
+  return element
+}
+
+function toMapBounds(sw: KakaoLatLng, ne: KakaoLatLng): MapBounds {
+  return {
+    sw: { lat: sw.getLat(), lng: sw.getLng() },
+    ne: { lat: ne.getLat(), lng: ne.getLng() },
+  }
+}

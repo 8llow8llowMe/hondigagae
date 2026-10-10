@@ -1,0 +1,186 @@
+'use client'
+
+import type { ReactNode } from 'react'
+
+import { CheckIcon } from '@/components/icons'
+import { handleRadioGroupKeyDown, radioTabIndex } from '@/lib/ui/radio-group-keys'
+import { cn } from '@/lib/utils/cn'
+
+/**
+ * 세로 필터 목록 — 디자인 가이드 §5 FilterControls.
+ *
+ * **`Chip` 과 같은 축을 다루지만 형태가 다르다.** 칩은 가로로 흐르는 모바일 상시 필터고,
+ * 이것은 세로 공간이 있는 곳(데스크톱 레일 · 바텀시트)의 형태다. 아트보드
+ * `혼디가개 장소 찾기.dc.html` 03·02 절이 근거다.
+ *
+ * **축의 성격이 컨트롤 종류를 정한다.**
+ * - 배타(하나만) → `FilterRadio` — 원형 표시기 + `role="radio"`
+ * - 다중(여러 개) → `FilterCheck` — 사각 표시기 + `role="checkbox"`
+ *
+ * **같은 세로 목록을 `aria-pressed` 토글로 두지 않는다** — 배타 축도 다중 선택으로 읽힌다.
+ * 가이드가 명시적으로 금지한 형태다.
+ *
+ * **`filter-list` · `filter-list-heading` · `filter-option` 클래스는 스타일이 아니라 자리다**
+ * (#389). 데스크톱 필터 레일(`.filter-rail`)이 이 셋의 좌우 여백만 바꿔 페이지의 왼쪽
+ * 기준선(40)에 세운다 — 같은 컴포넌트를 모바일 시트도 쓰는데 거기서는 40 이 틀린 값이라,
+ * 값을 컴포넌트가 아니라 **담는 곳**이 정해야 했다. 규칙은 `app/globals.css` 에 있다.
+ * 클래스 이름을 바꾸면 그 규칙이 조용히 안 걸린다.
+ *
+ * `RadioGroup`/`Checkbox`(`src/components/`)와 다른 컴포넌트다. 저쪽은 **폼 입력**이라
+ * 테두리 박스 + 에러 슬롯 + `name` 배선을 갖는다. 필터는 폼이 아니라 조회 조건이고,
+ * 제출도 검증도 없다 — 형태를 공유하면 둘 중 하나가 반드시 어색해진다
+ * (docs/component-guide.md §7 의 `Field` 분리와 같은 판단이다).
+ */
+export function FilterList({
+  label,
+  exclusive = false,
+  children,
+  className,
+}: {
+  /** 축 이름. 없으면 스크린리더가 무엇을 고르는 축인지 말하지 못한다 */
+  label: string
+  /** 배타 축이면 true. 기본은 다중 축이다 */
+  exclusive?: boolean
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      role={exclusive ? 'radiogroup' : 'group'}
+      aria-label={label}
+      /*
+        **행 사이를 4px 띄운다** (#412). 선택은 `bg-band` 이고 hover 도 같은 `bg-band` 라,
+        고른 행 바로 위·아래에 마우스를 올리면 **두 회색이 맞닿아 한 덩어리로 보였다** —
+        어느 쪽이 고른 것이고 어느 쪽이 지나가는 것인지 구분되지 않는다.
+        틈이 있으면 같은 색이어도 둘로 읽힌다.
+
+        **margin 이 아니라 `gap` 이다.** 행마다 margin 을 주면 첫 행 위·마지막 행 아래에도
+        붙어 목록이 담는 곳(시트 · 레일)마다 다른 여백을 갖게 된다. `gap` 은 사이에만 든다.
+        4 는 §4 스케일 안이다.
+      */
+      className={cn('filter-list flex flex-col gap-1 px-2', className)}
+    >
+      {children}
+    </div>
+  )
+}
+
+/** 축 제목. 12px `--fg-muted` — 옵션(16px)보다 작아 목록이 제목을 이긴다 */
+export function FilterListHeading({ children }: { children: ReactNode }) {
+  return (
+    <h3 className="filter-list-heading text-caption text-fg-muted px-4 pt-4 pb-2 font-semibold">
+      {children}
+    </h3>
+  )
+}
+
+type OptionProps = {
+  selected: boolean
+  onSelect: () => void
+  children: ReactNode
+  /** 이 조건이 무엇을 하는지. 라벨만으로 부족할 때만 준다 */
+  description?: string | undefined
+  className?: string | undefined
+}
+
+/** 배타 축 한 줄 */
+export function FilterRadio({ selected, onSelect, children, description, className }: OptionProps) {
+  return (
+    <OptionButton
+      role="radio"
+      selected={selected}
+      onSelect={onSelect}
+      description={description}
+      className={className}
+      indicator={
+        <span
+          aria-hidden
+          className={cn(
+            'flex size-5 shrink-0 items-center justify-center rounded-full',
+            selected ? 'bg-brand-500' : 'border-border-strong bg-bg border',
+          )}
+        >
+          {selected && <span className="bg-fg-inverse size-1.5 rounded-full" />}
+        </span>
+      }
+    >
+      {children}
+    </OptionButton>
+  )
+}
+
+/** 다중 축 한 줄 */
+export function FilterCheck({ selected, onSelect, children, description, className }: OptionProps) {
+  return (
+    <OptionButton
+      role="checkbox"
+      selected={selected}
+      onSelect={onSelect}
+      description={description}
+      className={className}
+      indicator={
+        <span
+          aria-hidden
+          className={cn(
+            'flex size-5 shrink-0 items-center justify-center rounded-sm',
+            selected ? 'bg-brand-500' : 'border-border-strong bg-bg border',
+          )}
+        >
+          {selected && <CheckIcon size={14} strokeWidth={2} className="text-fg-inverse" />}
+        </span>
+      }
+    >
+      {children}
+    </OptionButton>
+  )
+}
+
+/**
+ * 두 형태의 공통 몸통.
+ *
+ * **선택 상태를 배경색만으로 표현하지 않는다** — tint 와 함께 weight 를 올린다 (가이드 §5).
+ * 색을 못 보는 사람에게도 선택이 보여야 한다.
+ */
+function OptionButton({
+  role,
+  selected,
+  onSelect,
+  indicator,
+  children,
+  description,
+  className,
+}: OptionProps & { role: 'radio' | 'checkbox'; indicator: ReactNode }) {
+  return (
+    <button
+      type="button"
+      role={role}
+      aria-checked={selected}
+      /*
+        **라디오만 roving 이다** (#825). 체크박스는 칸마다 탭 스톱이 규약이라 건드리지
+        않는다 — `role` 하나로 갈리므로 두 형태가 같은 몸통을 써도 어긋나지 않는다.
+      */
+      tabIndex={role === 'radio' ? radioTabIndex(selected) : undefined}
+      onKeyDown={role === 'radio' ? handleRadioGroupKeyDown : undefined}
+      onClick={onSelect}
+      className={cn(
+        // 높이 44 — §7 하한이 아니라 이 자리에서 고른 값이다 (#883). 줄이려면 375 에서 재고 줄인다
+        'filter-option flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-left transition-colors',
+        'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
+        selected ? 'bg-band' : 'hover:bg-band',
+        className,
+      )}
+    >
+      {indicator}
+      <span className="min-w-0 flex-1">
+        <span
+          className={cn('text-body-1 text-fg block', selected ? 'font-semibold' : 'font-medium')}
+        >
+          {children}
+        </span>
+        {description !== undefined && (
+          <span className="text-caption text-fg-muted mt-1 block">{description}</span>
+        )}
+      </span>
+    </button>
+  )
+}

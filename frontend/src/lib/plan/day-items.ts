@@ -1,0 +1,332 @@
+import { messages } from '@/lib/messages'
+import { isPlaceTarget } from '@/lib/plan/detail'
+import type { PlanDayItemsReplacePayload, PlanItemDetail, PlanItemPayload } from '@/types/plan'
+
+/**
+ * 일자 편집모드의 순수 로직 — 이동 · 삭제 표시 · 요청 본문 조립.
+ *
+ * **렌더와 분리한다.** 여기 담긴 규칙은 전부 계약 해석이라 값으로 검증해야 한다.
+ * 규칙 근거는 docs/features/plan/일자편집-세부명세.md E1·E4.
+ */
+
+/**
+ * 편집 중인 항목 하나.
+ *
+ * **삭제를 배열에서 빼지 않는다.** 취소선 + `복구` 로 보류해 두고 저장 시점에 반영한다 —
+ * 빼 버리면 복구가 "다시 넣기" 가 되어 원래 자리를 잃는다 (E4).
+ */
+export type PlanDayEditItem = {
+  item: PlanItemDetail
+  /** 저장하면 삭제된다는 표시. 아직 서버 상태는 그대로다 */
+  removed: boolean
+}
+
+/**
+ * **편집 항목은 시각을 들지 않는다** (#1028 · 명세 G0). 시각은 일정 목록의 시간 칩이
+ * 소유한다 — 순서 편집 저장은 서버가 준 `item.startTime` 원문을 그대로 되싣는다
+ * (`toPayloadItem`). 예전(#623)에는 여기 편집용 `startTime: 'HH:mm' | ''` 가 있었다.
+ */
+export function toEditItems(items: PlanItemDetail[]): PlanDayEditItem[] {
+  return items.map((item) => ({ item, removed: false }))
+}
+
+export type MoveDirection = 'up' | 'down'
+
+/**
+ * 항목을 한 칸 옮긴다. **경계에서는 배열을 그대로 돌려준다** —
+ * 호출부가 참조 동일성으로 "안 움직였다" 를 알 수 있다.
+ *
+ * **삭제 표시된 항목도 함께 움직인다.** 목록에 남아 있으므로 건너뛰면 눈에 보이는
+ * 순서와 배열이 어긋난다.
+ */
+export function moveEditItem(
+  items: PlanDayEditItem[],
+  index: number,
+  direction: MoveDirection,
+): PlanDayEditItem[] {
+  const target = direction === 'up' ? index - 1 : index + 1
+  if (index < 0 || index >= items.length) return items
+  if (target < 0 || target >= items.length) return items
+
+  const next = [...items]
+  const moved = next[index] as PlanDayEditItem
+  next[index] = next[target] as PlanDayEditItem
+  next[target] = moved
+
+  return next
+}
+
+/** 삭제 표시를 켜고 끈다 */
+export function toggleRemoved(items: PlanDayEditItem[], index: number): PlanDayEditItem[] {
+  if (index < 0 || index >= items.length) return items
+
+  return items.map((entry, position) =>
+    position === index ? { ...entry, removed: !entry.removed } : entry,
+  )
+}
+
+/**
+ * 저장할 것이 있는가.
+ *
+ * **순서와 삭제 표시만 본다.** 변경이 없으면 저장 버튼을 잠근다 — 같은 목록을 다시 보내면
+ * `planItemId` 만 전부 새로 발급되고 얻는 것이 없다. 시각은 이제 편집모드가 고치지 않는다
+ * (#1028 · 명세 G0).
+ */
+export function hasEditChanges(items: PlanDayEditItem[], original: PlanItemDetail[]): boolean {
+  if (items.some((entry) => entry.removed)) return true
+  if (items.length !== original.length) return true
+
+  return items.some((entry, index) => entry.item.planItemId !== original[index]?.planItemId)
+}
+
+/** 삭제 표시를 뺀, 저장 후 남을 항목들 */
+export function survivingItems(items: PlanDayEditItem[]): PlanItemDetail[] {
+  return items.filter((entry) => !entry.removed).map((entry) => entry.item)
+}
+
+/**
+ * 편집 상태 → 일괄 교체 요청 본문.
+ *
+ * 지키는 것 넷 (E1):
+ * 1. **`targetId` 를 문자열로 싣는다** — Snowflake 정밀도
+ * 2. **`memo` · `startTime` · `itemType` 을 되돌려 싣는다** — 일괄 교체라 빼먹으면 순서만
+ *    바꿨는데 메모와 시각이 지워진다. 시각은 편집모드가 고치지 않으므로(#1028 · 명세 G0)
+ *    **서버가 준 원문 그대로**다
+ * 3. **`sequence` 를 0부터 다시 매긴다** — 화면의 배열 순서가 정본이다
+ * 4. **`day` 를 경로값 그대로 싣는다** — 서버가 덮어쓰지만 `@Min(1)` 이 먼저 돈다
+ */
+export function planDayItemsPayload(
+  items: PlanDayEditItem[],
+  day: number,
+): PlanDayItemsReplacePayload {
+  return {
+    items: survivingItems(items).map((item, index) => toPayloadItem(item, day, index)),
+  }
+}
+
+function toPayloadItem(item: PlanItemDetail, day: number, sequence: number): PlanItemPayload {
+  return {
+    day,
+    sequence,
+    itemType: item.itemType.code,
+    // 대상이 없는 항목(MOVE)은 키 자체를 넣지 않는다. null 을 보내면 의미가 같지만
+    // 요청 본문에 빈 값이 남아 계약을 읽기 어려워진다
+    ...(item.targetId === null ? {} : { targetId: item.targetId }),
+    title: item.title,
+    ...(item.memo === null ? {} : { memo: item.memo }),
+    ...(item.startTime === null ? {} : { startTime: item.startTime }),
+  }
+}
+
+/*
+  항목 하나의 시작 시각만 바꾸는 일괄 교체 본문(`setItemStartTimePayload`, #1028)은 #1053 에서
+  걷었다 — 시각 저장이 단건 API(`changeItemStartTime`)로 옮겨 가 이 파일이 만들 본문이 없다.
+*/
+
+// ─── 장소 담기 (#82) ──────────────────────────────────────────────────────────
+
+/**
+ * `title` 상한. 백엔드 `PlanItemRequest.title` 의 `@Size(max = 100)` 이다.
+ *
+ * **서버는 넘치면 자르지 않고 `PLAN_110` 을 낸다.** 장소 제목을 그대로 복사하는
+ * 담기 경로에서는 화면이 미리 잘라야 한다 (F3). 사용자가 쓴 글이 아니라 복사해 온
+ * 이름이라 잘라도 잃는 것이 없다.
+ *
+ * mock 의 동명 상수(`src/lib/api/mock/plan-data.ts`)와 값이 같지만 **별개다** —
+ * 그쪽은 서버 역할이라 검증하는 쪽이고, 이쪽은 요청을 만드는 쪽이다.
+ */
+export const ITEM_TITLE_MAX = 100
+
+/**
+ * 그 일자에 이미 담긴 **장소** id.
+ *
+ * **서버는 중복을 막지 않는다.** 화면이 먼저 막지 않으면 같은 곳이 두 번 담긴 일정이
+ * 조용히 만들어진다 (F1·F5-4).
+ *
+ * **`isPlaceTarget` 으로 거른다** — `PLACE`/`MEAL`/`LODGING` 의 `targetId` 만 `place.id` 이고
+ * **`WALK` 의 `targetId` 는 `walk_course.id` 라 다른 네임스페이스다.** 걸러내지 않으면 우연히
+ * 값이 겹치는 장소가 `이미 담았어요` 로 잠겨, 담을 수 있는 곳을 담지 못한다 —
+ * 버튼이 사라져 우회로도 없다. 같은 구분을 항목 보강도 쓴다 (`lib/plan/detail.ts`).
+ *
+ * `MEAL`·`LODGING` 은 포함한다 — 같은 장소가 식사로 담겨 있어도 또 담을 이유가 없다.
+ */
+export function placeIdsOf(items: PlanItemDetail[]): Set<string> {
+  const ids = new Set<string>()
+  for (const item of items) {
+    if (isPlaceTarget(item) && item.targetId !== null) ids.add(item.targetId)
+  }
+  return ids
+}
+
+/**
+ * 담기가 새 항목을 넣을 자리 — 그날 **끝에 붙은 숙박 앞** (#1175).
+ *
+ * **맨 끝이 아니다.** 2026-10-06 사용성 점검 2회차에서 `장소 추가` 로 담은 카페가 그날 숙박 뒤에
+ * 붙어, 숙소에서 38.7km 를 되돌아가는 순서가 됐다 — 사용자가 순서 편집으로 직접 옮겨야 했다(옮기니
+ * 5km). 숙박은 그날의 끝이다. 낮에 갈 곳을 고른 사람이 숙소 다음에 가려는 경우는 드물고, 그렇다면
+ * 순서 편집으로 옮긴다 — 반대 방향의 실수보다 싸다.
+ *
+ * **끝에 연달아 붙은 숙박 묶음만 본다.** 중간의 숙박(아침 체크아웃 · 낮 짐 맡기기)은 그날의 끝이
+ * 아니라 건드리지 않는다 — 그 뒤에 이미 낮 일정이 이어진다. 숙박만 있는 날은 맨 앞(0)이다.
+ *
+ * **이동·휴식 추가(`appendMoveItemPayload`)는 쓰지 않는다** — 숙소 앞 이동인지 숙소에서의 휴식인지
+ * 화면이 알 수 없어 예전처럼 맨 끝이다(H7-3).
+ */
+export function itemInsertIndex(items: PlanItemDetail[]): number {
+  let index = items.length
+  while (index > 0 && items[index - 1]?.itemType.code === 'LODGING') index -= 1
+  return index
+}
+
+/** 기존 항목을 되싣고 `itemInsertIndex` 자리에 하나를 끼운 본문. `sequence` 는 0부터 다시 매긴다 */
+function insertItemPayload(
+  items: PlanItemDetail[],
+  day: number,
+  added: Omit<PlanItemPayload, 'day' | 'sequence'>,
+): PlanDayItemsReplacePayload {
+  const at = itemInsertIndex(items)
+  const existing = items.map((item, index) =>
+    toPayloadItem(item, day, index < at ? index : index + 1),
+  )
+
+  return {
+    items: [...existing.slice(0, at), { day, sequence: at, ...added }, ...existing.slice(at)],
+  }
+}
+
+/**
+ * 그 일자에 장소 하나를 담은 일괄 교체 본문 — **끝에 붙은 숙박 앞, 없으면 맨 끝** (#1175).
+ *
+ * **새 API 가 없다.** 담기도 일자 편집과 같은 `PUT …/days/{day}/items` 라, 기존 항목을
+ * 전부 되싣고 하나를 더한 목록을 보낸다 — 되싣지 않으면 그 일자가 새 항목 하나만
+ * 남기고 비워진다 (E1).
+ *
+ * `itemType` 은 **`PLACE` 고정**이다. 식사·숙박 구분은 이 이슈 밖이다. **`WALK` 담기는
+ * 이 함수를 쓰지 않는다** — [#382](https://github.com/8llow8llowMe/hondigagae/issues/382)로
+ * `walk_course` 조회 API 가 생겨 더 이상 막힌 것이 아니고, `appendWalkCourseItemPayload`
+ * (아래)가 자매 함수로 따로 있다 — 중복 판정(`placeIdsOf` vs `walkCourseIdsOf`)과 `title`
+ * 조립 규칙이 갈려 인자로 합치지 않았다 (`올레담기-세부명세.md` D3-1).
+ *
+ * 위치를 고르는 UI 는 두지 않는다 — 순서는 편집모드가 소유한다(F5-3). 자리는 `itemInsertIndex`
+ * 하나가 정한다 — 예전에는 늘 맨 끝이라 숙박 뒤에 붙었다.
+ */
+export function appendPlaceItemPayload(
+  items: PlanItemDetail[],
+  day: number,
+  place: { placeId: string; title: string },
+): PlanDayItemsReplacePayload {
+  return insertItemPayload(items, day, {
+    itemType: 'PLACE',
+    // 문자열 그대로다 — Snowflake 라 Number() 를 거치면 정밀도를 잃는다 (E1 규칙 1)
+    targetId: place.placeId,
+    title: place.title.slice(0, ITEM_TITLE_MAX),
+  })
+}
+
+// ─── 산책 코스 담기 (#620) ────────────────────────────────────────────────────
+
+/**
+ * 그 일자에 이미 담긴 **산책 코스** id. `placeIdsOf` 의 자매다.
+ *
+ * **`placeIdsOf` 를 재사용하지 않는다.** 그 함수는 `isPlaceTarget` 으로 `WALK` 를
+ * **일부러 걸러낸다** — 코스를 장소 id 집합으로 재면 값이 우연히 겹치는 장소가 있어도
+ * 없어도 중복이 영원히 잡히지 않는다.
+ *
+ * 반대로 **코스 판정에 `placeIdsOf` 의 결과를 섞지 않는다.** 우연히 값이 겹치는 장소가
+ * 담겨 있으면 담을 수 있는 코스가 잠긴다 — 버튼이 사라져 우회로가 없다. #82 가 겪은
+ * 결함의 거울상이다 (`올레담기-세부명세.md` D3-2).
+ *
+ * 판정은 `itemType.code === 'WALK' && targetId !== null` 이다. **`isPlaceTarget` 의
+ * 부정이 아니다** — `MOVE` 가 그 사이에 있다.
+ */
+export function walkCourseIdsOf(items: PlanItemDetail[]): Set<string> {
+  const ids = new Set<string>()
+  for (const item of items) {
+    if (item.itemType.code === 'WALK' && item.targetId !== null) ids.add(item.targetId)
+  }
+  return ids
+}
+
+/**
+ * 그 일자에 산책 코스 하나를 담은 일괄 교체 본문 — 자리는 장소 담기와 같다(**끝에 붙은 숙박 앞**,
+ * `itemInsertIndex`, #1175). `appendPlaceItemPayload` 의 자매다 (`올레담기-세부명세.md` D3).
+ *
+ * **`itemType` 이 `WALK` 고정이고 `targetId` 는 `walk_course.id` 다** — `place.id` 와
+ * 다른 네임스페이스다. **서버가 저장 시 이 id 를 검증하지 않는다**
+ * (`verifyPlaceTargets` 가 `PLACE_TARGETS`(`PLACE`·`MEAL`·`LODGING`)만 본다 — D3-3).
+ * 틀린 id 를 실어도 조용히 저장되고 그 항목은 영원히 제목만 남으므로, **여기서 id 를
+ * 지어내거나 가공하지 않는다** — 코스 상세 응답의 `walkCourseId` 를 그대로 받는다.
+ *
+ * `title` 은 호출부가 `{courseLabel} {name}` 을 조립해 넘긴다 (D3 결정 근거 D8-2) —
+ * 요약이 `null` 로 오는 경로가 실재해(D3-3 · tour-service 장애) 그때 남는 것은 `title`
+ * 뿐이다.
+ */
+export function appendWalkCourseItemPayload(
+  items: PlanItemDetail[],
+  day: number,
+  course: { walkCourseId: string; title: string },
+): PlanDayItemsReplacePayload {
+  return insertItemPayload(items, day, {
+    itemType: 'WALK',
+    // 문자열 그대로다 — Snowflake 라 Number() 를 거치면 정밀도를 잃는다 (E1 규칙 1)
+    targetId: course.walkCourseId,
+    title: course.title.slice(0, ITEM_TITLE_MAX),
+  })
+}
+
+// ─── 이동·휴식 직접 추가 (#1014) ──────────────────────────────────────────────
+
+/**
+ * 그 일자의 **맨 끝에** 이동·휴식(`MOVE`) 항목 하나를 붙인 일괄 교체 본문.
+ * `appendPlaceItemPayload` 의 자매다 (`일자편집-세부명세.md` H1).
+ *
+ * **새 API 가 없다.** 담기와 같은 `PUT …/days/{day}/items` 라 기존 항목을 전부 되싣고
+ * 하나를 더한다 — 되싣지 않으면 그 일자가 새 항목 하나만 남기고 비워진다 (E1).
+ *
+ * **`targetId` 키를 넣지 않는다.** 서버 계약이 "`MOVE` 는 비워 둡니다" 이고
+ * (`PlanItemRequest.targetId`), 장소 검증은 `targetId` 가 없는 항목을 묻지 않는다
+ * (`PlanCommandProcessor.verifyPlaceTargets`). `null` 을 실어도 뜻은 같지만 되싣는 쪽
+ * (`toPayloadItem`)이 키를 빼므로 **한 본문 안에서 두 모양을 섞지 않는다.**
+ *
+ * **`title` 은 앞뒤 공백을 걷고 100자로 자른다.** 사용자가 쓴 글이라 넘치면 잘라 보내지
+ * 않고 모달이 먼저 막는다(`validateMoveTitle`) — 여기서 자르는 것은 그 검증을 거치지 않은
+ * 호출에 대한 2차 방어다. 서버는 자르지 않고 `PLAN_110` 을 낸다.
+ *
+ * 순서는 **맨 끝**이다. 위치를 고르는 UI 는 두지 않는다 — 순서는 편집모드가 소유한다
+ * (F5-3 과 같은 판단).
+ */
+export function appendMoveItemPayload(
+  items: PlanItemDetail[],
+  day: number,
+  move: { title: string },
+): PlanDayItemsReplacePayload {
+  const existing = items.map((item, index) => toPayloadItem(item, day, index))
+
+  return {
+    items: [
+      ...existing,
+      {
+        day,
+        sequence: existing.length,
+        itemType: 'MOVE',
+        // 비우면 기본 제목이다 (#1026) — 서버 `@NotBlank` 라 빈 값은 보낼 수 없다
+        title: (move.title.trim() || messages.plan.addMoveDefaultTitle).slice(0, ITEM_TITLE_MAX),
+      },
+    ],
+  }
+}
+
+/**
+ * 이동·휴식 제목 검증. 통과하면 `null`, 아니면 필드에 붙일 문구.
+ *
+ * 서버 `PlanItemRequest.title` 의 `@Size(max = 100)`(`PLAN_110`) 복제본이다
+ * (`form-guide.md` §5). **빈 값·공백만은 막지 않는다** (#1026) — `appendMoveItemPayload` 가
+ * 기본 제목(`이동 및 휴식`)으로 채워 서버 `@NotBlank` 에 닿지 않는다.
+ *
+ * **길이는 걷어낸 값으로 잰다.** 보내는 것이 걷어낸 값이라(`appendMoveItemPayload`) 앞뒤
+ * 공백 때문에 101자가 된 입력을 막으면 서버가 받을 값을 화면이 거절하게 된다.
+ */
+export function validateMoveTitle(value: string): string | null {
+  if (value.trim().length > ITEM_TITLE_MAX) return messages.plan.addMoveTitleTooLong
+  return null
+}

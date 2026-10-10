@@ -1,0 +1,270 @@
+# Frontend Form Guide
+
+> 폼 규약 정본 (T4). `docs/fe-foundation-spec.md` 의 미작성 항목을 채운다.
+> 근거: 백엔드 `ValidationErrorSupport` / `ValidationErrorBody` / 각 도메인 `*ValidationMessage` 실측 (2026-08-27)
+> 최초 적용: 로그인·회원가입 화면. 복잡 폼 검증: 반려견 프로필 (이슈 #12)
+
+## 1. 결정 — zod + 자체 경량 훅
+
+폼 라이브러리를 도입하지 않는다. `zod`(이미 의존성에 있음) + 얇은 자체 훅을 쓴다.
+
+| 근거                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------------- |
+| 의존성 0개 추가. 이 저장소는 런타임 의존성 9개로 보수적으로 유지하고 있다                                                   |
+| 검증·오류 병합·제출 상태를 **순수 함수**로 뽑으면 현재 테스트 환경에서 그대로 테스트된다 (`testing-guide.md` §1)            |
+| `component-guide.md` §5 가 상호작용 컴포넌트를 **controlled 전용**으로 못박았다. RHF 의 uncontrolled/ref 모델과 결이 다르다 |
+
+Server Actions 를 쓰지 않는 이유: 전송 경로가 BFF 프록시(`/api/bff`)로 통일돼 있다
+(`architecture-guide.md` §8). Server Action 을 섞으면 인증 주입·에러 분기가 두 벌이 된다.
+
+**재검토 조건**: 필드 20개 이상 / 배열 필드 / 단계별 위저드가 필요해지면 이 결정을 다시 본다.
+
+## 2. 모듈 구조
+
+```text
+src/lib/form/
+  field-errors.ts   서버 400 응답 → FormErrors        순수
+  validate.ts       zod safeParse → FormErrors        순수
+  use-form.ts       상태 배선 + 제출 (얇게)
+src/lib/messages/form.ts   클라이언트 검증 문구
+```
+
+**순수 함수에 로직을 몰고 훅은 배선만 한다.** 훅은 node 테스트 환경에서 검증할 수 없다.
+
+## 3. 오류 표현
+
+```ts
+export type FormErrors = {
+  /** 필드명 → 표시할 메시지 1개 */
+  fields: Record<string, string>
+  /** 특정 필드에 귀속되지 않는 오류 (로그인 실패, 이메일 중복 등) */
+  form: string | null
+}
+```
+
+필드 오류와 폼 전체 오류를 **한 타입에 담되 자리를 나눈다.** 백엔드도 대표 메시지
+(`resultMessage`)와 필드 목록(`fieldErrors`)을 두 키로 나눠 내려준다 (§4).
+
+## 4. 서버 400 → 필드 매핑 (핵심)
+
+### 4.1 백엔드가 내려주는 두 가지 형태
+
+정본은 `backend/docs/api-design-guide.md` §2-1 이다. **`resultMessage` 는 오류 종류와
+무관하게 항상 문자열이고**, 필드 목록은 `fieldErrors` 로 분리돼 있다 (#491).
+
+**(a) 검증 실패** — `fieldErrors` 가 **배열**이다.
+
+```jsonc
+{
+  "dataHeader": {
+    "success": false,
+    "resultCode": "MEMBER_104", // 정렬된 첫 오류의 코드
+    "resultMessage": "비밀번호는 8자 이상 20자 이하여야 합니다.", // 첫 오류의 메시지
+    "fieldErrors": [
+      {
+        "code": "MEMBER_104",
+        "field": "password",
+        "message": "비밀번호는 8자 이상 20자 이하여야 합니다.",
+      },
+      { "code": "MEMBER_105", "field": "password", "message": "비밀번호는 공백 없이 ..." },
+      { "code": "MEMBER_108", "field": "nickname", "message": "닉네임은 필수입니다." },
+    ],
+  },
+  "dataBody": null,
+}
+```
+
+**(b) 도메인 예외** — `fieldErrors` 가 **`null`** 이다.
+
+```jsonc
+{
+  "dataHeader": {
+    "success": false,
+    "resultCode": "MEMBER_001",
+    "resultMessage": "이미 가입된 이메일 (a@b.c)입니다.",
+    "fieldErrors": null,
+  },
+  "dataBody": null,
+}
+```
+
+> **두 형태를 `resultMessage` 만 보고 가르지 않는다.** 둘 다 문자열이라 갈리지 않는다 —
+> **가르는 것은 `fieldErrors` 의 유무다.** 문자열이면 폼 전체 오류로 단정하던 옛 구현이
+> 계약 통일 직후 모든 폼의 필드 오류를 통째로 죽였다 (#501).
+
+### 4.2 매핑 규칙
+
+1. **`fieldErrors[]` 를 순회하되 필드별 첫 오류만 채택한다. 뒤 항목으로 덮어쓰지 않는다.**
+   백엔드 `ValidationErrorSupport` 가 이미 정렬해서 내려준다:
+   **(1) DTO 선언 순서 → (2) 제약 우선순위 → (3) 메시지**.
+   제약 우선순위는 `필수(0) → 길이(1) → 범위(2) → 형식(3)` 으로, 사용자가 먼저 고쳐야 할 것이 앞에 온다.
+   덮어쓰면 이 정렬이 통째로 무의미해진다. 위 예시에서 비밀번호는 `MEMBER_104`(길이)를 보여야지
+   `MEMBER_105`(문자 구성)를 보이면 안 된다.
+2. `fieldErrors` 가 없으면(`null`·`undefined`) `resultMessage` 를 `form` 에 넣는다.
+   필드 오류가 아니다.
+3. 형태가 어느 쪽도 아니면 `fields` 는 비우고 `form` 에 화면 기본 문구를 넣는다.
+   **빈 오류로 조용히 성공한 것처럼 보이게 두지 않는다.**
+4. **서버 문구를 그대로 쓴다.** FE 에서 한국어로 다시 쓰지 않는다 (`api-integration-guide.md` §6).
+
+### 4.3 필드명 정합성
+
+`fieldErrors[].field` 는 백엔드 DTO 의 필드명이다. 폼 상태의 키를 **요청 DTO 필드명과 같게** 둔다.
+다르면 매핑 테이블이 필요해지고, 백엔드가 필드를 바꿀 때 조용히 깨진다.
+
+`field` 가 `"request"` 면 백엔드가 필드를 특정하지 못한 경우다 → `form` 으로 보낸다.
+
+**폼에 없는 칸의 필드 오류는 사라진다.** 공용 매핑은 `fieldErrors` 가 잡히면 `form` 을 비우므로, 서버가 화면에
+칸이 없는 필드(`items` 등)로 오류를 내면 문구가 아무 데도 렌더되지 않는다. 그런 폼만 `useForm` 의 생략 가능한
+`toErrors` 로 매핑을 바꿔 준다 — 생략하면 공용 매핑(`apiErrorToFormErrors` + `messages.form.submitFailed`)이다.
+지금 쓰는 곳은 AI 초안 담기의 `PLAN_136`(일정 항목 수 상한) 하나다(`lib/ai-plan/commit-error.ts`, #1251 ·
+plan 공통명세 S1-1). 폼마다 칸 목록을 넘기는 공용 규칙으로 넓히지 않았다 — 모든 호출부가 바뀌는데 겪는 코드가 하나다.
+
+## 5. 클라이언트 검증
+
+zod 스키마는 **백엔드 제약의 복제본**이다. 각 필드에 대응하는 백엔드 코드를 주석으로 남긴다.
+
+```ts
+// MEMBER_104 @Size(min=8,max=20) / MEMBER_105 @Pattern — MemberValidationMessage 실측
+password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
+```
+
+- 필드별 **첫 issue 만** 채택한다. 서버 규칙(§4.2)과 같은 동작이어야 한다.
+- 클라이언트 검증은 서버 왕복을 줄이는 것이지 **대체가 아니다.** 서버 오류를 항상 다시 병합한다.
+- **예외: `POST /auth/login` 은 백엔드에 `@Valid` 가 없어 서버 검증이 돌지 않는다.**
+  여기서는 클라이언트 검증이 유일한 방어다 (BE 후속 요청으로 분리됨).
+
+### 병합 순서
+
+```text
+제출 → 클라이언트 검증 실패? → 표시하고 중단 (요청 보내지 않음)
+     → 통과 → 요청 → 400 → 서버 오류로 fields/form 을 교체
+```
+
+클라이언트 오류와 서버 오류를 **합치지 않고 교체한다.** 둘을 합치면 이미 고친 필드의
+낡은 클라이언트 오류가 남는다.
+
+## 6. 제출 중 중복 방지
+
+**두 겹 모두 건다.**
+
+| 겹                            | 이유                                                      |
+| ----------------------------- | --------------------------------------------------------- |
+| 버튼 `disabled` + `aria-busy` | 시각·보조기술에 상태를 알린다 (`component-guide.md` §7)   |
+| 훅 내부 재진입 가드 (ref)     | `disabled` 반영 전에 Enter 키 제출이 두 번 들어갈 수 있다 |
+
+제출 성공/실패와 무관하게 가드를 반드시 해제한다 (`finally`).
+
+## 7. 이탈 경고
+
+- `beforeunload` 로 **브라우저 이탈만** 다룬다. dirty 이면서 제출 중이 아닐 때만 건다.
+- **App Router 내 라우트 이동은 경고하지 않는다.** Next App Router 에 이동을 가로채는 공식 API 가
+  없다. 비공식 우회(router 패치, `popstate` 가로채기)는 버전 업에서 깨지므로 쓰지 않는다.
+- 이 한계를 화면 설계로 보완한다: 되돌아가기 버튼에서 확인을 받거나, 입력이 짧게 유지되게 만든다.
+
+## 8. 접근성 (폼이 보장할 것)
+
+`component-guide.md` §7 의 `Input 계열` 계약을 폼 단위로 확장한다.
+
+- 모든 입력에 `label` 을 연결한다 (`id` / `htmlFor`). placeholder 를 label 대신 쓰지 않는다.
+- 오류 시 `aria-invalid="true"` + `aria-describedby` 로 오류 메시지를 연결한다.
+- **안내(`hint`)도 `aria-describedby` 로 잇는다** ([#1100](https://github.com/8llow8llowMe/hondigagae/issues/1100)).
+  정상이면 hint, 오류면 오류 하나 — 화면에 보이는 것만이다. `Field` 에 `hint` · `error` 를 주면 안쪽
+  입력이 알아서 가리킨다(`component-guide.md` §7). 입력에 따로 넘기지 않는다.
+- **폼 전체 오류는 반드시 읽힌다** — 제출 후 화면 변화가 없으면 스크린리더 사용자가 실패를 모른다.
+  읽히는 길은 **`role="alert"` 이거나 포커스 이동이거나, 둘 중 하나만**이다
+  ([#1102](https://github.com/8llow8llowMe/hondigagae/issues/1102)). 둘 다 두면 알림이 나타나며 한 번,
+  포커스가 옮겨 오며 한 번 — 같은 문구를 두 번 읽는다.
+  - **포커스가 그 표시로 오면 역할을 뗀다**(`announce="focus"`). 포커스를 주지 않는 쪽을 고르지 않은
+    이유: 그러면 #1078 이 막은 `BODY` 낙하가 돌아온다.
+  - **포커스가 다른 칸으로 가면 `role="alert"` 다**(`announce="live"`) — 필드 오류가 먼저인 실패(반려견
+    폼의 "N개 확인" 요약), 로그인 401(비밀번호 칸, 로그인 D4), 단계 되돌림 안내(새 단계의 첫 입력, D6).
+  - 판정은 `submitFailureAnnounce(errors, errorStatus)` 하나 — **포커스 순서의 첫 대상이 그 표시인가**
+    다. 포커스 effect 와 같은 함수를 봐야 "역할을 뗐는데 포커스도 안 간" 무음 실패가 없다. 위의 두
+    예외 갈래는 호출부가 `live` 로 덮는다.
+  - **`FormAlert` 의 기본값은 `live` 그대로다.** 포커스를 옮기지 않는 나머지 28개 파일(37곳)은 바뀌지 않는다.
+    `focus` 는 포커스를 실제로 옮기는 자리(지금은 `FormFailure` 와 공유 모달의 재시도 결과 — #1159,
+    판정은 `shareFailureAnnounce` · 일정 상태 전이의 실패 — #1203, 판정은 `planStatusResultAnnounce`)만 넘긴다. `FormFailure.announce` 는 필수다.
+  - **성공 안내도 같은 계약이다** ([#1174](https://github.com/8llow8llowMe/hondigagae/issues/1174)).
+    `FormNotice` 가 `announce` 를 받는다 — 기본값 `live`(`role="status"`), `focus` 면 역할을 떼고
+    `tabIndex={-1}`. 지금은 일정 상태 전이의 결과만 넘긴다: 전폭 버튼에서 시작해 포커스가 `BODY` 로
+    떨어졌으면 `focus`, 메뉴에서 시작해 포커스가 `⋯` 에 남았으면 `live`(판정은 `planStatusResultAnnounce`).
+    **그 전이의 실패도 같은 판정이다** ([#1203](https://github.com/8llow8llowMe/hondigagae/issues/1203)) —
+    `FormAlert` 가 `ref` 를 받아(`FormNotice` 와 같다) `focus` 면 패널이 알림으로 포커스를 옮긴다.
+- 제출 실패 시 **화면에서 첫 번째로 보이는 오류 필드로 포커스를 옮긴다.**
+  - **판정 기준은 DOM 순서다.** zod 스키마의 키 선언 순서가 아니다 — 두 순서는 언제든 어긋날 수
+    있고, 어긋나면 포커스가 위의 오류를 지나쳐 아래로 간다 ([#560](https://github.com/8llow8llowMe/hondigagae/issues/560)
+    실측: `/plans/new` 가 시작일·종료일 오류를 지나쳐 제목으로 갔다).
+  - 고르는 일은 `src/lib/form/focus-first-error.ts` 의 `focusFirstError(container, errors)` 하나가
+    맡는다. **폼마다 따로 구현하지 않는다** — 새 폼도 이 함수를 부른다.
+  - **언제 부를지는 여전히 `submitCount` 하나가 정한다.** `errors` 를 effect 의존성에 넣으면 입력
+    중인 필드에서 포커스를 훔친다 (`use-form.ts` 의 `submitCount` JSDoc).
+  - **접힌 섹션 안의 필드는 먼저 펼친다.** 포커스를 옮길 요소가 마운트돼 있지 않고 오류 메시지도
+    화면에 없어 제출이 조용히 실패한다. 펼침 판정도 "첫 오류" 가 아니라 **"오류 중 하나라도 접기
+    안인가"** 로 본다 (`ai-plan-create-form.tsx` 의 `COLLAPSED_FIELDS`).
+- **필드 오류가 없는 실패에서도 포커스를 놓지 않는다** ([#1078](https://github.com/8llow8llowMe/hondigagae/issues/1078)).
+  제출 중 버튼이 `disabled` 가 되면 브라우저는 포커스를 `BODY` 로 떨어뜨리고, 실패해서 버튼이
+  살아나도 돌려주지 않는다. 5xx · 429 · 409 처럼 폼 전체 오류로만 오는 실패 뒤에 키보드 사용자가
+  문서 맨 위에서 다시 시작했다 (실측: 로그인 503 · 429 · `MEMBER_007`, 가입 409, 재설정 완료).
+  - 순서는 `src/lib/form/submit-failure-focus.ts` 의 `focusSubmitFailure` 하나가 정한다:
+    **첫 오류 필드 → 폼 전체 알림(`FormAlert`) → 폼의 첫 입력.** `focusFirstError` 를 부르던
+    effect 는 필드 오류만 다룰 때 그대로 두고, 폼 전체 오류가 날 수 있는 폼은 이 함수를 부른다.
+  - `FormAlert` 는 그래서 `tabIndex={-1}` + `data-form-alert` 를 단다. 찾는 쪽은 `role="alert"`
+    가 아니라 이 속성을 본다 — `next dev` 오버레이도 `alert` 다.
+  - **5xx · 무응답이면 알림 자리가 폼 안 일시 장애 표시다** ([#1079](https://github.com/8llow8llowMe/hondigagae/issues/1079)).
+    폼 전체 실패는 **한 자리에 하나만** 선다 — 일시 장애(`ErrorState` `flush` + 재시도)이거나
+    `FormAlert` 이거나. 판정은 `src/lib/form/form-failure-display.ts` 의 `formFailureDisplay`
+    하나고, 화면과 포커스(`focusSubmitFailure(container, errors, errorStatus)`)가 같은 함수를 본다.
+    일시 장애의 바깥 상자가 `tabIndex={-1}` · `data-form-temporary-error` 를 단다(`role="alert"` 는
+    `announce="live"` 일 때만 — 위 낭독 경로 규칙, #1102).
+    인증 폼과 반려견 등록 · 수정 폼이 `src/components/form-failure.tsx` 의 `FormFailure` 를 쓴다 —
+    두 feature 가 쓰므로 #1101 에서 `features/auth/` 에서 공용으로 올렸다(component-guide.md §9).
+    제목을 가진 카드 안이면 `headingLevel={3}` 을 준다(반려견 폼).
+  - **값을 고치면 일시 장애가 통째로 걷힌다** (#1102). 호출부가 `errorStatus` 를 비우기 **직전에**
+    `setErrors((prev) => formErrorsAfterEdit(prev, errorStatus))` 로 서버 문구(`errors.form`)도 걷는다.
+    상태만 비우면 5xx 에도 채워 둔 서버 문구로 `FormAlert` 가 서서, 일시 장애가 "서비스를 일시적으로
+    사용할 수 없습니다." 알림으로 **모양을 바꿨다**. 표시 판정(`formFailureDisplay`)은 고칠 수 없었다
+    — `(문구, null)` 이 "401 뒤 값을 고쳤다"(알림을 남긴다)와 같은 입력이라서다. 재시도 전까지는
+    아무것도 서지 않는다(5xx 문구는 원래 그려진 적이 없어 잃는 정보가 없다).
+- **재전송 뒤에도 포커스를 놓지 않는다** (#1102). 가입 · 재설정 2단계 `다시 보내기` 는 요청 중
+  `loading`, 끝나면 성공이든 429 든 쿨다운으로 `disabled` 라 포커스가 `BODY` 로 떨어졌다(실측: 성공 ·
+  429 · 503 여섯 갈래 모두). `submitCount` 경로 밖이라 재전송 횟수 effect 가 `focusResendResult` 를
+  부른다 — **성공은 폼의 첫 입력(코드 칸)**, 막혔으면 제출 실패와 같은 순서(429 알림 · 5xx 일시 장애).
+  성공은 포커스를 잃었을 때만 옮긴다(요청 중 코드 칸을 눌러 둔 사람의 자리를 빼앗지 않는다). 성공
+  안내(`FormNotice`)로 보내지 않는 이유: 문구가 그대로라 다시 읽힐 것이 없고, 쿨다운 진입은 버튼 옆
+  `aria-live` 가 "다시 보내기 (60초 후 가능)" 으로 이미 알린다. 재전송이 성공하면 직전 폼 전체 실패
+  (429 · 5xx 문구)도 걷는다.
+  - **재전송이 코드 칸에 남기는 것** ([#1109](https://github.com/8llow8llowMe/hondigagae/issues/1109),
+    사용자 결정 2026-10-01). 판정은 `codeStepAfterResend`(`lib/form/code-step-after-resend.ts`) 하나를
+    가입 · 재설정이 같이 쓴다. **성공이면 코드 칸 오류(`AUTH_004` 불일치)와 값을 함께 걷는다** — 옛
+    코드는 더 이상 유효하지 않다. 코드 칸이 아닌 필드 오류(재설정의 새 비밀번호)는 남긴다.
+    **429 · 5xx · 무응답이면 코드 칸 오류와 값은 그대로다** — 새 코드가 오지 않았다. 429 는 서버 문구를
+    폼 전체 실패로 **얹는다**(예전처럼 오류를 통째로 바꾸면 코드 칸 오류가 함께 사라졌다). 그래서 틀린
+    코드 뒤 429 면 첫 포커스 대상은 남은 오류 칸이고 알림은 `role="alert"` 로 읽힌다 — 로그인 401 과
+    같은 모양이다(`submitFailureAnnounce`).
+  - **단계를 되돌리는 실패**(`AUTH_005` · `MEMBER_006` · `AUTH_017`)는 단계 전환 effect 가 새 단계의
+    첫 입력으로 옮긴다. 제출 실패 effect 는 단계 가드로 비켜선다 — 둘이 포커스를 다투지 않게.
+- 비밀번호 표시 토글은 `aria-pressed` 로 상태를 알린다.
+
+## 9. 테스트
+
+`testing-guide.md` §1 방식(node + `renderToStaticMarkup`)을 그대로 따른다.
+
+| 대상                | 방법                                                                                                  |
+| ------------------- | ----------------------------------------------------------------------------------------------------- |
+| `field-errors`      | 순수 함수 테스트. **필드 중복 시 첫 오류 채택**, 문자열 형태, 비정상 형태                             |
+| `validate`          | 순수 함수 테스트. 필드별 첫 issue                                                                     |
+| 폼 컴포넌트         | props 로 `FormErrors` 를 주입해 마크업에 `aria-invalid` / 메시지 노출 확인                            |
+| `focus-first-error` | 선택자를 만드는 **순수 함수만** node 에서 테스트한다. DOM 순서 판정은 `e2e/form-field-errors.spec.ts` |
+| 제출·입력 상호작용  | **테스트 불가.** 브라우저 실측으로 검증한다 (`fe-design-reviewer`)                                    |
+
+## 10. 새 폼 체크리스트
+
+- [ ] 폼 상태 키가 요청 DTO 필드명과 같다
+- [ ] zod 스키마에 대응 백엔드 코드 주석이 있다
+- [ ] 서버 400 을 `field-errors` 로 병합한다 (`fieldErrors` 형태·문자열 형태 둘 다)
+- [ ] 필드별 첫 오류만 표시한다
+- [ ] 폼 전체 오류가 `role="alert"` 또는 포커스 이동 중 **하나로** 읽힌다 (§8, #1102)
+- [ ] 제출 중 중복 방지가 두 겹이다
+- [ ] 제출 실패 시 `focusFirstError` 로 **화면의 첫 오류** 필드에 포커스가 간다 (§8)
+- [ ] 401 / 409 / 429 분기를 화면 문구로 확정했다
+- [ ] `done-checklist.md` 를 통과했다

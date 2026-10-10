@@ -1,0 +1,29 @@
+// 혼디가개 api-gateway 배포 잡.
+// 라우팅과 Swagger 집계. discovery 다음에 배포한다.
+//
+// Jenkins 멀티브랜치 파이프라인 이름: hondigagae-api-gateway
+// 배포 대상 PR 라벨:                  backend-api-gateway
+//   dev  -> main-server (192.168.0.11), 호스트 포트 7000
+//   prod -> backend-1   (192.168.0.13), 호스트 포트 5000
+def backendPipeline
+node('builder-backend') {
+    checkout scm
+    backendPipeline = load 'Jenkinsfile.backend-common.groovy'
+}
+
+backendPipeline.run([
+    serviceGroup       : 'cloud',
+    serviceName        : 'api-gateway',
+    modulePath         : 'cloud:api-gateway',
+    fsPath             : 'backend/cloud/api-gateway',
+    dockerfile         : 'api-gateway.Dockerfile',
+    composeFile        : 'docker-compose-api-gateway.yml',
+    composeServiceName : 'api-gateway',
+    containerNamePrefix: 'hondigagae-api-gateway',
+    deploySubdir       : 'cloud/api-gateway',
+    buildAgentLabel    : 'builder-backend',
+    deployAgentLabels  : [
+        dev : 'deploy-backend-dev',
+        prod: 'deploy-backend-prod'
+    ]
+])

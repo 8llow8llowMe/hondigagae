@@ -1,0 +1,103 @@
+spring:
+  application:
+    name: ${SPRING_APPLICATION_NAME:ai-service}
+  config:
+    import: optional:classpath:observability-common.yml
+  profiles:
+    active: local
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            # 기본 read timeout 60초는 장애 전파에 취약하므로 공통 타임아웃을 명시한다.
+            connectTimeout: ${INTERNAL_CLIENT_CONNECT_TIMEOUT_MS:2000}
+            readTimeout: ${INTERNAL_CLIENT_READ_TIMEOUT_MS:5000}
+
+infra:
+  redis:
+    key-prefix: ${REDIS_KEY_PREFIX:hondigagae}
+
+# AI 일정 생성 작업 상태 보관 정책. Redis Hash + TTL (api-design-guide §7)
+ai:
+  plan:
+    job:
+      ttl-seconds: ${AI_PLAN_JOB_TTL_SECONDS:86400}
+      # 실효 동시성 1 기준이다 (#508). 잡 1건이 워커를 쥐는 벽시계 최악값은
+      # 게이트 대기 90 + 모델 호출 120 + 내부 조회(5초 x 최대 10회) 50
+      # + 권역 거리순 조회(#1312, 예산 3초 + 진행 중 호출 1회 5초) 8 = 268초 (PENDING/RUNNING 공통).
+      # 동시 실행 1 + 대기열 1(AsyncConfig) 이므로 대기열 끝의 최악 대기는 1 x 268 = 268초 -> 300초가 덮는다.
+      # 대기열을 키우면 이 값도 함께 올린다 (대기열 길이 x 268초 <= 이 값). 세 값은 한 세트다.
+      pending-timeout-seconds: ${AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS:300}
+      running-timeout-seconds: ${AI_PLAN_JOB_RUNNING_TIMEOUT_SECONDS:300}
+
+# LLM provider 설정 (Spring AI). on/off 스위치는 없다 - BossPickSeoul 과 같게 어댑터가 항상 뜬다.
+# Ollama 가 없으면 기동은 되고 첫 생성 요청이 timeout-ms 뒤 실패한다 (연결은 첫 호출 때 일어난다).
+# provider 는 Spring AI 모듈 스위치, 모델 교체는 model 값 하나로 끝난다.
+ai-llm:
+  provider: ${AI_LLM_PROVIDER:OLLAMA}
+  base-url: ${AI_LLM_BASE_URL:http://localhost:11434}
+  api-key: ${AI_LLM_API_KEY:}
+  model: ${AI_LLM_MODEL:qwen2.5:7b-instruct}
+  # 모델 호출 read timeout. LlmCallGate 에서 차례를 받은 뒤부터 잰다 - 남을 기다린 시간이
+  # 섞이면 동시 제출이 서로의 예산을 깎아 둘 다 죽는다 (#508).
+  timeout-ms: ${AI_LLM_TIMEOUT_MS:120000}
+  # 모델 호출 차례를 기다리는 최대 시간. 넘기면 AIPLAN_021(붐빔)로 가른다.
+  # 90초 = 실측 한 턴(66초)보다 넉넉하되 최악 한 턴(timeout-ms 120초)보다는 짧게.
+  # 키우면 잡 1건의 최악값이 커져 위 pending-timeout-seconds 산술의 여유가 줄고,
+  # 동기 준비물 생성이 요청 스레드를 붙잡는 시간도 함께 늘어난다.
+  queue-wait-ms: ${AI_LLM_QUEUE_WAIT_MS:90000}
+  max-tokens: ${AI_LLM_MAX_TOKENS:4000}
+  # 컨텍스트 창(num_ctx). 프롬프트 + 출력이 함께 들어간다.
+  # 명시하지 않으면 Ollama 가 2,048 로 잡아 일정 프롬프트(실측 11,160자)가 조용히 잘린다.
+  # 줄이려면 place-candidate-size 를 함께 줄인다 - 프롬프트의 대부분이 후보 목록이다.
+  context-tokens: ${AI_LLM_CONTEXT_TOKENS:16384}
+  temperature: ${AI_LLM_TEMPERATURE:0.2}
+  reasoning-effort: ${AI_LLM_REASONING_EFFORT:low}
+  place-candidate-size: ${AI_LLM_PLACE_CANDIDATE_SIZE:50}
+  # 호출 뒤 모델을 메모리에 붙들어 둘 시간(Ollama keep_alive). 요청마다 싣는다 (#1128).
+  # Ollama 기본 5분이면 뜸한 dev 에서 첫 요청에 모델 로드가 붙는다(LLM timing 로그의 loadMs).
+  # 기본은 -1m(상주) — 단위 없는 문자열("-1")은 Ollama 가 400 으로 거부한다(실측). 어댑터가 -1 을 -1s 로 바꿔 보내긴 한다.
+  # Ollama 는 전용 호스트(dev: ollama-01)라 메모리 트레이드오프가 없다. 24h 로 두면 하루 쉰 뒤
+  # 첫 요청에 모델 로드 약 60초가 붙는다(dev 2026-10-10 실측, loadMs=61584) (#1321).
+  # 요청 값이 서버 OLLAMA_KEEP_ALIVE 를 덮는다 (#1246). Ollama 가 다른 서비스와 같은 호스트면 30m 처럼 줄인다.
+  keep-alive: ${AI_LLM_KEEP_ALIVE:-1m}
+
+logging:
+  level:
+    com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
+
+# 내부 서비스(tour/plan) 조회와 LLM 호출용 서킷브레이커.
+# 아직 Feign 클라이언트와 실제 LLM 어댑터가 없지만, 추가 시 타임아웃·서킷이 빠지지 않도록 먼저 둔다.
+# LLM 은 정상 응답이 수십 초라 slow-call 임계를 별도로 완화한다 (coding-conventions §10).
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 3s
+        slow-call-rate-threshold: 80
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - com.hondigagae.domainlayer.planner.application.exception.AiPlanException
+          # 도메인 예외 변환은 서킷 밖(support)에서 일어나므로, 서킷을 실제로 통과하는 4xx 는
+          # FeignClientException 으로 제외해야 한다. 없으면 정상 404 가 실패로 집계돼 서킷을 연다.
+          - feign.FeignException$FeignClientException
+    instances:
+      tour-service:
+        base-config: default
+      auth-service:
+        base-config: default
+      plan-service:
+        base-config: default
+      llm:
+        base-config: default
+        # LLM 생성은 수십 초가 정상 범위라 slow-call 판정이 의미가 없다. 기준을 read
+        # timeout 과 동일하게 연동해 사실상 비활성화하고 실패율 기준만 쓴다 — 값을 하드코딩하면
+        # 타임아웃만 올렸을 때 정상 호출이 slow 로 집계되어 서킷이 열리는 사고가 난다.
+        slow-call-duration-threshold: ${AI_LLM_TIMEOUT_MS:120000}ms

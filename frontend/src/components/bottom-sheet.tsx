@@ -1,0 +1,138 @@
+'use client'
+
+import { type ReactNode, type RefObject, useRef } from 'react'
+
+import { toBody } from '@/lib/ui/body-portal'
+import { useOverlay } from '@/lib/ui/overlay'
+import { cn } from '@/lib/utils/cn'
+
+/**
+ * BottomSheet — 흐름을 잇는 선택 (디자인 가이드 §5-2).
+ *
+ * **여기서 선택 → 그 자리에서 실행.** 화면을 이동시키지 않아 담으려던 맥락을 잃지 않는다.
+ * 단계가 더 필요하면 **같은 시트를 한 단계 밀어 넣는다**(좌상단 뒤로). 새 화면으로
+ * 보내지 않는다. **오버레이 위에 오버레이를 쌓지 않는다.**
+ *
+ * **주요 버튼에 결과를 쓴다** — "적용" 이 아니라 "27곳 보기", "2일차에 담기".
+ * 데스크톱에서는 시트가 아니라 좌측 레일·팝오버로 대체한다(세로 공간이 있다).
+ */
+export function BottomSheet({
+  open,
+  onClose,
+  title,
+  /** 있으면 좌상단 뒤로 버튼을 그린다 — 같은 시트 안에서 단계를 되돌린다 */
+  onBack,
+  children,
+  /** 시트 하단에 고정되는 주요 액션. 라벨에 결과를 쓴다 */
+  footer,
+  trapFocus = false,
+  triggerRef,
+  className,
+}: {
+  open: boolean
+  onClose: () => void
+  title: string
+  onBack?: () => void
+  children: ReactNode
+  footer?: ReactNode
+  /**
+   * Tab · Shift+Tab 을 시트 안에서 순환시킨다 (#1295). **기본은 끈다** — `useOverlay` 의 같은 옵션을
+   * 그대로 넘긴다. 이 컴포넌트는 담기 · 필터 · 지역 · 로그인 안내 시트가 함께 쓰므로 기본을 바꾸면
+   * 그 시트들의 키보드 동작이 같이 움직인다. **필요한 시트만 켠다** — 첫 사용처는 가입 약관 시트다
+   * (`aria-modal="true"` 인데 Tab 이 뒤쪽 상단바 `←` 로 빠졌다).
+   */
+  trapFocus?: boolean
+  /**
+   * 닫을 때 포커스가 돌아갈 자리 (#1295). 없으면 열기 직전의 활성 요소로 돌아간다(`useOverlay`).
+   *
+   * **제출 응답이 시트를 연 경우**에 넘긴다 — 그때 열기 직전의 활성 요소는 제출 중 `disabled` 가 된
+   * 버튼을 잃은 `BODY` 다. `current` 는 **닫히는 순간** 읽히므로 `onClose` 안에서 채워도 된다.
+   */
+  triggerRef?: RefObject<HTMLElement | null>
+  className?: string
+}) {
+  const panelRef = useRef<HTMLDivElement>(null)
+  useOverlay({
+    open,
+    onClose,
+    containerRef: panelRef,
+    trapFocus,
+    ...(triggerRef !== undefined ? { triggerRef } : {}),
+  })
+
+  if (!open) return null
+
+  return toBody(
+    <div className="fixed inset-0 z-50 flex items-end md:items-center md:justify-center">
+      {/* 배경 rgba(21,24,29,.5) — 가이드 §5-2.
+          Esc 와 바깥 클릭이 닫기를 맡으므로 a11y 트리에서 뺀다 — 전면을 덮는 버튼이
+          스크린리더에 거대한 버튼으로 읽히면 방해만 된다. */}
+      <button
+        type="button"
+        aria-hidden
+        tabIndex={-1}
+        onClick={onClose}
+        className="overlay-backdrop absolute inset-0"
+      />
+
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        className={cn(
+          /*
+            **`overflow-hidden` 이 없으면 `md:rounded-xl` 이 헛돈다.** 하단 footer 가
+            자기 배경(`bg-bg`)을 사각으로 칠해서 부모의 둥근 아래 모서리를 덮는다 —
+            데스크톱 중앙 패널에서 위만 둥글고 아래는 각진 상태로 보였다.
+            모바일은 시트가 화면 바닥에 붙으므로 아래가 각진 것이 맞고, `rounded-t-xl`
+            이라 잘릴 것이 없다.
+
+            **데스크톱 폭은 `max-w-sm`(384)이고 `Modal` 과 같은 값이다** (#412).
+            `Modal` 은 `size` 기본값이 `sm` 이라 확인 모달이 전부 384 인데 시트만 448
+            이었다 — 같은 화면에서 뜨는 오버레이 두 계열의 폭이 갈려 있었다.
+            448 은 특히 짧은 시트에서 비어 보였다: `/places` 지도의 `지역` 시트는
+            한 낱말짜리 라디오 셋뿐인데 선택 밴드가 448 을 가로질러, 고를 것이 적다는
+            사실보다 **패널이 비었다**는 인상이 먼저 왔다.
+
+            **384 가 내용의 하한이다.** 가장 내용이 무거운 `ai-plan-place-picker-sheet`
+            (장소 행 + 두 줄 메타)를 384·360 에서 재 보니 384 는 448 과 높이가 같고
+            (379px, 넘침 0) **360 부터 줄이 늘어난다**(397px). 그래서 여기서 더 좁히지
+            않는다.
+          */
+          'bg-bg relative flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-t-xl shadow-lg outline-none md:max-w-sm md:rounded-xl',
+          className,
+        )}
+      >
+        {/* 그래버 36×4 — 모바일에서만. 데스크톱 중앙 패널에는 끌 손잡이가 없다 */}
+        <div aria-hidden className="flex justify-center pt-2 pb-1 md:hidden">
+          <span className="bg-border-strong h-1 w-9 rounded-full" />
+        </div>
+
+        <div className="flex items-center gap-2 px-4 pt-2 pb-4">
+          {onBack !== undefined && (
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label="이전 단계"
+              className="text-fg-muted hover:text-fg focus-visible:ring-brand-500 -ml-2 flex size-11 items-center justify-center focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <span aria-hidden>←</span>
+            </button>
+          )}
+          <h2 className="text-body-1 text-fg font-semibold">{title}</h2>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+
+        {footer !== undefined && (
+          // `data-sheet-footer` — 실행 자리가 스크롤 영역 밖(하단 고정)에 섰는지 마크업으로 잰다 (#1295)
+          <div data-sheet-footer="" className="border-border bg-bg border-t px-4 py-3">
+            {footer}
+          </div>
+        )}
+      </div>
+    </div>,
+  )
+}

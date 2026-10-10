@@ -1,0 +1,929 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import { resolveMock } from '@/lib/api/mock'
+import { mockStore, resetMockStore } from '@/lib/api/mock/store'
+import { toDayString, todayUtc } from '@/lib/date/day'
+import type { PlanDetail, PlanWeatherResponse } from '@/types/plan'
+
+const TOKEN = 'mock-access-900000000000000001'
+/** 3일 일정 (2026-09-12 ~ 09-14), 항목 7개 — WALK 1개와 delisted 장소 1개를 포함한다 */
+const PLAN = '223456789012000001'
+/** 2일 일정인데 3일차 고아 항목이 있다 */
+const ORPHAN_PLAN = '223456789012000002'
+/** 다른 회원의 일정 */
+const OTHERS = '223456789012000099'
+
+function call(path: string, method: string, body: unknown = null, token: string | null = TOKEN) {
+  return resolveMock(path, method, '', body === null ? null : JSON.stringify(body), token)
+}
+
+function detailOf(planId: string): PlanDetail {
+  return call(`/plans/${planId}`, 'GET')?.payload.dataBody as PlanDetail
+}
+
+describe('일정 상세 mock — 조회', () => {
+  beforeEach(resetMockStore)
+
+  /**
+   * **문구와 `fieldErrors` 까지 단언한다** — 코드만 보면 목이 서버와 다른 문장을 내도
+   * 초록불이라, `PLAN_114`(실제로는 방문 체크 본문 코드다) 가 오래 살아남았다 (#803).
+   *
+   * dev 실측(2026-09-21): 코드는 `PLAN_124`, 문구는 **경로변수 이름을 끼워** 만들고,
+   * 같은 코드·필드·문구가 `fieldErrors` 한 건에 실린다.
+   */
+  it('숫자가 아닌 planId 는 404 가 아니라 400 PLAN_124 다 — @PathVariable long 이다', () => {
+    const result = call('/plans/abc', 'GET')
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PLAN_124',
+      resultMessage: 'planId 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        { code: 'PLAN_124', field: 'planId', message: 'planId 파라미터 형식이 올바르지 않습니다.' },
+      ],
+    })
+  })
+
+  it('없는 숫자 planId 는 404 PLAN_001 이다', () => {
+    const result = call('/plans/223456789012999999', 'GET')
+
+    expect(result?.status).toBe(404)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_001')
+  })
+
+  it('남의 일정도 404 다 — 존재 여부를 흘리지 않는다', () => {
+    expect(call(`/plans/${OTHERS}`, 'GET')?.status).toBe(404)
+  })
+
+  it('토큰이 없으면 401 이다', () => {
+    expect(call(`/plans/${PLAN}`, 'GET', null, null)?.status).toBe(401)
+  })
+
+  it('항목을 day → sequence 순으로 내려준다', () => {
+    const detail = detailOf(PLAN)
+
+    const order = detail.items.map((item) => `${item.day}-${item.sequence}`)
+    expect(order).toEqual([...order].sort())
+  })
+
+  it('totalDays 를 기간에서 계산한다', () => {
+    expect(detailOf(PLAN).totalDays).toBe(3)
+  })
+
+  it('itemType 을 metadata 로 부풀린다 — 화면이 한국어 매핑을 만들지 않게', () => {
+    const walk = detailOf(PLAN).items.find((item) => item.itemType.code === 'WALK')
+
+    expect(walk?.itemType.name).toBe('산책')
+  })
+
+  it('장소 항목에 place 요약을 실어 준다 — FE 가 항목마다 조회하지 않게 (#86)', () => {
+    const museum = detailOf(PLAN).items.find(
+      (item) => item.title === '제주특별자치도립김창열미술관',
+    )
+
+    expect(museum?.place?.addr1).toContain('한림읍')
+    expect(museum?.place?.indoor).toBe(true)
+    expect(museum?.place?.lat).not.toBeNull()
+  })
+
+  it('WALK 는 place 가 null 이다 — targetId 가 walk_course.id 라 물어볼 장소가 없다', () => {
+    const walk = detailOf(PLAN).items.find((item) => item.itemType.code === 'WALK')
+
+    expect(walk).toBeDefined()
+    expect(walk?.place).toBeNull()
+  })
+
+  it('사라진(delisted) 장소는 place 가 null 이지만 항목은 남는다', () => {
+    const delisted = detailOf(PLAN).items.find((item) => item.title === '사라진 전시관')
+
+    expect(delisted).toBeDefined()
+    expect(delisted?.targetId).not.toBeNull()
+    expect(delisted?.place).toBeNull()
+  })
+
+  it('기간 밖 항목을 그대로 내려준다 — 서버가 정리하지 않는 상태를 재현한다', () => {
+    const detail = detailOf(ORPHAN_PLAN)
+
+    expect(detail.totalDays).toBe(2)
+    expect(detail.items.some((item) => item.day > detail.totalDays)).toBe(true)
+  })
+})
+
+/**
+ * 경로변수 바인딩 문법 — `NumberUtils.parseNumber` (#809).
+ *
+ * **목이 `/^\d+$/` 로 걸러 서버보다 엄격했다.** `@PathVariable long` 은 부호·공백·앞자리
+ * 0·16진수를 받고, 대신 **범위를 넘으면 거부한다**. 아래 경계는 dev 게이트웨이 실측
+ * 28종(2026-09-21 · 인증 없는 GET)을 그대로 옮긴 것이다 — 401(바인딩 통과)이면 목에서는
+ * 400 이 아니어야 하고, 400 `PLAN_124` 면 목도 같아야 한다.
+ */
+describe('일정 상세 mock — 경로변수 바인딩 문법 (#809)', () => {
+  beforeEach(resetMockStore)
+
+  const code = (raw: string) => call(`/plans/${raw}`, 'GET')?.payload.dataHeader.resultCode
+
+  /**
+   * **8진수가 아니라는 것이 문법을 확정한 증거다.** `Long.decode` 였다면 `08`·`09` 가
+   * 무효여야 하는데 dev 는 둘 다 통과시킨다 — 16진수 접두사가 없어 `Long.valueOf` 로
+   * 가기 때문이다. 이 두 줄이 깨지면 `decodeIntegral` 이 8진수로 샌 것이다.
+   */
+  it.each(['-1', '+1', '007', '08', '09', '0', '-0'])(
+    '`%s` 는 바인딩을 통과한다 — 400 이 아니라 404 다',
+    (raw) => {
+      expect(code(raw)).toBe('PLAN_001')
+    },
+  )
+
+  /** 16진수 접두사는 `Long.decode` 로 간다. `isHexNumber` 는 `-` 만 보고 `+` 는 안 본다 */
+  it.each(['0x10', '0X1F', '#10', '-#10'])('16진수 `%s` 도 통과한다', (raw) => {
+    expect(code(raw)).toBe('PLAN_001')
+  })
+
+  /** `trimAllWhitespace` 는 앞뒤가 아니라 **전부** 지운다 — `'1 2'` 는 `12` 다 */
+  it.each([' 1', '1 ', '\t 1 ', '1 2'])('공백이 섞인 `%s` 도 통과한다', (raw) => {
+    expect(code(raw)).toBe('PLAN_001')
+  })
+
+  it.each(['1.5', '1e3', '0b101', '1,000', '+0x10', '#-10', '--1', '++1', '-+1', 'abc', ' '])(
+    '`%s` 는 바인딩에 실패해 400 PLAN_124 다',
+    (raw) => {
+      expect(code(raw)).toBe('PLAN_124')
+    },
+  )
+
+  /** **범위 초과는 400 이다** — 목이 여기서는 서버보다 느슨했다 */
+  it('long 경계 — MAX 는 통과하고 MAX+1 은 400 이다', () => {
+    expect(code('9223372036854775807')).toBe('PLAN_001')
+    expect(code('9223372036854775808')).toBe('PLAN_124')
+  })
+
+  it('long 경계 — MIN 은 통과하고 MIN-1 은 400 이다', () => {
+    expect(code('-9223372036854775808')).toBe('PLAN_001')
+    expect(code('-9223372036854775809')).toBe('PLAN_124')
+  })
+
+  /**
+   * **정규화한 값으로 조회한다.** 서버는 `' 1'` 을 `1` 로 풀어 1번 일정을 찾는다 —
+   * 목이 원문으로 찾으면 같은 주소가 404 로 갈린다.
+   */
+  it('공백과 앞자리 0 이 섞여도 같은 일정을 찾는다', () => {
+    expect(detailOf(` ${PLAN} `).planId).toBe(PLAN)
+    expect(detailOf(`0${PLAN}`).planId).toBe(PLAN)
+  })
+
+  /**
+   * **`day` 는 `int` 라 경계가 다르다.** 같은 숫자가 `planId` 에서는 통과하고 `day` 에서는
+   * 400 이다 — `long` 범위로 검사하면 이 줄이 깨진다.
+   */
+  it('day 는 int 경계다 — planId 가 받는 2147483648 을 거부한다', () => {
+    expect(code('2147483648')).toBe('PLAN_001')
+
+    const result = call(`/plans/${PLAN}/days/2147483648/items`, 'PUT', { items: [] })
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PLAN_124',
+      resultMessage: 'day 파라미터 형식이 올바르지 않습니다.',
+    })
+  })
+
+  /** int 안쪽이면 바인딩은 통과하고, 기간 밖이라는 **다른** 판정으로 넘어간다 */
+  it.each(['2147483647', '-2147483648', '-1', '0x10'])(
+    'day `%s` 는 바인딩을 통과해 PLAN_002 로 간다',
+    (raw) => {
+      const result = call(`/plans/${PLAN}/days/${raw}/items`, 'PUT', { items: [] })
+      expect(result?.payload.dataHeader.resultCode).toBe('PLAN_002')
+    },
+  )
+})
+
+describe('일정 상세 mock — 수정 · 삭제', () => {
+  beforeEach(resetMockStore)
+
+  it('부분 수정이다 — 보내지 않은 필드는 유지된다', () => {
+    const before = detailOf(PLAN)
+    const after = call(`/plans/${PLAN}`, 'PUT', { status: 'CONFIRMED' })?.payload
+      .dataBody as PlanDetail
+
+    expect(after.status.code).toBe('CONFIRMED')
+    expect(after.title).toBe(before.title)
+    expect(after.budget).toBe(before.budget)
+  })
+
+  it('완료로 바꿀 수 있다 — 화면 #613 이 이 필드를 쓴다', () => {
+    const after = call(`/plans/${PLAN}`, 'PUT', { status: 'COMPLETED' })?.payload
+      .dataBody as PlanDetail
+
+    expect(after.status.code).toBe('COMPLETED')
+    expect(after.status.name).toBe('완료')
+  })
+
+  /*
+    **여행 전 상태 가드** (#971). 서버가 시작일 전 완료를 `PLAN_026` 400 으로 거절한다 —
+    mock 이 받아 주면 화면이 로컬에서 서버와 다른 답을 낸다. 시작일 당일부터 허용한다.
+  */
+  describe('시작일 전 완료는 400 PLAN_026 이다', () => {
+    /** 오늘 기준 `offset` 일 뒤에 시작하는 1일 일정을 만든다 */
+    function createPlanStartingIn(offset: number): string {
+      const start = toDayString(todayUtc(new Date()) + offset * 86_400_000)
+      const created = call('/plans', 'POST', {
+        petIds: ['123456789012000001'],
+        areaCode: '39',
+        title: '가드 확인용 일정',
+        startDate: start,
+        endDate: start,
+        items: [],
+      })?.payload.dataBody as PlanDetail
+      return created.planId
+    }
+
+    it('내일 시작하는 일정은 완료할 수 없다 — 서버 문구 그대로다', () => {
+      const planId = createPlanStartingIn(1)
+      const result = call(`/plans/${planId}`, 'PUT', { status: 'COMPLETED' })
+
+      expect(result?.status).toBe(400)
+      expect(result?.payload.dataHeader).toMatchObject({
+        success: false,
+        resultCode: 'PLAN_026',
+        resultMessage: '여행 시작일 전에는 여행을 완료할 수 없습니다.',
+      })
+      // 거절했으면 상태도 그대로다
+      expect(detailOf(planId).status.code).toBe('DRAFT')
+    })
+
+    it('출발 당일에는 완료할 수 있다 — 당일치기가 있다', () => {
+      const planId = createPlanStartingIn(0)
+      const after = call(`/plans/${planId}`, 'PUT', { status: 'COMPLETED' })?.payload
+        .dataBody as PlanDetail
+
+      expect(after.status.code).toBe('COMPLETED')
+    })
+
+    it('시작 전 일정의 다른 상태 전이는 막지 않는다', () => {
+      const planId = createPlanStartingIn(9)
+
+      expect(call(`/plans/${planId}`, 'PUT', { status: 'CONFIRMED' })?.status).toBe(200)
+      expect(call(`/plans/${planId}`, 'PUT', { status: 'DRAFT' })?.status).toBe(200)
+    })
+  })
+
+  it('budget 0 은 유효하다 — 예산을 비우는 유일한 방법이다', () => {
+    const after = call(`/plans/${PLAN}`, 'PUT', { title: '새 이름', budget: 0 })?.payload
+      .dataBody as PlanDetail
+
+    expect(after.budget).toBe(0)
+    expect(after.title).toBe('새 이름')
+  })
+
+  it('빈 제목은 400 PLAN_103 이다', () => {
+    const result = call(`/plans/${PLAN}`, 'PUT', { title: '   ' })
+
+    expect(result?.status).toBe(400)
+    expect(errorsOf(result)[0]?.code).toBe('PLAN_103')
+  })
+
+  it('60자를 넘는 제목은 400 PLAN_104 다', () => {
+    const result = call(`/plans/${PLAN}`, 'PUT', { title: '가'.repeat(61) })
+
+    expect(errorsOf(result)[0]?.code).toBe('PLAN_104')
+  })
+
+  it('음수 예산은 400 PLAN_107 이다', () => {
+    const result = call(`/plans/${PLAN}`, 'PUT', { budget: -1 })
+
+    expect(errorsOf(result)[0]?.code).toBe('PLAN_107')
+  })
+
+  it('삭제는 소프트 삭제다 — 이후 조회가 404 다', () => {
+    expect(call(`/plans/${PLAN}`, 'DELETE')?.status).toBe(200)
+    expect(call(`/plans/${PLAN}`, 'GET')?.status).toBe(404)
+  })
+
+  it('남의 일정은 수정·삭제할 수 없다', () => {
+    expect(call(`/plans/${OTHERS}`, 'PUT', { title: 'x' })?.status).toBe(404)
+    expect(call(`/plans/${OTHERS}`, 'DELETE')?.status).toBe(404)
+  })
+})
+
+describe('일정 판정 mock — /weather', () => {
+  beforeEach(resetMockStore)
+
+  function weatherOf(planId: string): PlanWeatherResponse {
+    return call(`/plans/${planId}/weather`, 'GET')?.payload.dataBody as PlanWeatherResponse
+  }
+
+  it('days 는 항상 totalDays 길이다 — 길이로 성공을 판단하지 않는다', () => {
+    expect(weatherOf(PLAN).days).toHaveLength(3)
+    expect(weatherOf(ORPHAN_PLAN).days).toHaveLength(2)
+  })
+
+  it('예보 밖 일자는 score 가 null 이고 이유가 문장으로 온다', () => {
+    const third = weatherOf(PLAN).days[2]
+
+    expect(third?.score).toBeNull()
+    expect(third?.suitabilityLevel).toBeNull()
+    expect(third?.unavailableReason).not.toBeNull()
+  })
+
+  /*
+    **코드와 문장은 짝이다** (#492 · #497). 화면이 사유마다 다르게 그리므로 mock 이 코드를
+    빠뜨리면 **mock 에서만** 빈 일차 문구가 두 번 나오는 계약 드리프트가 생긴다.
+  */
+  it('판정을 못 낸 일자는 사유 코드와 문장이 짝으로 온다', () => {
+    const third = weatherOf(PLAN).days[2]
+
+    expect(third?.unavailableReasonCode).not.toBeNull()
+    expect(third?.unavailableReason).not.toBeNull()
+  })
+
+  it('판정이 나온 일자는 코드도 문장도 null 이다 — 정상은 정상으로 읽혀야 한다', () => {
+    const first = weatherOf(PLAN).days[0]
+
+    expect(first?.unavailableReasonCode).toBeNull()
+    expect(first?.unavailableReason).toBeNull()
+  })
+
+  it('항목이 없는 일자는 판정 기준이 없다 — representativePlaceId 가 null 이다', () => {
+    const third = weatherOf(PLAN).days[2]
+
+    expect(third?.representativePlaceId).toBeNull()
+  })
+
+  it('WALK 는 판정 기준 장소가 되지 않는다 — targetId 가 walk_course.id 다', () => {
+    const second = weatherOf(PLAN).days[1]
+
+    expect(second?.representativePlaceId).not.toBe('777777777777000001')
+  })
+
+  it('비 예보 일자에만 실내 대안이 온다', () => {
+    const days = weatherOf(PLAN).days
+
+    expect(days[0]?.indoorAlternatives).toEqual([])
+    expect(days[1]?.indoorAlternatives.length).toBeGreaterThan(0)
+  })
+
+  it('중기예보 구간을 코드로 알린다 — 화면이 대략적인 값임을 밝힐 수 있게', () => {
+    const days = weatherOf(PLAN).days
+
+    expect(days[0]?.weather?.forecastSourceCode).toBe('SHORT_TERM')
+    expect(days[1]?.weather?.forecastSourceCode).toBe('MID_TERM')
+  })
+
+  it('하늘상태·강수형태는 metadata 가 아니라 문자열이다 (실측 계약)', () => {
+    const first = weatherOf(PLAN).days[0]
+
+    expect(typeof first?.weather?.skyStateName).toBe('string')
+    expect(typeof first?.weather?.precipitationTypeName).toBe('string')
+  })
+
+  it('남의 일정 판정도 404 다', () => {
+    expect(call(`/plans/${OTHERS}/weather`, 'GET')?.status).toBe(404)
+  })
+
+  // ── 동행 반려견 (#152) ────────────────────────────────────────────────────
+
+  it('응답이 판정에 들어간 반려견 목록을 함께 준다', () => {
+    expect(weatherOf(PLAN).petIds).toEqual(['123456789012000001', '123456789012000002'])
+    expect(weatherOf(ORPHAN_PLAN).petIds).toEqual(['123456789012000002'])
+  })
+
+  it('아이별 점수가 petIds 순서로 온다', () => {
+    const first = weatherOf(PLAN).days[0]
+
+    expect(first?.petSuitabilities?.map((pet) => pet.petId)).toEqual([
+      '123456789012000001',
+      '123456789012000002',
+    ])
+  })
+
+  /*
+    **이 테스트가 #152 의 핵심이다.** 기준 반려견은 점수가 가장 낮은 아이라서 대표와 다를 수
+    있고, 일자의 score·suitabilityLevel·reasons 는 전부 그 아이 기준이다. 화면이 대표 이름을
+    붙이면 거짓말이 된다.
+  */
+  it('기준 반려견은 점수가 가장 낮은 아이다 — 대표와 다를 수 있다', () => {
+    const first = weatherOf(PLAN).days[0]
+    const lowest = [...(first?.petSuitabilities ?? [])].sort(
+      (a, b) => (a.score ?? 0) - (b.score ?? 0),
+    )[0]
+
+    expect(first?.basisPetId).toBe(lowest?.petId)
+    expect(first?.basisPetId).not.toBe(weatherOf(PLAN).petIds?.[0])
+    expect(first?.score).toBe(lowest?.score)
+  })
+
+  it('한 마리 일정은 원소 하나고 기준이 대표와 같다', () => {
+    const first = weatherOf(ORPHAN_PLAN).days[0]
+
+    expect(first?.petSuitabilities).toHaveLength(1)
+    expect(first?.basisPetId).toBe('123456789012000002')
+  })
+
+  it('판정을 못 낸 일자는 기준 반려견이 없고 아이별 목록이 빈 배열이다', () => {
+    const third = weatherOf(PLAN).days[2]
+
+    expect(third?.basisPetId).toBeNull()
+    expect(third?.petSuitabilities).toEqual([])
+  })
+
+  it('등급 경계가 백엔드와 같다 — 80 이상 HIGH, 60 이상 MEDIUM', () => {
+    const levels = weatherOf(PLAN).days[0]?.petSuitabilities?.map((pet) => [
+      pet.score,
+      pet.suitabilityLevel?.code,
+    ])
+
+    expect(levels).toEqual([
+      [84, 'HIGH'],
+      [73, 'MEDIUM'],
+    ])
+  })
+})
+
+function errorsOf(result: ReturnType<typeof call>): { code: string; field: string }[] {
+  // 검증 실패의 필드 목록은 `resultMessage` 가 아니라 `fieldErrors` 로 온다 (#491)
+  return result?.payload.dataHeader.fieldErrors ?? []
+}
+
+describe('일자별 항목 일괄 교체 mock', () => {
+  beforeEach(resetMockStore)
+
+  /** 3일 일정의 1일차 항목 3개를 그대로 되돌려 보내는 본문 */
+  function currentDayItems(day: number) {
+    return detailOf(PLAN)
+      .items.filter((item) => item.day === day)
+      .map((item, index) => ({
+        day,
+        sequence: index,
+        itemType: item.itemType.code,
+        ...(item.targetId === null ? {} : { targetId: item.targetId }),
+        title: item.title,
+        ...(item.memo === null ? {} : { memo: item.memo }),
+        ...(item.startTime === null ? {} : { startTime: item.startTime }),
+      }))
+  }
+
+  function replace(day: number, items: unknown[], planId = PLAN) {
+    return call(`/plans/${planId}/days/${day}/items`, 'PUT', { items })
+  }
+
+  it('그 일자를 통째로 교체한다 — 다른 일자는 건드리지 않는다', () => {
+    const before = detailOf(PLAN)
+    const day2Before = before.items.filter((item) => item.day === 2).length
+
+    const after = replace(1, currentDayItems(1).slice(0, 1))?.payload.dataBody as PlanDetail
+
+    expect(after.items.filter((item) => item.day === 1)).toHaveLength(1)
+    expect(after.items.filter((item) => item.day === 2)).toHaveLength(day2Before)
+  })
+
+  it('저장하면 planItemId 가 전부 새로 발급된다 — 삭제 후 재삽입이다', () => {
+    const before = detailOf(PLAN)
+      .items.filter((item) => item.day === 1)
+      .map((item) => item.planItemId)
+
+    const after = (replace(1, currentDayItems(1))?.payload.dataBody as PlanDetail).items
+      .filter((item) => item.day === 1)
+      .map((item) => item.planItemId)
+
+    expect(after).toHaveLength(before.length)
+    expect(after.some((id) => before.includes(id))).toBe(false)
+  })
+
+  it('memo · startTime 이 보존된다 — 빼먹으면 순서만 바꿔도 지워진다', () => {
+    const after = replace(1, currentDayItems(1))?.payload.dataBody as PlanDetail
+    const first = after.items.find((item) => item.day === 1 && item.sequence === 0)
+
+    expect(first?.memo).toBe('실내라 비가 와도 괜찮아요')
+    expect(first?.startTime).toBe('10:00:00')
+  })
+
+  // ── 항목 시작 시각 (#623 · 명세 D14-5 · G7) ─────────────────────────────────
+  it('시각을 실어 교체하면 상세에 그대로 나온다', () => {
+    const items = currentDayItems(1).map((item, index) =>
+      index === 0 ? { ...item, startTime: '10:30:00' } : item,
+    )
+    const after = replace(1, items)?.payload.dataBody as PlanDetail
+    const first = after.items.find((item) => item.day === 1 && item.sequence === 0)
+
+    expect(first?.startTime).toBe('10:30:00')
+  })
+
+  it('키를 빼고 교체하면 startTime 이 null 이 된다 — 일괄 교체라 유지가 아니라 삭제다', () => {
+    // day 1 · sequence 0 은 이미 startTime('10:00:00')이 있는 항목이다 — 위 테스트가
+    // 그 값을 그대로 확인한다. 여기서는 그 키를 빼고 다시 보낸다
+    const items = currentDayItems(1).map((item) => {
+      const clone: Record<string, unknown> = { ...item }
+      delete clone.startTime
+      return clone
+    })
+    const after = replace(1, items)?.payload.dataBody as PlanDetail
+    const first = after.items.find((item) => item.day === 1 && item.sequence === 0)
+
+    expect(first?.startTime).toBe(null)
+  })
+
+  it('빈 목록을 보내면 그 일자가 비워진다 — 서버가 허용하는 동작이다', () => {
+    const after = replace(1, [])?.payload.dataBody as PlanDetail
+
+    expect(after.items.filter((item) => item.day === 1)).toEqual([])
+  })
+
+  it('기간 밖 일자는 400 PLAN_002 다', () => {
+    const result = replace(9, currentDayItems(1))
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_002')
+  })
+
+  it('존재하지 않는 장소가 섞이면 400 PLAN_004 다 — delisting 도 걸린다', () => {
+    const result = replace(1, [
+      {
+        day: 1,
+        sequence: 0,
+        itemType: 'PLACE',
+        targetId: '999999999999999999',
+        title: '사라진 곳',
+      },
+    ])
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_004')
+  })
+
+  it('PLAN_004 로 막히면 기존 항목이 그대로 남는다 — 검증이 삭제보다 먼저다', () => {
+    const before = detailOf(PLAN).items.filter((item) => item.day === 1).length
+
+    replace(1, [
+      {
+        day: 1,
+        sequence: 0,
+        itemType: 'PLACE',
+        targetId: '999999999999999999',
+        title: '사라진 곳',
+      },
+    ])
+
+    expect(detailOf(PLAN).items.filter((item) => item.day === 1)).toHaveLength(before)
+  })
+
+  it('day 가 0 이면 @Min(1) 에 걸린다 — 경로값 덮어쓰기보다 검증이 먼저다', () => {
+    const result = replace(1, [
+      { day: 0, sequence: 0, itemType: 'PLACE', targetId: '212481712381923328', title: '미술관' },
+    ])
+
+    expect(result?.status).toBe(400)
+    expect(errorsOf(result)[0]?.code).toBe('PLAN_110')
+  })
+
+  it('빈 제목은 400 PLAN_105 다', () => {
+    const result = replace(1, [{ day: 1, sequence: 0, itemType: 'PLACE', title: '  ' }])
+
+    expect(errorsOf(result)[0]?.code).toBe('PLAN_105')
+  })
+
+  it('100자를 넘는 제목은 400 PLAN_106 이다', () => {
+    const result = replace(1, [{ day: 1, sequence: 0, itemType: 'PLACE', title: '가'.repeat(101) }])
+
+    expect(errorsOf(result)[0]?.code).toBe('PLAN_106')
+  })
+
+  it('500자를 넘는 메모는 400 PLAN_108 이다', () => {
+    const result = replace(1, [
+      { day: 1, sequence: 0, itemType: 'PLACE', title: '미술관', memo: '가'.repeat(501) },
+    ])
+
+    expect(errorsOf(result)[0]?.code).toBe('PLAN_108')
+  })
+
+  it('WALK 는 장소 검증 대상이 아니다 — targetId 가 walk_course.id 다', () => {
+    const result = replace(1, [
+      { day: 1, sequence: 0, itemType: 'WALK', targetId: '777777777777000001', title: '산책' },
+    ])
+
+    expect(result?.status).toBe(200)
+  })
+
+  /** **`field` 가 `planId` 가 아니라 `day` 다** — 서버가 실패한 인자 이름을 그대로 쓴다 */
+  it('숫자가 아닌 day 는 400 PLAN_124 이고 field 가 day 다', () => {
+    const result = call(`/plans/${PLAN}/days/abc/items`, 'PUT', { items: [] })
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PLAN_124',
+      resultMessage: 'day 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        { code: 'PLAN_124', field: 'day', message: 'day 파라미터 형식이 올바르지 않습니다.' },
+      ],
+    })
+  })
+
+  /** 둘 다 틀리면 **첫 인자가 이긴다** — 스프링이 선언 순서로 푼다 (dev 실측, #803) */
+  it('planId 와 day 가 모두 틀리면 planId 오류가 이긴다', () => {
+    const result = call('/plans/abc/days/xyz/items', 'PUT', { items: [] })
+
+    expect(result?.payload.dataHeader.resultMessage).toBe(
+      'planId 파라미터 형식이 올바르지 않습니다.',
+    )
+  })
+
+  it('남의 일정은 교체할 수 없다', () => {
+    expect(replace(1, [], OTHERS)?.status).toBe(404)
+  })
+
+  it('토큰이 없으면 401 이다', () => {
+    expect(call(`/plans/${PLAN}/days/1/items`, 'PUT', { items: [] }, null)?.status).toBe(401)
+  })
+})
+
+/**
+ * 항목 방문 체크 — 이슈 #124.
+ *
+ * **계약의 핵심은 마지막 케이스다**: 일자 항목을 일괄 교체하면 그 날의 체크가 초기화된다.
+ * mock 이 체크를 이어받으면 화면이 경고 문구로 말하는 사실을 로컬에서 검증할 수 없다.
+ */
+describe('일정 상세 mock — 항목 방문 체크 (#124)', () => {
+  beforeEach(resetMockStore)
+
+  /** 1일차 첫 항목. 시드에서 `visited: true` 로 시작한다 */
+  const VISITED_ITEM = '323456789012000001'
+  /** 1일차 세 번째 항목(숙소). 시드에서 꺼진 상태다 */
+  const UNVISITED_ITEM = '323456789012000003'
+
+  function visit(planItemId: string, visited: boolean, planId = PLAN) {
+    return call(`/plans/${planId}/items/${planItemId}/visited`, 'PUT', { visited })
+  }
+
+  function itemOf(planId: string, planItemId: string) {
+    return detailOf(planId).items.find((item) => item.planItemId === planItemId)
+  }
+
+  it('상세 응답이 visited 를 함께 준다 — 시드가 켠 항목과 끈 항목을 둘 다 낸다', () => {
+    expect(itemOf(PLAN, VISITED_ITEM)?.visited).toBe(true)
+    expect(itemOf(PLAN, UNVISITED_ITEM)?.visited).toBe(false)
+  })
+
+  it('체크하면 상세에 반영된다', () => {
+    expect(visit(UNVISITED_ITEM, true)?.status).toBe(200)
+    expect(itemOf(PLAN, UNVISITED_ITEM)?.visited).toBe(true)
+  })
+
+  it('해제도 같은 API 다 — visited=false 를 보낸다', () => {
+    expect(visit(VISITED_ITEM, false)?.status).toBe(200)
+    expect(itemOf(PLAN, VISITED_ITEM)?.visited).toBe(false)
+  })
+
+  it('응답이 Response<Void> 다 — dataBody 가 null 이다', () => {
+    const result = visit(UNVISITED_ITEM, true)
+
+    expect(result?.payload.dataHeader.success).toBe(true)
+    expect(result?.payload.dataBody).toBeNull()
+  })
+
+  it('visited 가 빠지면 400 PLAN_100 이다 — @NotNull Boolean 이다', () => {
+    const result = call(`/plans/${PLAN}/items/${UNVISITED_ITEM}/visited`, 'PUT', {})
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_100')
+  })
+
+  it('없는 항목은 404 PLAN_005 다', () => {
+    const result = visit('323456789012999999', true)
+
+    expect(result?.status).toBe(404)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_005')
+  })
+
+  it('다른 일정의 항목을 내 planId 로 체크할 수 없다 — 404 PLAN_005 다', () => {
+    // 소유권은 일정 기준으로 보고, 항목이 그 일정의 것인지 다시 확인한다
+    const result = visit(VISITED_ITEM, true, ORPHAN_PLAN)
+
+    expect(result?.status).toBe(404)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_005')
+  })
+
+  it('숫자가 아닌 planItemId 는 404 가 아니라 400 PLAN_124 다', () => {
+    const result = visit('abc', true)
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PLAN_124',
+      resultMessage: 'planItemId 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        {
+          code: 'PLAN_124',
+          field: 'planItemId',
+          message: 'planItemId 파라미터 형식이 올바르지 않습니다.',
+        },
+      ],
+    })
+  })
+
+  it('남의 일정 항목은 404 PLAN_001 이다 — 일정 판정이 먼저다', () => {
+    const result = visit(VISITED_ITEM, true, OTHERS)
+
+    expect(result?.status).toBe(404)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_001')
+  })
+
+  it('토큰이 없으면 401 이다', () => {
+    const result = call(
+      `/plans/${PLAN}/items/${VISITED_ITEM}/visited`,
+      'PUT',
+      { visited: true },
+      null,
+    )
+
+    expect(result?.status).toBe(401)
+  })
+
+  it('일괄 교체하면 그 날의 체크가 초기화된다 — 항목이 새로 발급되기 때문이다', () => {
+    expect(itemOf(PLAN, VISITED_ITEM)?.visited).toBe(true)
+
+    // 1일차를 항목 하나로 교체한다. 새 planItemId 가 발급된다
+    const replaced = call(`/plans/${PLAN}/days/1/items`, 'PUT', {
+      items: [
+        { day: 1, sequence: 0, itemType: 'PLACE', targetId: '212481712381923328', title: '미술관' },
+      ],
+    })
+    expect(replaced?.status).toBe(200)
+
+    const dayOne = detailOf(PLAN).items.filter((item) => item.day === 1)
+
+    expect(dayOne).toHaveLength(1)
+    // 낡은 id 는 사라졌고, 새 항목은 꺼진 상태다
+    expect(itemOf(PLAN, VISITED_ITEM)).toBeUndefined()
+    expect(dayOne[0]?.visited).toBe(false)
+  })
+
+  it('교체 뒤 낡은 planItemId 로 체크하면 404 PLAN_005 다 — 재시도로 풀리지 않는 실패다', () => {
+    call(`/plans/${PLAN}/days/1/items`, 'PUT', { items: [] })
+
+    expect(visit(VISITED_ITEM, true)?.status).toBe(404)
+  })
+
+  /*
+    **여행 전 표시 가드** (#983). 서버가 시작일 전 `visited: true` 를 `PLAN_027` 400 으로
+    거절한다 — mock 이 받아 주면 화면이 로컬에서 서버와 다른 답을 낸다. 시작일 당일부터
+    허용하고, **해제는 언제나 받는다.** 시드 일정(09-12 ~ 09-14)의 기간을 옮겨 본다 —
+    "기간을 미래로 옮긴 뒤 남은 표시" 가 해제 갈래의 실제 경로다.
+  */
+  describe('시작일 전 다녀옴 표시는 400 PLAN_027 이다', () => {
+    /** 시드 일정의 시작일을 오늘 기준 `offset` 일 뒤로 옮긴다 */
+    function moveStartTo(offset: number) {
+      const plan = mockStore().plans.find((candidate) => candidate.planId === PLAN)!
+      const start = toDayString(todayUtc(new Date()) + offset * 86_400_000)
+      plan.startDate = start
+      plan.endDate = toDayString(todayUtc(new Date()) + (offset + 2) * 86_400_000)
+    }
+
+    it('내일 시작하는 일정의 항목은 표시할 수 없다 — 서버 문구 그대로다', () => {
+      moveStartTo(1)
+      const result = visit(UNVISITED_ITEM, true)
+
+      expect(result?.status).toBe(400)
+      expect(result?.payload.dataHeader).toMatchObject({
+        success: false,
+        resultCode: 'PLAN_027',
+        resultMessage: '여행 시작일 전에는 다녀옴으로 표시할 수 없습니다.',
+      })
+      // 거절했으면 체크도 그대로다
+      expect(itemOf(PLAN, UNVISITED_ITEM)?.visited).toBe(false)
+    })
+
+    it('시작 전이어도 해제는 받는다 — 옛 표시를 풀 수 있어야 한다', () => {
+      moveStartTo(9)
+
+      expect(visit(VISITED_ITEM, false)?.status).toBe(200)
+      expect(itemOf(PLAN, VISITED_ITEM)?.visited).toBe(false)
+    })
+
+    it('출발 당일부터는 표시할 수 있다', () => {
+      moveStartTo(0)
+
+      expect(visit(UNVISITED_ITEM, true)?.status).toBe(200)
+      expect(itemOf(PLAN, UNVISITED_ITEM)?.visited).toBe(true)
+    })
+
+    it('소유 확인이 가드보다 먼저다 — 남의 항목은 날짜와 무관하게 404 PLAN_005 다', () => {
+      moveStartTo(9)
+
+      expect(visit('323456789012999999', true)?.payload.dataHeader.resultCode).toBe('PLAN_005')
+    })
+  })
+})
+
+/**
+ * 항목 시작 시각 단건 수정 — 이슈 #1053 (BE #1030 · PR #1052).
+ *
+ * **계약의 핵심은 첫 케이스다**: 행을 제자리에서 고치므로 `planItemId` 와 `visited` 가 남는다.
+ * mock 이 일괄 교체처럼 새로 발급하면 화면이 "체크가 남는다" 는 사실을 로컬에서 검증할 수 없다.
+ */
+describe('일정 상세 mock — 항목 시작 시각 (#1053)', () => {
+  beforeEach(resetMockStore)
+
+  /** 1일차 첫 항목. 시드에서 `visited: true` · `10:00:00` 으로 시작한다 */
+  const VISITED_ITEM = '323456789012000001'
+  /** 1일차 두 번째 항목. 시드에서 `visited: true` 다 */
+  const NEIGHBOR_ITEM = '323456789012000002'
+
+  function setTime(planItemId: string, body: unknown, planId = PLAN) {
+    return call(`/plans/${planId}/items/${planItemId}/start-time`, 'PUT', body)
+  }
+
+  function itemOf(planItemId: string) {
+    return detailOf(PLAN).items.find((item) => item.planItemId === planItemId)
+  }
+
+  it('시각만 바뀐다 — planItemId · visited · 순서 · 이름 · 메모가 남는다', () => {
+    const before = itemOf(VISITED_ITEM)!
+    expect(before.visited).toBe(true)
+
+    expect(setTime(VISITED_ITEM, { startTime: '14:30:00' })?.status).toBe(200)
+
+    expect(itemOf(VISITED_ITEM)).toEqual({ ...before, startTime: '14:30:00' })
+  })
+
+  it('옆 항목의 체크도 그대로다 — 일괄 교체와 갈리는 지점이다', () => {
+    setTime(VISITED_ITEM, { startTime: '14:30:00' })
+
+    expect(itemOf(NEIGHBOR_ITEM)?.visited).toBe(true)
+  })
+
+  it('응답이 Response<Void> 다 — dataBody 가 null 이다', () => {
+    const result = setTime(VISITED_ITEM, { startTime: '14:30:00' })
+
+    expect(result?.payload.dataHeader.success).toBe(true)
+    expect(result?.payload.dataBody).toBeNull()
+  })
+
+  it('HH:mm 도 받는다 — 초가 붙어 저장된다', () => {
+    expect(setTime(VISITED_ITEM, { startTime: '09:05' })?.status).toBe(200)
+    expect(itemOf(VISITED_ITEM)?.startTime).toBe('09:05:00')
+  })
+
+  it('startTime: null 은 시각을 비운다 — 체크는 남는다', () => {
+    expect(setTime(VISITED_ITEM, { startTime: null })?.status).toBe(200)
+    expect(itemOf(VISITED_ITEM)?.startTime).toBeNull()
+    expect(itemOf(VISITED_ITEM)?.visited).toBe(true)
+  })
+
+  it('빈 객체 {} 도 시각을 비운다 — 필드는 선택이다', () => {
+    expect(setTime(VISITED_ITEM, {})?.status).toBe(200)
+    expect(itemOf(VISITED_ITEM)?.startTime).toBeNull()
+  })
+
+  it('바디가 없으면 400 PLAN_100 이다 — 바디 자체는 필수다', () => {
+    const result = setTime(VISITED_ITEM, null)
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_100')
+    expect(itemOf(VISITED_ITEM)?.startTime).toBe('10:00:00')
+  })
+
+  it('형식이 어긋난 시각은 400 PLAN_100 이다 — 아무것도 바꾸지 않는다', () => {
+    for (const startTime of ['25:00:00', '10시', 1030]) {
+      const result = setTime(VISITED_ITEM, { startTime })
+
+      expect(result?.status).toBe(400)
+      expect(result?.payload.dataHeader.resultCode).toBe('PLAN_100')
+    }
+    expect(itemOf(VISITED_ITEM)?.startTime).toBe('10:00:00')
+  })
+
+  it('없는 항목은 404 PLAN_005 다', () => {
+    const result = setTime('323456789012999999', { startTime: '10:30:00' })
+
+    expect(result?.status).toBe(404)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_005')
+  })
+
+  it('다른 일정의 항목을 내 planId 로 고칠 수 없다 — 404 PLAN_005 다', () => {
+    const result = setTime(VISITED_ITEM, { startTime: '10:30:00' }, ORPHAN_PLAN)
+
+    expect(result?.status).toBe(404)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_005')
+  })
+
+  it('남의 일정은 404 PLAN_001 이다 — 일정 판정이 먼저다', () => {
+    const result = setTime(VISITED_ITEM, { startTime: '10:30:00' }, OTHERS)
+
+    expect(result?.status).toBe(404)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_001')
+  })
+
+  it('숫자가 아닌 planItemId 는 400 PLAN_124 다', () => {
+    const result = setTime('abc', { startTime: '10:30:00' })
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_124')
+  })
+
+  it('토큰이 없으면 401 이다', () => {
+    const result = call(
+      `/plans/${PLAN}/items/${VISITED_ITEM}/start-time`,
+      'PUT',
+      { startTime: '10:30:00' },
+      null,
+    )
+
+    expect(result?.status).toBe(401)
+  })
+})

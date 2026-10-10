@@ -1,0 +1,98 @@
+import { Button, ButtonLink } from '@/components/button'
+import { StateCharacter } from '@/components/character'
+import {
+  AiPlanJobBlock,
+  AiPlanJobCondition,
+  AiPlanJobFrame,
+} from '@/features/ai-plan/ai-plan-job-frame'
+import { messages } from '@/lib/messages'
+import type { Inset } from '@/lib/ui/inset'
+
+export type AiPlanCanceledProps = {
+  /** 입력 조건 요약. 조건을 잃었으면 null */
+  conditionSummary: string | null
+  /** 같은 조건으로 다시 제출. 조건이 없으면 줄 수 없다 */
+  onRetry: (() => void) | null
+  retrying: boolean
+  /** 조건을 되살려 폼으로 */
+  changeHref: string
+  /**
+   * 좌우 여백 축 (`AiPlanProgress` · `AiPlanFailed` 와 같은 계약, #473).
+   *
+   * **기본값은 `main`(16/40)이다** — 형제 둘과 같은 값으로 맞춘다. 지금 호출처는
+   * `/ai-plans/jobs/[jobId]` 하나뿐이고 거기서 `card`(16/20)를 넘긴다 — 이 표시가 L1 카드
+   * 안에 들어가고, 카드가 이미 한 번 들어와 있어 안쪽까지 40 을 주면 내용이 두 번 밀린다
+   * (`DESIGN.md §0`).
+   */
+  inset?: Inset
+}
+
+/**
+ * 작업 취소 — #250.
+ *
+ * **`AiPlanFailed` 를 재사용하지 않는다.** 실패 화면은 서버 `errorMessage` 를 그리는 것이
+ * 골자인데 **취소는 `errorCode`·`errorMessage` 가 비어 온다**(백엔드가 일부러 비운다) —
+ * 태우면 사유 없는 "일정을 만들지 못했어요" 가 뜨고, 사용자가 스스로 그만둔 일이 장애처럼
+ * 읽힌다. 그래서 `ServerReason` 도 쓰지 않는다 — **받아 적을 말이 없다.**
+ *
+ * **`AI 없이 직접 만들기` 갈래를 주지 않는다.** 실패는 "AI 로는 안 되니 직접" 이 대안이지만,
+ * 취소는 만들기 자체를 그만둔 것이라 그 제안이 맥락에 없다. 되돌아갈 두 갈래만 준다.
+ *
+ * **골격은 셋이 공유한다** (#710, `AiPlanJobFrame`) — 재사용하지 않는 것은 **본문**이지
+ * 배치가 아니다.
+ *
+ * 표시 전용이라 node 환경에서 렌더 테스트가 된다.
+ */
+export function AiPlanCanceled({
+  conditionSummary,
+  onRetry,
+  retrying,
+  changeHref,
+  inset = 'main',
+}: AiPlanCanceledProps) {
+  return (
+    <AiPlanJobFrame>
+      <AiPlanJobBlock inset={inset}>
+        {/*
+          **서서 기다린다** (#939, DESIGN.md §0-5) — 멈췄지만 조건은 그대로 있고 다시 넣을 수
+          있다는 문장이다. 진행 화면의 목줄 산책과 같은 자리 · 같은 규칙(발을 구분선에 댄다)이다.
+          **실패(`AiPlanFailed`)에는 두지 않는다** — 조건 문제일 수 있는 실패에 귀여운 그림이
+          서면 사용자가 겪은 일을 가볍게 만든다.
+        */}
+        <div className="flex w-full items-end gap-6">
+          <div className="flex min-w-0 flex-col items-start gap-2">
+            <h2 className="text-title-2 text-fg font-semibold">{messages.aiPlan.canceledTitle}</h2>
+            <p className="text-body-2 text-fg-muted">{messages.aiPlan.canceledDescription}</p>
+          </div>
+          <StateCharacter pose="stand" className="-mb-5" />
+        </div>
+      </AiPlanJobBlock>
+
+      <AiPlanJobCondition
+        inset={inset}
+        label={messages.aiPlan.jobConditionKeptLabel}
+        summary={conditionSummary}
+      />
+
+      <AiPlanJobBlock inset={inset}>
+        <div className="flex flex-wrap gap-2">
+          {/*
+            **재제출은 조건이 남아 있을 때만 준다** (`AiPlanFailed` 와 같은 판단).
+
+            취소는 **멱등 키를 함께 풀어 준다** — 같은 조건으로 다시 넣는 것이 취소의 주된
+            쓰임인데 키가 남으면 취소된 잡을 그대로 돌려받는다. 그래서 이 버튼이 실제로
+            **새 작업**을 만든다.
+          */}
+          {onRetry !== null && (
+            <Button onClick={onRetry} loading={retrying}>
+              {messages.aiPlan.canceledRetry}
+            </Button>
+          )}
+          <ButtonLink href={changeHref} variant="secondary">
+            {messages.aiPlan.canceledChange}
+          </ButtonLink>
+        </div>
+      </AiPlanJobBlock>
+    </AiPlanJobFrame>
+  )
+}

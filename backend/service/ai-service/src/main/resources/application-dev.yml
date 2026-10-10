@@ -1,0 +1,47 @@
+server:
+  port: ${AI_SERVICE_PORT}
+  shutdown: graceful
+
+spring:
+  cloud:
+    config:
+      enabled: false
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+  client:
+    serviceUrl:
+      defaultZone: http://${SERVICE_DISCOVERY_HOSTNAME}:${SERVICE_DISCOVERY_PORT}/eureka/
+
+infra:
+  redis:
+    mode: ${REDIS_MODE}
+    # standalone 에서만 쓴다. sentinel 모드에서는 master-name 과 sentinel-nodes 로 접속한다.
+    host: ${REDIS_HOST}
+    port: ${REDIS_PORT}
+    password: ${REDIS_PASSWORD}
+    # sentinel 모드 필수. 둘 중 하나라도 비면 기동 시점에 실패한다.
+    master-name: ${REDIS_MASTER_NAME:}
+    sentinel-nodes: ${REDIS_SENTINEL_NODES:}
+    key-prefix: ${REDIS_KEY_PREFIX}
+
+# Resource Server 검증 키. auth-service 가 발급에 쓰는 JWT_ACCESS_KEY 와 같은 값을 주입한다.
+app:
+  security:
+    jwt:
+      resource:
+        access-key: ${JWT_ACCESS_KEY}
+
+# Eureka 등록명은 환경별 접미사가 붙으므로 하드코딩하지 않고 앱 이름 env 를 참조한다.
+# (tour/plan 조회 Feign 클라이언트 추가 시 바로 쓰인다)
+feign-client:
+  target-services:
+    tour-service: ${TOUR_SERVICE_APP_NAME}
+    plan-service: ${PLAN_SERVICE_APP_NAME}
+    # 없으면 PetConditionClient 가 리터럴 "auth-service" 로 폴백해 dev/prod 등록명
+    # (접미사 포함)을 못 찾고, 어댑터가 실패를 관용 처리해 반려견 특성이 조용히 통째로 빠진다.
+    auth-service: ${AUTH_SERVICE_APP_NAME}

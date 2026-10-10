@@ -1,0 +1,381 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+
+import { describe, expect, it } from 'vitest'
+
+import { PhotoGallery } from '@/features/place/photo-gallery'
+import { messages } from '@/lib/messages'
+import type { PlaceImage } from '@/types/place'
+
+/** 허용 호스트여야 next/image 에 넘어간다 — 아니면 걸러진다 */
+function image(index: number): PlaceImage {
+  return {
+    originImgUrl: `http://tong.visitkorea.or.kr/cms/resource/mock/place-${index}.jpg`,
+    smallImageUrl: null,
+    imgName: `사진 ${index}`,
+    cpyrhtDivCd: 'Type1',
+  }
+}
+
+function render(count: number, contentTypeCode: string | null = null) {
+  const images = Array.from({ length: count }, (_, index) => image(index + 1))
+
+  return renderToStaticMarkup(
+    createElement(PhotoGallery, {
+      images,
+      title: '제주특별자치도립김창열미술관',
+      contentTypeCode,
+    }),
+  )
+}
+
+describe('PhotoGallery — 장수별 배치 (가이드 §5)', () => {
+  it('0장이고 카테고리를 모르면 섹션 자체를 렌더하지 않는다', () => {
+    expect(render(0)).toBe('')
+  })
+
+  it('1장이면 전폭으로 늘리지 않고 660px 에서 멈춘다', () => {
+    const markup = render(1)
+
+    expect(markup).toContain('--gallery-w-single-max')
+    // 열이 하나뿐이다 — 비율 분할이 아니다
+    expect(markup).not.toContain('1.62fr')
+  })
+
+  it('2장이면 균등 2분할이고 썸네일 열을 만들지 않는다', () => {
+    const markup = render(2)
+
+    expect(markup).toContain('grid-template-columns:1fr 1fr')
+    expect(markup).not.toContain('1.62fr')
+  })
+
+  it('3장 이상이면 대표 + 썸네일 2 로 나눈다', () => {
+    const markup = render(3)
+
+    // 고정 px 가 아니라 비율이다 — 데스크톱 2단의 우측 열이 가변이기 때문이다
+    expect(markup).toContain('grid-template-columns:1.62fr 1fr')
+    expect(markup).toContain('grid-template-rows:1fr 1fr')
+  })
+
+  it('데스크톱 대표·썸네일 폭을 고정 px 토큰으로 두지 않는다', () => {
+    const markup = render(3)
+
+    expect(markup).not.toContain('--gallery-w-lead')
+    expect(markup).not.toContain('--gallery-w-thumb')
+  })
+
+  it('썸네일에 담기지 않는 나머지는 +N 으로 얹는다', () => {
+    // 8장 = 대표 1 + 썸네일 2 + 나머지 5
+    expect(render(8)).toContain('+5')
+  })
+
+  it('나머지가 없으면 +N 을 그리지 않는다', () => {
+    expect(render(3)).not.toContain('+0')
+  })
+})
+
+describe('PhotoGallery — 높이는 항상 고정', () => {
+  it('장수와 무관하게 고정 높이 토큰을 쓴다', () => {
+    for (const count of [1, 2, 3, 8]) {
+      const markup = render(count)
+
+      expect(markup).toContain('--gallery-h-mobile')
+      expect(markup).toContain('--gallery-h-desktop')
+      // aspect-* 로 높이를 콘텐츠에 맡기지 않는다 — TourAPI 해상도가 고르지 않다
+      expect(markup).not.toContain('aspect-')
+    }
+  })
+})
+
+describe('PhotoGallery — 모바일 캐러셀', () => {
+  it('scroll-snap 으로 넘길 수 있음을 알린다', () => {
+    const markup = render(3)
+
+    expect(markup).toContain('snap-x')
+    expect(markup).toContain('snap-start')
+  })
+
+  it('점 인디케이터가 아니라 카운터를 쓴다', () => {
+    const markup = render(8)
+
+    expect(markup).toContain('1/8')
+  })
+
+  it('1장이면 카운터를 그리지 않는다', () => {
+    expect(render(1)).not.toContain('1/1')
+  })
+})
+
+describe('PhotoGallery — 출처', () => {
+  it('사진 출처를 갤러리 바로 아래에 붙인다', () => {
+    expect(render(1)).toContain(messages.place.photoSource)
+  })
+
+  it('본문 끝의 정보 출처와 문구가 갈린다', () => {
+    expect(messages.place.photoSource).not.toBe(messages.place.detailCopyrightPrefix)
+  })
+})
+
+describe('PhotoGallery — 사진이 없을 때 (DESIGN.md §7-3)', () => {
+  it('카테고리 일러스트로 자리를 채운다', () => {
+    const markup = render(0, 'CULTURE')
+
+    expect(markup).toContain('/illustrations/place-culture.webp')
+    // 고정 높이는 사진이 있을 때와 같다 — 자리의 크기가 흔들리면 안 된다
+    expect(markup).toContain('--gallery-h-mobile')
+    expect(markup).toContain('--gallery-h-desktop')
+  })
+
+  it('일러스트에는 사진 출처를 붙이지 않는다', () => {
+    // 한국관광공사가 준 사진이 아니라 우리가 그린 도형이다
+    expect(render(0, 'CULTURE')).not.toContain(messages.place.photoSource)
+  })
+
+  it('일러스트는 장식이라 뷰어를 열지 않는다', () => {
+    // 확대해 봐야 같은 도형이고, 누를 수 있으면 "사진이 더 있다" 로 읽힌다
+    expect(render(0, 'CULTURE')).not.toContain('<button')
+  })
+
+  it('자산이 없는 카테고리는 회색 타일로 떨어뜨리지 않고 렌더하지 않는다', () => {
+    // 없애려던 회색 벽이 그대로 돌아온다
+    expect(render(0, 'NEW_CODE_FROM_SERVER')).toBe('')
+  })
+
+  it('사진이 한 장이라도 있으면 일러스트를 쓰지 않는다', () => {
+    expect(render(1, 'CULTURE')).not.toContain('/illustrations/')
+  })
+})
+
+describe('PhotoGallery — 뷰어 열기 (+N 뒤의 사진)', () => {
+  it('모든 타일이 뷰어를 여는 버튼이다', () => {
+    const markup = render(3)
+
+    expect(markup).toContain('<button')
+    expect(markup).toContain(messages.place.galleryOpenAction.replace('{index}', '1'))
+  })
+
+  it('+N 은 장수만 말하지 않고 나머지를 여는 버튼이다', () => {
+    // 8장 = 대표 1 + 썸네일 2 + 나머지 5. 그 5장은 뷰어 말고는 도달할 경로가 없다
+    const markup = render(8)
+
+    expect(markup).toContain('+5')
+    expect(markup).toContain(messages.place.galleryOpenMoreAction.replace('{count}', '5'))
+  })
+
+  it('뷰어는 닫힌 채로 렌더된다 — 사진을 누르기 전에는 열리지 않는다', () => {
+    // 문구로 보지 않는다 — 타일 라벨(`1번째 사진 크게 보기`)이 뷰어 제목을 부분 문자열로
+    // 품고 있어 항상 잡힌다. 다이얼로그가 실제로 있는지를 본다
+    expect(render(8)).not.toContain('role="dialog"')
+  })
+})
+
+describe('PhotoGallery — 첫 화면에 내려오는 사진 (#1132)', () => {
+  /*
+    모바일 캐러셀과 데스크톱 모자이크가 **둘 다 마크업에 있고 CSS 로 갈린다**
+    (`md:hidden` / `hidden md:block`). 그래서 갈래별로 잘라서 센다 — 통째로 세면 한쪽에서
+    늘어난 장수를 다른 쪽이 가린다.
+  */
+  function split(markup: string) {
+    const at = markup.indexOf('<div class="hidden md:block">')
+    return { mobile: markup.slice(0, at), desktop: markup.slice(at) }
+  }
+
+  function imgTags(markup: string) {
+    return markup.match(/<img[^>]*>/g) ?? []
+  }
+
+  /*
+    **8장이 첫 화면에 다 내려왔다** (2026-10-03 Lighthouse 모바일, 상세 4.9MB). 캐러셀의
+    가려진 장은 `loading="lazy"` 였는데도 그랬다 — 크롬이 스크롤 컨테이너 안의 지연
+    이미지를 여유 거리(수천 px) 안이면 미리 받는 것으로 보이고, 342px 여덟 장은 그 안이다.
+    브라우저 판단에 맡기지 않고 **아직 닿지 않은 장은 `<img>` 자체를 만들지 않는다.**
+  */
+  it('모바일 캐러셀은 첫 장과 옆에 물린 둘째 장만 사진을 만든다', () => {
+    const { mobile } = split(render(8))
+    const tags = imgTags(mobile)
+
+    expect(tags).toHaveLength(2)
+    expect(tags[0]).toContain('place-1.jpg')
+    expect(tags[1]).toContain('place-2.jpg')
+  })
+
+  /* 사진을 만들지 않은 장도 자리·버튼은 그대로다 — 넘기기·카운터·뷰어 열기가 같다 */
+  it('사진을 아직 만들지 않은 장도 자리와 뷰어 버튼은 남는다', () => {
+    const { mobile } = split(render(8))
+
+    expect(mobile.match(/<li /g)).toHaveLength(8)
+    expect(mobile).toContain(messages.place.galleryOpenAction.replace('{index}', '8'))
+  })
+
+  it('데스크톱은 보이는 세 장만 만든다 — +N 뒤의 사진은 뷰어에서만 받는다', () => {
+    const { desktop } = split(render(8))
+
+    expect(imgTags(desktop)).toHaveLength(3)
+    expect(desktop).not.toContain('place-4.jpg')
+  })
+
+  /*
+    첫 장만 앞세운다. 모바일 첫 장과 데스크톱 대표는 **같은 URL** 이라(`unoptimized`)
+    보이지 않는 갈래의 대표가 따로 받아지지 않는다.
+  */
+  it('첫 장만 바로 받고 나머지는 지연 로드다', () => {
+    const { mobile, desktop } = split(render(8))
+    const [mobileLead, mobileNext] = imgTags(mobile)
+    const [desktopLead, ...desktopThumbs] = imgTags(desktop)
+
+    expect(mobileLead).not.toContain('loading="lazy"')
+    expect(desktopLead).not.toContain('loading="lazy"')
+    expect(mobileNext).toContain('loading="lazy"')
+    desktopThumbs.forEach((tag) => expect(tag).toContain('loading="lazy"'))
+  })
+})
+
+describe('PhotoGallery — 미등록 호스트', () => {
+  it('next/image 가 던지지 않도록 허용 호스트가 아닌 것은 걸러낸다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(PhotoGallery, {
+        images: [{ ...image(1), originImgUrl: 'https://evil.example.com/a.jpg' }],
+        title: '테스트',
+      }),
+    )
+
+    expect(markup).toBe('')
+  })
+})
+
+/*
+  #1230 — 지도 미리보기는 데스크톱에서도 400 폭 패널이라 **뷰포트로 가르지 않고** 캐러셀만 쓴다.
+  `always` 전달이 빠지면 캐러셀이 `md:hidden` 으로 돌아가 데스크톱 패널에서 사진이 통째로 사라진다.
+*/
+describe('PhotoGallery — 캐러셀 갈래 (#1230)', () => {
+  function renderCarousel(count: number, contentTypeCode: string | null = null) {
+    const images = Array.from({ length: count }, (_, index) => image(index + 1))
+
+    return renderToStaticMarkup(
+      createElement(PhotoGallery, {
+        images,
+        title: '수월봉',
+        contentTypeCode,
+        layout: 'carousel',
+      }),
+    )
+  }
+
+  it('캐러셀이 어느 폭에서도 선다 — md:hidden 이 없다', () => {
+    const markup = renderCarousel(3)
+
+    expect(markup).toContain('snap-x')
+    expect(markup).not.toContain('md:hidden')
+    expect(markup).toContain('1/3')
+  })
+
+  it('데스크톱 모자이크를 그리지 않는다', () => {
+    const markup = renderCarousel(3)
+
+    expect(markup).not.toContain('hidden md:block')
+    expect(markup).not.toContain('--gallery-h-desktop')
+  })
+
+  it('사진이 없으면 일러스트도 폭과 상관없이 한 갈래만 보인다', () => {
+    const markup = renderCarousel(0, 'CULTURE')
+
+    expect(markup).toContain('/illustrations/place-culture.webp')
+    expect(markup).not.toContain('md:hidden')
+    expect(markup).not.toContain('hidden md:block')
+  })
+
+  it('넘긴 장도 첫 장처럼 좌우 16 을 띄운다 — 스냅 자리가 트랙 여백(px-4)을 따른다 (#1264)', () => {
+    const markup = renderCarousel(3)
+
+    expect(markup).toContain('scroll-px-4')
+  })
+
+  it('기본(responsive)은 예전 그대로 — 상세 화면은 바뀌지 않는다', () => {
+    const markup = render(3)
+
+    expect(markup).toContain('relative md:hidden')
+    expect(markup).toContain('hidden md:block')
+  })
+})
+
+describe('PhotoGallery — 캐러셀 넘기기 (#1233 D3)', () => {
+  function renderCarousel(count: number) {
+    const images = Array.from({ length: count }, (_, index) => image(index + 1))
+
+    return renderToStaticMarkup(
+      createElement(PhotoGallery, { images, title: '수월봉', layout: 'carousel' }),
+    )
+  }
+
+  const prev = `aria-label="${messages.place.galleryPrevAction}"`
+  const next = `aria-label="${messages.place.galleryNextAction}"`
+
+  it('첫 칸에서는 이전 버튼을 숨기고 다음 버튼만 세운다', () => {
+    const markup = renderCarousel(3)
+
+    expect(markup).not.toContain(prev)
+    expect(markup).toContain(next)
+  })
+
+  it('한 장이면 넘길 곳이 없어 버튼을 세우지 않는다', () => {
+    const markup = renderCarousel(1)
+
+    expect(markup).not.toContain(prev)
+    expect(markup).not.toContain(next)
+  })
+
+  it('버튼은 사진 위에 마우스를 올렸을 때만 서서히 나타난다', () => {
+    const button = renderCarousel(3).match(new RegExp(`<button[^>]*${next}[^>]*>`))?.[0] ?? ''
+
+    expect(button).toContain('opacity-0')
+    expect(button).toContain('group-hover/gallery:opacity-100')
+    expect(button).toContain('transition-opacity duration-200 ease-out')
+  })
+
+  it('보이지 않는 동안에는 누를 수 없다 — 휴대폰(호버 없음)에서 사진 탭을 가로채지 않는다', () => {
+    const button = renderCarousel(3).match(new RegExp(`<button[^>]*${next}[^>]*>`))?.[0] ?? ''
+
+    expect(button).toContain('pointer-events-none')
+    expect(button).toContain('group-hover/gallery:pointer-events-auto')
+    expect(button).toContain('group-has-[:focus-visible]/gallery:pointer-events-auto')
+  })
+
+  it('마우스로 누른 포커스로는 뜨지 않고 키보드 포커스만 예외다', () => {
+    const button = renderCarousel(3).match(new RegExp(`<button[^>]*${next}[^>]*>`))?.[0] ?? ''
+
+    expect(button).not.toContain('group-focus-within')
+    expect(button).toContain('group-has-[:focus-visible]/gallery:opacity-100')
+  })
+
+  it('상세(responsive) 캐러셀도 같은 버튼을 쓴다', () => {
+    expect(render(3)).toContain(next)
+  })
+
+  it('지금 위치를 보조기기에 알린다', () => {
+    expect(renderCarousel(3)).toMatch(/aria-live="polite"[^>]*>1\/3</)
+  })
+})
+
+describe('PhotoGallery — 미리보기의 사진 출처 (#1233 D3)', () => {
+  const overlay = new RegExp(`<span[^>]*absolute[^>]*>${messages.place.photoSource}</span>`)
+
+  it('미리보기(carousel)는 출처를 사진 위 좌하단에 얹는다 — 아래 줄을 따로 두지 않는다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(PhotoGallery, {
+        images: [image(1), image(2)],
+        title: '수월봉',
+        layout: 'carousel',
+      }),
+    )
+
+    expect(markup).toMatch(overlay)
+    expect(markup.split(messages.place.photoSource)).toHaveLength(2)
+  })
+
+  it('상세(responsive)는 갤러리 아래 줄 그대로다', () => {
+    const markup = render(2)
+
+    expect(markup).not.toMatch(overlay)
+    expect(markup).toContain(messages.place.photoSource)
+  })
+})

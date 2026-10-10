@@ -1,0 +1,1145 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>장소 미리보기 패널 시안</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+    />
+    <style>
+      /* DESIGN.md 토큰 값 그대로 */
+      :root {
+        --bg: #ffffff;
+        --band: #eef0f3;
+        --bg-sunken: #f5f6f8;
+        --border: #e3e5ea;
+        --border-strong: #c4c8d0;
+        --row-selected: #f0f7f3;
+        --fg: #15181d;
+        --fg-muted: #596069;
+        --fg-subtle: #878d96;
+        --brand-500: #2e9b6b;
+        --brand-600: #237a54;
+        --brand-700: #1d6646;
+        --link: #1f7a55;
+        --high-100: #e4f0ea;
+        --high-700: #16563c;
+        --mid-100: #fef4e0;
+        --mid-700: #8a5f0f;
+        --crit-100: #fdecec;
+        --crit-700: #ce2d2d;
+        --map-land: #eef2e6;
+        --map-sea: #cfe3ef;
+        --map-road: #ffffff;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        background: #dfe2e7;
+        color: var(--fg);
+        font-family:
+          Pretendard,
+          -apple-system,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+      }
+
+      /* ── 시안 문서 틀 ── */
+      .doc {
+        max-width: 1520px;
+        margin: 0 auto;
+        padding: 32px 16px 80px;
+      }
+      .doc h1 {
+        font-size: 22px;
+        font-weight: 800;
+      }
+      .doc .lead {
+        color: var(--fg-muted);
+        font-size: 14px;
+        margin-top: 6px;
+        line-height: 1.6;
+      }
+      .controls {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: #dfe2e7;
+        padding: 14px 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: center;
+      }
+      .seg {
+        display: inline-flex;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 3px;
+      }
+      .seg button {
+        border: 0;
+        background: none;
+        padding: 6px 12px;
+        border-radius: 7px;
+        font-size: 13px;
+        color: var(--fg-muted);
+      }
+      .seg button.on {
+        background: var(--fg);
+        color: #fff;
+        font-weight: 600;
+      }
+      .seg-label {
+        font-size: 12px;
+        color: var(--fg-muted);
+        margin-right: 6px;
+      }
+      .frame-title {
+        margin: 28px 0 10px;
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .frame-title h2 {
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .frame-title span {
+        font-size: 13px;
+        color: var(--fg-muted);
+      }
+      .scaler {
+        width: 100%;
+        overflow: hidden;
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+      }
+      .frame {
+        transform-origin: top left;
+        background: var(--bg-sunken);
+        position: relative;
+        overflow: hidden;
+      }
+      .notes {
+        margin-top: 12px;
+        background: var(--bg);
+        border-radius: 12px;
+        padding: 16px 20px;
+        font-size: 13px;
+        line-height: 1.7;
+        color: var(--fg-muted);
+      }
+      .notes b {
+        color: var(--fg);
+      }
+      .notes ol {
+        padding-left: 18px;
+      }
+      .mobile-row {
+        display: flex;
+        gap: 24px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+      .mobile-row .notes {
+        flex: 1;
+        min-width: 280px;
+        margin-top: 0;
+      }
+
+      /* ── 앱 크롬 ── */
+      .urlbar {
+        height: 36px;
+        background: #f1f3f5;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--fg-muted);
+      }
+      .urlbar .addr {
+        background: #fff;
+        border-radius: 6px;
+        padding: 4px 10px;
+        flex: 1;
+        max-width: 640px;
+      }
+      .urlbar .addr mark {
+        background: var(--high-100);
+        color: var(--high-700);
+        font-weight: 700;
+        border-radius: 3px;
+        padding: 0 2px;
+      }
+      .gnb {
+        height: 64px;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 40px;
+      }
+      .gnb .logo {
+        font-weight: 800;
+        font-size: 19px;
+        margin-right: 16px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .gnb .logo i {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        background: var(--brand-600);
+        display: inline-block;
+      }
+      .gnb .nav {
+        font-size: 14px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        color: var(--fg);
+      }
+      .gnb .nav.on {
+        background: var(--band);
+        font-weight: 600;
+      }
+      .gnb .sp {
+        flex: 1;
+      }
+
+      /* ── 지도 ── */
+      .map {
+        position: absolute;
+        inset: 0;
+        background: var(--map-sea);
+      }
+      .map svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .pin {
+        position: absolute;
+        transform: translate(-50%, -100%);
+      }
+      .pin b {
+        display: block;
+        width: 26px;
+        height: 26px;
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        background: #fff;
+        border: 2px solid var(--brand-600);
+      }
+      .pin.sel b {
+        width: 38px;
+        height: 38px;
+        background: var(--brand-600);
+        border-color: #fff;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      }
+      .pin.sel::after {
+        content: attr(data-label);
+        position: absolute;
+        left: 50%;
+        top: -30px;
+        transform: translateX(-50%);
+        background: var(--fg);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 6px;
+        white-space: nowrap;
+      }
+      .map-tools {
+        position: absolute;
+        right: 16px;
+        bottom: 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .map-tools span {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: #fff;
+        border: 1px solid var(--border);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        color: var(--fg-muted);
+      }
+      .view-toggle {
+        position: absolute;
+        right: 16px;
+        top: 24px;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 4px;
+        display: flex;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        font-size: 13px;
+      }
+      .view-toggle span {
+        padding: 8px 14px;
+        border-radius: 8px;
+      }
+      .view-toggle .on {
+        background: var(--fg);
+        color: #fff;
+        font-weight: 600;
+      }
+      .research {
+        position: absolute;
+        top: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 9px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      /* ── 목록 패널 (기존) ── */
+      .panel {
+        position: absolute;
+        top: 24px;
+        bottom: 32px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(21, 24, 29, 0.12);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .list {
+        left: 16px;
+        width: 400px;
+      }
+      .list-head {
+        padding: 18px 20px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      .search {
+        height: 44px;
+        border: 1px solid var(--border-strong);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        font-size: 14px;
+        color: var(--fg-subtle);
+      }
+      .chips {
+        display: flex;
+        gap: 6px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+      }
+      .chip {
+        font-size: 12px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--fg-muted);
+      }
+      .count {
+        font-size: 12px;
+        color: var(--fg-muted);
+        margin-top: 12px;
+      }
+      .rows {
+        overflow: hidden;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        position: relative;
+      }
+      .row.sel {
+        background: var(--row-selected);
+      }
+      .row.sel::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: var(--brand-500);
+      }
+      .thumb {
+        width: 72px;
+        height: 72px;
+        border-radius: 10px;
+        flex: none;
+      }
+      .row h4 {
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .row p {
+        font-size: 12px;
+        color: var(--fg-muted);
+        margin-top: 4px;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: var(--band);
+        color: var(--fg-muted);
+        margin-top: 6px;
+        margin-right: 4px;
+      }
+      .collapse-tab {
+        position: absolute;
+        right: -24px;
+        top: 50%;
+        width: 24px;
+        height: 48px;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-left: 0;
+        border-radius: 0 8px 8px 0;
+        display: grid;
+        place-items: center;
+        color: var(--fg-muted);
+        font-size: 12px;
+      }
+
+      /* ── 미리보기 패널 (신규) ── */
+      .preview {
+        width: 380px;
+      }
+      .preview.beside {
+        left: 428px;
+      } /* 16 + 400 + 12 */
+      .preview.replace {
+        left: 16px;
+        width: 400px;
+      }
+      .pv-scroll {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .pv-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 10px 0 16px;
+        height: 50px;
+      }
+      .pv-top .back {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--link);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 6px;
+        border-radius: 8px;
+      }
+      .icon-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        color: var(--fg-muted);
+        font-size: 18px;
+      }
+      .pv-photos {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 4px;
+        padding: 6px 16px 0;
+        height: 168px;
+      }
+      .pv-photos div {
+        border-radius: 10px;
+        position: relative;
+      }
+      .pv-photos .more {
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .pv-body {
+        padding: 16px 20px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .pv-title {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .pv-title h3 {
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+      }
+      .pv-meta {
+        font-size: 13px;
+        color: var(--fg-muted);
+        margin-top: 4px;
+      }
+      .badge {
+        font-size: 12px;
+        font-weight: 700;
+        padding: 5px 9px;
+        border-radius: 6px;
+        white-space: nowrap;
+        flex: none;
+      }
+      .badge.high {
+        background: var(--high-100);
+        color: var(--high-700);
+      }
+      .badge.mid {
+        background: var(--mid-100);
+        color: var(--mid-700);
+      }
+      .badge.unknown {
+        border: 1px dashed var(--border-strong);
+        color: var(--fg-muted);
+      }
+
+      .visit {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 14px;
+        font-size: 13px;
+      }
+      .visit .open {
+        color: var(--high-700);
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .visit .open::before {
+        content: '';
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--brand-500);
+      }
+      .visit .open.closed {
+        color: var(--fg-muted);
+      }
+      .visit .open.closed::before {
+        background: var(--fg-subtle);
+      }
+      .visit a {
+        color: var(--link);
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      .verdicts {
+        background: var(--bg-sunken);
+        border-radius: 12px;
+        padding: 4px 14px;
+      }
+      .vline {
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .vline:last-child {
+        border-bottom: 0;
+      }
+      .vline dt {
+        color: var(--fg-muted);
+        font-size: 12px;
+        padding-top: 1px;
+      }
+      .vline dd b {
+        font-weight: 700;
+      }
+      .vline dd .why {
+        color: var(--fg-muted);
+        display: block;
+        font-size: 12px;
+        margin-top: 1px;
+      }
+      .vline .safe {
+        color: var(--high-700);
+      }
+      .vline .warn {
+        color: var(--mid-700);
+      }
+      .guest-hint {
+        font-size: 12px;
+        color: var(--fg-muted);
+      }
+      .guest-hint a {
+        color: var(--link);
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .skel {
+        height: 12px;
+        border-radius: 4px;
+        background: var(--band);
+        animation: pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .pv-actions {
+        margin-top: auto;
+        padding: 14px 20px 18px;
+        border-top: 1px solid var(--border);
+        display: grid;
+        grid-template-columns: 48px 1fr 1fr;
+        gap: 8px;
+        background: var(--bg);
+      }
+      .btn {
+        height: 48px;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--border-strong);
+        background: #fff;
+        color: var(--fg);
+        text-decoration: none;
+      }
+      .btn.primary {
+        background: var(--brand-600);
+        border-color: var(--brand-600);
+        color: #fff;
+      }
+      .btn.icon {
+        font-size: 18px;
+        color: var(--fg-muted);
+      }
+
+      /* ── 모바일 ── */
+      .phone {
+        width: 390px;
+        height: 844px;
+        border-radius: 36px;
+        border: 10px solid #15181d;
+        overflow: hidden;
+        position: relative;
+        background: var(--map-sea);
+        flex: none;
+      }
+      .phone .status {
+        height: 44px;
+        background: #fff;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .phone .m-search {
+        position: absolute;
+        top: 60px;
+        left: 16px;
+        right: 16px;
+        height: 46px;
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        font-size: 14px;
+        color: var(--fg-subtle);
+        z-index: 5;
+      }
+      .sheet {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #fff;
+        border-radius: 20px 20px 0 0;
+        box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.14);
+        z-index: 6;
+        display: flex;
+        flex-direction: column;
+      }
+      .grabber {
+        width: 40px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--border-strong);
+        margin: 8px auto 4px;
+      }
+      .m-pv {
+        padding: 6px 16px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .m-head {
+        display: flex;
+        gap: 12px;
+      }
+      .m-head .thumb {
+        width: 84px;
+        height: 84px;
+      }
+      .m-head h3 {
+        font-size: 19px;
+        font-weight: 800;
+      }
+      .m-actions {
+        display: grid;
+        grid-template-columns: 48px 1fr 1fr;
+        gap: 8px;
+        padding: 12px 16px 26px;
+        border-top: 1px solid var(--border);
+        margin-top: 4px;
+      }
+
+      .ph1 {
+        background: linear-gradient(160deg, #a9c4dc 0%, #c7d6e2 55%, #6f9a4a 56%, #5b8a3a 100%);
+      }
+      .ph2 {
+        background: linear-gradient(170deg, #6b8f3a 0%, #8a7a5a 35%, #5d5446 70%, #3f3a33 100%);
+      }
+      .ph3 {
+        background: linear-gradient(150deg, #2f3b3f 0%, #4c5a4b 50%, #7aa07a 100%);
+      }
+      .ph4 {
+        background: linear-gradient(140deg, #d9c9a8, #b59a6a);
+      }
+      .ph5 {
+        background: linear-gradient(140deg, #9cc0d6, #5d8fb0);
+      }
+      .ph6 {
+        background: linear-gradient(140deg, #b9d3a8, #6e9a58);
+      }
+      .ph3::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        border-radius: 10px;
+      }
+      .more span {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* 주석 표식 */
+      .callout {
+        position: absolute;
+        z-index: 50;
+        background: #ff5a36;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 800;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        box-shadow: 0 0 0 3px rgba(255, 90, 54, 0.25);
+      }
+      body:not(.show-callouts) .callout {
+        display: none;
+      }
+    </style>
+  </head>
+  <body class="show-callouts">
+    <div class="doc">
+      <h1>
+        지도 보기 · 장소 미리보기 패널 시안
+        <span style="color: var(--fg-muted); font-weight: 600">#1227</span>
+      </h1>
+      <p class="lead">
+        행이나 핀을 고르면 목록 옆에 미리보기가 뜬다. 상세 정보를 다 옮기지 않고
+        <b>"갈 만한가"를 판단할 것만</b> 싣는다. 고른 장소는 <code>?place=</code>로 URL에 남는다.
+        색·간격은 <code>DESIGN.md</code> 토큰 값이고, 사진·지도는 자리표시다.
+      </p>
+
+      <div class="controls">
+        <div>
+          <span class="seg-label">상태</span>
+          <div class="seg" id="state-seg">
+            <button data-v="member" class="on">로그인 · 반려견 있음</button>
+            <button data-v="guest">비로그인</button>
+            <button data-v="loading">조회 중</button>
+            <button data-v="partial">판정 실패</button>
+            <button data-v="closed">영업 종료 · 값 없음</button>
+          </div>
+        </div>
+        <div>
+          <span class="seg-label">번호 표식</span>
+          <div class="seg" id="callout-seg">
+            <button data-v="on" class="on">켜기</button>
+            <button data-v="off">끄기</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ 1440 ══ -->
+      <div class="frame-title">
+        <h2>① 데스크톱 1280 이상 — 목록 옆에 붙는다</h2>
+        <span>1440 × 900 · 축소 표시</span>
+      </div>
+      <div class="scaler" data-w="1440" data-h="900">
+        <div class="frame" style="width: 1440px; height: 900px">
+          <div class="urlbar">
+            <span>●●●</span>
+            <div class="addr">
+              hondigagae.kr/places?view=map&amp;area=39<mark>&amp;place=26434</mark>
+            </div>
+          </div>
+          <div class="gnb">
+            <span class="logo"><i></i>혼디가개</span><span class="nav on">장소 찾기</span
+            ><span class="nav">여행 일정</span><span class="nav">AI 일정 생성</span
+            ><span class="sp"></span><span class="nav">로그인</span>
+          </div>
+          <div style="position: absolute; top: 100px; left: 0; right: 0; bottom: 0">
+            <div class="map" data-map></div>
+            <div class="view-toggle"><span>목록</span><span class="on">지도</span></div>
+            <div class="research" style="left: calc(50% + 200px)">이 지역에서 다시 찾기</div>
+            <div class="panel list" data-list></div>
+            <div class="panel preview beside" data-preview="desktop"></div>
+            <div class="map-tools"><span>◎</span><span>＋</span><span>－</span></div>
+            <span class="callout" style="left: 440px; top: 2px">1</span>
+            <span class="callout" style="left: 600px; top: 250px">2</span>
+            <span class="callout" style="left: 600px; top: 470px">3</span>
+            <span class="callout" style="left: 440px; bottom: 110px">4</span>
+          </div>
+        </div>
+      </div>
+      <div class="notes">
+        <ol>
+          <li>
+            <b>자리</b>: 목록 패널(400)과 12 간격을 두고 380 폭으로 뜬다. 위·아래 여백은 목록 패널과
+            같다(위 24 · 아래 32, 카카오 축척 막대 회피). 닫기(✕)는 <code>?place=</code>를 지우고 행
+            선택도 푼다. 목록 패널을 접으면 미리보기가 왼쪽 16 자리로 옮겨 간다.
+          </li>
+          <li>
+            <b>머리</b>: 이름 · 적합도 등급 배지 · 메타(주소 · 분류 · 거리). 그 아래
+            <b>방문 핵심 줄</b>(영업 상태 · 전화 · 길찾기)은 #1226이 상세 머리에 올릴 줄과 같은
+            컴포넌트다. 값이 없는 칸은 빠진다.
+          </li>
+          <li>
+            <b>판정 3줄</b>: 적합도 근거 · 지금 산책 · 동반 조건. 상세의
+            <code>PlaceVerdictSummary</code>와 같은 문장이다. 줄마다 따로 조회하고 따로 실패한다.
+            혼잡도는 넣지 않는다.
+          </li>
+          <li>
+            <b>하단 바</b>: 저장 · 일정에 담기 · 상세 보기. 상세 보기는
+            링크(<code>/places/26434</code>)다. 같은 query key라 이동하면 첫 화면이 캐시로 바로
+            뜬다.
+          </li>
+        </ol>
+      </div>
+
+      <!-- ══ 1024–1279 ══ -->
+      <div class="frame-title">
+        <h2>② 데스크톱 1024–1279 — 목록 패널을 대신한다</h2>
+        <span>1180 × 820 · 축소 표시</span>
+      </div>
+      <div class="scaler" data-w="1180" data-h="820">
+        <div class="frame" style="width: 1180px; height: 820px">
+          <div class="urlbar">
+            <span>●●●</span>
+            <div class="addr">
+              hondigagae.kr/places?view=map&amp;area=39<mark>&amp;place=26434</mark>
+            </div>
+          </div>
+          <div class="gnb">
+            <span class="logo"><i></i>혼디가개</span><span class="nav on">장소 찾기</span
+            ><span class="nav">여행 일정</span><span class="sp"></span
+            ><span class="nav">로그인</span>
+          </div>
+          <div style="position: absolute; top: 100px; left: 0; right: 0; bottom: 0">
+            <div class="map" data-map></div>
+            <div class="view-toggle"><span>목록</span><span class="on">지도</span></div>
+            <div class="panel preview replace" data-preview="narrow"></div>
+            <div class="map-tools"><span>◎</span><span>＋</span><span>－</span></div>
+            <span class="callout" style="left: 22px; top: 2px">5</span>
+          </div>
+        </div>
+      </div>
+      <div class="notes">
+        <ol start="5">
+          <li>
+            <b>3단을 두지 않는다.</b> 1180에서 400 + 12 + 380을 쓰면 지도가 360 남짓만 남아 고른 핀
+            주변이 안 보인다. 목록 자리를 미리보기가 쓰고, <b>← 목록</b>으로 돌아간다. 이때 목록
+            스크롤 위치와 선택 행은 유지한다. 브라우저 뒤로가기도 같은 동작이다(처음 열 때만 push).
+          </li>
+        </ol>
+      </div>
+
+      <!-- ══ 390 ══ -->
+      <div class="frame-title">
+        <h2>③ 모바일 390 — 시트가 미리보기 카드로 바뀐다</h2>
+        <span>실제 크기</span>
+      </div>
+      <div class="mobile-row">
+        <div class="phone">
+          <div class="status">9:41</div>
+          <div class="map" data-map style="top: 44px"></div>
+          <div class="m-search">장소 · 지역 검색</div>
+          <div class="sheet" data-preview="mobile"></div>
+          <span class="callout" style="left: 8px; bottom: 340px">6</span>
+        </div>
+        <div class="notes">
+          <ol start="6">
+            <li>
+              <b>핀을 탭하면</b> 목록 시트가 내려가고, 같은 자리에 미리보기 카드가 낮은 높이로 선다.
+              사진은 썸네일 하나로 줄이고 판정 3줄은 그대로 둔다. 모바일에서 가장 먼저 잘리는 게
+              판정이면 이 기능의 의미가 없다.
+            </li>
+            <li>
+              <b>카드는 위로 끌어도 더 높아지지 않는다.</b> 더 보고 싶으면 <b>상세 보기</b>로 간다.
+              끌어올려 펼치는 단계를 넣으면 "작은 상세 페이지"가 하나 더 생긴다.
+            </li>
+            <li>
+              <b>닫기</b>: ✕ · 지도 빈 곳 탭 · 뒤로가기. 셋 다 <code>?place=</code>를 지우고 목록
+              시트를 이전 높이로 돌린다.
+            </li>
+            <li>
+              <b>검토 포인트</b>: 하단 바 3칸(저장 · 담기 · 상세)이 390에서 좁다. 상세 보기를 카드
+              머리의 "›"로 옮기는 안도 있다.
+            </li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const PLACES = [
+        {
+          n: '수월봉',
+          m: '제주시 한경면 · 관광지 · 1.2km',
+          t: ['동반 가능', '소형견'],
+          c: 'ph1',
+          sel: true,
+        },
+        { n: '차귀도 포구', m: '제주시 한경면 · 관광지 · 2.4km', t: ['동반 가능'], c: 'ph5' },
+        {
+          n: '고산리 유적',
+          m: '제주시 한경면 · 문화시설 · 1.8km',
+          t: ['동반 가능', '목줄 필수'],
+          c: 'ph4',
+        },
+        { n: '신창풍차해안도로', m: '제주시 한경면 · 관광지 · 5.1km', t: ['동반 가능'], c: 'ph6' },
+        { n: '당산봉', m: '제주시 한경면 · 관광지 · 1.6km', t: ['동반 가능', '소형견'], c: 'ph2' },
+      ]
+
+      function listHTML() {
+        return `
+      <div class="list-head">
+        <div class="search">장소 · 지역 검색</div>
+        <div class="chips"><span class="chip">동반 가능</span><span class="chip">야외</span><span class="chip">소형견</span><span class="chip">거리순</span></div>
+        <div class="count">이 지역 32곳</div>
+      </div>
+      <div class="rows">${PLACES.map(
+        (p) => `
+        <div class="row ${p.sel ? 'sel' : ''}">
+          <div class="thumb ${p.c}"></div>
+          <div><h4>${p.n}</h4><p>${p.m}</p>${p.t.map((t) => `<span class="tag">${t}</span>`).join('')}</div>
+        </div>`,
+      ).join('')}
+      </div>
+      <span class="collapse-tab">‹</span>`
+      }
+
+      function verdictsHTML(state) {
+        if (state === 'loading') {
+          return `<dl class="verdicts">${[0, 1]
+            .map(
+              () => `
+        <div class="vline"><dt>${'&nbsp;'}</dt><dd><div class="skel" style="width:80%"></div><div class="skel" style="width:55%;margin-top:6px"></div></dd></div>`,
+            )
+            .join('')}
+        <div class="vline"><dt>동반</dt><dd><b>동반 가능</b> · 소형견 · 목줄 필수</dd></div></dl>`
+        }
+        const suit =
+          state === 'guest'
+            ? `<div class="vline"><dt>오늘</dt><dd><b class="safe">여행 적합</b><span class="why">최고 체감 22.7°C · 강수 0% · 일반 기준</span></dd></div>`
+            : state === 'partial'
+              ? ''
+              : state === 'closed'
+                ? `<div class="vline"><dt>콩이</dt><dd><b class="warn">여행 보통</b><span class="why">체감 31°C, 소형견은 그늘 위주로 짧게</span></dd></div>`
+                : `<div class="vline"><dt>콩이</dt><dd><b class="safe">여행 적합</b><span class="why">소형견 기준 체감 22.7°C, 야외라도 무리 없어요</span></dd></div>`
+        const walk =
+          state === 'closed'
+            ? `<div class="vline"><dt>산책</dt><dd><b class="warn">지금 산책 주의</b><span class="why">노면(아스팔트) 52°C · 짧게 걷기</span></dd></div>`
+            : `<div class="vline"><dt>산책</dt><dd><b class="safe">지금 산책 안전</b><span class="why">노면(아스팔트) 41°C · 13:34 기준</span></dd></div>`
+        const pet = `<div class="vline"><dt>동반</dt><dd><b>동반 가능</b> · 소형견 · 목줄 필수</dd></div>`
+        return `<dl class="verdicts">${suit}${walk}${pet}</dl>`
+      }
+
+      function badgeHTML(state) {
+        if (state === 'loading')
+          return `<div class="skel" style="width:64px;height:26px;border-radius:6px"></div>`
+        if (state === 'partial') return ''
+        if (state === 'closed') return `<span class="badge mid">여행 보통</span>`
+        return `<span class="badge high">여행 적합</span>`
+      }
+
+      function visitHTML(state) {
+        if (state === 'closed')
+          return `<div class="visit"><span class="open closed">영업 종료 · 내일 09:00</span><a href="#">길찾기</a></div>`
+        if (state === 'loading')
+          return `<div class="visit"><div class="skel" style="width:110px"></div><a href="#">064-710-6043</a><a href="#">길찾기</a></div>`
+        return `<div class="visit"><span class="open">상시 개방</span><a href="#">064-710-6043</a><a href="#">길찾기</a></div>`
+      }
+
+      function footHint(state) {
+        if (state === 'guest')
+          return `<p class="guest-hint">반려견을 등록하면 크기·민감도를 반영해 판정해요. <a href="#">가입하고 등록하기 ›</a></p>`
+        if (state === 'partial')
+          return `<p class="guest-hint">오늘 적합도를 불러오지 못했어요. 나머지 정보는 그대로 볼 수 있어요.</p>`
+        return ''
+      }
+
+      function previewHTML(kind, state) {
+        const top =
+          kind === 'narrow'
+            ? `<div class="pv-top"><span class="back">‹ 목록</span><span class="icon-btn">✕</span></div>`
+            : `<div class="pv-top"><span style="font-size:12px;color:var(--fg-muted)">장소 미리보기</span><span class="icon-btn">✕</span></div>`
+        const actions = `<div class="pv-actions"><span class="btn icon">♡</span><a class="btn primary" href="#">일정에 담기</a><a class="btn" href="#">상세 보기 ›</a></div>`
+        return `
+      ${top}
+      <div class="pv-scroll">
+        <div class="pv-photos"><div class="ph1"></div><div style="display:grid;grid-template-rows:1fr 1fr;gap:4px"><div class="ph2" style="border-radius:10px"></div><div class="ph3 more"><span>+6</span></div></div></div>
+        <div class="pv-body">
+          <div>
+            <div class="pv-title"><h3>수월봉</h3>${badgeHTML(state)}</div>
+            <p class="pv-meta">제주시 한경면 고산리 · 관광지 · 1.2km</p>
+          </div>
+          ${visitHTML(state)}
+          ${verdictsHTML(state)}
+          ${footHint(state)}
+        </div>
+      </div>
+      ${actions}`
+      }
+
+      function mobileHTML(state) {
+        return `
+      <div class="grabber"></div>
+      <div class="m-pv">
+        <div class="m-head">
+          <div class="thumb ph1"></div>
+          <div style="flex:1;min-width:0">
+            <div class="pv-title"><h3>수월봉</h3><span class="icon-btn" style="width:32px;height:32px;margin:-6px -6px 0 0">✕</span></div>
+            <p class="pv-meta">한경면 고산리 · 관광지 · 1.2km</p>
+            <div style="margin-top:8px">${badgeHTML(state)}</div>
+          </div>
+        </div>
+        ${visitHTML(state)}
+        ${verdictsHTML(state)}
+        ${footHint(state)}
+      </div>
+      <div class="m-actions"><span class="btn icon">♡</span><a class="btn primary" href="#">일정에 담기</a><a class="btn" href="#">상세 ›</a></div>`
+      }
+
+      function mapHTML() {
+        return `
+      <svg viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
+        <path d="M120 80 C 300 40, 520 60, 700 120 S 980 260, 960 420 S 820 660, 600 640 S 260 620, 160 520 S 40 260, 120 80 Z" fill="var(--map-land)"/>
+        <path d="M180 140 C 260 260, 420 300, 520 420 S 760 560, 900 520" stroke="var(--map-road)" stroke-width="10" fill="none"/>
+        <path d="M300 90 C 340 220, 330 400, 260 560" stroke="var(--map-road)" stroke-width="7" fill="none"/>
+        <path d="M600 110 C 560 260, 640 420, 760 600" stroke="var(--map-road)" stroke-width="6" fill="none"/>
+        <ellipse cx="640" cy="300" rx="70" ry="44" fill="#dfe8cf"/>
+        <ellipse cx="380" cy="470" rx="90" ry="50" fill="#dfe8cf"/>
+      </svg>
+      <span class="pin sel" data-label="수월봉" style="left:66%;top:44%"><b></b></span>
+      <span class="pin" style="left:74%;top:30%"><b></b></span>
+      <span class="pin" style="left:82%;top:58%"><b></b></span>
+      <span class="pin" style="left:58%;top:64%"><b></b></span>
+      <span class="pin" style="left:88%;top:40%"><b></b></span>
+      <span class="pin" style="left:20%;top:30%"><b></b></span>`
+      }
+
+      let state = 'member'
+      function render() {
+        document.querySelectorAll('[data-map]').forEach((el) => (el.innerHTML = mapHTML()))
+        document.querySelectorAll('[data-list]').forEach((el) => (el.innerHTML = listHTML()))
+        document.querySelectorAll('[data-preview]').forEach((el) => {
+          const kind = el.dataset.preview
+          el.innerHTML = kind === 'mobile' ? mobileHTML(state) : previewHTML(kind, state)
+        })
+      }
+
+      function fit() {
+        document.querySelectorAll('.scaler').forEach((s) => {
+          const w = +s.dataset.w,
+            h = +s.dataset.h
+          const k = Math.min(1, s.clientWidth / w)
+          s.firstElementChild.style.transform = `scale(${k})`
+          s.style.height = `${h * k}px`
+        })
+      }
+
+      document.getElementById('state-seg').addEventListener('click', (e) => {
+        const b = e.target.closest('button')
+        if (!b) return
+        state = b.dataset.v
+        e.currentTarget.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b))
+        render()
+      })
+      document.getElementById('callout-seg').addEventListener('click', (e) => {
+        const b = e.target.closest('button')
+        if (!b) return
+        document.body.classList.toggle('show-callouts', b.dataset.v === 'on')
+        e.currentTarget.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b))
+      })
+      addEventListener('resize', fit)
+      render()
+      fit()
+    </script>
+  </body>
+</html>

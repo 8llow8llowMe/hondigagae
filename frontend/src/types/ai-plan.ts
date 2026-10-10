@@ -1,0 +1,390 @@
+import type { CodeNameMetadata } from '@/types/api'
+
+/**
+ * AI 일정 생성 — 요청·응답 타입.
+ *
+ * 근거: backend ai-service **소스 실측** — `AiPlanWebController` · `AiPlanCreateRequest` ·
+ * `AiPlanSubmitResponse` · `AiPlanJobStatusResponse` · `AiPlanDraftResponse` ·
+ * `AiPlanDayItem` · `AiPlanScheduleItem` · `AiPlanErrorCode` · `AiPlanValidationMessage`
+ * (`origin/develop` `af86c98`, 2026-08-31). 계약 상세는 docs/features/ai-plan/공통명세.md.
+ *
+ * **명세 S1 표보다 최신이다.** 명세는 `8e44ddc` 기준이고 그 뒤 PR #78 이
+ * `AiPlanCreateRequest` 에 `petIds` · `pinnedPlaceIds` · `preferFavorites` · `planId` ·
+ * `regenerateDay` 를 추가하면서 `petId` 를 선택으로 내렸다.
+ *
+ * #128 로 **`preferFavorites`·`pinnedPlaceIds`·`petIds`** 를 붙였다.
+ *
+ * **`petIds` 로 만든 초안도 담기는 한 마리에 붙는다.** `plan-service` 의 `Plan` 은
+ * `petId` **단일**이라 저장 직전에 판정 기준이 될 한 마리를 사람이 고른다
+ * (다견선택-세부명세 D4). `PlanCreateRequest` 의 다견화는 BE 선행이라 범위 밖이다.
+ *
+ * 아직 보내지 않는 것:
+ *  - **`planId`·`regenerateDay`** — 아트보드 03 은 **저장 전 미리보기**에서 하루 재생성을
+ *    하는데 계약은 `planId`(이미 저장된 일정)를 요구한다. 계약과 정본이 어긋나 있다 (#90)
+ */
+
+/**
+ * `POST /ai-plans` 요청 본문.
+ *
+ * - **`petIds` 를 숫자로 바꾸지 않는다.** 서버는 `Long` 으로 읽지만 Snowflake 라
+ *   `Number()` 를 거치면 정밀도를 잃는다. 문자열 그대로 실어 보내면 Jackson 이 읽는다
+ *   (plan 공통명세 S1)
+ * - **`budget` 은 `@Positive` 다.** 일정 생성(`@PositiveOrZero`)과 다르다 — `0` 을 보내면
+ *   `AIPLAN_106` 400 이다. "상관없음" 은 `0` 이 아니라 **키 생략**으로 표현한다
+ */
+export type AiPlanSubmitPayload = {
+  areaCode: string
+  /**
+   * 관광 시군구코드 — 제주시 `'4'` · 서귀포시 `'3'` (#251 · [PR #246](https://github.com/8llow8llowMe/hondigagae/pull/246)).
+   *
+   * **"제주 전체" 는 키를 뺀다.** 빈 문자열을 보내면 서버가 null 로 접어 주긴 하지만
+   * (`Feign` 이 쿼리에서 빼도록), 생략이 "좁히지 않았다" 를 그대로 말한다.
+   *
+   * **좁혀서 후보가 없으면 서버가 지역 전체로 넓히지 않는다** — `AIPLAN_012` 로 작업이
+   * 실패한다(HTTP 200 + `status=FAILED`). "제주시만" 이라는 요청에 서귀포 장소를 섞으면
+   * 조건을 무시한 일정이 되기 때문이고, 화면은 그 실패에 **지역을 넓혀 보라는 다음
+   * 행동**을 준다.
+   *
+   * `@Size(max = 10)` — 넘으면 `AIPLAN_115` 다. 화면이 코드를 고르게 하므로 닿지 않는다.
+   */
+  sigunguCode?: string
+  /** `YYYY-MM-DD` */
+  startDate: string
+  /** `YYYY-MM-DD` */
+  endDate: string
+  /**
+   * 동반 반려견. **한 마리여도 배열이다** (#128 · 명세 D2-2).
+   *
+   * 서버가 `petIds` 를 `petId` 보다 우선하므로(`effectivePetIds()`) 결과가 같고,
+   * 두 경로를 남기면 제출·스냅샷·복원 세 곳에 각각 분기가 생긴다.
+   */
+  petIds: string[]
+  /** 원 단위. 생략 가능하고 **0 은 보낼 수 없다** */
+  budget?: number
+  /** 500자 이하. 빈 값이면 생략한다 */
+  requestNote?: string
+  /**
+   * 저장한 장소를 후보에 합치고 조건이 맞으면 먼저 배치한다 (#128, 아트보드 05).
+   *
+   * **`false` 는 보내지 않는다.** 서버 기본이 `false` 이고
+   * (`Boolean.TRUE.equals(preferFavorites)`), 끄기를 명시적으로 실어 보낼 이유가 없다.
+   */
+  preferFavorites?: boolean
+  /**
+   * 꼭 넣을 장소. **최대 10곳**이고 서버가 반드시 배치한다.
+   *
+   * **`preferFavorites` 와 다른 약속이다** — 저쪽은 우선순위(조건이 맞을 때만),
+   * 이쪽은 배치 보장이다. 아트보드 05 가 "먼저 / 꼭" 으로 문구를 갈라 쓰라고 못박았다.
+   *
+   * `placeId` 는 문자열 그대로 보낸다 — Snowflake 라 `Number()` 를 거치면 정밀도를 잃는다.
+   */
+  pinnedPlaceIds?: string[]
+  /**
+   * 하루 재생성 대상 일정 (#128 · 하루재생성-세부명세 R3).
+   *
+   * **`regenerateDay` 와 반드시 짝이다** — 하나만 오면 서버가 막는다
+   * (`AiPlanJobProcessor:191`). 새 일정을 만드는 경로(`/ai-plans/new`)는 둘 다
+   * 보내지 않는다.
+   *
+   * Snowflake 라 **문자열 그대로 보낸다** — `Number()` 를 거치면 정밀도를 잃는다.
+   */
+  planId?: string
+  /** 다시 구성할 일차, **1부터**. `planId` 와 반드시 짝이다 (`@Positive`) */
+  regenerateDay?: number
+}
+
+/** `POST /ai-plans` → **HTTP 202**. 같은 요청이 진행 중이면 기존 `jobId` 를 그대로 준다(멱등) */
+export type AiPlanSubmitResult = {
+  submissionStatus: CodeNameMetadata
+  jobId: string
+}
+
+/**
+ * 백엔드 `AiPlanJobStatus` — **다섯이다.** `CANCELED` 가 #250 으로 들어왔고
+ * `COMPLETED`·`FAILED` 와 함께 종결 상태다.
+ *
+ * 판정은 `lib/ai-plan/job.ts` 가 코드 문자열로 하므로 이 목록을 쓰지 않는다. 계약이
+ * 무엇인지 한 줄로 읽히도록 남겨 둔다.
+ */
+export const AI_PLAN_JOB_STATUSES = [
+  'PENDING',
+  'RUNNING',
+  'COMPLETED',
+  'FAILED',
+  'CANCELED',
+] as const
+export type AiPlanJobStatusCode = (typeof AI_PLAN_JOB_STATUSES)[number]
+
+/**
+ * 초안의 개별 항목.
+ *
+ * **`itemType` 은 문자열이지 metadata 객체가 아니다** (`AiPlanScheduleItem.itemType`).
+ * 다른 도메인의 enum 과 달리 `name`/`description` 이 없어 화면이 표시명을 만들어야 한다.
+ */
+export type AiPlanScheduleItem = {
+  /**
+   * `PLACE` | `MEAL` | `LODGING` | `MOVE` — **초안에 `WALK` 는 오지 않는다** (#89).
+   * ai-service 는 산책 코스 후보를 보지 않아 `walk_course.id` 를 알 수 없다.
+   * 산책 일정은 `PLACE` 로 오고 그 성격은 `title`·`note` 에 담긴다.
+   */
+  itemType: string
+  /** 이동 항목이거나 검증된 장소가 아니면 null */
+  placeId: string | null
+  /**
+   * **nullable 이다.** DTO 에 제약이 없고 `AiPlanPresenter.toScheduleItems` 가 리스트만
+   * `List.of()` 로 방어한 뒤 `title`/`note` 는 그대로 통과시킨다. `ai-llm.enabled=true`
+   * 면 `OllamaLlmAdapter.toDomain` 이 모델 산출물을 그대로 싣는다 — **`.trim()` 을
+   * 바로 부르면 결과 화면 전체가 죽는다.**
+   */
+  title: string | null
+  note: string | null
+}
+
+export type AiPlanDayItem = {
+  /** 1부터 */
+  day: number
+  items: AiPlanScheduleItem[]
+}
+
+export type AiPlanReasonItem = {
+  code: string
+  name: string
+  description: string
+}
+
+/** 초안. **일정 전체에 대한 XAI(`reasons`)라 일자별이 아니다** (명세 S6) */
+export type AiPlanDraft = {
+  days: AiPlanDayItem[]
+  reasons: AiPlanReasonItem[]
+}
+
+/**
+ * `GET /ai-plans/jobs/{jobId}` · `POST /ai-plans/jobs/{jobId}/cancel`.
+ *
+ * **작업 실패는 HTTP 5xx 가 아니라 200 + `status.code === 'FAILED'`** 다
+ * (api-integration-guide.md §5). `dataHeader.success` 만 보면 실패를 놓친다.
+ *
+ * **취소 응답도 같은 모양이다** — 컨트롤러가 `AiPlanJobStatusResponse` 를 그대로 돌려주므로
+ * 화면은 그것을 작업 캐시에 바로 쓴다.
+ */
+export type AiPlanJob = {
+  jobId: string
+  /** `PENDING` | `RUNNING` | `COMPLETED` | `FAILED` | **`CANCELED`** (#250) */
+  status: CodeNameMetadata
+  /**
+   * 지금 밟고 있는 세부 단계 (#250 · 백엔드 `AiPlanJobStep`).
+   * `CONDITIONS` 조건 확인 · `CANDIDATES` 후보 장소 수집 · `WEATHER` 날씨 전망 반영 ·
+   * `DRAFTING` 일정 구성.
+   *
+   * **`PENDING` 이면 null 이다** — 아직 시작하지 않았다는 뜻이라 0 이나 1 로 그리면
+   * 화면이 시작한 것으로 거짓말을 한다. 종결 상태에서는 **마지막으로 밟은 단계**가
+   * 남는다 (실패 지점이 곧 진단이다).
+   */
+  step: CodeNameMetadata | null
+  /** 몇 번째 단계인지, **1부터**. `PENDING` 이면 null */
+  stepOrder: number | null
+  /**
+   * 전체 단계 수. 화면의 `n / m 단계` 에서 m 이다.
+   *
+   * **화면이 상수로 적지 않는다.** 백엔드가 값의 개수에서 파생시키므로 단계가 늘면 이
+   * 값도 함께 는다 — 복제해 두면 `5 / 4 단계` 가 나간다.
+   */
+  totalSteps: number
+  /**
+   * 현재 단계에 들어간 서버 시각 (#1057 · 백엔드 #985). ISO-8601 **오프셋 포함**, 밀리초까지
+   * (`2026-09-30T14:03:12.345+09:00` — 밀리초가 0 이면 소수부가 빠진다).
+   *
+   * **`RUNNING` 이고 단계가 있을 때만 값이 있다.** `PENDING` · 종결은 null 이다 — 끝난 작업 위에
+   * 경과 시간이 계속 늘지 않게 서버가 비운다. **`RUNNING` 이어도 null 일 수 있다** — 필드가 생기기
+   * 전에 저장된 잡은 다음 단계 전이 전까지 null 로 읽힌다(`ai-service.md` "옛 저장 데이터와 호환").
+   *
+   * 지어낸 진행률이 아니다 — "이 단계에서 n초째" 만 말하고, 얼마나 남았는지는 말하지 않는다.
+   */
+  stepStartedAt: string | null
+  /** `COMPLETED` 일 때만 채워진다 */
+  planDraft: AiPlanDraft | null
+  /**
+   * `FAILED` 일 때만 채워진다.
+   *
+   * **취소는 실패가 아니라 비어 있다** — 채우면 화면이 "실패했습니다" 를 띄우고 지표에서도
+   * 장애와 섞인다(백엔드 판단). `CANCELED` 를 실패로 다루면 안 되는 이유다.
+   */
+  errorCode: string | null
+  errorMessage: string | null
+  /**
+   * 이 작업을 만들 때 쓴 생성 조건 (#488 · FE #498). **상태를 가리지 않고 채워진다.**
+   *
+   * **이것이 있어서 다른 브라우저·기기에서도 초안을 담을 수 있다.** 예전에는 조건이
+   * `sessionStorage` 에만 있어, 대기 화면이 약속한 *"주소를 남겨 두면 다시 볼 수 있어요"*
+   * 가 **보기까지만** 참이었다 — 다른 브라우저에서 열면 초안은 그려지는데 담기가 막혔다.
+   *
+   * **담는 데 필요한 것만 담긴다.** `pinnedPlaceIds` · `preferFavorites` 는 `POST /plans`
+   * 가 받지 않는 값이라 서버가 일부러 뺐다 — 그래서 이 값으로는 **"같은 조건으로 다시
+   * 만들기" 를 할 수 없다** (그 둘이 빠진 채 재제출되면 버튼이 말하는 "같은 조건" 이
+   * 사실이 아니게 된다). 재제출은 보관본이 있을 때만 한다.
+   *
+   * **`null` 가드를 둔다.** 저장된 요청 파라미터가 비어 있는 잡뿐이라 정상 경로에서는
+   * 생기지 않지만, 스키마가 nullable 로 적혀 있다.
+   */
+  conditions: AiPlanJobConditions | null
+  /**
+   * 이 작업의 초안을 이미 담은 일정 아이디 (#1041 · 백엔드 #970, Snowflake 문자열).
+   * 조회와 SSE 이벤트가 같은 규칙으로 싣는다.
+   *
+   * **`COMPLETED` 이고 담은 적이 있을 때만 채워진다.** 담기 전 · 담은 일정을 삭제한 뒤 ·
+   * plan-service 조회 실패는 null 이다. 화면은 값이 있으면 담기 대신 그 일정으로 보낸다.
+   * 읽기는 `lib/ai-plan/job.ts` 의 `committedPlanIdOf()` 하나가 한다.
+   */
+  committedPlanId: string | null
+}
+
+/**
+ * 작업 조회가 함께 내리는 생성 조건 (#488). 제출 때 받은 값을 그대로 돌려준다.
+ *
+ * **`AiPlanRequestSnapshot` 과 모양이 다르다.** 이쪽은 서버 계약이고 저쪽은 화면 보관본이라,
+ * 옮기는 일은 `lib/ai-plan/conditions.ts` 한 곳이 한다.
+ */
+export type AiPlanJobConditions = {
+  areaCode: string
+  /** 제출 때 지정하지 않았으면 `null` — "제주 전체" 다 */
+  sigunguCode: string | null
+  startDate: string
+  endDate: string
+  /**
+   * 동반 반려견. **이름은 오지 않는다** — 화면이 회원의 반려견 목록에서 맞춘다.
+   *
+   * **제출 때 지정하지 않았으면 빈 배열이고, 그때는 서버가 회원의 대표 반려견으로 짰다.**
+   * 어느 아이였는지는 응답에 없다 — 화면이 짐작하면 **남의 아이에 일정이 붙는다.**
+   */
+  petIds: string[]
+  /** 원 단위. 제출 때 지정하지 않았으면 `null` */
+  budget: number | null
+  /** 제출 때 지정하지 않았으면 `null` */
+  requestNote: string | null
+}
+
+/**
+ * 조건 입력 폼 값. **요청 본문이 아니다** — `budget` 이 폼에서는 **만원 단위 문자열**이고
+ * 전송 직전에 원 단위 숫자 또는 생략으로 바뀐다 (`src/lib/ai-plan/submit.ts`).
+ *
+ * **`areaCode` 필드는 없다.** 제주(`'39'`) 고정이고 선택지가 하나인 컨트롤을 폼에 두지
+ * 않는다 (plan 공통명세 S9 과 같은 규칙). **`sigunguCode` 는 다르다** — 계약에 들어오면서
+ * 선택지가 셋이 됐다 (#251).
+ */
+export type AiPlanFormValues = {
+  requestNote: string
+  startDate: string
+  endDate: string
+  /**
+   * 좁힐 시군구. **`null` 이 "제주 전체" 다** (#251).
+   *
+   * 빈 문자열을 쓰지 않는다 — `''` 는 "고르지 않았다" 와 "전체를 골랐다" 를 구분하지
+   * 못하고, 제출 직전에 키를 뺄지 판단하는 자리에서 그 차이가 필요하다.
+   */
+  sigunguCode: string | null
+  petIds: string[]
+  /** **만원 단위**다. 빈 값 = "상관없음" (아트보드 01 — 칩 + 직접 입력) */
+  budgetManwon: string
+  /** 저장한 곳 먼저 넣기 (#128, 아트보드 05) */
+  preferFavorites: boolean
+  /**
+   * 꼭 넣을 장소. **`placeId` 만 두지 않고 이름을 함께 든다** — 칩에 이름을 그려야 하고,
+   * 시트를 닫은 뒤 이름을 다시 조회하면 폼이 네트워크에 의존하게 된다.
+   */
+  pinnedPlaces: PinnedPlace[]
+}
+
+/** 폼이 들고 있는 "꼭 넣을 장소" 한 곳. 계약으로 나갈 때는 `placeId` 만 실린다 */
+export type PinnedPlace = {
+  placeId: string
+  title: string
+}
+
+export const EMPTY_AI_PLAN_FORM_VALUES: AiPlanFormValues = {
+  requestNote: '',
+  startDate: '',
+  endDate: '',
+  // 기본은 제주 전체 — 좁히는 것은 사용자가 고르는 일이다
+  sigunguCode: null,
+  petIds: [],
+  budgetManwon: '',
+  preferFavorites: false,
+  pinnedPlaces: [],
+}
+
+/**
+ * 제출한 조건. **`jobId` 를 키로 `sessionStorage` 에 보관한다** (명세 S5 함정 1 · S8 미결 2).
+ *
+ * 초안에는 반려견·`areaCode`·기간·예산이 없는데 담기(`POST /plans`)에는 필요하고,
+ * 작업 조회 응답에도 요청 조건이 없어 **`jobId` 로 되살릴 수 없다.** 없으면 담기를 막는다
+ * — 다른 기기에서 같은 URL 을 열면 실제로 없다.
+ */
+export type AiPlanRequestSnapshot = {
+  areaCode: string
+  startDate: string
+  endDate: string
+  /**
+   * 동반 반려견. **담기에 이 순서 그대로 전부 실린다** (#152 · #174) —
+   * `PlanCreateRequest.petIds` 가 받고 **첫 번째가 대표 반려견**이 된다.
+   *
+   * 예전에는 저장이 한 마리라 담기 패널에서 기준을 골랐다 (다견선택-세부명세 D4).
+   *
+   * `name` 은 일정 제목 기본값에만 쓰인다. 비어 있어도 흐름이 막히지 않는다.
+   */
+  pets: {
+    petId: string
+    name: string
+  }[]
+  budget: number | null
+  requestNote: string
+  /**
+   * #128 로 더한 두 조건. **담기에는 쓰이지 않는다** — `POST /plans` 에 해당 필드가 없다.
+   * 실패 화면의 `조건 바꾸기` 가 폼을 되살릴 때 이 둘도 살아나야 해서 함께 보관한다
+   * (아트보드 02 ②: "입력한 조건은 그대로 남아 있어요").
+   *
+   * **선택 필드로 둔다.** 앞 형식으로 저장된 값이 열어 둔 탭에 남아 있을 수 있고,
+   * 모양 검사가 없는 필드로 흘러들면 `readAiPlanRequest` 가 통째로 null 을 준다.
+   */
+  preferFavorites?: boolean
+  pinnedPlaces?: PinnedPlace[]
+  /**
+   * 좁힌 시군구 (#251). `null`·생략이 "제주 전체" 다.
+   *
+   * **재제출과 `조건 바꾸기` 가 함께 쓴다.** 위 두 필드와 달리 이것은 **제출 본문으로
+   * 다시 나가는 값**이라, 빠뜨리면 "같은 조건으로 다시 만들기" 가 조용히 제주 전체로
+   * 넓어진다 — 사용자가 고른 조건을 화면이 말없이 바꾸는 셈이다.
+   */
+  sigunguCode?: string | null
+}
+
+// ─── 반려견 여행 준비물 (#155) ────────────────────────────────────────────────
+
+/**
+ * 준비물 한 항목.
+ *
+ * **`reason` 이 이 기능의 핵심이다** (XAI). 서버가 이 여행의 예보·반려견 특성·일정에
+ * 근거한 완성 문장을 준다 — "2일차 강수확률 80% 예보라 야외 일정 중 비를 만날 수
+ * 있습니다." FE 가 문장을 조립하지 않는다 (styling-guide.md §7).
+ */
+export type PackingListItem = {
+  /** 분류. **enum 이 아니라 문자열이다** — 서버가 "필수"·"날씨 대비"·"반려견 케어"·"이동" 을
+   * 그대로 주고, 모르는 분류가 와도 화면이 버리지 않는다 */
+  category: string
+  name: string
+  reason: string
+}
+
+/**
+ * `POST /ai-plans/packing-list/{planId}` 응답.
+ *
+ * **저장되지 않는 제안이다.** 서버가 결과를 보관하지 않으므로 새로고침하면 사라진다 —
+ * 화면이 그 사실을 밝혀야 저장된 것으로 오해하고 나중에 다시 열어 보려다 잃지 않는다.
+ *
+ * **동기 API 이고 수십 초가 걸릴 수 있다.** AI 일정 생성(202 + 폴링)과 다르다 — 출력이
+ * 짧아(8~15개) 잡을 두지 않았다.
+ */
+export type PackingListResult = {
+  planId: string
+  items: PackingListItem[]
+  totalCount: number
+}

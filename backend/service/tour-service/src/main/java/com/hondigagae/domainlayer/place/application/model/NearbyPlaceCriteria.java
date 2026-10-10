@@ -1,0 +1,35 @@
+package com.hondigagae.domainlayer.place.application.model;
+
+import com.hondigagae.shared.travel.place.AllowedPetSize;
+import com.hondigagae.domainlayer.place.domain.enums.ContentType;
+import com.hondigagae.shared.travel.pet.PetSizeType;
+import com.hondigagae.shared.travel.place.PetAllowanceType;
+import lombok.Builder;
+
+/**
+ * 좌표 반경 기반 장소 조회 조건.
+ *
+ * <p>지역 코드로 거르는 목록 조회와 달리 "지금 내 위치 주변"을 본다. 여행 중 다음 일정을
+ * 고를 때 쓰는 조회라 커서가 아니라 가까운 순 상위 N 개다.
+ */
+@Builder(toBuilder = true)
+public record NearbyPlaceCriteria(
+    double lat,
+    double lng,
+    int radius,
+    // 목록 조회의 sigunguCode 와 같은 의미다. 지도의 "이 지역에서 재검색" 이 시군구 필터를 잃지 않게 한다 (#1316).
+    String sigunguCode,
+    ContentType contentType,
+    PetAllowanceType petAllowanceType,
+    Boolean indoor,
+    AllowedPetSize allowedPetSize,
+    PetSizeType petSizeType,
+    Integer petWeightKg,
+    // 원본 분류로 거른다. contentTypeId 39 에 음식점과 카페가 섞여 있어 이 값이 필요하다.
+    String sourceCategory,
+    // 장소명·주소 부분 일치. 공백/빈 값은 필터 없음이다.
+    String keyword,
+    int size
+) {
+
+}

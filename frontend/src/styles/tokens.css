@@ -1,0 +1,181 @@
+/**
+ * DESIGN.md 의 토큰을 CSS 변수로 옮긴 파일.
+ * DESIGN.md 가 정본이며, 이 파일은 수동 동기다. 토큰을 바꿀 때 두 파일을 함께 고친다.
+ * DESIGN.md 의 상위 정본은 `혼디가개 디자인 가이드.dc.html` 이다.
+ * (docs/tooling-guide.md §11)
+ *
+ * 3차 세트 — 디자인 가이드(아트보드) 실측 반영. 이슈 #50.
+ */
+
+:root {
+  /* ── 표면 · 테두리 — DESIGN.md §2-1
+     3층 표면(§0): --bg-sunken 은 페이지 바닥(L0), --bg 는 섹션(L1),
+     --band 는 아이템 채움(L2)이다. 바닥은 Canvas 가 소유하고
+     화면이 회색 면을 직접 칠하지 않는다. */
+  --bg: #ffffff;
+  --band: #eef0f3;
+  --bg-sunken: #f5f6f8;
+  --border: #e3e5ea;
+  --border-strong: #c4c8d0;
+  --row-selected: #f0f7f3;
+
+  /* ── 텍스트 3단 — DESIGN.md §2-2
+     읽는 회색 텍스트는 --fg / --fg-muted 두 단계뿐이다.
+     --fg-subtle 은 placeholder·비활성·장식 전용이며 단위에도 쓰지 않는다. */
+  --fg: #15181d;
+  --fg-muted: #596069;
+  --fg-subtle: #878d96;
+  --fg-inverse: #ffffff;
+
+  /* ── 등급 --metric-* — DESIGN.md §2-3
+     5톤 × 3층. -100 tint 배경 / -500 흰 배경 위 마크·큰 숫자 / -700 텍스트.
+     상호작용 색(브랜드·링크)과 분리된 스케일이다. */
+  --metric-critical-100: #fdecec;
+  --metric-critical-500: #d54040;
+  --metric-critical-700: #ce2d2d;
+
+  --metric-high-100: #e4f0ea;
+  --metric-high-500: #1f7a55;
+  --metric-high-700: #16563c;
+
+  --metric-mid-100: #fef4e0;
+  --metric-mid-500: #b0761a;
+  --metric-mid-700: #8a5f0f;
+
+  --metric-low-100: #eef0f3;
+  --metric-low-500: #6b7280;
+  --metric-low-700: #4b5563;
+
+  /* UNKNOWN 에는 tint 가 없다. 점선 테두리 전용이고 문구는 --fg-muted 로 쓴다. */
+  --metric-unknown-500: #a8aeb8;
+
+  /* ── 혼잡도 막대 전용 — DESIGN.md §2-3 (#603)
+     **등급(--metric-*)을 쓰지 않는다.** 붐비는 날은 위험한 날이 아니라 사람 많은 날이라
+     danger 계열이 맞지 않고("LOW 에 danger 를 쓰지 않는다" 와 같은 규칙), 막대 높이가 이미
+     집중률이라 색까지 등급을 그리면 같은 변수를 두 번 그리게 된다.
+
+     그래서 색은 **"이 날이 답" 하나만** 말한다. 두 값뿐이고 둘 다 막대 fill 전용 —
+     텍스트에 쓰지 않는다. 대비는 흰 배경이 아니라 **트랙(--band) 위**에서 잰다. */
+  --congestion-bar: #5b8db8;
+  --congestion-best: #1d5a86;
+
+  /* ── 액션 · 링크 — DESIGN.md §2-4
+     --link 는 --metric-high-500 과 값이 같다. 토큰명을 분리해 둔 것은
+     나중에 갈라야 할 때 한 줄만 고치기 위해서다. 값이 같아도 이름을 지킨다.
+
+     **채운 버튼은 --brand-600 이고 --brand-500 이 아니다** (이슈 #61).
+     500 위 흰 글자는 3.49:1 이라 16px 라벨(본문 취급)에 필요한 4.5:1 에 미달한다.
+     500 은 **글자를 얹지 않는 곳**에만 남는다 — 포커스 링, 선택 표시기 같은
+     비텍스트 요소는 3:1 기준이라 3.49:1 로 통과한다. */
+  --brand-500: #2e9b6b;
+  --brand-600: #237a54;
+  /* 채운 버튼 hover / pressed. 600 에서 명도만 5%p 낮췄다 —
+     한 단계(8.6%p) 더 내리면 --link-hover(#16563c)와 거의 같아져 역할이 흐려진다. */
+  --brand-700: #1d6646;
+
+  /*
+    소개 페이지 표면 (DESIGN.md §0-2, #635). 값은 --row-selected · --metric-high-100 과 같고
+    **이름만 이 축의 것**이다 — 브랜드 tint 로 읽혀 다른 화면이 가져다 쓰지 못하게 한다.
+    --brand-50/100 은 §2-7 폐기 토큰이라 되살리지 않는다.
+  */
+  --intro-band: #f0f7f3;
+  --intro-tint: #e4f0ea;
+
+  --link: #1f7a55;
+  --link-hover: #16563c;
+
+  /* ── AI 표시 전용 — DESIGN.md §2-5. 장식 배지에 쓰지 않는다. */
+  --accent-100: #fdeee0;
+  --accent-700: #a75921;
+
+  /* ── 날씨 픽토그램 전용 — DESIGN.md §9-1 (#342)
+     등급(--metric-*)과 **다른 축이다.** 하늘상태·강수형태를 그리는 선 아이콘에만 쓰고,
+     점수·판정에 쓰지 않는다.
+
+     1.5px 선이라 비텍스트 3:1 기준으로 본다 — 흰 배경에서 sun 3.46:1 · rain 5.43:1 ·
+     snow 4.38:1 이다. **글자에 쓰지 않는다** (sun 은 본문 4.5:1 에 미달한다). */
+  --weather-sun: #c77700;
+  --weather-rain: #1d6fa5;
+  --weather-snow: #3c7fa8;
+
+  /* ── 시스템 상태 — DESIGN.md §2-6
+     일시 장애(5xx) 전용이다. 데이터 부재(404)에 쓰지 않는다.
+     산책 위험 판정에는 --metric-critical-* 을 쓴다. */
+  --danger-100: #fdecec;
+  --danger-500: #d54040;
+  --danger-700: #ce2d2d;
+  --danger-900: #b91c1c;
+
+  /* ── 영업 상태 — DESIGN.md §2-9 (이슈 #598)
+     병원·약국 행의 `진료중` / `영업 시간 아님` 전용이다. 값은 각각
+     --metric-high-* · --danger-* 와 **같지만 이름을 분리한다** — --link 가
+     --metric-high-500 과 값이 같아도 이름을 지키는 것과 같은 규칙이다.
+
+     분리하는 이유가 값이 아니라 **의미**다. 등급 토큰을 그대로 쓰면 같은 초록이
+     홈에서는 `여행 적합`(3단계 척도의 한 칸)이고 여기서는 `진료중`(두 값 중 하나)이
+     되어, 토큰의 뜻이 화면마다 갈린다. --danger-* 쪽은 더 나쁘다 — 그것은 5xx
+     일시 장애 전용이고, 문 닫은 병원은 장애가 아니다.
+
+     **색만으로 가르지 않는다.** 두 tint 의 명도 대비가 1.02:1 이라 적록색약에게는
+     같은 밝기로 보인다. `진료중` 은 글자 무게를 함께 올린다 (badge.tsx 의 `strong`). */
+  --status-open-100: #e4f0ea;
+  --status-open-700: #16563c;
+  --status-closed-100: #fdecec;
+  --status-closed-700: #ce2d2d;
+
+  /* ── 소셜 브랜드 예외 — DESIGN.md §2-8. 로그인 버튼에만. */
+  --kakao-bg: #fee500;
+  --kakao-fg: #191600;
+  --naver-mark: #03c75a;
+
+  /* ── Radius — DESIGN.md §5. 목록·섹션·행에는 라운드가 없다. */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* ── Shadow — DESIGN.md §6. 실제로 떠 있는 것에만. */
+  --shadow-md: 0 4px 12px rgb(21 24 29 / 8%);
+  --shadow-lg: 0 12px 32px rgb(21 24 29 / 12%);
+
+  /* ── 레이아웃 — DESIGN.md §7 */
+  --content-max: 1440px;
+  /* 읽는 폭 (#781) — 1440 은 "화면 끝까지 가지 않는다" 는 캡이지 읽는 폭이 아니다 */
+  --reading-max: 760px;
+  --header-h: 56px;
+  --header-h-search: 64px;
+  --tabbar-h: 64px;
+  --rail-context: 400px;
+  --rail-filter: 280px;
+  --band-h: 8px;
+
+  /* ── PhotoGallery 표시 크기 — DESIGN.md §7-3.
+     TourAPI 이미지는 가로 940px 가 대부분이라(dev 실측 2026-09-07) 전폭으로 늘리면
+     업스케일이 드러난다. 그래서 표시 폭에 상한을 둔다. 높이는 항상 고정이다.
+
+     데스크톱 모자이크의 대표/썸네일 폭은 토큰이 아니라 **비율(`1.62fr 1fr`)** 이다 —
+     2단에서 우측 열이 가변이라 고정 px 로는 열을 채우지 못한다.
+
+     모바일 높이는 214 → 200 이다 (#650 · 진단 D-1). 제목 아래 판정 요약 3줄이 들어오면서
+     첫 화면의 예산이 빠듯해졌다. 342×200 = 1.71 로 16:9(1.78)에 가까워진다. */
+  --gallery-w-mobile: 342px;
+  --gallery-h-mobile: 200px;
+  --gallery-h-desktop: 300px;
+  --gallery-w-single-max: 660px;
+
+  /* ── 홈 추천 장소 캐러셀의 카드 폭 — DESIGN.md §7-4 (#1069).
+     카드가 스크롤러 폭의 82% 라 다음 카드가 비쳐 보인다 — 그것이 넘김 신호라 화살표를 두지
+     않는다. 768~1023 은 44% 다(아래 미디어 쿼리). 1024 이상은 3열 그리드라 쓰지 않는다. */
+  --home-place-card-w: 82%;
+}
+
+@media (width >= 48rem) {
+  :root {
+    --header-h: 64px;
+    /* 82% 그대로면 768 에서 카드가 556 · 사진이 347 로 한 화면에 한 장뿐이다 (실측).
+       44% 면 두 장 + 셋째의 가장자리가 서서 넘김 신호는 그대로이고, 카드가 390 의 카드
+       (294)와 비슷한 크기로 남는다. */
+    --home-place-card-w: 44%;
+  }
+}

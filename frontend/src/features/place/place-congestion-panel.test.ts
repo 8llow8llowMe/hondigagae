@@ -1,0 +1,654 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+
+import { describe, expect, it } from 'vitest'
+
+import {
+  PlaceCongestionPanel,
+  type PlaceCongestionPanelProps,
+} from '@/features/place/place-congestion-panel'
+import { CONGESTION_DAYS, CONGESTION_DEFAULT_DAYS } from '@/lib/insight/congestion'
+import { messages } from '@/lib/messages'
+import { congestion, congestionAllUnknown } from '@/test/fixtures/insight'
+
+function render(overrides: Partial<PlaceCongestionPanelProps> = {}) {
+  const props: PlaceCongestionPanelProps = {
+    data: congestion,
+    loading: false,
+    failed: false,
+    onRetry: () => undefined,
+    // 화면의 기본값과 같다 — 기본이 7일이던 시절의 습관으로 두면 테스트만 다른 화면을 본다
+    days: CONGESTION_DEFAULT_DAYS,
+    onDaysChange: () => undefined,
+    ...overrides,
+  }
+
+  return renderToStaticMarkup(createElement(PlaceCongestionPanel, props))
+}
+
+/*
+  이 카드의 배지와 장소 상세 이름 옆 배지가 390 실측에서 문구·폭·색까지 같았다 — 같은
+  화면에 선 `보통` 둘이 다른 축이었다 (#652 · 진단 D-2).
+*/
+describe('PlaceCongestionPanel — 배지가 축을 밝힌다 (#652)', () => {
+  it('추천일 배지가 혼잡도 축임을 말한다', () => {
+    const markup = render()
+    const axis = messages.common.metricAxisCongestion
+
+    /*
+      **추천일 줄로 범위를 좁힌다.** 마크업 전체에 걸면 아래 막대 목록의 `sr-only` 가
+      같은 낱말을 내는 날 통과해 버린다 — 지금은 안 내지만 그때 이 단언이 조용히
+      공허해진다 (testing-guide.md §5).
+    */
+    const leastRow = markup.slice(
+      markup.indexOf(messages.place.detailCongestionLeastLabel),
+      markup.indexOf('<ol'),
+    )
+
+    expect(leastRow).toContain(`>${axis} </span>`)
+    expect(leastRow).toContain(`</span>${congestion.leastCrowded?.level.name}</span>`)
+  })
+
+  /* 축은 혼잡도 하나다 — 적합도 라벨이 이 카드에 새어 들어오면 축이 다시 섞인다 */
+  it('이 카드에 적합도 라벨이 새어 들어오지 않는다', () => {
+    expect(render()).not.toContain(`>${messages.common.metricAxisSuitability} </span>`)
+  })
+
+  /*
+    막대가 글자로 말하는 것은 그대로다 — 축 라벨은 배지에만 붙는다.
+
+    **`not.toContain('sr-only">혼잡도')` 로 재지 않는다.** `sr-only` 의 첫 텍스트는 언제나
+    날짜라 그 단언은 구조상 참일 수밖에 없다(뮤테이션으로 확인: 막대의 `level.name` 을
+    바꿔도 통과했다). 실제 문구를 통째로 잰다.
+  */
+  it('막대의 sr-only 문구를 바꾸지 않는다', () => {
+    const markup = render()
+
+    expect(markup).toContain('9월 4일 금요일 정보 없음')
+    expect(markup).not.toContain(`정보 없음${messages.common.metricAxisCongestion}`)
+  })
+})
+
+describe('PlaceCongestionPanel — 상태 배타성', () => {
+  /* 제목은 어느 상태에서나 선다 — 카드가 통째로 사라지면 자리가 흔들린다 */
+  it('조회 중에도 제목은 두고 본문만 스켈레톤이다', () => {
+    const markup = render({ data: null, loading: true })
+
+    expect(markup).toContain(messages.place.detailCongestionTitle)
+    expect(markup).not.toContain(messages.place.detailCongestionLeastLabel)
+    expect(markup).not.toContain(messages.place.detailCongestionErrorTitle)
+  })
+
+  /*
+    **이 카드만 덮는다.** 판정 둘과 기본 정보는 그대로 쓸모가 있다 — 적합도 패널이 화면
+    전체를 에러로 덮지 않는 것과 같은 판단이다.
+  */
+  it('조회가 실패하면 그 자리에서 재시도를 준다', () => {
+    const markup = render({ data: null, failed: true })
+
+    expect(markup).toContain(messages.place.detailCongestionErrorTitle)
+    expect(markup).toContain(messages.common.retry)
+  })
+})
+
+describe('PlaceCongestionPanel — 서버가 고른 날', () => {
+  /*
+    규칙(`UNKNOWN` 제외 최저 집중률, 동률이면 이른 날짜)은 BE `CongestionSnapshot` 한
+    곳이다. FE 가 다시 고르면 같은 기간에 다른 날을 추천하게 된다 — fixture 의 최저는
+    `2026-09-05`(21.4)이고 화면이 그 날을 그대로 말해야 한다.
+  */
+  it('leastCrowded 의 날짜를 그대로 쓴다', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.place.detailCongestionLeastLabel)
+    expect(markup).toContain('9월 5일 (토)')
+    /*
+      **`21.4` 로 재면 안 된다** (#651). 집중률 표시가 정수로 가면서 그 문자열은 이제
+      막대의 `style="height:21.4%"` 로만 남는다 — 집중률 줄이 통째로 사라져도 통과한다.
+      화면이 읽는 값은 정수다.
+    */
+    expect(markup).toContain(`${messages.place.detailCongestionRateLabel} 21`)
+  })
+
+  /* 등급 문구는 서버 `name` 이다. FE 가 한국어 매핑 테이블을 만들지 않는다 */
+  it('등급은 서버 name 을 그대로 쓴다', () => {
+    expect(render()).toContain('한산')
+  })
+
+  /*
+    **`null` 이면 자리를 만들지 않는다.** 아는 날이 하나도 없다는 뜻이라, 비워 둔 자리는
+    "한산한 날이 없다" 로 읽힌다. 대신 자료가 없다는 사실을 말한다.
+  */
+  it('leastCrowded 가 null 이면 그 줄 대신 빈 상태를 말한다', () => {
+    const markup = render({ data: congestionAllUnknown })
+
+    expect(markup).not.toContain(messages.place.detailCongestionLeastLabel)
+    expect(markup).toContain(messages.place.detailCongestionEmptyTitle)
+  })
+
+  /* 404 가 아니라 빈 상태다 — 장소는 있고 연결된 통계가 없다. 재시도할 것이 없다 */
+  it('빈 상태에 재시도를 달지 않는다', () => {
+    const markup = render({ data: congestionAllUnknown })
+
+    expect(markup).not.toContain(messages.common.retry)
+  })
+
+  /* 전부 모르는 날이면 펼칠 이유가 없다 — 30일도 같은 빈 답이다 */
+  it('빈 상태에는 펼치기를 두지 않는다', () => {
+    expect(render({ data: congestionAllUnknown })).not.toContain(
+      messages.place.detailCongestionExpand,
+    )
+  })
+})
+
+/**
+ * 자료가 하나도 없을 때 **차트를 그리지 않는다** (#731).
+ *
+ * #670 은 차트를 남기고 veil 로 덮었고, #708 이 그 위 문구에 불투명 면을 줬다. 390 실측에서
+ * 그 조합이 **"아직 안 그려진 차트"** 로 읽혔다 — 점선 30칸 · 정상 갈래와 같은 색의 날짜 축
+ * 30개 · 볼 것이 없는데 살아 있는 가로 스크롤(`scrollWidth` 1254 / `clientWidth` 358).
+ * 그리지 않으면 그 넷이 한꺼번에 사라진다.
+ */
+describe('PlaceCongestionPanel — 자료가 없으면 차트를 그리지 않는다 (#731)', () => {
+  const empty = () => render({ data: congestionAllUnknown })
+
+  /*
+    **레일·막대·점선 격자·날짜 축을 통째로 내지 않는다.** 칸이 하나라도 남으면 그 자리가
+    다시 "덜 그려진 그래프" 가 된다.
+  */
+  it('칸도 점선 격자도 남기지 않는다', () => {
+    const markup = empty()
+
+    expect(markup).not.toContain('<li ')
+    expect(markup).not.toContain('border-metric-unknown-500')
+    // 트랙 높이(`TRACK_HEIGHT`)도 함께 사라진다 — 차트를 이루던 것이 하나도 없다
+    expect(markup).not.toContain('h-36')
+  })
+
+  /*
+    **날짜 축이 사라진다.** "자료가 없다" 고 말하면서 날짜만 또렷하던 모순이 이 갈래의
+    결함 중 하나였다. 픽스처 7일의 날짜가 하나도 남지 않았는지 본다.
+  */
+  it('날짜 축을 남기지 않는다', () => {
+    const markup = empty()
+
+    // `9월 4일 금요일 …` 같은 sr-only 줄도, 축의 `4금` 도 없다
+    expect(markup).not.toContain('9월 4일')
+    expect(markup).not.toContain('정보 없음')
+  })
+
+  /*
+    **볼 것이 없는데 구르지 않는다.** 스크롤 컨테이너와 레일이 만들어지는 수단 자체를 잰다 —
+    화살표(`ScrollRailArrows`)는 스크롤 여지를 잰 뒤에만 그려 서버 렌더에는 정상 갈래에서도
+    나오지 않으므로, 라벨 부재로 재면 언제나 참인 공허한 단언이 된다.
+  */
+  it('스크롤 컨테이너도 레일도 만들지 않는다', () => {
+    const markup = empty()
+
+    expect(markup).not.toContain('overflow-x-auto')
+    expect(markup).not.toContain('scroll-rail')
+  })
+
+  /*
+    **가릴 것이 없으면 덮개도 없다** — veil(`absolute inset-0` + `bg-bg/70`)과 그것을 앉히던
+    `aria-hidden` 차트가 함께 사라졌다. 이 단언이 깨지면 #670 의 구조가 되돌아온 것이다.
+  */
+  it('veil 도 aria-hidden 도 남지 않는다', () => {
+    const markup = empty()
+
+    expect(markup).not.toContain('absolute inset-0')
+    expect(markup).not.toContain('bg-bg/70')
+    expect(markup).not.toContain('aria-hidden')
+    // 갱신이 아니라 진입 시점의 정적 콘텐츠다
+    expect(markup).not.toContain('role="status"')
+  })
+
+  /*
+    **자료 0건인데 기간을 제시하지 않는다.** 머리의 `9.1 – 9.7` 이 남으면 카드가 "이 기간을
+    재어 봤다" 고 말하는데 본문은 "잰 것이 없다" 고 말한다.
+  */
+  it('카드 머리의 기간 표기를 내리지만 제목은 남긴다', () => {
+    const markup = empty()
+
+    expect(markup).not.toContain('9.1 – 9.7')
+    expect(markup).toContain(messages.place.detailCongestionTitle)
+  })
+
+  /*
+    이 갈래는 점선의 **뜻**이 아니라 **이 장소에 자료가 없다**는 사실을 말한다. 점선이
+    없어졌으니 그 설명도 설 자리가 없다.
+  */
+  it('점선 설명도 예측 범위도 내지 않는다', () => {
+    const markup = empty()
+
+    expect(markup).not.toContain(messages.place.detailCongestionUnknownNote)
+    expect(markup).not.toContain(messages.place.detailCongestionExtendedNote)
+    // 범례도 제목 옆 안내 버튼도 서지 않는다 (#1066) — 눈앞 화면과 어긋나는 말이다
+    expect(markup).not.toContain(`>${messages.place.detailCongestionUnknownLegend}<`)
+    expect(markup).not.toContain(messages.place.detailCongestionRangeTipLabel)
+  })
+
+  /* 문구 키를 새로 만들지도, 같은 말을 두 번 내지도 않는다 */
+  it('빈 상태 문구를 한 번만 낸다', () => {
+    const markup = empty()
+
+    expect(markup.split(messages.place.detailCongestionEmptyTitle)).toHaveLength(2)
+    expect(markup.split(messages.place.detailCongestionEmptyDescription)).toHaveLength(2)
+  })
+
+  /*
+    **재시도는 여전히 없다.** 404 가 아니라 빈 상태이고, 눌러도 같은 빈 답이 온다. 30일도
+    같은 빈 답이라 펼치기도 내밀지 않는다 (#670 의 결정을 그대로 지킨다).
+  */
+  it('재시도도 기간 토글도 두지 않는다', () => {
+    const markup = empty()
+
+    expect(markup).not.toContain('<button')
+    expect(markup).not.toContain(messages.common.retry)
+    expect(markup).not.toContain(messages.place.detailCongestionErrorTitle)
+    expect(markup).not.toContain(messages.place.detailCongestionExpand)
+    expect(markup).not.toContain(messages.place.detailCongestionCollapse)
+  })
+
+  /*
+    **대안 링크는 기존 장소 검색 경로다.** 상세 응답에 `sigunguCode` 가 없어 같은 시군구로
+    좁힐 수 없으므로 `/places` 를 기본 필터 그대로 연다 — 없는 라우트를 만들지 않는다.
+  */
+  it('다른 장소로 가는 길을 하나 준다', () => {
+    const markup = empty()
+
+    expect(markup).toContain('href="/places"')
+    expect(markup).toContain(messages.place.detailCongestionEmptyAction)
+  })
+
+  /*
+    서버가 날짜 목록 자체를 비워 보내는 갈래도 같은 화면이다 — 예전에는 높이 0 짜리 veil 을
+    피하려 문구만 따로 세우는 갈래가 하나 더 있었는데, 차트를 안 그리면서 그 구분이 없어졌다.
+  */
+  it('날짜 목록이 비어도 같은 블록 하나다', () => {
+    const markup = render({ data: { ...congestionAllUnknown, dailyCongestions: [] } })
+
+    expect(markup).toContain(messages.place.detailCongestionEmptyTitle)
+    expect(markup).toContain(messages.place.detailCongestionEmptyDescription)
+    expect(markup).toContain('href="/places"')
+  })
+})
+
+/**
+ * **정상 갈래(일부만 `null`)가 회귀하지 않는다** (#731).
+ *
+ * 이 변경의 가장 위험한 지점이다. 경계는 `hasUnknown` 이 아니라 `leastCrowded === null`
+ * 이고(`isCongestionEmpty`), 아는 날이 하루라도 있으면 그 날이 답이다 — 답이 있는 카드에서
+ * 차트를 지우면 서비스가 할 말을 스스로 가린다. 픽스처 7일 중 `2026-09-04` 하루가
+ * `UNKNOWN` 이라 이 갈래가 실제로 섞인 기간이다.
+ */
+describe('PlaceCongestionPanel — 일부만 모르는 날은 그대로 둔다 (#731)', () => {
+  it('차트도 점선도 날짜 축도 그대로 선다', () => {
+    const markup = render()
+
+    expect(markup.match(/<li /g)).toHaveLength(7)
+    // 그쪽에서 점선은 여전히 옳은 기호다 — 31칸 중 한 칸이 "아직 모르는 날" 을 말한다
+    expect(markup).toContain('border-metric-unknown-500')
+    expect(markup).toContain('9월 4일 금요일 정보 없음')
+    expect(markup).toContain('overflow-x-auto')
+  })
+
+  it('요약·설명·토글과 기간 표기가 살아 있다', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.place.detailCongestionLeastLabel)
+    expect(markup).toContain(messages.place.detailCongestionUnknownNote)
+    expect(markup).toContain(messages.place.detailCongestionCollapse)
+    expect(markup).toContain('9.1 – 9.7')
+  })
+
+  it('빈 상태 문구와 대안 링크가 새어 들어오지 않는다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain(messages.place.detailCongestionEmptyTitle)
+    expect(markup).not.toContain(messages.place.detailCongestionEmptyDescription)
+    expect(markup).not.toContain(messages.place.detailCongestionEmptyAction)
+    expect(markup).not.toContain('href="/places"')
+  })
+})
+
+/**
+ * 빈 상태 블록 — #708 의 상자를 이어받되 배경만 바꿨다 (#731).
+ *
+ * **정상 갈래의 `LeastCrowded` 요약과 같은 자리·같은 개수**로 선다. 갈래가 달라도 카드의
+ * 골격이 흔들리지 않아야 한다.
+ */
+describe('PlaceCongestionPanel — 빈 상태 블록 (#731)', () => {
+  const empty = () => render({ data: congestionAllUnknown })
+
+  /** 블록은 자기 채움에서 시작한다 — 그 뒤 조각이 블록 안이다 */
+  const block = (markup: string) => {
+    const at = markup.indexOf('bg-band')
+
+    // 매치 실패를 삼키지 않는다 (testing-guide.md §5) — 블록이 사라지면 아래가 공허해진다
+    expect(at).toBeGreaterThan(-1)
+    return markup.slice(at)
+  }
+
+  /*
+    **채움은 `--band` 다.** #731 은 `--bg-sunken` 을 지정했지만 그 토큰은 바닥(L0) 전용이고
+    `styles/token-usage.test.ts` 가 소유자(`Canvas`)를 강제한다 — 카드 안 아이템 채움으로
+    이 시스템이 정해 둔 색은 `--band` 하나다 (DESIGN.md §0 · §2-1).
+  */
+  it('LeastCrowded 와 같은 면·곡률을 쓰고 문구와 링크를 담는다', () => {
+    const markup = block(empty())
+
+    expect(markup).toContain('rounded-md')
+    // 두 줄과 링크가 그 블록 **뒤**에 온다 = 안에 든다
+    expect(markup).toContain(messages.place.detailCongestionEmptyTitle)
+    expect(markup).toContain(messages.place.detailCongestionEmptyDescription)
+    expect(markup).toContain(messages.place.detailCongestionEmptyAction)
+  })
+
+  /*
+    **블록 하나다.** 정상 갈래의 요약이 서던 자리를 그대로 받는다 — 문구를 담는 면이 둘
+    이상이면 갈래마다 카드 골격이 달라진다. 이 갈래에는 트랙(`bg-band`)이 없으므로 면의
+    개수를 그대로 셀 수 있다.
+  */
+  it('면을 하나만 만든다', () => {
+    const markup = empty()
+
+    expect(markup.match(/bg-band/g)).toHaveLength(1)
+  })
+
+  /*
+    **테두리를 걷었다.** `--border-strong` 은 veil 합성면 위에서 변이 사라지지 않게 고른
+    값이었는데(#708) 가릴 격자가 없어지면서 근거가 사라졌다. 테두리를 남기면 L2 가 L1 의
+    채널(면 + 1px 테두리)을 쓰게 되어 두 층이 함께 죽는다 (DESIGN.md §0).
+
+    **그림자도, 말풍선 꼬리도 없다** — 카드 안에 눕는 면이다 (§0 · §6).
+  */
+  it('테두리도 그림자도 꼬리도 만들지 않는다', () => {
+    const markup = empty()
+
+    expect(markup).not.toContain('border-border-strong')
+    expect(markup).not.toContain('shadow-')
+    expect(markup).not.toContain('rotate-45')
+  })
+
+  /*
+    **가운데 정렬과 폭 상한을 걷었다.** 둘 다 veil 한가운데 뜨는 상자의 사정이었다 — 이제
+    이 블록은 `LeastCrowded` 와 같은 자리에 눕고, 좌측 정렬이 이 저장소의 빈 상태 규칙이다
+    (`EmptyState`: "가운데 정렬 + 큰 제목은 빈 상태를 사건처럼 보이게 한다").
+  */
+  it('좌측 정렬이고 폭은 카드가 준다', () => {
+    const markup = block(empty())
+
+    expect(markup).not.toContain('text-center')
+    expect(markup).not.toContain('max-w-xs')
+  })
+})
+
+describe('PlaceCongestionPanel — UNKNOWN 날짜', () => {
+  /*
+    **걸러내지 않는다.** 빠뜨리면 날짜 축에 구멍이 생겨 그 날이 "한산한 날" 로 읽힌다 —
+    서버가 데이터 없는 날짜를 목록에 남겨 보내는 이유와 같다. fixture 의 `2026-09-04` 는
+    가운데에 있다.
+  */
+  it('모르는 날도 자리를 지킨다', () => {
+    const markup = render()
+
+    // 기간이 7일이면 막대도 7개다 — 모르는 날을 빼면 6개가 된다
+    expect(markup.match(/<li /g)).toHaveLength(7)
+    // 등급 이름은 서버 `name` 그대로다. 색·높이는 스크린리더에 아무 말도 하지 못한다
+    expect(markup).toContain('9월 4일 금요일 정보 없음')
+  })
+
+  /*
+    **`--metric-unknown-500` 점선 전용 토큰이 쓰이는 자리다.** 빈칸도 짧은 막대도 둘 다
+    "한산하다" 로 읽힌다 — 트랙 전체를 점선으로 두고 막대를 그리지 않는다.
+  */
+  it('모르는 날은 점선 트랙이고 막대를 그리지 않는다', () => {
+    const markup = render()
+
+    expect(markup).toContain('border-metric-unknown-500')
+    expect(markup).toContain(messages.place.detailCongestionUnknownNote)
+  })
+
+  /*
+    #1066 — 점선의 뜻은 **숨기지 않고 형태만 줄인다.** 문장 각주 대신 점선 견본 + `모름`
+    범례가 보이고, 예전 문장은 보조기기용 이름으로 남는다 (`모름` 한 낱말은 무엇을
+    모른다는 것인지 말하지 않는다).
+  */
+  it('점선의 뜻은 견본 + 모름 범례로 보이고 문장은 sr-only 로 남는다', () => {
+    const markup = render()
+
+    expect(markup).toContain(
+      `<span aria-hidden="true">${messages.place.detailCongestionUnknownLegend}</span>`,
+    )
+    expect(markup).toContain(
+      `<span class="sr-only">${messages.place.detailCongestionUnknownNote}</span>`,
+    )
+    // 견본은 트랙과 같은 선이다 — 다르게 그리면 범례가 무엇을 가리키는지 흐려진다
+    expect(markup).toContain(
+      'border-metric-unknown-500 size-3 shrink-0 rounded-sm border-2 border-dashed',
+    )
+  })
+
+  it('범례는 토글과 한 줄이다 — 차트 아래에 문장 줄을 쌓지 않는다', () => {
+    const markup = render()
+    const row = markup.slice(markup.lastIndexOf('<div class="flex items-center justify-between'))
+
+    expect(row).toContain(messages.place.detailCongestionCollapse)
+    expect(row).toContain(messages.place.detailCongestionUnknownLegend)
+  })
+
+  /* 모르는 날이 없으면 점선의 뜻을 설명할 이유도 없다 */
+  it('모르는 날이 없으면 점선 설명을 내지 않는다', () => {
+    const allKnown = {
+      ...congestion,
+      dailyCongestions: congestion.dailyCongestions.filter(
+        (item) => item.concentrationRate !== null,
+      ),
+    }
+    const markup = render({ data: allKnown })
+
+    expect(markup).not.toContain(messages.place.detailCongestionUnknownNote)
+    expect(markup).not.toContain(`>${messages.place.detailCongestionUnknownLegend}<`)
+  })
+})
+
+describe('PlaceCongestionPanel — 기간', () => {
+  /* 기간 표기는 응답의 `fromDate` · `toDate` 다. FE 가 `days` 로 계산하지 않는다 */
+  it('카드 머리에 서버가 준 기간을 적는다', () => {
+    expect(render()).toContain('9.1 – 9.7')
+  })
+
+  /*
+    **기본이 30일이다** (#603). 7일은 좁히는 쪽 선택지로 남는다 — 이 카드의 값은 "언제
+    갈까" 에 멀리까지 답하는 것이고, 폭으로 기본값을 가를 수 없는 이유는
+    `CONGESTION_DEFAULT_DAYS` 주석에 있다.
+  */
+  it('기본은 30일이고 7일로 좁힐 수 있다', () => {
+    expect(render()).toContain(messages.place.detailCongestionCollapse)
+    expect(render({ days: CONGESTION_DAYS.week })).toContain(messages.place.detailCongestionExpand)
+  })
+
+  it('30일에서는 되돌리는 버튼을 준다', () => {
+    expect(render()).toContain(messages.place.detailCongestionCollapse)
+  })
+
+  /*
+    #1066 — 예측 범위는 차트 아래 상시 각주가 아니라 **제목 옆 `InfoTip`** 이다. 기간
+    꼬리표(`9.1 – 9.7`)가 이미 보여 #603 의 "기본 상태에서 보인다" 목적은 그쪽이 지킨다.
+    첫 렌더는 닫힌 상태라 본문은 서지 않는다 (`info-tip.test.ts`).
+  */
+  it('예측 범위는 제목 옆 안내 버튼으로 연다 — 상시 각주가 아니다', () => {
+    const markup = render()
+    const head = markup.slice(0, markup.indexOf('</h2>') + 200)
+
+    expect(head).toContain(`aria-label="${messages.place.detailCongestionRangeTipLabel}"`)
+    expect(markup).not.toContain(messages.place.detailCongestionExtendedNote)
+  })
+
+  /* 예측이 닿는 범위의 이야기라 펼친 기간과 무관하다 — 토글마다 제목 줄이 흔들리지 않게 */
+  it('7일 보기에서도 같은 안내 버튼이 선다', () => {
+    expect(render({ days: CONGESTION_DAYS.week })).toContain(
+      `aria-label="${messages.place.detailCongestionRangeTipLabel}"`,
+    )
+  })
+
+  it('로딩 · 실패에는 안내 버튼을 내지 않는다', () => {
+    const label = `aria-label="${messages.place.detailCongestionRangeTipLabel}"`
+
+    expect(render({ data: null, loading: true })).not.toContain(label)
+    expect(render({ data: null, failed: true })).not.toContain(label)
+  })
+
+  /*
+    30일에만 구르는 레일이 된다 (#603) — 7일은 36px × 7칸 = 288px 라 구를 것이 없다.
+
+    **화살표는 여기서 못 본다.** `ScrollRailArrows` 는 스크롤 여지를 **잰 뒤에만** 그린다
+    (`useScrollRail` 의 `fade`), 서버 렌더에는 레이아웃이 없어 언제나 `none` 이다. 홈 곡선도
+    같아서 `walk-times-section.test.ts` 가 화살표 대신 `scroll-rail` 을 센다. 실제로 뜨는지는
+    `e2e/place-congestion.spec.ts` 가 본다.
+  */
+  it('30일에만 구르는 레일이 된다 — 스크롤바는 숨기고 페이드·화살표에 맡긴다', () => {
+    const markup = render()
+
+    expect(markup).toContain('scrollbar-none')
+    expect(markup).toContain('overflow-x-auto')
+    expect(render({ days: CONGESTION_DAYS.week })).not.toContain('overflow-x-auto')
+  })
+
+  /*
+    **`scroll-rail` 은 장식이 아니라 가로 넘침의 유일한 방어막이다** (#603).
+
+    날짜 칸마다 붙는 `sr-only` 라벨은 `position: absolute` 다. 스크롤러가 `position: static`
+    이면 그 30개의 컨테이닝 블록이 스크롤러가 아니라 **바깥의 positioned 조상**이 된다 —
+    스크롤러가 자기 내용을 클립하고 있어도 저것들은 클립되지 않고, 정적 위치가 조상의
+    `scrollWidth` 로 그대로 샌다.
+
+    실측(`/places/126434` 30일 보기): 1440 에서 좌측 판정 레일이 가로로 770px 스크롤됐고
+    (`scrollWidth` 1164 / `clientWidth` 394), 390 에서는 페이지가 통째로 넘쳤다
+    (`documentElement.scrollWidth` 390 → 1135). DESIGN.md §7 이 버그로 못박은 그 증상이다.
+
+    `.scroll-rail` 이 `position: relative` 로 기준면을 되돌리고 `contain: layout` 으로 남은
+    전파를 끊는다 — 홈 곡선에서 같은 것을 겪고 `app/globals.css` 에 적어 둔 처방이다.
+
+    **문자열 assertion 은 클래스가 붙었는지까지만 잠근다.** 실제 넘침은
+    `e2e/place-congestion.spec.ts` 가 잰다.
+  */
+  it('30일 레일에만 scroll-rail 을 준다 — sr-only 라벨이 조상으로 새지 않게', () => {
+    expect(render()).toContain('scroll-rail')
+    expect(render({ days: CONGESTION_DAYS.week })).not.toContain('scroll-rail')
+  })
+})
+
+describe('PlaceCongestionPanel — 막대 색 (#603)', () => {
+  /*
+    **색은 "이 날이 답" 하나만 말한다.** 등급으로 칠하지 않는 이유는 막대 높이가 이미
+    집중률이고 서버 등급도 그 집중률에서 갈리기 때문이다 — 색으로 등급을 그리면 같은
+    변수를 두 번 그리게 되고, 실제로 30일을 펼치면 한 등급에 몰려 한 덩어리로 깔렸다.
+
+    fixture 의 `leastCrowded` 는 `2026-09-05`(21.4) 하루다.
+  */
+  it('서버가 고른 날만 진한 파랑이고 나머지는 연한 파랑이다', () => {
+    const markup = render()
+
+    expect(markup.match(/bg-congestion-best/g)).toHaveLength(1)
+    // 7일 중 `UNKNOWN` 하루는 막대 자체가 없고(점선 트랙), 고른 하루는 위에서 셌다
+    expect(markup.match(/bg-congestion-bar/g)).toHaveLength(5)
+  })
+
+  /*
+    **등급 색을 쓰지 않는다.** 붐비는 날은 위험한 날이 아니라 사람 많은 날이라
+    `--metric-critical-*`(산책 위험 전용)이 맞지 않는다 — DESIGN.md §2-3 의 "`LOW` 에
+    danger 를 쓰지 않는다" 와 같은 규칙이다.
+  */
+  it('막대에 등급 색을 쓰지 않는다', () => {
+    const markup = render()
+
+    for (const tone of ['critical', 'high', 'mid', 'low']) {
+      expect(markup).not.toContain(`bg-metric-${tone}-500`)
+    }
+  })
+
+  /*
+    **선택 표시가 둘이면 어느 쪽이 답인지 흐려진다.** 진한 파랑이 그 역할을 가져가면서
+    트랙의 `--brand-500` 테두리와 날짜의 `--brand-700` 을 걷었다.
+  */
+  it('예전 선택 표시(브랜드 테두리·초록 날짜)를 남기지 않는다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain('outline-brand-500')
+    expect(markup).not.toContain('text-brand-700')
+  })
+
+  /*
+    이 카드에서 실제로 비교를 해 주는 것은 막대 **높이**인데 높이는 스크린리더에 아무것도
+    전하지 못한다. 등급 이름만 읽으면 같은 `혼잡` 안의 68 과 92 가 한 낱말로 뭉개진다.
+  */
+  it('보조기기에 등급 이름과 집중률을 함께 읽어 준다', () => {
+    const markup = render()
+
+    // 눈으로 보는 값과 갈리지 않게 **정수**로 읽는다 (#651) — 71.8 → 72
+    expect(markup).toContain(`${messages.place.detailCongestionRateLabel} 72`)
+  })
+})
+
+/**
+ * 집중률 표현 (#651 · 진단 D-3).
+ *
+ * `57.77` 은 높은 값인지 낮은 값인지 화면에 비교 기준이 없었다.
+ *
+ * **계산 규칙은 여기서 재지 않는다.** 반올림 순서 · `UNKNOWN` 제외 · 비교 생략은
+ * `lib/insight/congestion.test.ts` 가 분기별로 잰다. 여기서 같은 것을 다시 재려 하면
+ * 픽스처가 두 구현에서 같은 값을 내 **항진식이 되기 쉽다** — 실제로 이 픽스처는 반올림
+ * 순서를 뒤집어도 `24` 로 같다. 이 파일은 **화면에 나오는 모양**만 본다.
+ */
+describe('PlaceCongestionPanel — 집중률 표현 (#651)', () => {
+  /** 픽스처 7일: 71.8 · 37.2 · 28.6 · null · 21.4 · 44.9 · 68.3 → 아는 날 6일, 평균 45 */
+  /**
+   * 집중률 줄만 떼어 낸다.
+   *
+   * **매치 실패를 `''` 로 삼키지 않는다** — 그 위에 쌓은 `not.toContain` 이 전부 공허하게
+   * 통과한다. 줄이 사라지는 것 자체가 회귀다.
+   */
+  const rateLine = (markup: string) => {
+    const line = markup.match(new RegExp(`${messages.place.detailCongestionRateLabel}[^<]*`))?.[0]
+
+    expect(line).toBeDefined()
+    return line!
+  }
+
+  it('집중률에 소수점이 없다', () => {
+    const markup = render()
+
+    expect(markup).not.toMatch(new RegExp(`${messages.place.detailCongestionRateLabel} \\d+\\.\\d`))
+  })
+
+  it('평균과 차이를 함께 말한다', () => {
+    const line = rateLine(render())
+
+    // leastCrowded 21.4 → 21, 평균 45 → 24 낮다
+    expect(line).toContain('21')
+    expect(line).toContain('45')
+    expect(line).toContain('24')
+  })
+
+  /* 아는 날이 하나뿐이면 "평균보다 0 낮아요" 가 된다 — 비교 문구를 붙이지 않는다 */
+  it('비교할 것이 없으면 숫자만 낸다', () => {
+    const onlyOne = {
+      ...congestion,
+      dailyCongestions: [
+        congestion.dailyCongestions[4]!,
+        { ...congestion.dailyCongestions[0]!, concentrationRate: null },
+      ],
+    }
+    const line = rateLine(render({ data: onlyOne }))
+
+    expect(line).toContain('21')
+    expect(line).not.toContain('평균')
+  })
+
+  /** 집중률은 단위가 없는 0~100 지표다 */
+  it('% 를 붙이지 않는다', () => {
+    expect(rateLine(render())).not.toContain('%')
+  })
+})

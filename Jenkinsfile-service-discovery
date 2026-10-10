@@ -1,0 +1,29 @@
+// 혼디가개 service-discovery 배포 잡.
+// Eureka 서버. 다른 서비스가 등록할 대상이라 가장 먼저 배포한다.
+//
+// Jenkins 멀티브랜치 파이프라인 이름: hondigagae-service-discovery
+// 배포 대상 PR 라벨:                  backend-service-discovery
+//   dev  -> main-server (192.168.0.11), 호스트 포트 7761
+//   prod -> backend-1   (192.168.0.13), 호스트 포트 5761
+def backendPipeline
+node('builder-backend') {
+    checkout scm
+    backendPipeline = load 'Jenkinsfile.backend-common.groovy'
+}
+
+backendPipeline.run([
+    serviceGroup       : 'cloud',
+    serviceName        : 'service-discovery',
+    modulePath         : 'cloud:service-discovery',
+    fsPath             : 'backend/cloud/service-discovery',
+    dockerfile         : 'service-discovery.Dockerfile',
+    composeFile        : 'docker-compose-service-discovery.yml',
+    composeServiceName : 'service-discovery',
+    containerNamePrefix: 'hondigagae-service-discovery',
+    deploySubdir       : 'cloud/service-discovery',
+    buildAgentLabel    : 'builder-backend',
+    deployAgentLabels  : [
+        dev : 'deploy-backend-dev',
+        prod: 'deploy-backend-prod'
+    ]
+])

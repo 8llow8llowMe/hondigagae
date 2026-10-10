@@ -1,0 +1,210 @@
+import { expect, test } from '@playwright/test'
+
+import { hasListView, mapFailedToList } from './helpers/map-fallback'
+
+/**
+ * 장소 이름·주소 검색 — 이슈 #431 (계약은 #421).
+ *
+ * ### 왜 e2e 인가
+ *
+ * 검색은 **입력 → 제출 → URL → 재조회**가 한 줄로 이어져야 뜻이 있다. 그 사슬의 어느
+ * 고리도 node 환경 렌더 테스트로는 볼 수 없다 — 폼 제출도, `router.replace` 도,
+ * 바뀐 `searchParams` 로 다시 도는 조회도 실제 브라우저에서만 일어난다.
+ *
+ * **엔터 제출을 특히 잰다.** 검색창에서 엔터가 안 먹는 것은 버튼이 멀쩡해도 고장이고,
+ * 암묵적 폼 제출은 마크업(`<form>` + `type="submit"`)에 달려 있어 조용히 깨진다.
+ */
+const KEYWORD = '미술관'
+
+test.describe('장소 검색 (#431)', () => {
+  test('엔터로 제출하면 URL 에 keyword 가 실리고 목록이 좁혀진다', async ({ page }) => {
+    await page.goto('/places?view=list')
+
+    const before = await page.locator('#place-list li').count()
+    expect(before).toBeGreaterThan(0)
+
+    await page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).fill(KEYWORD)
+    await page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).press('Enter')
+
+    await expect(page).toHaveURL(new RegExp(`keyword=${encodeURIComponent(KEYWORD)}`))
+    await expect(page.locator('#place-list li')).not.toHaveCount(before)
+  })
+
+  test('검색 버튼으로도 같은 일이 일어난다', async ({ page }) => {
+    await page.goto('/places?view=list')
+
+    /*
+      **행이 선 뒤에 친다.** 기다리지 않고 치면 하이드레이션 전에 누르게 되어 핸들러가
+      아직 없다 — 누른 자국도 남지 않는다. `#place-list` 는 실화면에만 있는 `id` 라
+      (`loading.tsx` 의 골격에는 없다) 이 대기가 곧 "실화면이 섰다" 는 뜻이다.
+    */
+    await expect(page.locator('#place-list').getByRole('listitem').first()).toBeVisible()
+
+    await page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).fill(KEYWORD)
+    await page.getByRole('button', { name: '검색', exact: true }).click()
+
+    await expect(page).toHaveURL(new RegExp(`keyword=${encodeURIComponent(KEYWORD)}`))
+  })
+
+  /*
+    **보기를 바꿔도 조건이 남는다.** 조건은 URL 에 남아 `nearbyPlacesPath` 가 그대로
+    싣는다 — 그 전제가 깨지면 목록에서 좁혀 둔 검색이 지도로 넘어갈 때 조용히 풀린다.
+
+    **지도 갈래에도 검색 입력이 생겼다** (#596) — 아래 `지도 보기 검색` 절이 잰다.
+  */
+  test('지도로 넘어가도 keyword 가 남는다', async ({ page }) => {
+    await page.goto(`/places?view=list&keyword=${encodeURIComponent(KEYWORD)}`)
+
+    await page.getByRole('link', { name: '지도' }).click()
+
+    await expect(page).toHaveURL(new RegExp(`keyword=${encodeURIComponent(KEYWORD)}`))
+  })
+
+  /*
+    **초기화가 검색어도 지운다.** 초기화는 `DEFAULT_PLACE_FILTERS` 로 가고 그 안에서
+    `keyword` 는 `null` 이다 — 검색어만 따로 남으면 "초기화했는데 결과가 그대로" 가 된다.
+  */
+  test('필터 초기화가 검색어까지 지운다', async ({ page }) => {
+    await page.goto(`/places?view=list&keyword=${encodeURIComponent(KEYWORD)}&indoor=true`)
+
+    await page.getByRole('button', { name: '초기화' }).first().click()
+
+    await expect(page).not.toHaveURL(/keyword=/)
+    await expect(page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' })).toHaveValue('')
+  })
+
+  /*
+    **입력은 URL 을 따라간다.** 뒤로가기·초기화가 `keyword` 를 바꿨는데 입력이 제 값을
+    들고 있으면, 화면에 보이는 검색어와 실제 조건이 갈린다.
+  */
+  test('주소로 직접 들어오면 입력에 검색어가 채워져 있다', async ({ page }) => {
+    await page.goto(`/places?view=list&keyword=${encodeURIComponent(KEYWORD)}`)
+
+    await expect(page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' })).toHaveValue(
+      KEYWORD,
+    )
+  })
+
+  test('0건이면 무엇으로 찾았는지 되돌려 준다', async ({ page }) => {
+    await page.goto('/places?view=list&keyword=존재하지않는장소이름ZZZ')
+
+    await expect(page.getByRole('main')).toContainText('존재하지않는장소이름ZZZ')
+  })
+})
+
+/**
+ * 지도 보기의 검색 — 이슈 #596.
+ *
+ * #431 이 *"지도 갈래에는 두지 않는다"* 로 접었던 결정을 뒤집은 자리다. 뒤집은 이유가
+ * **지도에서 검색어가 걸린 것을 알 방법이 없다**는 것이라, 잴 것도 그것이다: `?keyword=`
+ * 를 달고 들어오면 화면이 그 글자를 되돌려 주는가, 그리고 지우는 길이 있는가.
+ *
+ * **`MOCK_API=true` 라 카카오 SDK 는 뜨지 않는다** — #1289 부터 SDK 가 실패하면 **목록 보기로
+ * 옮겨진다**(`helpers/map-fallback.ts`). 그래서 이 절이 재는 것은 **지도 갈래로 들어온 검색 조건이
+ * 옮겨진 목록 보기까지 따라오고, 거기서 검색이 도는가** 다. 실제 SDK 위 오버레이 · 패널의 검색 자리는
+ * 소스 단언이 잠근다(`src/features/place/place-map-search.test.ts`).
+ */
+test.describe('지도 보기 검색 (#596)', () => {
+  test('지도 갈래에도 검색이 있고 URL 의 검색어를 들고 있다', async ({ page }) => {
+    await page.goto(`/places?keyword=${encodeURIComponent(KEYWORD)}`)
+
+    await expect(
+      page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).first(),
+    ).toHaveValue(KEYWORD)
+  })
+
+  /*
+    **URL 만 보면 절반이다.** `/places` 가 `/emergency` 와 갈리는 지점이 검색어를 **서버로
+    보낸다**는 것이고(#421), 이 이슈 본문도 *"그 경로가 실제로 도는지 확인해야 한다"* 로
+    못박았다. `keyword` 가 주소창에 실리는 것은 그 경로가 돌았다는 증거가 되지 못한다 —
+    `router.replace` 만 되고 조회가 안 나가도 URL 은 똑같이 바뀐다.
+
+    **목록이 좁아지는 것으로 잰다.** 폴백 목록도 `usePlaceList(filters)` 라, 제출로 바뀐
+    `keyword` 를 물고 BFF 를 다시 친다. 개수가 달라졌다면 왕복이 돈 것이다. 목록 갈래가
+    위에서 쓰는 방식과 같다 (`not.toHaveCount(before)`).
+  */
+  /*
+    **옮겨진 뒤에 친다.** 옮기기 전 지도 갈래의 입력에 채우면 그 값은 새 입력에 덮이고 엔터는 떨어져
+    나간 노드로 간다(`helpers/map-fallback.ts`). 개수도 옮긴 뒤의 목록(`#place-list`)에서 센다.
+  */
+  test('지도를 못 띄우면 목록 보기로 옮겨지고, 거기서 제출하면 목록이 좁혀진다', async ({
+    page,
+  }) => {
+    await page.goto('/places')
+    await mapFailedToList(page, hasListView)
+
+    const rows = page.locator('#place-list li')
+    const before = await rows.count()
+    expect(before).toBeGreaterThan(0)
+
+    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' })
+    await box.fill(KEYWORD)
+    await box.press('Enter')
+
+    await expect(page).toHaveURL(new RegExp(`keyword=${encodeURIComponent(KEYWORD)}`))
+    await expect(rows).not.toHaveCount(before)
+  })
+
+  /*
+    **옮겨도 검색 조건이 따라와야 한다** (`fallbackListHref` 는 미리보기만 뺀다). 잃으면 지도에서 건 검색어가
+    목록으로 튕기는 순간 사라진다. 따라온 검색어를 비우고 제출하면 풀린다(`normalizeKeyword` 가 빈 값을 `null` 로).
+  */
+  test('옮겨진 목록 보기가 검색어를 들고 있고, 비우고 제출하면 풀린다', async ({ page }) => {
+    await page.goto(`/places?keyword=${encodeURIComponent(KEYWORD)}`)
+    await mapFailedToList(page, hasListView)
+
+    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' })
+    await expect(box).toHaveValue(KEYWORD)
+
+    await box.fill('')
+    await box.press('Enter')
+
+    await expect(page).not.toHaveURL(/keyword=/)
+  })
+})
+
+/**
+ * 담기 화면의 검색 — 이슈 #1012.
+ *
+ * `/places` 와 같은 `PlaceSearchField` 가 목록·지도 두 갈래에 선다. 잴 것은 **경로**다 —
+ * 검색은 `usePlaceFilterNav` 로 `router.replace` 하는데, 그 경로가 `usePathname()` 이 아니라
+ * `/places` 였다면 담기 화면에서 검색하는 순간 담기 문맥(어느 일정의 몇째 날)을 잃는다.
+ */
+test.describe('담기 화면 검색 (#1012)', () => {
+  const PLAN_ADD = '/plans/223456789012000001/days/1/add'
+  const onPlanAdd = (search: string) => new RegExp(`${PLAN_ADD.replace(/\//g, '\\/')}\\?${search}`)
+
+  test('목록 갈래에서 제출하면 담기 경로에 keyword 가 실리고 보기가 남는다', async ({ page }) => {
+    await page.goto(`${PLAN_ADD}?view=list`)
+
+    // 행이 선 뒤에 친다 — 하이드레이션 전에는 핸들러가 없다 (위 `검색 버튼으로도` 와 같다)
+    await expect(page.locator('#plan-add-place-list').getByRole('listitem').first()).toBeVisible()
+
+    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' })
+    await box.fill(KEYWORD)
+    await box.press('Enter')
+
+    await expect(page).toHaveURL(onPlanAdd(`keyword=${encodeURIComponent(KEYWORD)}&view=list`))
+  })
+
+  /*
+    `MOCK_API=true` 라 지도 갈래는 담기의 목록 보기로 옮겨진다 (위 #596 절 머리 주석). 옮겨도 **담기 경로와
+    검색어가 남아야** 하고, 비우고 제출하면 검색어만 빠진다 — 담기 문맥(경로)과 보기는 그대로다.
+  */
+  test('지도를 못 띄우면 담기 목록으로 옮겨지고, 비우고 제출하면 검색어만 빠진다', async ({
+    page,
+  }) => {
+    await page.goto(`${PLAN_ADD}?keyword=${encodeURIComponent(KEYWORD)}`)
+    await mapFailedToList(page, hasListView)
+
+    await expect(page).toHaveURL(onPlanAdd(`keyword=${encodeURIComponent(KEYWORD)}&view=list`))
+
+    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' })
+    await expect(box).toHaveValue(KEYWORD)
+
+    await box.fill('')
+    await box.press('Enter')
+
+    await expect(page).toHaveURL(onPlanAdd('view=list$'))
+  })
+})

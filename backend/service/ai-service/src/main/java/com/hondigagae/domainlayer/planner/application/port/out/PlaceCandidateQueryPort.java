@@ -1,0 +1,82 @@
+package com.hondigagae.domainlayer.planner.application.port.out;
+
+import com.hondigagae.domainlayer.planner.application.port.out.query.PlaceCandidateQueryResult;
+import java.util.List;
+
+/**
+ * 일정에 넣을 후보 장소 조회 계약.
+ *
+ * <p><b>이 포트가 환각 방지의 핵심이다.</b> LLM 에게 "제주 관광지를 추천해"라고 물으면
+ * 존재하지 않는 카페를 지어내고, 존재하더라도 반려견 동반 가능 여부는 모른다. 대신 실제 DB 에
+ * 있는 동반 가능 장소 목록을 먼저 주고 <b>그 안에서만 고르게</b> 한다.
+ *
+ * <p>사후에 검증하는 방식보다 낫다. 검증은 틀린 답을 걸러낼 뿐이지만, 후보를 주는 방식은
+ * 애초에 틀릴 자리를 없앤다 (services/ai-service.md 의 환각 방지 항목).
+ */
+public interface PlaceCandidateQueryPort {
+
+    /**
+     * @param areaCode    관광 지역코드 (제주=39)
+     * @param sigunguCode 관광 시군구코드. null 이면 지역 전체다. 좁히면 후보 풀도 좁아지므로
+     *                    <b>넓히는 폴백을 두지 않는다</b> — 조건을 무시한 일정이 되기 때문이다
+     * @param size        후보 개수. 프롬프트 토큰과 선택지 다양성의 절충이다
+     */
+    List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, String sigunguCode, int size);
+
+    /**
+     * 사용자 요청(실내 · 카페)에 맞는 동반 가능 장소 (#1170).
+     *
+     * <p>{@code indoor} · {@code sourceCategory} 가 null 이면 그 조건은 걸지 않는다.
+     * 기본 구현은 필터를 무시하고 {@link #findPetFriendlyCandidates} 를 부른다 — 테스트 대역이
+     * 필터를 구현하지 않아도 생성이 깨지지 않게 한다. 운영 어댑터는 필터를 검색에 넘긴다.
+     */
+    default List<PlaceCandidateQueryResult> findRequestedCandidates(
+        String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory
+    ) {
+        return findPetFriendlyCandidates(areaCode, sigunguCode, size);
+    }
+
+    /**
+     * 동반 가능 숙박 (#1236). 후보 풀에 숙박을 권역마다 싣는 데 쓴다 — 지역 검색 상위 N 에는 숙박이 우연히만 든다.
+     *
+     * <p>기본 구현은 빈 목록이다 — 테스트 대역이 구현하지 않으면 숙박을 더 싣지 않을 뿐 생성은 그대로다.
+     * {@link #findRequestedCandidates} 처럼 일반 검색으로 대신하면 숙박이 아닌 장소가 숙박 몫으로 들어간다.
+     */
+    default List<PlaceCandidateQueryResult> findLodgingCandidates(String areaCode, String sigunguCode, int size) {
+        return List.of();
+    }
+
+    /**
+     * 동반 가능 음식점(카페 포함) (#1245). 후보 풀에 식사 자리를 권역마다 싣는 데 쓴다 — 지역 검색 상위 N 에는
+     * 음식점이 하나도 들지 않았다. 기본 구현은 빈 목록이다({@link #findLodgingCandidates} 와 같은 이유).
+     */
+    default List<PlaceCandidateQueryResult> findRestaurantCandidates(String areaCode, String sigunguCode, int size) {
+        return List.of();
+    }
+
+    /**
+     * 한 점에서 가까운 순으로 동반 가능 장소를 찾는다 — 종류를 가리지 않는다 (#1312). 제주 전체 일정의 후보 풀을 권역
+     * 대표점마다 채우는 데 쓴다 — {@code placeId} 순 첫 페이지는 권역이 쏠려 남동부 방문 장소가 2곳뿐이었다.
+     *
+     * <p>기본 구현은 빈 목록이다({@link #findLodgingCandidates} 와 같은 이유). 시군구는 걸지 않는다 — 제주 전체 요청에만 쓴다.
+     */
+    default List<PlaceCandidateQueryResult> findNearbyCandidates(String areaCode, double lat, double lng, int size) {
+        return List.of();
+    }
+
+    /** 한 점에서 가까운 순의 동반 가능 숙박 (#1312). 기본 구현은 빈 목록이다. */
+    default List<PlaceCandidateQueryResult> findNearbyLodgingCandidates(String areaCode, double lat, double lng, int size) {
+        return List.of();
+    }
+
+    /** 한 점에서 가까운 순의 동반 가능 음식점(카페 포함) (#1312). 기본 구현은 빈 목록이다. */
+    default List<PlaceCandidateQueryResult> findNearbyRestaurantCandidates(String areaCode, double lat, double lng, int size) {
+        return List.of();
+    }
+
+    /**
+     * 아이디로 후보를 직접 가져온다 — 사용자가 필수 포함으로 지정한 장소는 검색 상위 N 에
+     * 없어도 후보에 넣어야 하기 때문이다. 노출 불가 장소는 결과에서 빠진다.
+     */
+    List<PlaceCandidateQueryResult> findCandidatesByIds(List<Long> placeIds);
+}

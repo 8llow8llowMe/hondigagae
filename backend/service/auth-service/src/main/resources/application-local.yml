@@ -1,0 +1,119 @@
+server:
+  port: 8081
+  shutdown: graceful
+
+# 소셜 로그인 provider 설정. 로컬은 자격증명이 없으면 소셜 로그인 시점에만 실패한다.
+oauth:
+  kakao:
+    client-id: ${OAUTH_KAKAO_CLIENT_ID:}
+    client-secret: ${OAUTH_KAKAO_CLIENT_SECRET:}
+    redirect-uri: ${OAUTH_KAKAO_REDIRECT_URI:http://localhost:3000/oauth/kakao/callback}
+    scope:
+      - profile_nickname
+      - profile_image
+      - account_email
+  naver:
+    client-id: ${OAUTH_NAVER_CLIENT_ID:}
+    client-secret: ${OAUTH_NAVER_CLIENT_SECRET:}
+    redirect-uri: ${OAUTH_NAVER_REDIRECT_URI:http://localhost:3000/oauth/naver/callback}
+
+spring:
+  cloud:
+    config:
+      enabled: false  # 로컬에서만 Config Server 비활성화
+
+  # 이메일 인증코드 발송용 SMTP. 로컬은 자격증명이 없으면 발송 시점에만 실패한다.
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/hondigagae?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul&zeroDateTimeBehavior=convertToNull&rewriteBatchedStatements=true
+    username: ${DB_USERNAME:hondigagae}
+    password: ${DB_PASSWORD:hondigagae123!}
+
+  jpa:
+    open-in-view: false
+    defer-datasource-initialization: true
+    generate-ddl: true
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        show_sql: true
+        jdbc:
+          batch_size: 100
+        default_batch_fetch_size: 100
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+
+snowflake:
+  datacenter-id: 1
+  worker-id: 1
+
+infra:
+  redis:
+    mode: standalone
+    host: localhost
+    port: 6379
+    password:
+    key-prefix: ${REDIS_KEY_PREFIX:hondigagae:local}
+  storage:
+    endpoint: http://localhost:9000
+    public-url: http://localhost:9000
+    bucket: hondigagae-local
+    access-key: minioadmin
+    secret-key: minioadmin
+    max-file-bytes: 5242880
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+
+jwt:
+  # 로컬 개발 전용 기본 키 (HS512 — 64바이트 이상).
+  # access-key는 API Gateway 및 Resource Server 서비스와 반드시 동일해야 한다.
+  access-key: ${JWT_ACCESS_KEY:hondigagae-local-jwt-access-key-0123456789abcdef0123456789abcdef0123456789abcdef}
+  refresh-key: ${JWT_REFRESH_KEY:hondigagae-local-jwt-refresh-key-fedcba9876543210fedcba9876543210fedcba9876543210}
+  access-expiration: ${JWT_ACCESS_EXPIRATION:PT1H}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:P14D}
+  # 블랙리스트 조회 실패 시 정책. 게이트웨이의 동일 키와 정렬한다. (false = fail-closed, 503 응답)
+  blacklist-fail-open: ${JWT_BLACKLIST_FAIL_OPEN:false}
+
+# 일반 로그인 실패 횟수 제한 / 잠금
+auth:
+  login:
+    max-failure-count: ${AUTH_LOGIN_MAX_FAILURE_COUNT:5}
+    lock-duration: ${AUTH_LOGIN_LOCK_DURATION:PT10M}
+
+# 가입 동의 이력에 남길 법적 문서 버전.
+# 정본은 프론트 frontend/src/lib/legal/{terms-of-service,privacy-policy}.ts 의 version 이다.
+# 개정할 때 두 곳을 같이 올리지 않으면 "무엇에 동의했는가"가 어긋난다.
+legal:
+  terms-version: ${LEGAL_TERMS_VERSION:1.0}
+  privacy-version: ${LEGAL_PRIVACY_VERSION:1.0}
+
+# 탈퇴 회원 이메일을 다이제스트로 치환할 때 쓰는 pepper.
+# 로컬은 편의를 위해 명시적인 가짜값을 둔다 — 이 값으로 만든 다이제스트는 비밀이 아니다.
+# dev/prod 는 기본값 없이 Vault 의 WITHDRAWN_EMAIL_PEPPER 를 쓴다.
+# ⚠️ 한번 정하면 바꾸지 않는다. 바꾸면 기존 다이제스트와 대조가 불가능해져 재가입 차단이 뚫린다.
+member:
+  withdrawn-email:
+    pepper: ${WITHDRAWN_EMAIL_PEPPER:local-development-only-pepper-not-a-secret}

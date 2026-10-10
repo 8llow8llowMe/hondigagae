@@ -1,0 +1,943 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+
+import { Banner } from '@/components/banner'
+import { ButtonLink } from '@/components/button'
+import { EmptyState } from '@/components/empty-state'
+import { ErrorState } from '@/components/error-state'
+import { EmergencyIcon } from '@/components/icons'
+import { InfoTip } from '@/components/info-tip'
+import { Canvas, Surface, SurfaceList, SurfaceStack } from '@/components/surface'
+import { useNearbyFacilities } from '@/features/emergency/use-nearby-facilities'
+import { AboutIntroCard } from '@/features/home/about-intro-card'
+import { IndoorAlternativesSection } from '@/features/home/indoor-alternatives-section'
+import {
+  PlaceCardsEndCard,
+  PlaceInsightCard,
+  PlaceInsightCardList,
+} from '@/features/home/place-insight-card'
+import { ProfileCard } from '@/features/home/profile-card'
+import { RegionalWeatherSection } from '@/features/home/regional-weather-section'
+import { SuitabilityListSkeleton } from '@/features/home/suitability-list-skeleton'
+import { TripBannerCard } from '@/features/home/trip-banner'
+import { UpcomingPlanRow } from '@/features/home/upcoming-plan-row'
+import {
+  useRegionalWeather,
+  useSuitabilities,
+  useWalkSafety,
+} from '@/features/home/use-home-insight'
+import { WalkVerdict } from '@/features/home/walk-verdict'
+import { WalkVerdictSkeleton } from '@/features/home/walk-verdict-skeleton'
+import { WeatherWarningStrip } from '@/features/home/weather-warning-strip'
+import { useWalkTimes } from '@/features/insight/use-walk-times'
+import { WalkTimesSection } from '@/features/insight/walk-times-section'
+import { toLoginHref } from '@/features/nav/menu-items'
+import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
+import { usePetList } from '@/features/pet/use-pet-list'
+import { DEFAULT_RADIUS_METERS } from '@/lib/api/emergency'
+import { toPetCondition } from '@/lib/api/insight'
+import { dayToLocalNoon } from '@/lib/date/day'
+import { hospitalBannerDescription, pickNearestHospital } from '@/lib/emergency/nearest'
+import { getPositionIfGranted, type PositionResult } from '@/lib/geo/current-position'
+import { DEFAULT_BASIS_PLACE_ID, isDefaultBasis } from '@/lib/insight/basis-place'
+import { collectIndoorAlternatives } from '@/lib/insight/indoor'
+import { pickCardReason, placeCardsEnd } from '@/lib/insight/place-cards'
+import {
+  appliedFactorsOf,
+  pickTopPlaces,
+  resolveBasisPlaceId,
+  splitSharedReasons,
+} from '@/lib/insight/reasons'
+import { clearRecentPlaceId, isBasisPlaceGone, readRecentPlaceId } from '@/lib/insight/recent-place'
+import { walkTimesBasis, walkTimesQueryPosition } from '@/lib/insight/walk-times-position'
+import { pickWeatherWarning } from '@/lib/insight/weather-warning'
+import { messages } from '@/lib/messages'
+import { resolveSelectedPet } from '@/lib/nav/selected-pet'
+import { planPhaseOf } from '@/lib/plan/date'
+import { pickHomePlans } from '@/lib/plan/trip-banner'
+import { withCompanionParticle } from '@/lib/text/korean'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
+import type { PlaceSummary } from '@/types/place'
+import type { PlanSummaryItem } from '@/types/plan'
+
+/** 홈은 요약 화면이다. 3장이 적당하다 — 공통명세 S5-2 (N=3) */
+const TOP_PLACE_COUNT = 3
+
+/** 실내 대안도 같은 이유로 3곳이다 — 홈-세부명세 D1 의 "3열" */
+const INDOOR_ALTERNATIVE_COUNT = 3
+
+/** 다가오는 일정은 한 건만 — 나머지는 `/plans` 가 센다 */
+const UPCOMING_PLAN_COUNT = 1
+
+/** AI 일정 생성 — 보호 경로라 게스트는 `toLoginHref` 로 감싼다 (#905 R1) */
+const AI_PLAN_HREF = '/ai-plans/new'
+
+/**
+ * 홈 — 아트보드 `01 홈`(모바일 390) / `02 홈`(데스크톱 1440).
+ *
+ * **3층 표면을 쓰는 첫 화면이다** (#428). `main` 이 `Canvas`(L0)로 화면 끝까지 바닥을
+ * 칠하고, 두 열이 각각 `SurfaceStack` 으로 그 위에 `Surface`(L1) 카드를 쌓는다.
+ * **바닥과 쌓기를 가른 이유**: 바닥을 열에 걸면 1440 컨테이너 바깥(1800 에서 좌우
+ * 177px)이 흰색으로 남는다. 이 화면이 검증 게이트다 — 여기서 "묶어서 파악" 이
+ * 좋아지지 않으면 3a 를 걷고 나머지 18화면은 손대지 않는다.
+ *
+ * **데스크톱은 2단이다.** 좌 400 고정(sticky) + 우 가변.
+ * 좌측 = 변하지 않는 맥락(프로필 · 판정 · 골든타임 · 병원), 우측 = 지금 할 일
+ * (권역 · 적합도 · 실내 대안 · 일정).
+ *
+ * **열 구분선 1px 을 걷었다.** 2a 에서는 우측 열의 `border-left` 가 두 기둥을 갈랐는데,
+ * L0 바닥이 카드 사이로 비쳐 선 없이 갈린다. 선을 남기면 카드 테두리와 두 겹이 된다.
+ * `globals.css` 의 `.rail-layout` 주석이 적어 둔 "배경으로 깔면 우측 열의 흰 목록 행이
+ * 덮는다(실측 y=159..569)" 는 함정도 이 열에서는 함께 사라진다.
+ *
+ * **밴드도 전부 걷었다.** 섹션 사이 간격이 경계를 맡는다 — 2a 에서 폭(1024 미만은
+ * 밴드, 이상은 1px 선)과 상태(대안이 있을 때만 밴드)에 따라 경계 굵기가 갈리던 분기가
+ * 통째로 없어진다.
+ *
+ * **좌우를 한 번 다시 갈랐다.** 좌측 레일이 1277px 까지 부풀어 `lg:sticky` 가 뷰포트
+ * (헤더 64 를 뺀 936px)를 넘겨 무력화됐고, 그 사이 우측은 520px 이 비어 있었다. 기준은
+ * 축이다 — **시간축**("지금 나가도 되나" → "언제 나가나")은 좌측, **공간축**("어느 권역"
+ * → "어느 장소" → "비 오면 어느 실내")은 우측이다. 권역이 우측으로 옮겨 갔다.
+ *
+ * **예산은 특보 날에 이미 넘는다** (#905 실측, 1440×1000 · mock): 좌측 레일이 로그인
+ * 1220px · 게스트 1032px 이다 — 경보 문단과 골든타임 곡선이 늘어난 데다 올레·AI 배너가
+ * 더해졌다. 그날 `lg:sticky` 는 무력화되고 레일은 그냥 흐른다. 평일(특보 없음)은 예산
+ * 안이다. 배너를 더 얹을 때는 이 수치를 다시 잰다.
+ *
+ * 모바일은 한 컬럼이고 P1 → P2 → P3 순서로 카드가 쌓인다. 카드 사이 8px 로 바닥이
+ * 비치는데, 그 값이 2a 의 `Band` 와 같아 모바일 인상은 거의 그대로다.
+ *
+ * **최소 골격**: 최악에도 nav + 적합도 영역 + 병원 행은 남는다. 홈 전체를 `ErrorState` 로
+ * 덮지 않는다 — 진입점이 죽으면 아무 데도 갈 수 없다.
+ */
+export function HomeView({
+  authed,
+  showAboutIntro,
+  places,
+  plans,
+  todayIso,
+  todayLabel,
+}: {
+  authed: boolean
+  /**
+   * 서비스 소개 카드를 세우는가 (#950). **서버가 정한다** — 비로그인 + `hd_about_seen` 쿠키
+   * 없음. 브라우저는 뒤로 가기(캐시된 페이로드)에서만 쿠키로 한 번 더 막는다
+   * (`about-intro-card.tsx`).
+   */
+  showAboutIntro: boolean
+  places: PlaceSummary[]
+  plans: PlanSummaryItem[]
+  /**
+   * `2026-09-07` — **오늘도 서버가 정한다.** 클라이언트에서 `new Date()` 를 부르면
+   * 자정을 걸칠 때 서버와 브라우저가 서로 다른 일정을 고른다 (`dayToLocalNoon`).
+   */
+  todayIso: string
+  /** `2026-08-29 (금) · 제주시` — 서버에서 만들어 넘긴다 (하이드레이션 불일치 방지) */
+  todayLabel: string
+}) {
+  const [recentPlaceId, setRecentPlaceId] = useState<string | null>(null)
+
+  /*
+    서비스 소개 카드의 닫기 (#963). **두 사본이 이 상태 하나를 나눠 쓴다** — 카드는 폭마다 한
+    자리씩 두 벌이고(아래 `AboutIntroCard` 두 곳) 보이는 쪽만 그린다. 사본마다 상태를 가지면 한쪽
+    × 가 다른 쪽을 치우지 못해, 닫은 뒤 창을 1024 너머로 바꾸는 순간 숨었던 사본이 선다.
+
+    **쿠키를 구독하게 하지 않고 여기로 올렸다.** `markAboutSeen` 이 알림을 쏘고 카드가 구독하는
+    안도 되지만, 그러면 모듈 스코프 구독자 목록이 생기고 쿠키를 못 쓰는 브라우저에서는 닫히지
+    않는다. 상태 하나 · 콜백 하나가 더 적다. 뒤로 가기는 여전히 카드가 쿠키로 막는다.
+  */
+  const [aboutIntroDismissed, setAboutIntroDismissed] = useState(false)
+  const aboutIntroShown = showAboutIntro && !aboutIntroDismissed
+  const dismissAboutIntro = () => setAboutIntroDismissed(true)
+  const storedPetId = useSelectedPetStore((state) => state.selectedPetId)
+  const restore = useSelectedPetStore((state) => state.restore)
+
+  useEffect(() => {
+    restore()
+    setRecentPlaceId(readRecentPlaceId())
+  }, [restore])
+
+  const petList = usePetList(authed)
+  /*
+    **`authed ?` 삼항을 걷었다** (#200). 예전에는 조회를 막지 못해 게스트도 응답(403)을
+    받았고 그 결과를 여기서 버렸다. 이제 `usePetList` 가 미로그인에 조회하지 않으므로
+    `data` 가 `undefined` 이고, 삼항은 같은 답을 두 번 말하는 줄이 된다.
+  */
+  const pets = petList.data?.pets ?? []
+  const selectedPet = resolveSelectedPet(pets, storedPetId ?? null)
+  const condition = toPetCondition(selectedPet)
+
+  /*
+    **대표 지점 자체가 404 였는가** (#636 · 명세 D5-3). 운영 DB 에 그 id 가 없으면 몇 번을
+    물어도 같은 404 다 — 한 번 겪으면 기준을 `null` 로 굳혀 예전(기준 없음) 화면으로
+    떨어뜨린다. `useState` 인 이유는 **이 방문 동안만** 유효한 판정이어서다. 저장소에
+    남기면 배치가 장소를 되살려도 그 브라우저만 영원히 판정을 못 본다.
+  */
+  const [defaultBasisGone, setDefaultBasisGone] = useState(false)
+
+  /** 사용자가 **고른** 기준. 셋째 인자를 생략하면 대표 지점 이전의 판정 그대로다 */
+  const pickedBasisPlaceId = resolveBasisPlaceId(recentPlaceId, null)
+  /*
+    고른 것이 없으면 대표 지점으로 떨어진다 (#636 · 명세 D3-1). 첫 방문 · 새 기기 ·
+    시크릿 모드에서 판정 섹션이 통째로 빠지던 자리다.
+
+    **`useWalkSafety` 의 `enabled: placeId !== null` 은 남는다** — 아래 404 폴백이 `null` 을
+    다시 만든다.
+  */
+  const storedBasisPlaceId = resolveBasisPlaceId(
+    recentPlaceId,
+    null,
+    defaultBasisGone ? null : DEFAULT_BASIS_PLACE_ID,
+  )
+  const walkSafety = useWalkSafety(storedBasisPlaceId, condition)
+
+  /*
+    **죽은 기준 장소를 스스로 버린다** (#530). `localStorage` 의 id 가 가리키는 장소가
+    서버에서 사라지면 이 조회는 영원히 404 이고, 홈은 `오늘 판정을 불러오지 못했어요` 로
+    굳는다 — 404 에는 재시도 버튼도 없으니(`api-integration-guide.md` §3) 사용자가
+    빠져나갈 길이 화면에 없다.
+
+    **이제 한 단 더 좋아진다** (#636). 저장된 id 를 버리면 기준이 `null` 이 되는데, 그
+    `null` 을 대표 지점이 다시 받는다 — 미렌더로 떨어지지 않고 판정이 그대로 선다.
+
+    **렌더에서도 같이 끊는다.** effect 만 두면 저장소를 비우기 전 한 프레임 동안
+    `ErrorState` 가 번쩍인다 — 지워질 것이 정해진 오류를 한 번 보여 주는 셈이다.
+  */
+  const basisGone = isBasisPlaceGone(walkSafety.error)
+  const basisPlaceId = basisGone ? null : storedBasisPlaceId
+
+  useEffect(() => {
+    if (!basisGone) return
+
+    /*
+      **고른 기준을 먼저 버린다.** 저장된 id 가 마침 대표 지점과 같을 수도 있어(그 장소를
+      본 적이 있다) 순서가 뒤집히면 저장소가 안 지워진 채 대표 지점만 포기하게 된다.
+    */
+    if (pickedBasisPlaceId !== null) {
+      clearRecentPlaceId()
+      setRecentPlaceId(null)
+      return
+    }
+
+    // 대표 지점이 404 다 — 다시 시도하지 않는다 (D5-3). 개발자에게만 남기는 한 줄이다
+    console.warn(
+      `[home] 대표 기준 장소(${DEFAULT_BASIS_PLACE_ID})를 찾을 수 없어 오늘 판정을 그리지 않습니다. NEXT_PUBLIC_DEFAULT_BASIS_PLACE_ID 를 확인하세요.`,
+    )
+    setDefaultBasisGone(true)
+  }, [basisGone, pickedBasisPlaceId])
+  /*
+    골든타임 좌표 (#180). **`/emergency` 와 같은 모듈(`lib/geo/current-position`)을 쓴다** —
+    거부·타임아웃·미지원을 그 모듈이 이미 구분해 처리하고, 어느 경우에도 제주 중심 좌표를
+    돌려준다. 여기서 위치 로직을 새로 짜면 두 화면이 다르게 굴게 된다.
+
+    **진입에서 권한을 묻지 않는다** (#1133) — `getPositionIfGranted()` 는 이미 허용된
+    경우에만 좌표를 읽고, 아니면 묻지 않고 제주 중심으로 내린다. 홈은 검색으로 처음
+    들어오는 화면이라 첫 화면 권한 팝업이 이탈 요인이다(Lighthouse `geolocation-on-start`).
+    골든타임은 제주 기준으로도 답이 서고, 병원 배너는 `granted` 일 때만 실제 시설을 쓴다.
+
+    예전에는 제주시청 좌표를 상수로 박아 뒀는데, **그 값이 `JEJU_QUERY_CENTER` 의 폴백과
+    같은 값이었다** — 같은 뜻의 상수가 둘이면 반드시 갈라진다.
+
+    **기준 장소가 없어도 조회한다.** 산책 위험도는 장소가 있어야 성립하지만 골든타임은
+    좌표만 있으면 되고, 첫 방문자에게도 "오늘 언제 나가면 좋은지" 는 답할 수 있다.
+  */
+  const [position, setPosition] = useState<PositionResult | null>(null)
+
+  useEffect(() => {
+    void getPositionIfGranted().then(setPosition)
+  }, [])
+
+  /*
+    **위치를 알기 전에도 조회한다** (#1142) — 서버가 같은 좌표로 미리 받아 둔 캐시를 그대로 써서
+    LCP 문장이 첫 HTML 에 들어간다. 판정은 `lib/insight/walk-times-position.ts`.
+  */
+  const walkTimes = useWalkTimes(walkTimesQueryPosition(position), condition)
+  const regionalWeather = useRegionalWeather(condition)
+
+  /*
+    병원 배너에 실제 시설을 넣는다. **`granted` 일 때만 조회한다** — 폴백 좌표(제주 중심)
+    로 잰 거리를 "480m" 라고 쓰면 거짓말이고(`getCurrentPosition` 머리주석), 거리를 못 쓰면
+    이 조회로 화면에 보탤 것이 없다. 그때 배너는 지금까지의 고정 문구로 남는다.
+  */
+  const grantedPosition = position !== null && position.kind === 'granted' ? position : null
+  const facilities = useNearbyFacilities(grantedPosition, DEFAULT_RADIUS_METERS)
+  const nearestHospital = pickNearestHospital(facilities.data)
+
+  const topPlaces = pickTopPlaces(places, TOP_PLACE_COUNT)
+  const suitabilities = useSuitabilities(
+    topPlaces.map((place) => place.placeId),
+    condition,
+  )
+
+  const loaded = suitabilities.flatMap((query) => (query.data === undefined ? [] : [query.data]))
+  const pending = suitabilities.some((query) => query.isPending)
+  const allFailed = suitabilities.length > 0 && suitabilities.every((query) => query.isError)
+  const refetching = suitabilities.some((query) => query.isFetching && query.data !== undefined)
+
+  const heading =
+    selectedPet === null
+      ? messages.home.suitabilityFallback
+      : // 동반격 조사(와/과)는 이름의 받침에 따라 갈린다 — 고정하면 한쪽이 반드시 틀린다
+        messages.home.suitabilityHeading.replace('{name}', withCompanionParticle(selectedPet.name))
+
+  /*
+    캡션이 말할 축을 응답에서 읽는다 (`appliedFactorsOf`). **고정 문구가 아니다** — 예전에는
+    "오늘 날씨와 혼잡도 반영" 이 늘 나가서, 장소 세 장이 전부 `혼잡도 정보 없음` 인 화면에서
+    캡션과 배지가 서로를 부정했다.
+  */
+  const applied = appliedFactorsOf(loaded)
+  const sortNote = messages.home.sortNote[applied]
+
+  const placeById = new Map(places.map((place) => [place.placeId, place]))
+
+  /*
+    **기준 장소를 추천에서 뺀다** (#428). 좌측 판정이 "{장소} 기준" 으로 이미 그 장소를
+    말하고 있는데 우측 추천 1번에 같은 장소가 다시 섰다 — DESIGN.md §1 "같은 사실을 한
+    화면에서 두 번 말하지 않는다. 반복은 강조가 아니라 소음이다".
+
+    **조회는 그대로 두고 렌더에서만 뺀다.** `basisPlaceId` 는 `localStorage` 를 읽는
+    effect 뒤에야 정해지므로 첫 렌더와 하이드레이션 뒤의 값이 다르다 — 질의 집합을 여기에
+    묶으면 그 시점에 키가 바뀌어 재조회가 한 번 더 돈다.
+  */
+  const visible = loaded.filter((data) => data.placeId !== basisPlaceId)
+
+  /*
+    **점수를 낸 곳이 먼저다** (#428). 서버 순서를 그대로 쓰던 동안 `판단 근거 부족`
+    (점수 없음) 항목이 목록 맨 위에서 가장 큰 시각 무게를 받고 있었다 — 정보 가치와
+    시각 무게가 정반대였다. §1 "위계는 크기와 순서로 만든다".
+
+    **점수 안에서는 서버 순서를 지킨다.** 정렬은 "점수가 있나 없나" 한 축뿐이다 —
+    점수끼리 다시 세우면 서버가 고른 순서(적합도 외 요인이 섞인다)를 FE 가 뒤집는다.
+  */
+  const scored = visible.filter((data) => data.score !== null)
+  const unscored = visible.filter((data) => data.score === null)
+
+  /*
+    카드 전부에 똑같이 붙는 문장은 장소별 근거가 아니라 **이 화면의 전제**다 (#304).
+    카드에서 걷어 목록 위에 한 번만 적는다 — 남는 문장이 곧 장소 간 차이가 된다.
+  */
+  const { shared: sharedReasons, perPlace: placeReasons } = splitSharedReasons(
+    scored.map((data) => data.reasons),
+  )
+
+  /*
+    끝 카드 (#1069). 카드가 칸을 다 채우지 못한 날만 선다 — 목록 아래 버튼 줄 둘(`점수를
+    내지 못한 곳` · `전체 보기`)이 이 한 장으로 합쳐졌다. 3곳이 다 차면 끝 카드 없이 머리의
+    `장소 찾기` 가 맡는다. **수는 전체 수다** — 남은 수로 쓰면 같은 링크가 추천 수에 따라
+    다른 수를 말한다 (#905 R7).
+  */
+  const endCard = placeCardsEnd({
+    cards: scored.length,
+    unscored: unscored.length,
+    total: places.length,
+    capacity: TOP_PLACE_COUNT,
+  })
+
+  /*
+    비 예보일 때의 실내 대안. **추가 호출이 없다** — 위 적합도 응답에 이미 들어 있다.
+    위에서 보여 준 장소는 제외한다 (`collectIndoorAlternatives`).
+  */
+  const indoorAlternatives = collectIndoorAlternatives(
+    visible,
+    visible.map((data) => data.placeId),
+    INDOOR_ALTERNATIVE_COUNT,
+  )
+
+  /*
+    **`GET /plans` 는 날짜순이 아니다** — 최근 생성순이다. 그대로 첫 건을 집으면 지나간
+    일정이 "다가오는 일정" 으로 뜬다 (`pickUpcomingPlans`).
+  */
+  /*
+    날짜 줄의 자리를 가른다 (#428 · #530). **판정 자리가 서는 동안에는** 그쪽이 날짜를
+    맡는다 — 대기(`WalkVerdictSkeleton`) · 오류 · 판정 세 갈래가 모두 같은 자리(프로필
+    아래 판정 블록 맨 위)에 날짜를 그린다.
+
+    **대기 중에도 판정 자리다.** 예전에는 `walkSafety.data !== undefined` 까지 봐서, 판정이
+    오기 전에는 날짜가 카드 맨 위(프로필 위)에 섰다가 판정이 오는 순간 프로필 아래로
+    내려앉았다 — 로딩 화면과 완료 화면이 날짜 위치로 갈렸다. 이제 날짜는 처음부터 도착할
+    자리에 선다. 카드 맨 위는 판정 자리 자체가 없을 때(대표 지점마저 404)만 쓴다.
+
+    **폭 분기가 없다** (#530). 예전에는 이 조건이 `md:hidden` 과 곱해져 데스크톱만
+    판정에 날짜를 넘기고 모바일은 카드 밖에 남겼다 — 같은 줄이 폭에 따라 다른 물건이
+    됐다. 이제 `WalkVerdict` 가 두 폭 모두 자기 자리에 날짜를 그린다.
+  */
+  const verdictSlotShown = basisPlaceId !== null
+
+  const today = dayToLocalNoon(todayIso)
+
+  /*
+    **첫 화면 여행 배너와 맨 아래 일정 섹션** (#1113 · 명세 D5-1c). 배너는 출발 7일 안쪽 ·
+    여행 중인 일정 하나이고, 그 일정은 아래 섹션에서 빠진다 — 같은 목적지가 두 번 서지 않는다.
+    빼고 남는 것이 없으면 섹션째 숨는다 (`pickHomePlans`). 게스트는 배너도 섹션도 없다.
+  */
+  const homePlans =
+    today === null ? null : pickHomePlans(plans, today, todayIso, UPCOMING_PLAN_COUNT)
+  const tripBanner = authed ? (homePlans?.banner ?? null) : null
+  const upcomingPlans = homePlans?.upcoming ?? []
+  const planSectionShown = authed && (homePlans?.sectionShown ?? true)
+
+  /*
+    섹션 제목은 **고른 일정을 따라간다** (#561). `UPCOMING_PLAN_COUNT === 1` 이라 이 섹션에
+    서는 일정은 하나인데, 그게 여행 중이면 제목이 `다가오는 일정` 인 채로는 행의 `여행 중`
+    배지와 정면으로 어긋난다 — 행만 고치고 제목을 두면 모순이 제목으로 옮겨갈 뿐이다.
+
+    **여러 건을 세우게 되면 이 규칙을 다시 봐야 한다** — 여행 중과 다가오는 것이 한 섹션에
+    섞이면 어느 쪽도 제목이 될 수 없다. 그때는 일정 목록처럼 묶음을 갈라야 한다.
+  */
+  const showsOngoingPlan =
+    today !== null &&
+    upcomingPlans.some(
+      (plan) => planPhaseOf(plan.startDate, plan.endDate, today)?.kind === 'ongoing',
+    )
+
+  return (
+    /* L0 바닥은 `main` 이 전폭으로 칠한다 — 열에 걸면 1440 컨테이너 바깥이 희게 남는다 */
+    <Canvas as="main" id="main-content">
+      <h1 className="sr-only">혼디가개 홈</h1>
+
+      {/*
+        발효 중인 기상특보 — **홈 전체에서 여기 한 번뿐이다** (#349). 예전에는 판정 ·
+        골든타임 · 권역이 각자 배지를 그렸는데, 백엔드가 제주 전역 단일 지점에서 특보 하나를
+        골라 네 응답에 함께 싣기 때문에 **세 배지의 값이 갈릴 수 없었다.**
+
+        **`rail-layout` 밖, 두 열 위다.** 특보는 어느 한 열의 사실이 아니고, 이 자리가
+        로그인·기준 장소·폭과 무관하게 **항상 뜨는 유일한 자리**다.
+      */}
+      <WeatherWarningStrip
+        warning={pickWeatherWarning([
+          regionalWeather.data?.weatherWarning,
+          walkSafety.data?.weatherWarning,
+          walkTimes.data?.weatherWarning,
+        ])}
+      />
+
+      {/*
+        `rail-layout`(`app/globals.css`)이 2단 grid 를 만들고, 열 구분선은 우측 열의
+        `border-left` 가 그린다. 2단은 **데스크톱(1024+)부터**다. 태블릿(768~1023)은 한 컬럼을 유지한다 —
+        400px 레일 + 우측 본문이 768 에 안 들어가 가로 스크롤이 난다 (실측으로 확인).
+      */}
+      <div className="rail-layout">
+        {/*
+          ── 좌: 변하지 않는 맥락.
+
+          **`SurfaceStack` 이 sticky 를 받는다** (#428). 바닥은 `main` 이 이미 칠했고
+          이 요소는 카드 간격만 맡는다.
+        */}
+        {/* 열 사이 24 — 마주 보는 쪽만 절반을 낸다 (globals.css `.rail-layout` 주석, #559) */}
+        <SurfaceStack className="lg:sticky lg:top-16 lg:self-start lg:pr-3">
+          {/*
+            여행 배너의 **1024 미만 자리** (#1113) — 첫 카드. 한 컬럼에서 우측 열은 좌측 레일
+            뒤에 붙어(375 y≈1128) 거기 두면 첫 화면에 닿지 않는다. 1024 이상은 우측 열 머리의
+            사본이 서고 이쪽은 `display: none` 이다 — 서비스 소개 카드(#963)와 같은 처리다.
+          */}
+          {tripBanner !== null && <TripBannerCard banner={tripBanner} className="lg:hidden" />}
+
+          {/*
+            **카드 하나에 셋을 담는다** — `[누구 · 지금 안전한가 · 언제 나가나]`.
+            아래 병원 배너가 `[위급하면]` 으로 두 번째 카드다. 이 레일이 두 이야기라는
+            정의(DESIGN.md §7-1)를 카드 경계가 그대로 옮긴 것이다.
+
+            **셋을 각자 카드로 쪼개지 않는다.** 프로필과 판정이 갈라지면 판정의 화자
+            (누구 기준인가)가 사라지고, 판정과 골든타임이 갈라지면 "지금 나가도 되나 →
+            그럼 언제" 가 같은 규칙을 쓴다는 것이 안 읽힌다 (`walk-verdict.tsx` 머리주석).
+            카드 안은 1px 선이 잇는다 — 각 블록이 자기 `border-t` 를 그대로 들고 있다.
+          */}
+          <Surface>
+            {/*
+              **날짜 줄이 카드 안으로 들어왔다** (#530). 3a 로 바닥이 회색이 되면서 이 줄만
+              카드 밖에 떠 **어느 카드의 날짜인지 붙을 곳이 없었다.** #428 이 데스크톱만
+              판정 패널로 들였고 모바일은 바닥 위에 남겨, 같은 줄이 폭에 따라 다른 물건이
+              됐다.
+
+              **판정 자리가 서면 그리지 않는다.** 그때는 판정 블록이 `오늘 산책 {등급}`
+              바로 위에 같은 caption 으로 날짜를 그린다 — **두 폭 모두, 대기·오류·판정
+              세 갈래 모두 거기다.** 여기에도 두면 한 카드가 같은 날짜를 두 번 말하고,
+              대기에서만 여기 두면 판정이 오는 순간 날짜가 프로필 아래로 내려앉는다.
+
+              **판정 자리가 없을 때만 이 자리다** (대표 지점마저 404). 날짜를 잃지 않으면서,
+              잃지 않는 자리가 **카드 밖이 아니다.**
+            */}
+            {!verdictSlotShown && (
+              <p
+                className={cn(
+                  'text-caption text-fg-muted pt-4 font-medium tabular-nums',
+                  INSET_CLASS.card,
+                )}
+              >
+                {todayLabel}
+              </p>
+            )}
+
+            {authed ? (
+              <ProfileCard pets={pets} totalCount={petList.data?.totalCount ?? pets.length} />
+            ) : (
+              <ProfileCard pets={[]} totalCount={0} />
+            )}
+
+            {/*
+              판정. **첫 방문자에게도 선다** (#636) — 고른 기준이 없으면 대표 지점으로
+              떨어진다. 여기가 `null` 인 것은 이제 대표 지점마저 404 인 경우뿐이다 (D5-3).
+            */}
+            {basisPlaceId !== null && (
+              <>
+                {walkSafety.isPending && (
+                  /*
+                    **판정과 같은 칸이다** — 날짜까지 판정이 설 자리에 미리 세운다. 홈
+                    `loading.tsx` 도 같은 골격을 쓴다 (`walk-verdict-skeleton.tsx`).
+
+                    **카드 안이라 `rail` 이 아니라 `card` 다** (#485). 이 카드는 레일에
+                    서지만 인셋 축은 `Surface` 안쪽이라 형제(`ProfileCard` · `WalkVerdict`)가
+                    전부 `px-4 md:px-5` 를 쓴다. 여기만 `rail`(md 40) 이면 **로딩(40) →
+                    오류(40) → 성공(20)** 으로 재시도를 누르는 동안 글자가 좌우로 움직인다
+                    — `ErrorState` 의 `inset` JSDoc 이 적어 둔 바로 그 자리다.
+                  */
+                  <WalkVerdictSkeleton todayLabel={todayLabel} />
+                )}
+                {walkSafety.isError && (
+                  <div className="border-border border-t">
+                    {/* 날짜는 오류에서도 판정 자리 맨 위다 — 재시도가 대기로 돌아가도 날짜가 움직이지 않는다 */}
+                    <p
+                      className={cn(
+                        'text-caption text-fg-muted pt-4 font-medium tabular-nums',
+                        INSET_CLASS.card,
+                      )}
+                    >
+                      {todayLabel}
+                    </p>
+                    {/*
+                      **여기만 `h2` 로 남는다** (#456①). 이 카드(311행 `<Surface>`)는 제목도
+                      `aria-label` 도 없어 위에 `h2` 가 없다 — 한 단 내리면 페이지 `h1` 과
+                      이 제목 사이가 비어 레벨을 건너뛴다. 카드 안이라고 무조건 `h3` 가
+                      아니라, **그 카드가 `h2` 를 갖고 있을 때만** 내린다.
+                    */}
+                    <ErrorState
+                      title={messages.home.verdictErrorTitle}
+                      inset="card"
+                      onRetry={() => void walkSafety.refetch()}
+                    />
+                  </div>
+                )}
+                {walkSafety.data !== undefined && (
+                  <WalkVerdict
+                    data={walkSafety.data}
+                    petName={selectedPet?.name ?? null}
+                    todayLabel={todayLabel}
+                    /*
+                      **고른 것이 없을 때만 참이다** (#636). `isDefaultBasis` 만 보면 대표
+                      지점을 실제로 둘러본 사용자에게도 "장소를 보면 그곳 기준으로
+                      바뀌어요" 라고 말하게 된다 — 이미 그렇게 된 상태다.
+                    */
+                    basisIsDefault={pickedBasisPlaceId === null && isDefaultBasis(basisPlaceId)}
+                    busy={walkSafety.isFetching && !walkSafety.isPending}
+                  />
+                )}
+              </>
+            )}
+
+            {/*
+            골든타임. **산책 위험도 바로 아래다** — "지금 나가도 되나" 다음에 오는 질문이
+            "그럼 언제 나가나" 이고, 둘이 떨어지면 같은 판정 규칙을 쓴다는 것이 안 읽힌다.
+
+            **그래서 사이에 밴드를 두지 않는다** (#305). 2a 에서 밴드는 "여기서 다른
+            이야기가 시작된다" 는 유일한 신호였는데, 바로 위 주석이 같은 이야기라고 말하는
+            자리에 밴드가 서 있었다. 예전에는 판정이 없는 날 여기서 8px 밴드를 그렸고,
+            판정이 있는 날은 `WalkVerdict` 가 접힘 영역 안에서 그렸다 — **상태에 따라
+            경계의 굵기가 바뀌고 있었다.** (프리미티브는 #475 에서 지웠고, 3a 에서 이
+            일은 카드 경계가 맡는다 — `DESIGN.md §0`.)
+
+            지금 이 레일은 `[누구 · 지금 안전한가 · 언제 나가나]` 와 `[위급하면]` 두
+            이야기다. 앞의 셋은 1px 선으로 잇고(이 섹션의 `border-t`), **두 이야기의
+            경계는 카드 경계와 `SurfaceStack` 간격이 맡는다** — 이 섹션은 8px 밴드를
+            하나도 그리지 않는다. 스켈레톤 끝에 마지막 하나가 남아 있던 것을 #475 에서
+            걷었다 (카드 안 자식이 자기 배경을 가지면 각진 면이 radius 12 모서리를
+            덮는다 — `DESIGN.md §0`).
+
+            **조회 실패는 섹션을 숨긴다.** 홈의 최소 골격에 이 섹션은 없고, 여기에
+            `ErrorState` 를 하나 더 쌓으면 좌측 열이 오류 두 개로 채워진다.
+          */}
+            <WalkTimesSection
+              data={walkTimes.data ?? null}
+              loading={walkTimes.isPending}
+              basis={walkTimesBasis(position, walkTimes.isPlaceholderData)}
+              /*
+              **조회는 성공했는데 날씨를 못 받은 경우의 재조회** (#262). 위 주석의 "조회
+              실패는 섹션을 숨긴다" 와 다른 갈래다 — 저쪽은 `data === null`(HTTP 실패)이고
+              이쪽은 200 응답 안에서 `forecastCoverage: UNAVAILABLE` 로 온다.
+            */
+              onRetry={() => void walkTimes.refetch()}
+            />
+          </Surface>
+
+          {/*
+            서비스 소개 카드 (#950). **첫 카드 아래다 — 위가 아니다.** 홈은 설명 없이 오늘
+            상태부터 보여 준다(소개 명세 2026-09-15 §1-1). 오늘 상태를 본 다음에 "이게 뭘 보고
+            하는 말이지" 가 오고, 그 답이 `/about` 이다.
+
+            비로그인 · 소개를 본 적 없음일 때만 선다. 닫거나 `/about` 을 한 번 열면 쿠키가 남아
+            다음부터 서지 않는다 — 그 뒤 모바일의 통로는 맨 아래 `/about` 링크다(지우지 않는다).
+
+            **두 자리 중 1024 미만의 자리다** (#963) — 이상에서는 `lg:hidden` 으로 빠지고 우측
+            권역 카드 아래의 사본이 선다. 좌측 첫 카드가 약 720px 이라 이 자리는 1024×768 ·
+            1280×800 첫 화면 밖이었다.
+
+            **한 벌로 두 자리를 만들지 않은 이유** — 1024 미만에서 두 스택을 `display: contents`
+            로 풀고 `order` 로 당기는 안을 구현했다가 걷었다. 카드의 DOM 순서가 권역 뒤로 가서
+            키보드 · 스크린리더가 보이는 순서와 다르게 닿고(WCAG 1.3.2 · 2.4.3), 1024 미만 홈 전체
+            간격이 바뀌었다. `matchMedia` 로 한 자리만 그리는 안은 서버가 폭을 몰라 하이드레이션
+            뒤 카드가 옮겨 목록이 밀린다. **숨은 사본은 `display: none` 이라 탭 순서와 접근성
+            트리에서 빠진다** — 두 번 읽히지도 서지도 않는다. 대가는 서버 HTML 의 마크업 한 벌과
+            위의 공유 닫기 상태다.
+          */}
+          {aboutIntroShown && (
+            <AboutIntroCard className="lg:hidden" onDismiss={dismissAboutIntro} />
+          )}
+
+          {/*
+            AI 일정 생성 진입점 (#905 R1). 모바일 탭에는 AI 항목이 없어서, 이 배너가 없으면
+            모바일 방문자가 AI 여행 설계에 닿는 길이 `/plans` 안의 시트뿐이었다.
+
+            **골든타임 바로 아래, 올레 배너 위다.** "오늘 언제 나가나" 다음에 "그럼 일정을
+            짜 볼까" 가 온다 — 코스(어디를 걷나)보다 한 단 넓은 질문이다.
+
+            **게스트에게도 보인다.** 진입점을 숨기지 않고 `toLoginHref` 로 로그인을
+            거치게 한다 — 전역 nav 가 보호 항목을 다루는 방식과 같다 (`menu-items.ts`).
+            `authed` 는 `app/(main)/(home)/page.tsx` 가 `readSession()` 으로 정해 넘긴 값이다.
+
+            **`leading` 을 주지 않는다.** 아래 올레 배너와 같은 이유다 — `Banner` 의 아이콘
+            자리는 danger 색 고정이다. nav 의 `AI` 배지는 컴포넌트가 아니라 `nav-links.tsx`
+            안의 인라인 조각이고 `Banner.title` 은 문자열이라, 제목의 `AI` 낱말이 그 뜻을 진다.
+          */}
+          <Surface>
+            <Banner
+              href={authed ? AI_PLAN_HREF : toLoginHref(AI_PLAN_HREF)}
+              title={messages.home.aiPlanBannerTitle}
+              description={messages.home.aiPlanBannerDescription}
+              inset="card"
+            />
+          </Surface>
+
+          {/*
+            제주올레 코스 진입점 (#618 · 산책 코스 공통명세 S6-1).
+
+            **전역 nav 에 넣지 않았다.** nav 셋(장소 찾기·여행 일정·AI 일정 생성)은 *할 일*
+            축이고 항목을 늘리지 않기로 이미 정해져 있다 (`nav-links.tsx`) — `Banner` 가
+            §0 이 인정한 상시 진입점이다.
+
+            **골든타임 바로 아래다.** "오늘 언제 나가나" 다음에 오는 질문이 "그럼 어디를
+            걷나" 이고, 코스 목록이 답하는 것이 그것이다. 아래 병원 배너와 갈래가 다르다 —
+            저쪽은 "위급하면" 이라 좌측 레일의 끝에 남는다.
+
+            **`leading` 을 주지 않는다.** `Banner` 의 아이콘 자리는 danger 색 고정이라
+            (병원 배너 전용), 산책 코스에 쓰면 상시 진입점이 경보처럼 읽힌다.
+          */}
+          <Surface>
+            {/*
+              **홈에서 캐릭터는 여기 한 마리다** (#939, DESIGN.md §0-5). 목줄 산책이 "걸어 보기" 를
+              연기한다. 판정 · 골든타임 · 맞는 곳은 데이터 자리라 들이지 않는다 — 특히 위험 판정
+              옆의 앞발 자세는 캐릭터가 등급을 대신 말하는 것이 된다.
+            */}
+            <Banner
+              href="/olle"
+              title={messages.walkCourse.bannerTitle}
+              description={messages.walkCourse.bannerDescription}
+              character="leash"
+              inset="card"
+            />
+          </Surface>
+
+          {/*
+            상시 진입점. 오류·빈 화면에서도 제거하지 않는다 (Banner 주석).
+
+            **골든타임 바로 아래다.** 예전에는 권역 비교가 이 사이에 끼어 있었는데, 권역은
+            "오늘 어디로" 라 우측 열(공간축)로 옮겼다 — 이 배너는 좌측 레일의 정의
+            ("위급하면", DESIGN.md §7-1)에 그대로 남는다.
+          */}
+          <Surface>
+            <Banner
+              href="/emergency"
+              title={messages.home.emergencyTitle}
+              description={hospitalBannerDescription(nearestHospital)}
+              leading={<EmergencyIcon size={24} />}
+              inset="card"
+            />
+          </Surface>
+          {/*
+            **밴드와 끝맺음 선이 둘 다 사라졌다** (#428). 2a 는 1024 미만에서 좌우가 한
+            컬럼으로 이어지는 지점을 밴드로 끊고, 2단에서는 레일의 끝을 1px 선으로
+            맺어야 했다 — 폭에 따라 경계의 굵기가 갈리고 있었다.
+
+            3a 는 두 경우 다 **카드 사이 간격**이 경계다. 한 컬럼이든 2단이든 같은 값이라
+            폭 분기가 필요 없다.
+          */}
+        </SurfaceStack>
+
+        {/*
+          ── 우: 지금 할 일.
+
+          **열 구분선을 걷었다** (#428). 2a 에서는 이 열의 `border-left` 가 두 기둥을
+          갈랐는데, L0 바닥(`Canvas`)이 생기면 흰 카드 사이로 바닥이 비쳐 선 없이도
+          갈린다. 선을 남기면 카드 테두리와 두 겹이 된다.
+
+          선을 배경으로 깔지 않는 이유도 함께 사라졌다 — `globals.css` 의 `.rail-layout`
+          주석이 "배경으로 깔면 우측 열의 흰 목록 행이 덮는다(실측 y=159..569)" 고
+          적어 둔 그 문제다. 3a 는 모든 섹션이 흰 카드라 더 심해졌을 것이다.
+        */}
+        <SurfaceStack className="lg:pl-3">
+          {/*
+            여행 배너의 **1024 이상 자리** (#1113) — 우측 열 머리, `오늘 나가기 좋은 권역` 위.
+            우측은 "오늘 어디로" 의 열이고 이미 짠 여행이 그 첫 답이다. 좌측 레일 머리에 두면
+            "누구 · 지금 안전한가" 카드가 밀리고 레일 sticky 예산(머리주석)을 다시 깬다.
+          */}
+          {tripBanner !== null && (
+            <TripBannerCard banner={tripBanner} className="hidden lg:block" />
+          )}
+
+          {/*
+            권역 비교가 이 열의 머리다. **아래 "맞는 곳" 과 같은 질문을 넓은 단위로 먼저
+            답한다** — 권역(어느 권역) → 장소(어느 곳) 로 좁혀 읽힌다.
+
+            **조회 실패는 섹션을 숨긴다.** 그러면 이 열은 "맞는 곳" 으로 시작한다 —
+            예전 모양이라 어색하지 않다 (공통명세 S4-1 최소 골격).
+          */}
+          <RegionalWeatherSection
+            data={regionalWeather.data ?? null}
+            loading={regionalWeather.isPending}
+          />
+
+          {/*
+            서비스 소개 카드의 **1024 이상 자리** (#963) — 권역 카드 아래, `오늘 갈 만한 곳` 위.
+            권역도 오늘 상태라 "오늘 상태를 본 다음" 은 그대로이고, 권역 bottom 이 약 355 라
+            1024×768 에서도 첫 화면 안이다. 1024 미만은 좌측 레일의 사본이 서고 이쪽은
+            `display: none` 이다 — 근거는 그쪽 주석.
+
+            × 뒤 초점은 다음 형제(`오늘 갈 만한 곳`)로 간다 (`about-intro-card.tsx`).
+          */}
+          {aboutIntroShown && (
+            <AboutIntroCard className="hidden lg:block" onDismiss={dismissAboutIntro} />
+          )}
+
+          <Surface
+            lead
+            titleId="suitability-heading"
+            title={heading}
+            /*
+              **반영 축은 제목 옆 ⓘ 안이다** (#1065). 예전에는 제목 아래 상시 캡션(`날씨·혼잡도
+              반영`)이었다 — 매일 같은 말이라 읽히지 않으면서 홈 첫 화면에 글줄을 하나 더 세웠다.
+              **문구는 응답에 따라 바뀌는 그대로다** (`appliedFactorsOf`) — 장소 세 장이 전부
+              `혼잡도 정보 없음` 인 날 "혼잡도 반영" 이라고 말하지 않는다.
+
+              **둘 다 반영되지 않았으면 ⓘ 자체가 없다.** 눌러도 할 말이 없는 물음표를 두지 않는다.
+            */
+            titleTrailing={
+              sortNote === null ? undefined : (
+                <InfoTip label={messages.home.sortNoteLabel} align="start">
+                  {sortNote}
+                </InfoTip>
+              )
+            }
+            /*
+              **`N곳` 개수 줄을 걷었다** (#1069). #1065 가 반영 축을 ⓘ 로 옮기며 남긴 데스크톱
+              전용 한 줄인데, 끝 카드가 `장소 N곳 전체 보기` 로 같은 수를 말하게 되면서 한 카드
+              안에서 같은 사실이 두 번 섰다 (DESIGN.md §1). 3곳이 다 차 끝 카드가 없는 날에는
+              수가 빠지지만, 그날 할 일은 수를 읽는 것이 아니라 머리의 `장소 찾기` 다 — 요약
+              화면에서 목록 전체 수는 결정을 바꾸지 않는다. 모바일은 원래 이 줄이 없었다.
+            */
+            trailing={
+              <ButtonLink href="/places" className="hidden md:inline-flex">
+                {messages.home.findPlaces}
+              </ButtonLink>
+            }
+          >
+            {/*
+              카드에서 걷어 온 공통 근거 (#304) — 목록의 **전제**로 한 번만 선다.
+
+              **문구는 서버 `description` 그대로다.** 여기서 "오늘은" 같은 말을 앞에 붙이면
+              FE 가 서버 문장을 다시 쓰는 것이 된다 (docs/styling-guide.md §7).
+
+              **데스크톱 전용이다.** 카드 근거 자체가 `hidden md:block` 이라, 모바일에서는
+              걷어낼 것도 옮겨 올 것도 없다 — 여기에 상시 노출로 두면 없던 줄이 새로 생긴다.
+              모바일의 특보는 페이지 최상단 `WeatherWarningStrip` 이 말한다 (#349 — 예전에는
+              이 자리에 "위 권역 섹션의 배지" 라고 적혀 있었고, 그 배지는 이제 없다).
+
+              **좌측 판정에 기대지 않는다.** 예전 근거는 "첫 방문자에게는 판정 섹션이
+              렌더되지 않아 특보를 어디서도 못 본다" 였는데, #636 이 대표 지점 폴백을
+              넣으면서 그 상태가 좁아졌다 — 그래도 대표 지점마저 404 면 판정은 다시
+              사라진다(D5-3). 이 자리는 우측 열이라 로그인 여부와도 무관하게 남는다.
+            */}
+            {sharedReasons.length > 0 && (
+              <div className="hidden px-4 pb-3 md:block md:px-5">
+                {sharedReasons.map((reason, index) => (
+                  <p
+                    key={`${index}-${reason.code}`}
+                    className={cn(
+                      'text-body-2 break-keep',
+                      reason.scoreDelta === 0 ? 'text-fg-muted' : 'text-fg',
+                    )}
+                  >
+                    {reason.description}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {/*
+              **목록 위 1px 선을 걷었다** (#1069). #530 은 행 목록의 첫 행이 바로 위 글줄과 한
+              덩어리로 읽혀 선을 그었는데, 이제 첫 항목이 **사진 면**이라 머리말과 저절로 갈린다.
+              선을 남기면 사진 위에 가로줄이 하나 더 서서 카드 경계가 두 겹이 된다.
+
+              스켈레톤 · 오류 · 빈 상태는 예전처럼 **카드가 통째로 하는 말**이다.
+            */}
+            {pending && visible.length === 0 ? (
+              <SuitabilityListSkeleton />
+            ) : allFailed ? (
+              <ErrorState
+                headingLevel={3}
+                inset="card"
+                title={messages.common.temporaryErrorTitle}
+                onRetry={() => suitabilities.forEach((query) => void query.refetch())}
+              />
+            ) : visible.length === 0 ? (
+              <EmptyState
+                headingLevel={3}
+                inset="card"
+                title={messages.home.emptyPlacesTitle}
+                description={messages.home.emptyPlacesDesc}
+                action={
+                  <Link
+                    href="/places"
+                    className="text-body-2 text-link inline-flex h-11 items-center font-semibold"
+                  >
+                    {messages.home.findPlaces} ›
+                  </Link>
+                }
+              />
+            ) : (
+              /*
+                **순위로 접지 않는다** (#1069). 행 시절에는 1등만 펼치고 2·3등을 접었는데(#307),
+                카드는 크기가 같고 위계는 **순서**가 만든다 — 1위가 캐러셀의 첫 장, 그리드의
+                왼쪽 칸이다. 접으면 동반 여부까지 접혀 2위 이하의 첫 질문이 비었다.
+
+                **점수를 못 낸 곳은 카드가 아니다** (#428) — 끝 카드 안의 한 줄로 개수만 말한다.
+
+                **카드 구성이 바뀌면 틀을 새로 세운다(`key`).** 적합도 세 건은 따로 도착해 목록이
+                `[끝 카드]` → `[1위, 2위, 끝 카드]` 처럼 앞쪽에 카드가 끼어든다. 스냅 컨테이너는
+                배치가 바뀌면 **직전에 붙어 있던 항목을 따라 다시 스냅한다** — 768 실측에서 먼저
+                선 끝 카드를 따라가 scrollLeft 가 0 → 1014 → 446 으로 밀려, 첫 화면이 1위가 아니라
+                끝 카드였다. 새로 세우면 스크롤이 0 에서 시작해 **1위가 항상 첫 장이다.** 같은
+                구성의 재조회(`refetching`)는 key 가 같아 스크롤을 건드리지 않는다.
+              */
+              <PlaceInsightCardList
+                key={`${scored.map((data) => data.placeId).join(',')}|${endCard === null ? '' : 'end'}`}
+                busy={refetching}
+              >
+                {scored.map((data, index) => (
+                  <PlaceInsightCard
+                    key={data.placeId}
+                    data={data}
+                    place={placeById.get(data.placeId)}
+                    reason={pickCardReason(placeReasons[index] ?? data.reasons)}
+                  />
+                ))}
+                {endCard !== null && <PlaceCardsEndCard end={endCard} />}
+              </PlaceInsightCardList>
+            )}
+          </Surface>
+
+          {/*
+            비 예보일 때의 실내 대안. **장소 목록 바로 아래다** — 위 목록을 뒤집는 정보가
+            아니라 "비가 오면 이쪽" 이라는 곁가지라, 목록에서 떨어뜨리면 무엇의 대안인지
+            읽히지 않는다.
+
+            **밴드가 사라졌다** (#428). 2a 에서는 대안이 있을 때만 밴드를 그려야 했다 —
+            비가 안 오는 날 섹션이 `null` 이라 무조건 그리면 아래 일정 밴드와 회색 줄이
+            두 겹으로 겹쳤다. 3a 는 카드 사이 간격이 경계라 **없는 섹션은 간격도 없다.**
+          */}
+          {indoorAlternatives.length > 0 && (
+            <IndoorAlternativesSection alternatives={indoorAlternatives} />
+          )}
+
+          {/*
+            다가오는 일정(여행 중이면 제목이 바뀐다). 미로그인이면 섹션 미렌더. 여행 배너가
+            유일한 다가오는 일정을 가져갔으면 섹션째 숨는다 (`planSectionShown`).
+          */}
+          {planSectionShown && (
+            <Surface
+              titleId="plan-heading"
+              title={
+                showsOngoingPlan ? messages.home.ongoingHeading : messages.home.upcomingHeading
+              }
+              trailing={
+                plans.length > 0 ? (
+                  <Link
+                    href="/plans"
+                    className="text-body-2 text-link focus-visible:ring-brand-500 inline-flex min-h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                  >
+                    {messages.home.allPlans}
+                  </Link>
+                ) : undefined
+              }
+            >
+              {/*
+                **빈 상태가 두 갈래다.** 일정이 아예 없는 것과, 있지만 전부 지나간 것은
+                다음 행동이 다르다 — 앞은 만들라는 유도이고 뒤는 목록으로 보내는 안내다.
+                넷 다 지난 계정에 "아직 일정이 없어요" 라고 말하면 사용자는 자기 일정이
+                사라졌다고 읽는다.
+
+                **목록 위에 1px 선을 긋는다** — 위 `오늘 갈 만한 곳` 목록과 같은 처리다(#530).
+                `SurfaceList` 는 항목 사이에만 선을 그어, 제목 줄과 첫 일정 행이 한 덩어리로
+                붙어 보였다. 빈 상태에는 긋지 않는다 — 행이 아니라 카드가 통째로 하는 말이다.
+              */}
+              {upcomingPlans.length > 0 ? (
+                <SurfaceList className="border-border border-t">
+                  {upcomingPlans.map((plan) => (
+                    <UpcomingPlanRow key={plan.planId} plan={plan} today={today as Date} />
+                  ))}
+                </SurfaceList>
+              ) : plans.length === 0 ? (
+                <EmptyState
+                  headingLevel={3}
+                  inset="card"
+                  title={messages.home.noPlanTitle}
+                  description={messages.home.noPlanDesc}
+                />
+              ) : (
+                <EmptyState
+                  headingLevel={3}
+                  inset="card"
+                  title={messages.home.noUpcomingPlanTitle}
+                  description={messages.home.noUpcomingPlanDesc}
+                />
+              )}
+            </Surface>
+          )}
+        </SurfaceStack>
+      </div>
+
+      {/*
+        **모바일에서 `/about` 으로 가는 유일한 통로다.** 768 미만에는 푸터가 없고
+        (`app/globals.css` `.site-footer`), 헤더는 로고·응급·로그인만, 탭바 네 칸 중 둘은
+        보호 라우트다 — 비로그인 방문자가 데이터 출처에 닿을 수 있는 자리가 여기밖에 없다.
+        푸터를 감추는 것과 이 줄은 한 쌍이라 따로 떼지 않는다.
+
+        **`md:hidden` 이다** — 768 이상은 푸터가 같은 링크를 이미 갖고 있다. 두 곳이
+        동시에 보이면 같은 목적지가 한 화면에 두 번 선다.
+
+        **`Canvas` 안, 2열 밖이다.** 바깥에 두면 회색 바닥이 이 줄 위에서 끊긴다. 어느 한
+        열의 사실도 아니라 열 안에 넣지 않는다 — 기상특보 줄(#349)과 같은 자리 판단이다.
+
+        인셋은 `card` 다 — L0 바닥 위에 직접 놓이는 블록의 규칙이다 (`lib/ui/inset.ts`).
+      */}
+      <div className={cn('pb-6 md:hidden', INSET_CLASS.card)}>
+        <Link
+          href="/about"
+          className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
+        >
+          {messages.about.title}
+        </Link>
+      </div>
+    </Canvas>
+  )
+}

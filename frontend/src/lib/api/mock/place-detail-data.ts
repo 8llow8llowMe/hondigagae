@@ -1,0 +1,367 @@
+import { MOCK_PLACES } from '@/lib/api/mock/place-data'
+import type { PlaceDetail, PlaceImage, PlaceIntro, PlacePetInfo } from '@/types/place'
+
+/**
+ * 개발용 장소 상세 데이터.
+ *
+ * **계약을 근거로 만든 fixture 다.** 근거: backend `PlaceDetailResponse` / `PlaceIntroItem` /
+ * `PlacePetInfoItem` / `PlaceImageItem` / `PlacePresenter#toDetailResponse` (tour-service, 2026-08-27).
+ *
+ * 기본 필드는 목록 fixture(`MOCK_PLACES`)에서 파생시킨다. 목록과 상세가 다른 장소를 보여주면
+ * 개발 중에만 존재하는 착시가 생긴다.
+ *
+ * 데이터를 만들 때 지킨 것:
+ *  - **intro / petInfo 가 통째로 null 인 케이스**를 반드시 포함한다 (섹션 숨김이 기본 경로에 드러나야 한다)
+ *  - **images 가 빈 배열인 케이스**를 포함한다
+ *  - homepage 는 **HTML anchor 원문**, overview 는 **`<br>` 섞인 원문** 으로 둔다
+ *  - etcAcmpyInfo 는 개행 포함 장문으로 둔다 (TEXT 컬럼)
+ *  - 상세 응답에는 sigunguCode / indoor / sourceCategory / sourceName 이 없다 (이슈 #16)
+ */
+
+const SCOPE = {
+  FULL_AREA: {
+    code: 'FULL_AREA',
+    name: '전구역 동반 가능',
+    description: '실내외 전 구역에서 반려동물 동반이 가능합니다.',
+  },
+  PARTIAL: {
+    code: 'PARTIAL',
+    name: '일부 구역 동반 가능',
+    description: '지정된 일부 구역에서만 반려동물 동반이 가능합니다.',
+  },
+  OUTDOOR_ONLY: {
+    code: 'OUTDOOR_ONLY',
+    name: '실외만 동반 가능',
+    description: '실외 공간에서만 반려동물 동반이 가능합니다.',
+  },
+} as const
+
+const PET_SIZE = {
+  ALL: { code: 'ALL', name: '전 견종 가능', description: '견종·크기 제한 없이 동반이 가능합니다.' },
+  SMALL_ONLY: {
+    code: 'SMALL_ONLY',
+    name: '소형견만 가능',
+    description: '소형견만 동반이 가능합니다.',
+  },
+  SMALL_MEDIUM: {
+    code: 'SMALL_MEDIUM',
+    name: '중소형견 가능',
+    description: '소형견과 중형견까지 동반이 가능합니다.',
+  },
+} as const
+
+/**
+ * 영업 상태 4갈래를 mock 이 전부 싣는다 (#294).
+ *
+ * **dev 는 이 화면을 보여주지 못한다.** 장소 200곳 전수 실측(2026-09-08)에서
+ * `openNow` 가 전부 `null`, `open24` 가 전부 `false` 였다 — 문화정보원 원천의
+ * `weekly_hours_spec` 이 비어 있다. 그래서 **mock 이 유일한 확인 경로다.**
+ */
+const FULL_INTRO: PlaceIntro = {
+  infoCenter: '064-760-6331',
+  useTime: '09:00~17:50 (입장 마감 17:10)',
+  open24: false,
+  // 영업 중 — 무게를 준 배지
+  openNow: true,
+  restDate: '연중무휴',
+  parking: '가능 (승용차 40대, 30분 무료 이후 30분당 500원)',
+  chkPet: '반려동물 동반 가능 (전구역)',
+  chkBabyCarriage: '대여 가능',
+  chkCreditCard: '가능',
+}
+
+/** 일부 값만 있는 intro — 없는 줄이 숨겨져야 한다. 영업 상태는 **영업 시간 아님** 갈래다 */
+const PARTIAL_INTRO: PlaceIntro = {
+  infoCenter: null,
+  useTime: '10:00~18:00',
+  open24: false,
+  openNow: false,
+  restDate: null,
+  parking: '불가 (인근 공영주차장 이용)',
+  chkPet: null,
+  chkBabyCarriage: null,
+  chkCreditCard: null,
+}
+
+/**
+ * **24시간** 갈래. `openNow` 를 함께 두어 화면이 그것을 말하지 않는 것까지 보이게 한다 —
+ * 긴급 시설 dev 응답에 실제로 있는 `open24: true` / `openNow: false` 조합이다.
+ */
+const OPEN24_INTRO: PlaceIntro = {
+  infoCenter: '064-728-3919',
+  useTime: '매일 00:00~24:00',
+  open24: true,
+  openNow: false,
+  restDate: '연중무휴',
+  parking: '가능 (무료)',
+  chkPet: '반려동물 동반 가능 (전구역)',
+  chkBabyCarriage: null,
+  chkCreditCard: null,
+}
+
+/**
+ * **판정 근거 없음** 갈래 — 배지가 아예 나오지 않고 원문만 남아야 한다.
+ * 지금 dev 의 모든 장소가 이 상태다.
+ */
+const HOURS_UNKNOWN_INTRO: PlaceIntro = {
+  infoCenter: null,
+  useTime: '화~일 09:00~18:00',
+  open24: false,
+  openNow: null,
+  restDate: '매주 월요일',
+  parking: '가능 (승용차 20대)',
+  chkPet: null,
+  chkBabyCarriage: null,
+  chkCreditCard: '가능',
+}
+
+const FULL_PET_INFO: PlacePetInfo = {
+  acmpyTypeCd: '전구역 동반가능',
+  acmpyPsblCpam: '전 견종 동반 가능',
+  acmpyNeedMtr: '목줄 착용, 배변봉투 지참',
+  etcAcmpyInfo:
+    '반려견 동반 시 입장 전 안내데스크에서 확인을 받아 주세요.\n' +
+    '전시실 내부에서는 반려견을 안거나 이동장에 넣어 주셔야 합니다.\n' +
+    '야외 정원에서는 목줄을 착용한 상태로 자유롭게 산책할 수 있습니다.',
+  relaAcdntRiskMtr: '경사로가 있어 소형견은 안고 이동하시는 것을 권장합니다.',
+  relaFrnshPrdlst: '배변봉투, 급수대',
+  relaPosesFclty: '반려견 운동장, 야외 휴게 공간',
+  relaPurcPrdlst: '반려견 간식',
+  relaRntlPrdlst: '이동장',
+  allowanceScope: SCOPE.FULL_AREA,
+  allowedPetSize: PET_SIZE.ALL,
+  leashRequired: true,
+}
+
+/** 가공값만 있고 원문이 거의 없는 케이스 */
+const SPARSE_PET_INFO: PlacePetInfo = {
+  acmpyTypeCd: null,
+  acmpyPsblCpam: '10kg 미만 소형견',
+  acmpyNeedMtr: null,
+  etcAcmpyInfo: null,
+  relaAcdntRiskMtr: null,
+  relaFrnshPrdlst: null,
+  relaPosesFclty: null,
+  relaPurcPrdlst: null,
+  relaRntlPrdlst: null,
+  allowanceScope: SCOPE.OUTDOOR_ONLY,
+  allowedPetSize: PET_SIZE.SMALL_ONLY,
+  leashRequired: false,
+}
+
+const MEDIUM_PET_INFO: PlacePetInfo = {
+  acmpyTypeCd: '일부 구역 동반가능',
+  acmpyPsblCpam: '중형견까지 동반 가능',
+  acmpyNeedMtr: '목줄 착용 필수',
+  etcAcmpyInfo: null,
+  relaAcdntRiskMtr: null,
+  relaFrnshPrdlst: null,
+  relaPosesFclty: '야외 테라스',
+  relaPurcPrdlst: null,
+  relaRntlPrdlst: null,
+  allowanceScope: SCOPE.PARTIAL,
+  allowedPetSize: PET_SIZE.SMALL_MEDIUM,
+  leashRequired: true,
+}
+
+/**
+ * **실제로 뜨는 TourAPI 이미지다** ([#247](https://github.com/8llow8llowMe/hondigagae/issues/247) C).
+ *
+ * 예전에는 `.../mock/place-1.jpg` 같은 **일부러 404 인 가짜 경로**였다. `next/image` 가 던지지
+ * 않는지만 보려던 값이라 그림이 뜨지 않았고, 그래서 **사진이 실제로 어떻게 놓이는지는 로컬에서
+ * 한 번도 볼 수 없었다** — 갤러리 모자이크도 뷰어의 `object-contain` 도 빈 박스로만 확인했다.
+ * dev 에도 다중 이미지 장소가 없어 그 확인 경로가 아예 없었는데, 백필로 생겼다.
+ *
+ * **dev 실측으로 고른 네 장이다** (2026-09-07, 제주 26곳 · 고유 이미지 248장 중 200장 측정).
+ * 실제 분포를 덮도록 비율을 갈랐다 — 아무 네 장이나 두면 가장 흔한 모양만 보게 된다.
+ *
+ * | 비율 | 크기 | 실측 분포 | 이 배열 |
+ * | --- | --- | --- | --- |
+ * | 1.50 | 940×627 | 144장 (**가장 흔하다**) | 1번 |
+ * | 1.33 | 940×705 | 35장 | 2번 |
+ * | 1.00 | 940×940 | 12장 | 3번 |
+ * | 0.67~0.80 | 세로 | 8장 | **4번** |
+ *
+ * **파노라마(비율 2 이상)는 200장 중 0장이었다.** 세로도 4%뿐이라, `object-contain` 이 실제로
+ * 문제 되는 것은 세로 쪽 하나다 — 그래서 **세로를 4번에 뒀다.** 데스크톱은 대표 1 + 썸네일 2 만
+ * 그리므로 4번은 `+1` 뒤에 숨고, `+1` 을 누르면 뷰어가 **세로 사진에서 열린다.**
+ *
+ * **200장 전부 https 로 200 을 준다** — `imageSrc()` 의 https 승격(#227)이 실물로 확인됐다.
+ * 원본은 `http://` 로 오므로 여기에도 그대로 적는다(계약이 그렇다).
+ *
+ * **URL 을 지어내지 않는다.** 실재하는 파일이라야 이 배열의 뜻이 있고, 호스트도
+ * `remote-host.ts` 에 등록된 `tong.visitkorea.or.kr` 하나뿐이다.
+ */
+const IMAGES: PlaceImage[] = [
+  {
+    // 940×627 (1.50) — 실측에서 가장 흔한 모양
+    originImgUrl: 'http://tong.visitkorea.or.kr/cms/resource/09/3066909_image2_1.jpg',
+    smallImageUrl: 'http://tong.visitkorea.or.kr/cms/resource/09/3066909_image3_1.jpg',
+    imgName: '제주웰컴센터(2)',
+    cpyrhtDivCd: 'Type3',
+  },
+  {
+    // 940×705 (1.33). **`imgName` 을 비운다** — 원천에 이름이 없는 사진이 있고, 그때 alt 가
+    // 장소명으로 떨어지는지 봐야 한다 (갤러리·뷰어가 같은 규칙을 쓴다)
+    originImgUrl: 'http://tong.visitkorea.or.kr/cms/resource/91/3444891_image2_1.jpg',
+    smallImageUrl: null,
+    imgName: null,
+    cpyrhtDivCd: 'Type1',
+  },
+  /*
+    3장부터 데스크톱 배치가 **대표 + 썸네일 2 + `+N`** 으로 갈린다. 2장까지만 두면 그
+    분기가 화면에 한 번도 나타나지 않아, 가장 복잡한 배치를 실렌더로 볼 수 없었다.
+    4장이면 `+1` 오버레이까지 함께 나온다.
+  */
+  {
+    // 940×940 (1.00). **`cpyrhtDivCd` 가 null 인 사진이 실제로 있다** — 출처 줄 분기가 걸린다
+    originImgUrl: 'http://tong.visitkorea.or.kr/cms/resource/43/2862043_image2_1.JPG',
+    smallImageUrl: null,
+    imgName: '애월더선셋',
+    cpyrhtDivCd: null,
+  },
+  {
+    // 627×940 (0.67) — **세로 사진.** `+1` 뒤에 숨어 뷰어가 이것에서 열린다
+    originImgUrl: 'http://tong.visitkorea.or.kr/cms/resource/70/3082070_image2_1.jpg',
+    smallImageUrl: null,
+    imgName: '발트하우스 (13)',
+    cpyrhtDivCd: 'Type3',
+  },
+]
+
+const HOMEPAGE_ANCHOR =
+  '<a href="https://www.visitjeju.net/kr" target="_blank" title="새 창 열림">비짓제주 바로가기</a>'
+
+const OVERVIEW =
+  '제주 자연을 그대로 살린 공간이다.<br>반려견과 함께 산책할 수 있는 야외 동선이 마련돼 있고, ' +
+  '실내 전시 공간은 이동장 이용 시에만 입장할 수 있다.<br />주말에는 방문객이 몰려 오전 시간대를 권장한다.'
+
+type DetailVariant = {
+  intro: PlaceIntro | null
+  petInfo: PlacePetInfo | null
+  images: PlaceImage[]
+  overview: string | null
+  homepage: string | null
+  cpyrhtDivCd: string | null
+}
+
+/**
+ * 6가지 조합을 순환시켜 **nullable 경로가 항상 화면에 등장**하게 한다.
+ * 하나라도 빠지면 "내 로컬에서는 잘 보이던" 상태로 숨김 처리 버그가 지나간다.
+ *
+ * 4가지였던 것을 6으로 늘렸다 (#294) — 영업 상태가 4갈래이고 그중 둘(24시간 ·
+ * 판정 근거 없음)이 기존 조합에 자리가 없었다.
+ */
+const VARIANTS: DetailVariant[] = [
+  {
+    intro: FULL_INTRO,
+    petInfo: FULL_PET_INFO,
+    images: IMAGES,
+    overview: OVERVIEW,
+    homepage: HOMEPAGE_ANCHOR,
+    cpyrhtDivCd: 'Type1',
+  },
+  {
+    // intro 가 통째로 없다
+    intro: null,
+    petInfo: MEDIUM_PET_INFO,
+    images: [],
+    overview: OVERVIEW,
+    homepage: 'www.jejutour.go.kr',
+    cpyrhtDivCd: 'Type3',
+  },
+  {
+    // petInfo 가 통째로 없다
+    intro: PARTIAL_INTRO,
+    petInfo: null,
+    images: IMAGES.slice(0, 1),
+    overview: null,
+    homepage: null,
+    cpyrhtDivCd: null,
+  },
+  {
+    // 결합 데이터가 전부 없다 — 기본 정보만 남는다
+    intro: null,
+    petInfo: SPARSE_PET_INFO,
+    images: [],
+    overview: null,
+    homepage: null,
+    cpyrhtDivCd: null,
+  },
+  {
+    // 24시간 — `openNow` 가 어긋나도 화면은 `24시간` 만 말한다 (#294)
+    intro: OPEN24_INTRO,
+    petInfo: FULL_PET_INFO,
+    images: IMAGES.slice(0, 2),
+    overview: OVERVIEW,
+    homepage: HOMEPAGE_ANCHOR,
+    cpyrhtDivCd: null,
+  },
+  {
+    // 영업 상태 판정 근거 없음 — 배지 없이 원문만 (#294). 지금 dev 의 실상태다
+    intro: HOURS_UNKNOWN_INTRO,
+    petInfo: MEDIUM_PET_INFO,
+    images: IMAGES,
+    overview: null,
+    homepage: null,
+    cpyrhtDivCd: 'Type1',
+  },
+]
+
+/**
+ * delisted 로 내려보낼 순번. **한 곳은 반드시 있어야 한다.**
+ *
+ * 원천에서 사라진 장소는 **응답 본문의 플래그로만** 드러난다 — 404 가 아니라 200 이다
+ * (`types/place.ts` 의 `delisted` 주석). fixture 에 없으면 안내 배너도, 담기·저장이 400 으로
+ * 막히는 이유도 로컬에서 재현되지 않는다 (#146).
+ *
+ * 펜션을 고른 것은 폐업이 가장 그럴듯한 업종이어서다.
+ */
+const DELISTED_ORDINAL = 3
+
+export function mockPlaceDetail(placeId: string): PlaceDetail | null {
+  const index = MOCK_PLACES.findIndex((place) => place.placeId === placeId)
+  if (index === -1) return null
+
+  const summary = MOCK_PLACES[index]
+  if (summary === undefined) return null
+
+  const variant = VARIANTS[index % VARIANTS.length] ?? VARIANTS[0]
+  if (variant === undefined) return null
+
+  return {
+    placeId: summary.placeId,
+    // 원천이 TourAPI 가 아니면 null 이다 (#17 반영 — 그전에는 문자열 "null" 이었다)
+    contentId: index % 3 === 0 ? String(126439 + index) : null,
+    contentType: summary.contentType,
+    title: summary.title,
+    addr1: summary.addr1,
+    addr2: summary.addr1 === null ? null : '(중문동)',
+    zipcode: summary.addr1 === null ? null : '63546',
+    lat: summary.lat,
+    lng: summary.lng,
+    firstImage: summary.firstImage,
+    firstImage2: summary.firstImage2,
+    cpyrhtDivCd: variant.cpyrhtDivCd,
+    tel: summary.tel,
+    homepage: variant.homepage,
+    overview: variant.overview,
+    petAvailable: summary.petAllowanceType.code !== 'NOT_ALLOWED',
+    delisted: index === DELISTED_ORDINAL,
+    petAllowanceType: summary.petAllowanceType,
+    /*
+      **목록과 같은 값을 넘긴다** (#16). 백엔드도 같은 `Place` 도메인 모델을 보고
+      `toItem` 과 `toDetailResponse` 가 같은 매핑을 쓴다 — 여기서 다른 값을 만들면
+      목록에서 상세로 넘어갈 때 실내 여부가 바뀐다.
+
+      `MOCK_PLACES` 에 `indoor: null` · `sourceCategory: null` 장소가 이미 있어
+      "정보 없음" 분기를 로컬에서 볼 수 있다 (`place-data.ts` 주석).
+    */
+    indoor: summary.indoor,
+    sourceCategory: summary.sourceCategory,
+    sourceName: summary.sourceName,
+    intro: variant.intro,
+    petInfo: variant.petInfo,
+    images: variant.images,
+  }
+}

@@ -1,0 +1,137 @@
+package com.hondigagae.domainlayer.auth.application.service;
+
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthSessionsResponse;
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthGeneralLoginResponse;
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuthorizeResponse;
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthVerificationCodeSendResponse;
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueResponse;
+import com.hondigagae.domainlayer.auth.adapter.in.web.presenter.AuthPresenter;
+import com.hondigagae.domainlayer.auth.application.command.AuthGeneralLoginCommand;
+import com.hondigagae.domainlayer.auth.application.command.TokenReissueCommand;
+import com.hondigagae.domainlayer.auth.application.info.AuthCookieResult;
+import com.hondigagae.domainlayer.auth.application.info.GeneralLoginInfo;
+import com.hondigagae.domainlayer.auth.application.info.JwtTokenIssueInfo;
+import com.hondigagae.domainlayer.auth.application.info.JwtTokenReissueInfo;
+import com.hondigagae.domainlayer.auth.application.info.OAuthAuthorizationInfo;
+import com.hondigagae.domainlayer.auth.application.info.OAuthCallbackInfo;
+import com.hondigagae.domainlayer.auth.application.info.OAuthStateCookieResult;
+import com.hondigagae.domainlayer.auth.application.model.OAuthSignupConsent;
+import com.hondigagae.domainlayer.auth.application.port.in.AuthWebUseCase;
+import com.hondigagae.domainlayer.auth.application.service.processor.EmailVerificationProcessor;
+import com.hondigagae.domainlayer.auth.application.service.processor.GeneralLoginProcessor;
+import com.hondigagae.domainlayer.auth.application.service.processor.JwtTokenProcessor;
+import com.hondigagae.domainlayer.auth.application.service.processor.OAuthLoginProcessor;
+import com.hondigagae.domainlayer.auth.application.service.processor.PasswordResetProcessor;
+import com.hondigagae.domainlayer.member.domain.enums.OAuthProvider;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class AuthWebFacade implements AuthWebUseCase {
+
+    private final GeneralLoginProcessor generalLoginProcessor;
+    private final OAuthLoginProcessor oAuthLoginProcessor;
+    private final JwtTokenProcessor jwtTokenProcessor;
+    private final EmailVerificationProcessor emailVerificationProcessor;
+    private final PasswordResetProcessor passwordResetProcessor;
+    private final AuthPresenter authPresenter;
+
+    /**
+     * 트랜잭션을 걸지 않는다 — 이 흐름에 DB 쓰기가 없다. 회원 조회 한 번 뒤는 bcrypt 대조와
+     * Redis 왕복(실패 횟수·세션 저장)이라, 트랜잭션을 열면 가장 붐비는 경로가 커넥션을 잡은 채
+     * 원격 I/O 를 기다린다 (architecture-guide §3).
+     */
+    @Override
+    public AuthCookieResult<AuthGeneralLoginResponse> generalLogin(AuthGeneralLoginCommand command) {
+        // 1. 일반 로그인 자격 검증
+        GeneralLoginInfo generalLoginInfo = generalLoginProcessor.generalLogin(command);
+
+        // 2. 토큰 발급
+        JwtTokenIssueInfo jwtTokenIssueInfo = jwtTokenProcessor.issueTokens(generalLoginInfo.memberId(), generalLoginInfo.role());
+
+        // 3. Presenter를 통한 Info -> Response 변환
+        AuthGeneralLoginResponse response = authPresenter.toGeneralLoginResponse(jwtTokenIssueInfo);
+
+        return AuthCookieResult.of(response, jwtTokenIssueInfo.refreshToken());
+    }
+
+    @Override
+    public AuthSessionsResponse getMySessions(long memberId, String refreshToken) {
+        return authPresenter.toSessionsResponse(jwtTokenProcessor.listSessions(memberId, refreshToken));
+    }
+
+    @Override
+    public void revokeSession(long memberId, String sessionId) {
+        jwtTokenProcessor.revokeSession(memberId, sessionId);
+    }
+
+    @Override
+    public void logout(long memberId, String tokenId, String refreshToken) {
+        // 다중 기기 로그인을 지원하므로 현재 기기 세션만 무효화한다. 전 기기 무효화는 보안 이벤트 경로 전용.
+        jwtTokenProcessor.revokeCurrentSession(memberId, tokenId, refreshToken);
+    }
+
+    /** 재발급도 같은 이유로 트랜잭션을 두지 않는다 — 회원 조회 뒤는 전부 Redis 다. */
+    @Override
+    public AuthCookieResult<TokenReissueResponse> reissueToken(TokenReissueCommand command) {
+        // 1. 토큰 재발급 수행
+        JwtTokenReissueInfo jwtTokenReissueInfo = jwtTokenProcessor.reissueTokens(command.refreshToken());
+
+        // 2. Presenter를 통한 Info -> Response 변환
+        TokenReissueResponse response = authPresenter.toTokenReissueResponse(jwtTokenReissueInfo);
+
+        return AuthCookieResult.of(response, jwtTokenReissueInfo.newRefreshToken());
+    }
+
+    @Override
+    public AuthVerificationCodeSendResponse sendEmailVerificationCode(String email, String clientIp) {
+        // Redis/메일 중심 흐름이라 트랜잭션 경계를 두지 않는다 (DB 조회는 단건 findByEmail뿐).
+        return authPresenter.toVerificationCodeSendResponse(emailVerificationProcessor.sendCode(email, clientIp));
+    }
+
+    @Override
+    public void verifyEmailVerificationCode(String email, String code) {
+        emailVerificationProcessor.verifyCode(email, code);
+    }
+
+    @Override
+    public AuthVerificationCodeSendResponse sendPasswordResetCode(String email, String clientIp) {
+        // Redis/메일 중심 흐름이라 트랜잭션 경계를 두지 않는다 (DB 조회는 단건 findByEmail뿐).
+        return authPresenter.toVerificationCodeSendResponse(passwordResetProcessor.sendResetCode(email, clientIp));
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(String email, String code, String newPassword) {
+        passwordResetProcessor.resetPassword(email, code, newPassword);
+    }
+
+    @Override
+    public OAuthStateCookieResult<AuthOAuthAuthorizeResponse> generateOAuthAuthorizationUrl(OAuthProvider provider, OAuthSignupConsent consent) {
+        // state 원문을 함께 올려보낸다 — 컨트롤러가 그 값을 쿠키로도 심어 이 브라우저에 묶는다.
+        OAuthAuthorizationInfo info = oAuthLoginProcessor.generateAuthorizationUrl(provider, consent);
+        return OAuthStateCookieResult.of(authPresenter.toOAuthAuthorizeResponse(info), info.state());
+    }
+
+    @Override
+    public AuthCookieResult<AuthGeneralLoginResponse> oauthLogin(
+        OAuthProvider provider, String authCode, String state, String cookieState
+    ) {
+        // 1. state 검증 + provider 프로필 조회 — 외부 HTTP 왕복이므로 트랜잭션 밖에서 수행한다.
+        //    쿠키 state 와 대조해 이 브라우저가 발급받은 요청인지 먼저 확인하고, 통과했을 때만
+        //    state 를 소비하면서 인가 시점에 받아 둔 동의를 꺼낸다 (일회성이라 여기서만 가능).
+        OAuthCallbackInfo callbackInfo = oAuthLoginProcessor.fetchOAuthMember(provider, authCode, state, cookieState);
+
+        // 2. 회원 조회/생성 (Processor의 트랜잭션 경계) 후 토큰 발급.
+        //    콜백 결과를 풀어헤치지 않고 통째로 넘긴다 — 그 안을 무엇에 어떻게 쓰는지는 프로세서 몫이다.
+        GeneralLoginInfo loginInfo = oAuthLoginProcessor.login(provider, callbackInfo);
+        JwtTokenIssueInfo jwtTokenIssueInfo = jwtTokenProcessor.issueTokens(loginInfo.memberId(), loginInfo.role());
+
+        // 3. Presenter를 통한 Info -> Response 변환
+        AuthGeneralLoginResponse response = authPresenter.toGeneralLoginResponse(jwtTokenIssueInfo);
+
+        return AuthCookieResult.of(response, jwtTokenIssueInfo.refreshToken());
+    }
+}

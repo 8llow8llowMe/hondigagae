@@ -1,0 +1,942 @@
+# Frontend Screen Inventory
+
+> 화면별 담당 API, 상태, 착수 가능 여부. **백엔드 구현 상태와 동기화한다.**
+> 근거: `backend/docs/service-inventory.md` (백엔드 구현 현황), 루트 `README.md` (AI 기능 선정 상태)
+> 최종 확인: 2026-09-10 (dev 게이트웨이 OpenAPI 재수집 · **operation 57개** 전수 대조 — #409).
+> 그 전 실측: 2026-09-03 (백엔드 = origin/develop `48214dd` 기준, **`*WebController` 11개 · 엔드포인트 56개**)
+> 갱신 방법:
+>
+> ```bash
+> for f in $(find backend/service -name "*WebController.java" -not -path "*/build/*"); do echo "$(grep -cE '@(Get|Post|Put|Patch|Delete)Mapping' "$f")  $(basename "$f")"; done
+> ```
+>
+> **`build/` 를 빼야 한다** — 빌드 산출물의 복사본이 함께 잡히면 수가 두 배로 보인다.
+> **세는 대상은 `*WebController` 뿐이다.** 같은 서비스에 `*InternalController` 5개
+> (`/internal/v1/**`)와 `*ExceptionHandler` 9개가 함께 있어 `@RestController` 를 세면 25개가
+> 된다. `/internal/v1/**` 은 **게이트웨이가 라우팅하지 않아 FE 가 부를 수 없다**
+> (실측: `GET /internal/v1/places` → nginx 404). 이 문서가 한동안 "컨트롤러 13개" 라고
+> 적어 둔 것은 어느 기준으로도 맞지 않는 수였다 ([#207](https://github.com/8llow8llowMe/hondigagae/issues/207)).
+> **dev 게이트웨이가 올라왔다** — `https://api-dev.hondigagae.com/swagger-ui/index.html` 의
+> `/{서비스}-service/v3/api-docs` 를 받아 대조하는 편이 더 정확하다 (`/fe-api-check` 의 전제였다).
+> **plan-service 도 살아났다** (2026-09-10 확인) — 2026-09-03 에는 503 이라 일정·즐겨찾기 13개를
+> 로컬 소스로만 대조했는데, 지금은 네 서비스 모두 200 이다. 스냅샷은 `docs/api/openapi/` 에 있다.
+> **`backend/docs/service-inventory.md` 를 그대로 믿지 않는다** — 그 문서도 낡을 수 있다.
+
+## 착수 가능 여부 요약
+
+> **2026-10-01 갱신** — 요약표의 `가능` 행이 실제로는 전부 구현돼 있었다(각 절의 행 상태와 대조). 남은 것은 §6(백엔드 미착수)과 §7(AI 선정 전)뿐이다.
+
+| 영역          | 백엔드        | FE 착수                                         |
+| ------------- | ------------- | ----------------------------------------------- |
+| 홈 · 전역 nav | 구현          | **구현 완료** (#51)                             |
+| 인증 / 회원   | 구현          | **구현 완료** (§1 — 세션 관리 API 는 화면 없음) |
+| 반려견 프로필 | 구현          | **구현 완료** (§2 — #464)                       |
+| 장소 탐색     | 구현          | **구현 완료** (목록·상세·지도)                  |
+| 여행 일정     | 구현          | **구현 완료** (§4 — 상세·편집·공유·후기·브리핑) |
+| AI 일정 생성  | 구현 (Ollama) | **구현 완료** (§5)                              |
+| 장소 인사이트 | 구현          | **구현 완료** (§3-1)                            |
+| 긴급 시설     | 구현          | **구현 완료** (§5-2 — #13 · #14)                |
+| 제주올레 코스 | 구현          | **구현 완료** (§5-3 — #618)                     |
+| 그 외 전부    | 미착수        | **대기** (§6)                                   |
+
+## 1. 인증 / 회원 — **구현 완료**
+
+| 화면           | 경로                                | API                                                                          | 상태                                                                                                                    |
+| -------------- | ----------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 로그인         | `/(auth)/login`                     | `POST /auth/login`                                                           | **구현 완료** — 소셜 버튼·비밀번호 찾기 진입점 포함                                                                     |
+| 소셜 콜백      | `/(auth)/oauth/[provider]/callback` | `GET /auth/{provider}/authorize` → `GET /auth/{provider}/login?code=&state=` | **구현 완료** — kakao·naver, 중복 실행 가드                                                                             |
+| 회원가입       | `/(auth)/signup`                    | `POST /auth/email/send-code`, `/verify-code`, `POST /members/signup`         | **구현**                                                                                                                |
+| 소셜 가입 동의 | `/(auth)/signup/social/[provider]`  | `GET /auth/{provider}/authorize`                                             | **구현 완료** — 동의 3종 + 들어온 제공자 버튼 하나 ([#707](https://github.com/8llow8llowMe/hondigagae/issues/707))      |
+| 내 정보        | `/mypage`                           | `GET`·`PATCH /members/me`, `POST`·`DELETE /members/me/profile-image`         | **구현 완료** · **3층 표면 — 카드 둘** ([#466](https://github.com/8llow8llowMe/hondigagae/issues/466))                  |
+| 비밀번호 관리  | `/mypage/password`                  | `POST`·`DELETE /members/me/password`, `POST /members/me/password/setup`      | **구현 완료** — 계정 상태 3종 분기 · **3층 표면** ([#466](https://github.com/8llow8llowMe/hondigagae/issues/466))       |
+| 서비스 소개    | `/about`                            | —(백엔드 호출 없음)                                                          | **구현 완료** — 공개 경로. 8절 소개 + 예시 1회 재생 ([#635](https://github.com/8llow8llowMe/hondigagae/issues/635))     |
+| 회원 탈퇴      | `/mypage` 위 확인 모달              | `POST /members/me/withdraw`                                                  | **구현 완료** — 라우트 ~~`/mypage/withdraw`~~ 를 모달로 ([#944](https://github.com/8llow8llowMe/hondigagae/issues/944)) |
+| 비밀번호 찾기  | `/(auth)/password/reset`            | `POST /auth/password/reset/send-code`, `/auth/password/reset`                | **구현 완료** — 한 라우트 2단계 + 완료 안내                                                                             |
+
+주의: 소셜 로그인은 **2-step API 흐름** (`auth-guide.md` §1). 서버 리다이렉트가 아니다.
+
+주의: `state` 는 서버가 조회와 동시에 지운다 (Redis `GETDEL`). **콜백에서 교환을 두 번
+부르면 두 번째는 무조건 `AUTH_010`** 이므로 `use-oauth-exchange.ts` 의 ref 가드를 지운 채
+리팩터링하면 개발 모드(StrictMode)에서 성공 직후 오류 화면이 덮인다.
+
+**FE 미연동 (백엔드는 구현됨)** — dev Swagger 대조에서 드러났다 ([#207](https://github.com/8llow8llowMe/hondigagae/issues/207)).
+이 문서에 아예 없던 항목이라 여기 남긴다.
+
+| API                                 | 응답                                                                                              | 비고                                                                                                                |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `GET /auth/sessions`                | `AuthSessionsResponse` — `sessions[]`(`sessionId` · `lastRefreshedAt` · `current`) · `totalCount` | **로그인 기기 목록.** `refreshToken` 을 **쿠키로** 읽는다                                                           |
+| `DELETE /auth/sessions/{sessionId}` | `Response<Void>`                                                                                  | 개별 세션 강제 종료 (다른 기기 로그아웃)                                                                            |
+| `POST /members/signup/dev`          | `MemberDevSignupResponse` — `memberId` · `email`                                                  | **개발 서버 전용** 즉시 가입([#185](https://github.com/8llow8llowMe/hondigagae/issues/185)). 이메일 인증을 생략한다 |
+
+- **"기기 관리" 화면이 아직 없다.** 아트보드에도 없어 붙일 자리가 없다. 화면을 만들 때
+  `refreshToken` 이 **쿠키 파라미터**라는 점이 걸린다 — 이 저장소는 refresh 를 Next 서버
+  세션에 봉인하므로(`auth-guide.md`) BFF 가 쿠키로 되돌려 실어야 한다. `reissue`·`logout` 이
+  이미 그 경로를 쓰므로(`toCookieHeader`) 새로 만들 것은 없다.
+- **`POST /members/signup/dev` 는 FE 가 부르지 않는다.** 화면에서 쓰면 프로덕션에 남는다 —
+  개발용 계정은 curl 로 만든다.
+
+## 2. 반려견 프로필 — **구현 완료**
+
+| 화면             | 경로            | API                                           | 상태                                                                                                                                         |
+| ---------------- | --------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 반려견 목록      | `/pets`         | `GET /members/me/pets`                        | 구현 · **3층 표면** ([#464](https://github.com/8llow8llowMe/hondigagae/issues/464))                                                          |
+| 반려견 등록      | `/pets/new`     | `POST /members/me/pets`                       | 구현 · **3층 표면** ([#464](https://github.com/8llow8llowMe/hondigagae/issues/464))                                                          |
+| 반려견 수정·삭제 | `/pets/[petId]` | `GET`·`PUT`·`DELETE /members/me/pets/{petId}` | 구현 · **3층 표면 — 카드 둘** ([#464](https://github.com/8llow8llowMe/hondigagae/issues/464)) (읽기 전용 상세는 두지 않는다 — 공통명세 S5-1) |
+
+**사진 · 체중 · 대표견도 붙어 있다** ([#126](https://github.com/8llow8llowMe/hondigagae/issues/126))
+
+| 기능        | API                                                    | 어디                                                                                               |
+| ----------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| 반려견 사진 | `POST`·`DELETE /members/me/pets/{petId}/profile-image` | `pet-photo-section.tsx`. multipart — 회원 프로필 사진(#79)과 같은 통과 경로                        |
+| 체중        | `PetSaveRequest.weightKg`                              | `pet-form.tsx`. `0.1~99.9` 소수점 1자리이고 **`GET /places` 의 `petWeightKg` 필터가 이 값을 쓴다** |
+| 대표견      | `PUT /members/me/pets/{petId}/representative`          | `pet-photo-section.tsx`. **AI 일정과 담기가 지정이 없을 때 이 값을 기본으로 쓴다**                 |
+| 삭제 영향   | `GET /plans/companions/{petId}`                        | `pet-delete-section.tsx`. 삭제 확인창의 연결된 일정 수 (#1042)                                     |
+
+주의: 등록 상한이 있다 (`PET_002 PET_LIMIT_EXCEEDED`, HTTP 400). 타인 반려견 조회는 **404** 다.
+
+## 3. 장소 탐색 — **구현 완료**
+
+| 화면                        | 경로                   | API                                                                                                     | 상태                                                                                      |
+| --------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 장소 목록                   | `/places`              | `GET /places` (지역·타입·반려견 동반 필터, `SliceResponse` 커서)                                        | 구현                                                                                      |
+| 지도 아일랜드 헤더          | `/places?view=map` 내  | **없음** — 셸 헤더의 모양 · 자리만 바뀐다                                                               | 구현 (#1287)                                                                              |
+| 지도 아일랜드 알약 정리     | `/places?view=map` 내  | **없음** — 알약 내용 · 우측 조작 카드 · 미리보기 머리만 바뀐다                                          | 구현 (#1300)                                                                              |
+| 장소 상세                   | `/places/[placeId]`    | `GET /places/{placeId}` + `GET /places/{placeId}/suitability` (intro/petInfo/images 결합, **nullable**) | 구현 — 영업 상태 포함 (#294)                                                              |
+| 장소 상세 하단 바           | `/places/[placeId]` 내 | `GET`·`POST`·`DELETE /favorites/places` + `POST /plans` + `PUT /plans/{planId}/days/{day}/items`        | 구현 — 저장 + 일정에 담기 ([#118](https://github.com/8llow8llowMe/hondigagae/issues/118)) |
+| 지도 뷰                     | `/places?view=map`     | 목록 캐시 재사용 + `GET /places/nearby`(지도 이동 시) + 카카오 지도 SDK                                 | **구현** ([#14](https://github.com/8llow8llowMe/hondigagae/issues/14))                    |
+| 지도 병원·약국 층           | `/places?view=map` 내  | `GET /emergencies/facilities` (토글을 켰을 때만 · 고정 50km)                                            | **명세** (#1286)                                                                          |
+| 필터 줄 반려견 칩           | `/places?view=map` 내  | **없음** — 반려견 목록(프리페치) 재사용 · 판정 재조회 · 체구 필터 URL 맞춤                              | **구현 완료** (#1301)                                                                     |
+| 지도 필터 한 줄 · 필터 시트 | `/places?view=map` 내  | **없음** — 같은 `GET /places` · `GET /places/nearby` 필터 파라미터, 컨트롤 자리만 바뀐다                | **구현 완료** (#1314)                                                                     |
+
+주의:
+
+- **즐겨찾기 여부는 단건 API 로 확인할 수 있다** — `GET /favorites/places/{placeId}` → `{placeId, favorited}`.
+  화면은 아직 목록(`GET /favorites/places`) 전량을 받아 판정한다. 100곳 상한이라 당장 문제는
+  아니지만 단건 쪽이 의도에 맞다 ([#127](https://github.com/8llow8llowMe/hondigagae/issues/127) 에서 함께 정리).
+- **공개 API다.** tour-service는 security 의존이 없다 → 보호 경로 아님.
+  **단, 하단 바의 즐겨찾기·담기는 보호 리소스다** — 미로그인에는 조회조차 보내지 않는다
+  (401 이 전역 재발급을 헛돌린다).
+- **필터의 반려견 크기 축도 보호 리소스를 쓴다** ([#200](https://github.com/8llow8llowMe/hondigagae/issues/200)).
+  내 반려견을 기준으로 거르므로 `GET /members/me/pets` 가 필요하다 → **공개 화면인데
+  로그인 여부가 필요하다.** 그래서 `/places` 페이지가 `readSession()` 으로 판정해
+  `PlaceFilterRail`·`PlaceFilterChips` 에 `authed` 를 내려보낸다.
+  **`usePetList(authed)` 는 인자가 필수다** — 기본값을 주면 안 넘긴 호출부가 조용히
+  예전 동작(미로그인 403)으로 돌아간다. 이것이 #200 의 결함 모양이었다.
+- 무한 스크롤(`hasNext`) 기본.
+- **목록 정렬은 `placeId` 오름차순이고 최신순이 아니다** (BE #321). 아이디 대역이 원천별로
+  갈려 있어 사진·개요가 있는 관광정보(TourAPI) 장소가 먼저 오고, 이미지가 없는
+  문화정보원·식약처 장소가 뒤에 온다. **클라이언트가 재정렬하지 않는다** — 커서(`lastPlaceId`)가
+  서버 정렬에 묶여 있어 순서를 바꾸면 페이지 경계가 깨진다.
+- 데이터가 비어 있으면 batch 적재가 안 된 것이다 (`local-run-guide.md` §4).
+- **목록 필터 파라미터 (백엔드 `PlaceWebController` 실측)**: `areaCode`(제주=39), `sigunguCode`,
+  `contentType`(enum name — `TOURIST_SPOT` `CULTURE` `FESTIVAL` `COURSE` `LEPORTS` `LODGING` `SHOPPING` `RESTAURANT`),
+  `petAllowanceType`(`ALLOWED` `PARTIALLY_ALLOWED` `NOT_ALLOWED` `UNKNOWN`),
+  `indoor`(true 면 실내만), `allowedPetSize`(`ALL`/`SMALL_ONLY`/`SMALL_MEDIUM`/`UNKNOWN`),
+  `petWeightKg`(내 반려견 체중, **`Integer`**),
+  `sourceCategory`(원본 분류 자유 문자열, 예: 카페), `keyword`(장소명·주소 부분 일치, 최대 50자), `lastPlaceId`(커서), `size`(1~50, 기본 20).
+  **모두 단일값이며 배열이 아니다.** `keyword` 는 공백/빈 값이면 필터 없음이다 (#421).
+  화면 입력은 **목록 갈래와 지도 갈래 양쪽**에 있다 ([#431](https://github.com/8llow8llowMe/hondigagae/issues/431) ·
+  지도는 [#596](https://github.com/8llow8llowMe/hondigagae/issues/596)) — 정규화는
+  `lib/url/keyword.ts` 한 곳이고 `/emergency` 와 같은 규칙을 쓴다.
+- **`petWeightKg` 는 `petSizeType` 과 한 컨트롤이 함께 켠다** (#126). 아트보드의
+  "몽실이가 들어갈 수 있는 곳만" 체크 하나가 두 파라미터를 같이 보낸다 — 같은 축이라
+  따로 켜면 판정이 반쪽이 된다. 체중을 모르는 아이는 크기만 보낸다.
+- **체중은 올려서 보낸다.** 파라미터가 `Integer` 인데 조건이
+  `maxPetWeightKg >= petWeightKg` 라, 3.5kg 를 내림해 `3` 으로 보내면 **상한 3kg 인 곳이
+  통과한다.** 계산은 `lib/pet/weight.ts` 의 `toPlaceFilterWeight` 한 곳이다.
+- **`indoor` 주의**: 원천에 정보가 없는 장소(`indoor: null`)는 true/false **어느 쪽 필터에도 잡히지 않는다.**
+- `PlaceItem` 에 `indoor` / `sourceCategory` / `sourceName`(출처 표시명) 필드가 있다.
+- `contentType` / `petAllowanceType` 은 **응답에서 metadata 객체**(`{code, name, description}`)로 온다 → 서버 문구를 그대로 렌더한다.
+- `placeId` 는 응답에서 **문자열**이다 (백엔드 내부는 long).
+- **상세 컨트롤러는 `@PathVariable long` 이다** → 숫자가 아닌 `placeId` 는 404 가 아니라 **400(`PLACE_113`)** 이다.
+- **상세 응답(`PlaceDetailResponse`)에 `indoor` / `sourceCategory` / `sourceName` 이 들어왔다**
+  ([#16](https://github.com/8llow8llowMe/hondigagae/issues/16) 반영) **그리고 화면에 붙였다**
+  ([#112](https://github.com/8llow8llowMe/hondigagae/issues/112)). 목록(`PlaceItem`)과 **같은 매핑**이고
+  `sourceName` 은 표시명(`문화정보원`)이다. `indoor` 의 `null` 은 "원천에 정보 없음" 이라
+  `false`(야외)와 다르게 다룬다 — 메타 줄에서 낱말을 빼고, 장소 상세 · 지도 미리보기만 "실내 여부 미확인"
+  배지로 드러낸다. **목록 행은 #1267 에서 그 배지를 뺐다** — 모르는 정보를 행마다 반복하면 잡음이고, 낱말이
+  빠지는 것으로 충분하다. 조립은 `lib/place/meta.ts` 한 곳이다.
+- **`sigunguCode` 는 여전히 상세 응답에 없다.** 목록 항목에만 있다 — #16 범위가 아니었다.
+- **영업 상태(`intro.open24` / `intro.openNow`)는 화면에 붙었지만 dev 데이터가 비어 있다**
+  ([#294](https://github.com/8llow8llowMe/hondigagae/issues/294)). 장소 200곳 전수 조회
+  (2026-09-08)에서 `openNow` 가 **전부 `null`**, `open24` 가 **전부 `false`** 였다 —
+  `useTime` 은 131곳 전부 채워져 있고 `매일 00:00~24:00` 인 곳조차 `open24: false` 다.
+  BE `152ef4e`(#267)가 `weekly_hours_spec` 컬럼과 문화정보원 CSV 구조화를 넣었는데 그
+  원천의 장소가 전부 비어 오므로 **재적재/백필 누락으로 보인다.** FE 는 `openNow: null` 을
+  **완전 숨김**으로 다루므로 지금 화면은 종전과 같고, 백필되면 자동으로 배지가 뜬다.
+  **확인은 mock 6갈래로만 된다** (`features/place/장소상세-세부명세.md` D5-5).
+- **`delisted` 를 404 로 대신 읽지 않는다** ([#146](https://github.com/8llow8llowMe/hondigagae/issues/146)).
+  원천에서 사라진 장소의 상세는 **200 + `delisted: true`** 로 온다 — 기존 일정(`plan_item`)이
+  참조하는 장소라 백엔드가 일부러 계속 응답한다. `GET /places/{placeId}` 가 **404** 를 내는 것은
+  _병합된_(`mergedIntoId`) 장소뿐이다. 판정은 `lib/place/availability.ts` 하나가 갖고,
+  장소 상세와 AI 초안 미리보기가 함께 쓴다.
+- 상세의 `contentId` 는 원천이 TourAPI 가 아니면 **`null`** 이다
+  ([#17](https://github.com/8llow8llowMe/hondigagae/issues/17) 반영 — 그전에는 문자열 `"null"` 이었다).
+  타입은 `string | null` 이 맞다.
+- 상세의 `homepage` / `overview` 는 **HTML 태그가 섞인 원문**이다. `dangerouslySetInnerHTML` 을 쓰지 않는다.
+- 지도 좌표는 백엔드가 `lat`/`lng` (Double) 로 정규화해 내려준다. 카카오는 `LatLng(위도, 경도)` 순서이므로 `lat` 이 먼저다 (`external-api-guide.md`).
+- **지도 뷰(`?view=map`)의 데이터 출처는 둘이고 갈리는 조건이 명확하다** (#14).
+  들어온 직후에는 **목록 캐시를 재사용**하고(`architecture-guide.md` §9 "지도 뷰: 별도 조회 금지"),
+  **"이 지역에서 재검색" 버튼을 눌렀을 때만** `GET /places/nearby` 로 갈아탄다 (#396). 첫 `idle` 을
+  조회 계기로 세면 들어오자마자 프리페치를 버리고 반경 밖을 조회해 **첫 화면이 빈다** — 실제로 그랬다.
+  목록·핀의 지도 영역 필터도 그 버튼 뒤에 켜진다 (#1143 — 첫 `idle` 에 거르면 행이 빠지며 CLS 가 났다).
+- **`view` 는 백엔드 파라미터가 아니다.** 화면 표현 상태이고 `lib/url/view-mode.ts` 가 소유한다.
+  장소 찾기와 긴급 시설이 같은 키를 쓴다.
+- **장소 찾기와 긴급 시설 모두 지도가 기본이다** (`PLACES_DEFAULT_VIEW` ·
+  `EMERGENCY_DEFAULT_VIEW`). `/places` 와 `/emergency` 가 지도이고 목록이 `?view=list` 로
+  붙는다. 긴급 시설은 한때 목록이 기본이었다 — _"급할 때 필요한 것은 위치가 아니라
+  전화번호이고 지도 SDK 를 기다릴 여유가 없다"_. 그 근거는 [#353](https://github.com/8llow8llowMe/hondigagae/issues/353)
+  에서 **두 장치로 옮겨 지켰다**: 모바일 시트가 중간 단계로 열려 첫 화면에 행과 52px 전화
+  버튼이 이미 보이고, SDK 가 실패하면 목록 보기로 옮긴다(#1289 — 예전에는 지도 자리에 축소판 목록을 그렸다). `parseViewMode` 와
+  `viewModeHref` 에 **같은 기본값**을 넘겨야 한다. 어긋나면 토글이 가리키는 보기와 페이지가
+  그리는 보기가 달라져 전환이 먹지 않는다.
+- **긴급 시설의 필터·반경도 URL 이 소유한다** (`lib/url/emergency-filters.ts` ·
+  [#371](https://github.com/8llow8llowMe/hondigagae/issues/371)). `?type=ANIMAL_HOSPITAL` ·
+  `?open24Only=true` · `?openNowOnly=true` · `?keyword=한라` · `?radius=40000` 이고 기본값은
+  생략한다. **`keyword` 는 `/places` 와 같은 키다** ([#584](https://github.com/8llow8llowMe/hondigagae/issues/584)) —
+  저쪽은 서버로 보내고 이쪽은 화면에서 좁히지만, 같은 뜻의 값이 화면마다 다른 키로 실리면
+  주소를 손으로 고치는 사용자가 매번 다시 배운다. 정규화는 `lib/url/keyword.ts` 한 곳이다.
+  그전에는 컴포넌트 state 라 **`24시간` 을 켜고 40km 로 넓힌 뒤 공유한 링크가 받는 사람에게
+  기본 화면으로 열렸다** — 새로고침·뒤로가기도 좁힌 조건을 버렸다.
+  반경은 URL 에 실리지만 **필터가 아니라 조회 파라미터**라 「초기화」 대상이 아니다
+  (`EmergencyBoardParams` 가 반경을 `filters` 밖에 둔다).
+  **권역 세그먼트도 URL 이 소유한다** — `?region=SEOGWIPO`
+  ([#674](https://github.com/8llow8llowMe/hondigagae/issues/674) · 세부명세 D3-3). 그전에는
+  권역만 컴포넌트 state 라 새로고침 한 번에 고른 기준이 말없이 사라졌다. **좌표
+  (`searchCenter` · `position`)는 여전히 URL 에 두지 않는다** — 받는 사람에게 뜻이 없는 값이다.
+- **보기 전환 링크는 조건을 실어야 한다.** `viewModeHref('/emergency', '', …)` 처럼 쿼리를
+  비워 두면 목록↔지도 전환이 좁힌 조건을 통째로 버린다. 서버(토글)와 클라이언트(조건 변경)
+  **양쪽이 `viewModeHref` 를 거친다**.
+- **지도 뷰에도 필터가 있다** (`place-map-filter-bar.tsx`). **한 줄 + 필터 시트다** (#1314,
+  `features/place/장소-지도필터-한줄-세부명세.md`) — 맨 앞 `필터 n` 버튼(지역 · 실내/야외 · 체구를 시트 하나에서,
+  n 은 시트 안 걸린 축 수) · 구분선 · 반려견 칩(아일랜드 · 로그인) 뒤에 `동반 가능만` · 유형 · `초기화` 가 가로
+  스크롤러에 선다. 칩은 `sm`(모바일 36 · ≥768 44). 데스크톱 패널 머리와 모바일 시트 머리가 같은 줄을 쓰고, 모바일
+  시트의 개수 줄은 그 아래 32 글줄이다(`MapSheet headerSize="sm"`). 예전에는 지도 보기에 필터 컨트롤이 아예 없어
+  조건을 좁히려면 목록으로 되돌아가야 했다.
+  "더 있다" 신호(fade 마스크 + 원형 화살표)는 홈의 시간대 곡선과 **같은 `ScrollRail` 을
+  쓴다** (`components/scroll-rail.tsx`) — 같은 사실을 말하는 컨트롤이 화면마다 다르게
+  생기면 사용자가 두 번 배운다. 화살표는 `.scroll-rail-arrow` 가 `pointer: coarse` 에서
+  숨기므로 터치에는 나오지 않는다.
+- **지도를 옮기면 항상 그 지역을 다시 찾는다.** "지도 이동 시 재검색" 체크박스는 걷었다 —
+  켜고 끄는 것이 바꾸는 것은 데이터 출처인데 화면만 보고는 알 수 없었다.
+- **목록은 "더 보기" 버튼이 아니라 무한 스크롤이다** (`components/infinite-scroll-sentinel.tsx`).
+  커서 페이지네이션은 그대로다 — 표식이 화면에 들어오면 `fetchNextPage()` 가 돈다.
+
+## 3-1. 장소 인사이트 (적합도 · 산책 위험도) — **구현 완료**
+
+| 화면           | 경로                            | API                                        | 상태                                 |
+| -------------- | ------------------------------- | ------------------------------------------ | ------------------------------------ |
+| 여행 적합도    | `/` 홈 · `/places/[placeId]` 내 | `GET /places/{placeId}/suitability`        | **구현** — 홈(#51) · 장소 상세(#64)  |
+| 산책 위험도    | `/` 홈 · `/places/[placeId]` 내 | `GET /places/{placeId}/walk-safety`        | **구현** — 홈(#51) · 장소 상세(#197) |
+| 산책 골든타임  | `/` 홈                          | `GET /insights/walk-times`                 | **구현** (#167)                      |
+| 권역 날씨 비교 | `/` 홈                          | `GET /insights/regional-weather`           | **구현** (#169)                      |
+| 기상특보 표시  | `/` 홈 · `/places/[placeId]` 내 | 적합도·산책 위험도 응답의 `weatherWarning` | **구현** (#165)                      |
+| 기간 혼잡도    | `/places/[placeId]` 내          | `GET /places/{placeId}/congestions`        | **구현** (#430)                      |
+
+근거: tour-service `insight` 컨텍스트 / `PlaceInsightWebController` **실측**.
+이 서비스의 차별점이 담긴 응답이라 계약을 자세히 적어 둔다.
+
+**`GET /places/{placeId}/congestions` — `PlaceCongestionResponse`** (BE PR #138 · #425)
+
+| 필드                                   | 타입                          | 화면 지침                                                                                                     |
+| -------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `fromDate` · `toDate`                  | `LocalDate`                   | **카드 머리의 기간 표기가 이 둘이다.** FE 가 `days` 로 계산하지 않는다 — 서버가 기간을 자르면 표기만 늘어난다 |
+| `dailyCongestions[]`                   | `DailyCongestionItem[]`       | `date` · `level` · `concentrationRate`. **데이터 없는 날짜도 `UNKNOWN` 으로 자리를 지킨다 — 걸러내지 않는다** |
+| `dailyCongestions[].concentrationRate` | `Double \| null`              | 0~100. **`UNKNOWN` 이면 null 이다** — 0 으로 렌더하면 막대가 "가장 한산한 날" 처럼 보인다                     |
+| `leastCrowded`                         | `DailyCongestionItem \| null` | 같은 모양 하나. **없으면 null** 이고, 그때는 **자리를 만들지 않는다** — 아는 날이 하나도 없다는 뜻이다        |
+
+- 조회는 `fromDate`(기본 오늘) · `days`(기본 7 · 1~30)다. FE 는 **`fromDate` 를 보내지 않고**
+  (브라우저 타임존이 KST 가 아니면 어제부터의 기간이 나간다) `days` 만 7 · 30 둘 중 하나로 보낸다.
+- **반려견 조건을 받지 않는다** (dev Swagger 실측 2026-09-14). 붐빔은 장소와 날짜의 속성이다.
+- `leastCrowded` 규칙(UNKNOWN 제외 최저 집중률, 동률이면 가장 이른 날짜)은 BE 의
+  `CongestionSnapshot.leastCrowded` **한 곳**이다 — **FE 가 다시 고르지 않는다.** 같은 기간에
+  다른 날을 추천하게 된다.
+- **혼잡도 예측은 30일 rolling 이라 예보(약 11일)보다 멀리 답한다.** 적합도가 `INSUFFICIENT`
+  로 비는 날짜도 여기서는 붐빔 정도를 말할 수 있다.
+
+**FE 연동은 #430 이 했다** — 장소 상세의 판정 카드 **아래 새 L1 카드**(`PlaceCongestionPanel`)다.
+적합도 응답의 `congestion`(그 날 하나)과 겹치지 않는다: 장소 상세는 그 필드를 화면에 쓰지
+않고(혼잡 배지는 홈의 `place-insight-row` 뿐이다), 두 값은 시간 축이 다르다.
+
+**`GET /places/{placeId}/suitability` — `PlaceSuitabilityResponse`**
+
+| 필드                              | 타입                       | 화면 지침                                                                                                                                                                                                                     |
+| --------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `score`                           | `Integer`                  | 0~100 추정. **단위 없는 숫자를 그대로 두지 않는다** — 등급과 함께                                                                                                                                                             |
+| `suitabilityLevel`                | `ScoreMetricMetadata`      | 등급 metadata. `name` 을 그대로 렌더한다                                                                                                                                                                                      |
+| `reasons[]`                       | `SuitabilityReasonItem[]`  | **XAI.** `scoreDelta` 가 음수면 감점, `0` 이면 정보성                                                                                                                                                                         |
+| `weather`                         | `DailyWeatherItem \| null` | **예보 범위 밖이면 null** → 섹션을 숨긴다                                                                                                                                                                                     |
+| `weather.maxFeelsLikeTemperature` | `Double \| null`           | 하루 최고 체감온도(기상청 여름철 산식 — #292 이전에는 NOAA 열지수였다). **판정 옆 큰 숫자가 이 값이다** ([#253](https://github.com/8llow8llowMe/hondigagae/issues/253)). 중기예보는 null 이고 그때만 `maxTemperature` 가 선다 |
+| `congestion`                      | `CongestionItem`           | `level` 이 `UNKNOWN` 일 수 있다 (연결 데이터 없음)                                                                                                                                                                            |
+| `alternativePlaces`               | `AlternativePlaceItem[]`   | **비 예보일 때만 채워진다.** 안 오면 빈 배열 → 숨긴다                                                                                                                                                                         |
+
+- `reasons` 는 **점수 영향이 큰 순서**로 온다. 재정렬하지 않는다.
+- `description` 이 데이터 근거를 담은 완성 문장이다 ("최고기온 31도 로, 더위에 약한 아이에게는 부담이 큽니다."). **FE 가 문장을 조립하지 않는다.**
+- `scoreDelta` 부호로 감점/정보성을 시각 구분한다. 숫자를 그대로 노출할지는 디자인 판단.
+
+**`GET /places/{placeId}/walk-safety` — `WalkSafetyResponse`**
+
+| 필드                       | 타입                     | 화면 지침                                                                                        |
+| -------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
+| `walkSafetyLevel`          | `ScoreMetricMetadata`    | 등급 metadata                                                                                    |
+| `reasons[]`                | `WalkSafetyReasonItem[]` | `scoreDelta` 가 **없다** (적합도와 다르다)                                                       |
+| `estimatedPavementCelsius` | `Double`                 | **단위 ℃ 를 표기한다** (노면 온도)                                                               |
+| `feelsLikeCelsius`         | `Double`                 | **판정 기준값.** `체감온도` 라벨 + 단위 ℃ (#259). **시각 기준**이다                              |
+| `feelsLikeBasis`           | `String \| null`         | 산식·입력·임계 출처를 담은 완성형 문장. **접힌 서랍에 둔다** (#292)                              |
+| `heatIndexCelsius`         | `Double`                 | **참고값 — 판정에 쓰이지 않는다** (#292). 평면에 세우지 않고 서랍 안에서 `참고 열지수` 로 부른다 |
+| `heatIndexBasis`           | `String \| null`         | "산책 위험도 계산에는 쓰지 않으며…" 를 말하는 문장. **값과 붙여 둔다** (#292)                    |
+| `saferWindowStart/End`     | `LocalTime \| null`      | **없으면 null** → "더 안전한 시간대" 를 숨긴다                                                   |
+
+- **`*Basis` 는 대응 값이 null 이면 같이 null 이다** (BE `WalkSafetyPresenter`). 둘 다 같은
+  `temperature` 에서 나오므로 실무상 함께 있거나 함께 없다.
+- **판정 기준이 NOAA 열지수 → 기상청 여름철 체감온도로 바뀌었다** (BE `46f35e4` · FE #292).
+  근거 코드도 `HEAT_INDEX_HIGH` → **`FEELS_LIKE_HIGH`** 다. 33℃/85% 에서 두 산식이
+  NOAA 48 vs 기상청 35.5 로 갈리므로 **더운 날 필드를 잘못 읽으면 화면이 크게 틀린다.**
+
+- 적합도는 **일자 기준**(`targetDate`), 산책 위험도는 **시각 기준**(`targetDateTime`)이다. 같은 화면에 두 값을 나란히 두면 기준이 다른 것을 명시해야 한다.
+- `saferWindowStart/End` 는 **같은 날 안에서만** 제안된다.
+
+**장소 상세의 산책 위험도** ([#197](https://github.com/8llow8llowMe/hondigagae/issues/197))
+
+좌측 레일에서 적합도 **바로 아래**에 1px 선으로 붙는다. 하단 바를 사이에 끼우지 않는다 —
+둘 다 판정이라 한 묶음으로 읽혀야 하고, 밴드로 끊으면 같은 장소의 두 축이라는 것이 사라진다.
+
+- **기준 줄 문구를 적합도와 다르게 둔다** (`detailWalkSafetyBasis` = `{time} 기준`).
+  오후에는 "여행 적합 82점" 과 "지금 산책 위험" 이 **동시에** 뜨는 것이 정상인데, 기준 줄이
+  같으면 사용자가 한 판정의 두 표현으로 읽고 모순으로 본다.
+- **`petConditionApplied` 가 false 면 반려견 이름을 붙이지 않는다.** 고른 아이가 있어도
+  서버가 특성을 반영하지 못했으면 "몽실이 기준" 은 거짓이다.
+- **게스트에게도 렌더한다** — 적합도가 `GuestBlock` 으로 갈리는 것과 다르다. 노면 온도와
+  체감온도는 장소와 시각의 속성이라 반려견이 없어도 값 자체가 참이고, 홈의 `WalkVerdict` 도
+  같게 군다.
+- **`data.temperature` 를 쓰지 않는다.** 그 시각의 기온인데 장소 상세의 기온 라벨은 둘 다
+  **하루 단위**라(`detailFeelsLikeTemperature`·`detailMaxTemperature`), 붙이면 시각 기온을
+  일 최고로 말하게 된다.
+- **`feelsLikeCelsius` hero 에 `체감온도` 라벨이 붙는다** ([#259](https://github.com/8llow8llowMe/hondigagae/issues/259) — 해소됨).
+  예전에는 라벨이 없었다. 적합도의 점수 hero(`82 /100`)를 따라 뺐던 것인데 **점수는 단위가
+  스스로 말하고 온도는 그렇지 않다** — 맨 `35.0℃` 는 기온으로 읽힌다. 게다가
+  [#253](https://github.com/8llow8llowMe/hondigagae/issues/253) 이 적합도 쪽을 `체감온도`(하루 최대)로
+  바꾸면서 **같은 레일에 기준이 다른 체감온도 두 개**가 섰다(하루 최대 33.4 · 14:00 시각 32.4).
+
+  **이름은 `체감온도` 하나이고 기준은 `최고` 유무가 가른다.**
+
+  | 라벨            | 값                        | 기준                        | 쓰는 곳                                            |
+  | --------------- | ------------------------- | --------------------------- | -------------------------------------------------- |
+  | `체감온도`      | `feelsLikeCelsius`        | **시각** (`targetDateTime`) | 장소 상세 산책 위험도 · 홈 `WalkVerdict`           |
+  | `최고 체감온도` | `maxFeelsLikeTemperature` | **하루 최대**               | 장소 상세 적합도 게스트 블록 · 일정 상세 일자 판정 |
+  | `최고기온`      | `maxTemperature`          | 하루 최대 (**폴백**)        | 위 둘의 중기예보 구간                              |
+
+  **이름을 나누지 않은 이유**는 앞의 둘이 같은 물리량이기 때문이다 — 이름이 갈리면 사용자는
+  서로 다른 값으로 읽는다(예전에 홈만 `체감 열지수` 였던 것이 그 상태다). 규칙은
+  `lib/insight/temperature.test.ts` 가 네 문구를 한자리에서 고정한다.
+
+  라벨에 '지금' 을 얹지 않는다 — `지금 산책` 제목과 `{time} 기준` 각주가 이미 두 번 말한다.
+
+  **`참고 열지수`(`heatIndexCelsius`)는 이 표에 들어가지 않는다** (#292). 위 셋은 같은
+  물리량의 기준 차이지만 열지수는 **다른 산식의 다른 지표**이고, 무엇보다 판정에 쓰이지
+  않는다. 그래서 위계를 갈라 접힌 서랍 안에 두고 라벨에 `참고` 를 붙인다 — 평면에 세 번째
+  온도로 세우면 판정값과 같은 위계로 읽히고, 그것이 이 변경이 고치려는 오독 그 자체다.
+
+- 인셋은 적합도 패널과 **같은 `px-4 md:px-10 lg:px-6`** 다. 375·768·1280 실렌더로 확인했다.
+
+**`GET /insights/walk-times` — `WalkTimesResponse`** (#158 · FE #167)
+
+장소 산책 위험도와 **답하는 질문이 다르다.** 저쪽은 "지금 나가도 되나"(한 시점), 이쪽은
+"오늘 언제 나가야 하나"다. 판정 규칙은 같다.
+
+| 필드                    | 타입                             | 화면 지침                                                                                                     |
+| ----------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `hourly[]`              | `HourlyWalkSafetyItem[]`         | 시간대 곡선. **비어 있을 수 있다**(늦은 밤) → 판정 자리가 "예보 없음"을 말한다 — 아래                         |
+| `forecastCoverage`      | `CodeNameMetadata`               | **곡선이 빈 이유** (#262). `AVAILABLE` / `DAY_ENDED`(정상) / `UNAVAILABLE`(장애) / `OUT_OF_RANGE` — 아래      |
+| `goldenWindowStatus`    | `CodeNameMetadata`               | **구간이 없는 이유** (#270). `AVAILABLE` / `SUPPRESSED_BY_WARNING` / `ALL_HOURS_RISKY` / `NO_FORECAST` — 아래 |
+| `goldenStart/End/Level` | `LocalDateTime`·metadata \| null | **셋이 함께 null 이 된다** → "오늘은 나가지 않는 편이 좋아요". **null 만 방어하면 부족하다** — 아래           |
+| `weatherWarning`        | `WeatherWarningItem \| null`     | 경보면 골든타임을 주지 않는다                                                                                 |
+
+- **추천이 없는 날에 시간대를 지어내지 않는다.** 남은 시간이 전부 위험이거나 특보 경보가
+  발효 중이면 서버가 일부러 구간을 주지 않는다 — "그나마 이때가 낫다"고 말하면 사용자가
+  그것을 **허락으로 읽는다** (`GoldenWalkWindow`). 그때도 **곡선은 그대로 보여 준다.**
+- **`goldenStart == goldenEnd` 인 경우가 있다** ([#200](https://github.com/8llow8llowMe/hondigagae/issues/200)).
+  그날 남은 시간대가 한 칸뿐이면(늦은 밤) 서버가 시작과 끝을 같은 값으로 준다 — dev 에서
+  22:12 KST 에 `23:00 – 23:00` 으로 관측했다. **이 절이 한동안 "셋이 함께 null 이 된다"만
+  적어 둬서** 화면이 null 검사만 하고 대시로 이었고, 0분짜리 구간이 되어 고장으로 읽혔다.
+  **한 시각으로 말한다**(`goldenSingleHour`). **구간으로 늘리지 않는다** — 예보 단위가
+  1시간이라 `23:00 – 24:00` 이 그럴듯해 보이지만 서버가 주지 않은 끝시각을 만드는 것이다.
+- **`hourly` 가 한 칸일 수 있다.** 위와 같은 이유다. 곡선을 "비어 있음"(0칸)과 같이 다루면
+  남은 한 시간을 못 보여 준다.
+- **`hourly` 가 0칸인 것은 "판정 없음"이지 "위험"이 아니다** ([#204](https://github.com/8llow8llowMe/hondigagae/issues/204)).
+  **판정 자리는 서버 `goldenWindowStatus` 가 고른다** (#204 · #262 ·
+  [#270](https://github.com/8llow8llowMe/hondigagae/issues/270)):
+
+  | `goldenWindowStatus`    | 화면                     | 뜻                                        |
+  | ----------------------- | ------------------------ | ----------------------------------------- |
+  | `AVAILABLE`             | 추천 구간                | 이때 나가면 된다                          |
+  | `SUPPRESSED_BY_WARNING` | **보류**                 | 경보라 곡선이 좋아도 추천하지 않는다      |
+  | `ALL_HOURS_RISKY`       | 위험 단정                | **판정**: 남은 시간이 전부 위험이다       |
+  | `NO_FORECAST`           | 예보 없음 (+ **재시도**) | **근거 없음** — 이유는 `forecastCoverage` |
+
+  **불린 둘(`goldenStart` 있음 / `hourly` 있음)로는 표현되지 않는다.** 그렇게 갈라 두 번
+  틀렸다:
+
+  - dev 23:17 KST 에 `hourly: []` 를 받아 "남은 시간이 모두 위험 등급이에요"를 단정하면서
+    바로 아래 곡선 자리에서는 "오늘 남은 예보가 없어요"가 나왔다 — 한 카드 안에 모순된 두
+    문장이 같이 나갔다 (#204).
+  - **풍랑경보 날 곡선에는 저녁 안전 구간이 초록으로 그려져 있는데 같은 위험 단정이
+    나갔다** (#270). 곡선과 문장이 서로 다른 말을 하면 사용자는 둘 다 믿지 않는다.
+
+  둘 다 **모르는 것·보류를 나쁜 것으로 말한** 경우다 (루트 `CLAUDE.md`).
+  예보 없음과 보류는 **위험 톤을 쓰지 않는다** (DESIGN.md §2-3 — 등급이 없는 자리에 등급
+  색을 쓰면 안 된다). `남은 시간이 모두 위험 등급이에요` 는 **`ALL_HOURS_RISKY` 일 때만
+  참인 문장**이다.
+
+  **판정 순서를 화면이 다시 짜지 않는다.** 서버 `GoldenWindowStatus.of` 가 예보 → 경보 →
+  구간 순으로 정한다 — `weatherWarning` 을 보고 보류를 직접 판정하면 경보/주의보를 가르는
+  규칙까지 복제하게 되고, 서버가 그 규칙을 고쳐도 화면은 옛 규칙으로 답한다. **모르는
+  코드나 필드 없음(옛 서버)에서는 옛 세 갈래로 떨어진다** — 있지도 않은 사실을 말하지 않는다.
+
+- **곡선이 비는 이유는 하나가 아니다** ([#262](https://github.com/8llow8llowMe/hondigagae/issues/262)).
+  `forecastCoverage` 가 그것을 가른다 — 서버 `ForecastCoverage` 의 스키마 설명이
+  _"빈 곡선을 그냥 숨기지 말고 이 값으로 문구를 갈라 주세요"_ 라고 적고 있다.
+
+  | code           | 뜻                                                        | 화면                    |
+  | -------------- | --------------------------------------------------------- | ----------------------- |
+  | `AVAILABLE`    | 곡선 있음                                                 | (이 자리에 오지 않는다) |
+  | `DAY_ENDED`    | 그 날짜 예보 시간대가 지남. **정상** — 자정 이후 채워진다 | 문구만                  |
+  | `OUT_OF_RANGE` | 아직 안 온 날짜                                           | 문구만                  |
+  | `UNAVAILABLE`  | 목록 자체를 못 받았다. **이것만 장애다**                  | 문구 + **다시 시도**    |
+
+  **`UNAVAILABLE` 쪽이 요점이다.** 전에는 넷을 한 문장으로 접어 **고칠 수 있는 상태(재시도)를
+  고칠 수 없는 것처럼** 말했다 — `404` 에 재시도를 달지 않는 규칙(`frontend/CLAUDE.md`)과
+  같은 축인데 여기서만 반대로 접혀 있었다. dev 는 2026-09-06 현재 실제로 `UNAVAILABLE` 을 준다.
+
+  **문구는 서버 `name`/`description` 을 그대로 렌더한다** — enum metadata 를 FE 가 다시
+  쓰지 않는다는 규칙 그대로다. **`AVAILABLE` 인데 곡선이 비었거나 필드가 아예 없으면**
+  (옛 서버) 우리 문구(`goldenNoForecast`)로 떨어진다 — `예보 있음` 이라는 제목 아래
+  아무것도 없는 자리를 만들지 않는다.
+
+  로컬에서 보는 법은 `local-run-guide.md` 참고 — 실데이터로는 만들 수 없어 mock 이 반려견
+  조건 두 개(`heatSensitive`·`coldSensitive`)로 네 갈래를 낸다.
+
+- **`hasGolden` 을 `hourly` 보다 먼저 본다.** 곡선이 비었는지로 먼저 갈라 버리면 서버가
+  구간을 주는데 곡선만 못 받은 경우에 실제 추천을 감춘다. 예보 없음이 밀어내야 하는 것은
+  **위험 단정 하나뿐**이다.
+- **좌표는 `getPositionIfGranted()` 가 준다** (#180 · #1133 · `/emergency` 와 같은 모듈). 홈은
+  진입에서 권한을 묻지 않아 **이미 허용된 경우에만** 실제 좌표를 읽는다. 허용 전·거부·타임아웃·
+  미지원 어느 쪽이어도 제주 중심 좌표를 돌려주고, 화면은 **얻었으면 "현재 위치 기준" ·
+  못 얻었으면 "제주시 기준"** 으로 그 사실을 밝힌다. **좌표가 정해질 때까지 조회하지 않는다** —
+  먼저 쏘면 잘못된 지점의 곡선을 한 번 보여 준 뒤 갈아치우게 되고, 판정 화면에서 답이
+  바뀌면 못 믿는다.
+- 실패 종류(거부·타임아웃·미지원)를 구분해 적지는 않는다 — 이 섹션은 거리를 표시하지 않아
+  종류가 사용자의 다음 행동을 바꾸지 않는다 (`/emergency` 는 거리를 쓰므로 거기서는 구분한다).
+- `HourlyWalkSafetyItem` 이 등급과 함께 `temperature`·`estimatedPavementCelsius` 를 주는
+  이유는 **등급만으로는 "왜 그 색인지"를 말할 수 없어서다.** 노면온도는 **추정치**다.
+
+**`GET /insights/regional-weather` — `RegionalWeatherResponse`** (#158 · FE #169)
+
+제주를 다섯 권역(제주시·서귀포·동부·서부·한라산)으로 나눠 비교한다. **한라산이 섬을 기후로
+갈라 놓는다는 것이 전제다** — 같은 시각에 북부는 비가 오고 남부는 개어 있는 일이 흔하다.
+
+| 필드                    | 타입                         | 화면 지침                                               |
+| ----------------------- | ---------------------------- | ------------------------------------------------------- |
+| `regions[]`             | `RegionWeatherItem[]`        | **예보를 못 받은 권역도 남는다** (`weatherScore: null`) |
+| `recommendedRegion`     | `CodeNameMetadata \| null`   | null 이면 추천하지 않는다                               |
+| `recommendationReasons` | `string[]`                   | **문장 배열이다** — 근거 객체가 아니다                  |
+| `weatherWarning`        | `WeatherWarningItem \| null` | 경보면 `recommendedRegion` 이 null 이다                 |
+
+- **`weatherScore` 는 장소 적합도 점수가 아니다.** 같은 날씨 규칙을 쓰지만 장소·혼잡도 항목이
+  없어 "이 권역이 나가기 좋은가"이지 "이 장소가 갈 만한가"가 아니다. 문구가 둘을 섞으면 안 된다.
+- **점수 없는 권역을 0 으로 채우거나 목록에서 지우지 않는다.** 지우면 사용자가 "비교 대상이
+  넷"이라고 읽고, 0 으로 채우면 "나쁘다"로 읽는다.
+- **추천이 없는 날에 권역을 지어내지 않는다.** 적합도 0점·산책 위험이라고 말하는 같은
+  서비스가 여기서만 나가라고 하면 안 된다. 그때도 **비교표는 그대로 보여 준다.**
+
+## 4. 여행 일정 — **구현 완료**
+
+| 화면                        | 경로                                         | API                                                                                  | 상태                                                                                       |
+| --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| 일정 목록                   | `/plans`                                     | `GET /plans` (커서)                                                                  | **구현** (#75)                                                                             |
+| 일정 생성                   | `/plans/new`                                 | `POST /plans`                                                                        | **구현** (#75)                                                                             |
+| 일정 상세 (타임라인 + 판정) | `/plans/[planId]`                            | `GET /plans/{planId}` + `GET /plans/{planId}/weather`                                | **구현** (#80)                                                                             |
+| 일정 동선 지도              | `/plans/[planId]` 내 (`?day=`)               | **없음** — 좌표는 `GET /plans/{planId}` 가 항목마다 준다                             | **구현** (#743) — 일자별로 선을 잇는다. 도로 경로는 별 이슈                                |
+| 일정 수정·삭제              | `/plans/[planId]` 내                         | `PUT` · `DELETE /plans/{planId}`                                                     | **구현** (#80) — 이름·기간·예산·상태. **기간 수정은 #585.** **완료 전이는 #613**           |
+| 일자 항목 편집              | `/plans/[planId]` 내 모드                    | `PUT /plans/{planId}/days/{day}/items` (**일괄 교체**)                               | **구현** (#81)                                                                             |
+| 일정에 장소 담기            | `/plans/[planId]/days/[day]/add` + 실내 대안 | `PUT /plans/{planId}/days/{day}/items` (**같은 일괄 교체**)                          | **구현** (#82) — 새 API 없음. **지도 보기 추가, 기본 보기가 지도**(#370) — 새 API 없음     |
+| 하루 재생성                 | `/plans/[planId]/days/[day]/regenerate`      | `POST /ai-plans` (`planId`+`regenerateDay`) → `PUT /plans/{planId}/days/{day}/items` | **구현** (#128) — 새 API 없음. 정본 `docs/features/ai-plan/하루재생성-세부명세.md`         |
+| 일정 날씨 브리핑            | `/plans/[planId]` 내                         | `GET /plans/{planId}/weather`                                                        | **구현** (#80) — 일자 판정으로 통합                                                        |
+| 항목 방문 체크              | `/plans/[planId]` 내 항목 행                 | `PUT /plans/{planId}/items/{planItemId}/visited`                                     | **구현** (#124) — 해제도 같은 API                                                          |
+| 여행 후기                   | `/plans/[planId]` 좌측 레일                  | `GET` · `POST` · `PUT /plans/{planId}/reviews`                                       | **구현** (#615) — **완료 일정만.** 목록 "후기 미작성" 밴드는 `hasReview` 가 없어 넣지 않음 |
+| 일정 공유 링크 발급·폐기    | `/plans/[planId]` 관리 메뉴 안 모달          | `GET` · `POST` · `DELETE /plans/{planId}/share-link`                                 | **구현** (#628) — **확정·완료만.** `POST`·`DELETE` 둘 다 멱등                              |
+| 공유된 일정 열람            | `/shared-plans/[token]`                      | `GET /shared-plans/{token}` (**비인증**)                                             | **구현** (#628) — 정본 `docs/features/plan/일정공유-세부명세.md`                           |
+| 항목 시작 시각              | `/plans/[planId]` 항목 행 시간 칩            | `PUT /plans/{planId}/items/{planItemId}/start-time` (**단건**)                       | **구현** (#1028 · #1053) — BE #1030. 체크·`planItemId` 가 남는다                           |
+
+**항목 시작 시각 (`startTime`)** — [#623](https://github.com/8llow8llowMe/hondigagae/issues/623)
+
+- **새 컬럼도 새 API 도 없다.** `PlanItemDetailItem.startTime`(nullable) 로 이미 내려오고
+  `PlanItemRequest.startTime`(선택) 로 이미 저장된다. 화면만 쓰지 않고 있었다.
+- **아트보드를 이탈한다.** 아트보드 01·02 헤더 주석의 "시간 없음" 을 근거로 표시하지 않기로
+  했던 결정(`features/plan/일정상세-세부명세.md` D8-9)을 **D14-2 가 뒤집는다** — 주석은 예시
+  데이터에 시각이 없던 상태를 적은 것이고, 아트보드 이후에 생긴 판정 축(#625 항목 산책 위험도)의
+  입력이라 아트보드가 판단한 적이 없는 값이다. D8 표는 기록으로 남긴다.
+- **없으면 줄을 숨긴다. 지어내지 않는다.** 형식이 어긋난 값도 같다 (`lib/plan/start-time.ts`).
+- **시각으로 재정렬하지 않는다.** 순서 정본은 `sequence` 다. 서버가 순서 역전·중복을 막지 않으므로
+  화면도 경고하지 않는다.
+- **일괄 교체에서 키를 빼는 것이 곧 "지운다"** 다 — `PUT /plans/{planId}`(부분 수정, 키 생략 = 유지)와
+  **반대**다. 되싣기를 빠뜨리면 순서만 바꿔도 그 날 시각이 전부 사라진다
+  (`lib/plan/day-items.ts` · 기존 회귀 테스트 4종 유지).
+- **하루 재생성은 그 날 시각을 지운다.** 초안 계약(`AiPlanScheduleItem`)에 시각 필드가 없어
+  `toDraftItems` 가 실을 값이 없다. 그 일자에 시각이 있을 때만 확인 대화상자가 미리 말한다.
+- **AI 초안은 여전히 시각을 보내지 않는다.** 지어낸 시각으로 #625 가 판정하면 사용자가 정한 적
+  없는 시간의 답이 된다 — 백엔드가 `NO_START_TIME` 에서 "정오를 넣어 판정하지 않는다" 고 못박은 것과 같다.
+- ~~편집은 `순서 편집` 모드 안이다. 항목 단건 수정 API 가 없어 행에서 고치면 저장할 때마다 그 일자
+  방문 체크가 초기화된다.~~ **#1028 · #1053 으로 바뀌었다** — 입력은 항목 행의 시간 칩이고, 저장은
+  **단건 API `PUT /plans/{planId}/items/{planItemId}/start-time`**(BE #1030 · PR #1052)다. 행을 제자리에서
+  고쳐 **시각은 단건 API 라 방문 체크가 초기화되지 않는다.** 순서 편집 · 장소 담기 · 하루 다시 만들기는
+  여전히 일괄 교체다 (`features/plan/일자편집-세부명세.md` G · `일정상세-세부명세.md` D9-2).
+  | 일정 복사 | `/plans/[planId]` 관리 메뉴 → 모달 | `POST /plans/{planId}/copy` | **구현** (#617) — 지난·완료 일정만. `일정복사-세부명세.md` |
+  | 항목 산책 위험도 | `/plans/[planId]` 항목 행 | `GET /plans/{planId}/walk-safety` | **명세 완료** (#625) — BE 2026-09-17 `c701b95a`. **2026-09-14 스냅샷에 없다**. 계약 확장 #717 반영 (#758) |
+
+**항목 산책 위험도** — [#625](https://github.com/8llow8llowMe/hondigagae/issues/625) · BE `c701b95a`(2026-09-17) · 명세 `features/plan/일정상세-세부명세.md` D15
+
+- **스냅샷(`docs/api/openapi/plan-service.json`, 2026-09-14)에 이 엔드포인트가 없다.** BE 가
+  사흘 뒤에 들어왔다. **스냅샷을 근거로 "없는 API" 라고 판단하면 틀린다** — `goldenWindowStatus`
+  · `forecastCoverage` 와 같은 전례다 (`features/_index.md` 하단).
+- **선행이 [#623](https://github.com/8llow8llowMe/hondigagae/issues/623) 항목 시각이다.** 서버가 `startTime` 없는 항목을 `NO_START_TIME` 으로 판정 거부한다.
+- **등급 체계가 적합도와 다르다** — `SAFE`/`CAUTION`/`DANGER`/**`UNKNOWN`** 이다
+  (적합도는 `HIGH`/`MEDIUM`/`LOW`/`INSUFFICIENT`). `lib/insight/tone.ts` 의 `walkSafetyTone()`
+  을 그대로 쓴다 — 공용 매퍼로 묶으면 "안전" 이 회색으로 나간다.
+- **시각별 예보 지평이 `오늘 ~ 오늘+4`(5일) 로, 일자 날씨의 11일보다 짧다**
+  (`PlanItemWalkSafetyUnavailableReason.HOURLY_FORECAST_HORIZON_DAYS = 4`). 노면온도를
+  `기온 + 일사(날짜·시각·위도)` 로 추정해야 해서 단기예보만 쓴다. **같은 일정에서 `/weather` 에는
+  판정이 있는데 항목 위험도는 비어 있는 날이 정상이다.** 5일·11일 숫자를 화면에 베끼지 않는다.
+- **판정 못 낸 사유가 코드로 온다** — `PAST_DATE` · `NOT_PLACE_TARGET` · `NO_START_TIME` ·
+  `BEYOND_FORECAST_RANGE` · `LOOKUP_FAILED`. **다섯 중 `LOOKUP_FAILED` 만 일시 장애**다.
+  문장(`unavailableReason`)과 짝으로 오고, **FE 는 문장을 파싱하지도 짓지도 않는다.**
+- **항목 하나가 실패해도 HTTP 200 이다.** tour-service 호출 실패가 예외로 오르지 않는다
+  (`PlanInsightClientAdapter#findWalkSafety`) — 전체 5xx 와 구분해야 한다.
+- **지평 안인데 그 시각 예보가 없으면 등급 `UNKNOWN` + 사유 코드 `null`** 이다. 화면은 그때
+  배지를 세우지 않고 `walkSafetyLevel.description` 문장을 쓴다 — 없는 판정을 회색 배지로도
+  말하지 않는다. (BE 후속 요청: D15-11)
+- **`petConditionApplied` 가 응답에 없다** — 포트 결과에는 있는데 DTO 로 나오지 않아 행에
+  "몽실이 기준" 을 쓸 수 없다 (BE 후속 요청: D15-11).
+- **일괄 교체 후 반드시 무효화한다.** 교체가 `planItemId` 를 전부 새로 발급해 낡은 판정이
+  어느 행에도 붙지 않고 조용히 사라진다.
+- 체감온도 라벨 규칙은 §3-1 표 그대로다 — 항목 행은 **`체감온도`(시각 기준)** 이고 일자 판정은
+  **`최고 체감온도`(하루 최대)** 다. 한 일자 카드에 기준이 다른 두 값이 서는 것이 정상이다.
+  | 화면                        | 경로                                         | API                                                                                  | 상태                                                                                                                                                                 |
+  | --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | 일정 목록                   | `/plans`                                     | `GET /plans` (커서)                                                                  | **구현** (#75)                                                                                                                                                       |
+  | 일정 생성                   | `/plans/new`                                 | `POST /plans`                                                                        | **구현** (#75)                                                                                                                                                       |
+  | 일정 상세 (타임라인 + 판정) | `/plans/[planId]`                            | `GET /plans/{planId}` + `GET /plans/{planId}/weather`                                | **구현** (#80)                                                                                                                                                       |
+  | 일정 수정·삭제              | `/plans/[planId]` 내                         | `PUT` · `DELETE /plans/{planId}`                                                     | **구현** (#80) — 이름·기간·예산·상태. **기간 수정은 #585.** **완료 전이는 #613**                                                                                     |
+  | 일자 항목 편집              | `/plans/[planId]` 내 모드                    | `PUT /plans/{planId}/days/{day}/items` (**일괄 교체**)                               | **구현** (#81)                                                                                                                                                       |
+  | 일정에 장소 담기            | `/plans/[planId]/days/[day]/add` + 실내 대안 | `PUT /plans/{planId}/days/{day}/items` (**같은 일괄 교체**)                          | **구현** (#82) — 새 API 없음. **지도 보기 추가, 기본 보기가 지도**(#370) — 새 API 없음                                                                               |
+  | 하루 재생성                 | `/plans/[planId]/days/[day]/regenerate`      | `POST /ai-plans` (`planId`+`regenerateDay`) → `PUT /plans/{planId}/days/{day}/items` | **구현** (#128) — 새 API 없음. 정본 `docs/features/ai-plan/하루재생성-세부명세.md`                                                                                   |
+  | 일정 날씨 브리핑            | `/plans/[planId]` 내                         | `GET /plans/{planId}/weather`                                                        | **구현** (#80) — 일자 판정으로 통합                                                                                                                                  |
+  | 항목 방문 체크              | `/plans/[planId]` 내 항목 행                 | `PUT /plans/{planId}/items/{planItemId}/visited`                                     | **구현** (#124) — 해제도 같은 API                                                                                                                                    |
+  | 여행 후기                   | `/plans/[planId]` 좌측 레일                  | `GET` · `POST` · `PUT /plans/{planId}/reviews`                                       | **구현** (#615) — **완료 일정만.** 목록 "후기 미작성" 밴드는 `hasReview` 가 없어 넣지 않음                                                                           |
+  | 일정 공유 링크 발급·폐기    | `/plans/[planId]` 관리 메뉴 안 모달          | `GET` · `POST` · `DELETE /plans/{planId}/share-link`                                 | **구현** (#628) — **확정·완료만.** `POST`·`DELETE` 둘 다 멱등                                                                                                        |
+  | 공유된 일정 열람            | `/shared-plans/[token]`                      | `GET /shared-plans/{token}` (**비인증**)                                             | **구현** (#628) — 정본 `docs/features/plan/일정공유-세부명세.md`                                                                                                     |
+  | 일정에 올레 코스 담기       | `/olle/[walkCourseId]` 안의 시트             | `PUT /plans/{planId}/days/{day}/items` (**같은 일괄 교체**, `itemType=WALK`)         | **명세 완료** ([#620](https://github.com/8llow8llowMe/hondigagae/issues/620)) — 새 API 없음. 정본 `docs/features/plan/올레담기-세부명세.md` · 행 렌더는 일정상세 D12 |
+
+**일정 응급 브리핑** — [#125](https://github.com/8llow8llowMe/hondigagae/issues/125) · BE PR #105
+
+| 화면             | 경로                        | API                             | 상태            |
+| ---------------- | --------------------------- | ------------------------------- | --------------- |
+| 일정 응급 브리핑 | `/plans/[planId]/emergency` | `GET /plans/{planId}/emergency` | **구현** (#125) |
+
+**출발 전 확인 용도다** — 급할 때 검색을 시작하면 늦다는 것이 이 기능의 취지라, 화면도
+"지금 가장 가까운 곳"이 아니라 **일자별로 미리 훑는 목록**이다. 그래서 `/emergency`(현재
+위치 기준 · 지도 토글)와 모양이 다르고, 진입점은 일정 상세 좌측 레일의 배너 하나다.
+
+- **`operatingHoursKnown: false` 는 휴무가 아니라 확인 필요다** (백엔드 스키마 명시).
+  닫혔다고 쓰면 실제로 여는 병원을 사용자가 건너뛴다.
+- **반경 10km · 가까운 순 최대 3곳은 서버 고정**이다. 조절 컨트롤을 두지 않는다.
+- **길찾기 버튼이 없다.** 이 응답의 `FacilityItem` 에는 좌표가 없어 `directionsUrl` 이
+  링크를 만들 수 없고, 눌러도 못 가는 버튼은 달지 않는다. 대신 주소와 전화를 준다.
+- **`/emergencies/facilities` 의 `NearbyFacilityItem` 과 다른 타입이다** — `facilityId` ·
+  좌표 · `operatingHours` · `openNow` 가 없다. `FacilityRow` 를 재사용하면 없는 필드를 읽는다.
+- 반경 안에 시설이 없는 장소도 **목록에 남긴다.** 지우면 그 장소 주변을 확인한 것으로 오해한다.
+- **3층 표면** (`DESIGN.md §0`, #460) — `Canvas` + `SurfaceStack max-w-2xl`(일정 만들기 #453 과
+  같은 한 단 폭). 돌아가기 · `h1` · 반경 안내는 L0 위 페이지 머리(카드 인셋), **일자마다
+  `Surface title="N일차"` 카드**(일정 상세 #447 과 같은 판정), 장소 묶음은 카드 안 L2(`h3` 캡션 +
+  중첩 `SurfaceList`). 로딩 · 오류 · 빈 상태는 `Surface aria-label` 하나 안이다. 머리까지
+  `PlanEmergencyView` 가 그린다 — 반경이 응답에서 오는데 `h1` 과 한 덩어리여야 하기 때문이다.
+
+주의: **#124 는 아트보드 정본 없이 구현됐다.** 브랜드 자산 아트보드가 들어온 뒤에도
+`다녀옴` 아트보드는 없다 — 토글 자리·체크된 행의 표현·경고 위치는 아트보드가 그려지면
+재검토한다 (`docs/features/brand/브랜드에셋-세부명세.md` B12).
+
+주의: **일차 항목을 교체하면 그 날의 방문 체크는 초기화된다** (백엔드 스키마 설명). 일괄 교체
+모델과 부딪히는 지점이라 화면 문구가 이 사실을 말해야 한다 — #124 는 그 일자에 체크된 항목이
+있을 때만 경고 한 줄을 낸다 (`docs/features/plan/일정상세-세부명세.md` D9-2).
+
+| 저장한 장소 목록 | 경로         | API                                                                   | 상태                                                                                                                                                         |
+| ---------------- | ------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 저장한 장소      | `/favorites` | `GET /favorites/places` · `POST`·`DELETE /favorites/places/{placeId}` | **구현 완료** ([#127](https://github.com/8llow8llowMe/hondigagae/issues/127)) · **3층 표면** ([#462](https://github.com/8llow8llowMe/hondigagae/issues/462)) |
+
+주의:
+
+- **`/mypage` 하위가 아니다.** 아트보드 03 이 1200 이상 전폭 2열 그리드를 요구하는데
+  마이페이지 레이아웃은 `max-w-screen-md` 설정 목록이다. 진입점만 둘로 둔다 — 모바일은
+  마이페이지의 행(`MyFavoritesRow`), 데스크톱은 아바타 팝오버(`ACCOUNT_MENU_ITEMS`).
+  탭바는 4개 고정이라 늘리지 않는다.
+- **커서가 없다.** 상한 100곳이라 전량이 온다 → 무한 스크롤이 아니다. **정렬 컨트롤도 없다** —
+  응답이 최근 저장순 하나뿐이라 클라이언트 정렬은 틀린 순서가 된다.
+- **3층 표면** (`DESIGN.md §0`, #462) — `Canvas` + `SurfaceStack` + **카드 하나**. 제목·개수·
+  네 상태·AI 안내가 그 카드에 다 든다. 개수가 응답에서 오므로 **카드를 `FavoriteListSection`
+  이 그린다**(페이지는 바닥과 `sr-only` h1 만). xl 2열은 `SurfaceList columns={2}` 가 맡고
+  행은 인셋만 갖는다 — 2a 의 `last`·`lastGridRow`·`columnDivider` 세 prop 이 사라졌다.
+- **저장일(`savedAt`)이 응답에 없다.** `FavoriteEntity` 는 `BaseEntity` 를 상속해 DB 에는
+  있지만 `FavoritePlaceItem` 에 노출되지 않는다 → 아트보드 03 의 `2026-08-30 저장` 은
+  **구현 불가**이고 BE 후속 요청으로 남겼다 (`features/favorite/저장한장소-세부명세.md` D9-1).
+- **`GET /favorites/places/{placeId}`(단건 여부)가 생겼다** (`4a4f2cd`). 아직 쓰지 않는다 —
+  상세용 키를 따로 만들면 목록에서 해제했을 때 캐시가 갈린다 (`features/favorite/queries.ts` 주석).
+- **해제해도 행이 즉시 사라지지 않는다.** 무효화가 서버 목록에서 빼 오므로 화면이 항목을
+  원래 자리에 붙잡아 둔다 (`lib/favorite/retain.ts`) — 그 자리에서 되살릴 수 있어야 한다.
+- **아트보드 03 의 선택 → AI 일정 넘기기는 구현하지 않았다.** `pinnedPlaceIds` 를 FE 가
+  아직 보내지 않아 선택 상태가 쓰일 곳이 없다 → [#128](https://github.com/8llow8llowMe/hondigagae/issues/128).
+
+- **목록 좁히기는 화면에서 한다.** `GET /plans` 는 `petId` · `lastPlanId` · `size` 를 받고 `status` 와 `totalCount` 는 없다. `hasNext` 인 동안에는 개수를 말하지 않는다 (`docs/features/plan/공통명세.md` S3).
+  - **`petId` 는 있다** (`8a63485`, "반려견별 여행 히스토리"). 앞서 "없다" 고 적었던 것은 틀렸다 ([#148](https://github.com/8llow8llowMe/hondigagae/issues/148) 에서 정정). 그래도 **쓰지 않는다** — 화면 필터가 다중 선택이라 단일 `petId` 로 표현할 수 없고, 한 마리일 때만 서버로 보내면 같은 필터가 선택 개수에 따라 다른 경로로 동작한다.
+- **`COMPLETED` 로 가는 경로가 없다.** enum 에는 있으나 서버에 자동 전이가 없어, 여행이 끝나도 상태가 바뀌지 않는다. 다가오는/지난은 **날짜**로 나눈다 (S4).
+- **목록 정렬은 `id DESC`(만든 역순)** 이고 날짜순이 아니다 (`findByMemberIdAndDeletedFalseAndIdLessThanOrderByIdDesc`).
+- 일자 항목은 **부분 수정이 아니라 일괄 교체**다. 화면도 그 모델로 설계한다.
+- **`PlanItemDetail.place` 가 주소·실내 여부·대표 이미지·좌표를 함께 준다** ([#86](https://github.com/8llow8llowMe/hondigagae/issues/86) 반영). 장소를 가리키지 않는 항목(`WALK`·`MOVE`)이거나
+  원천에서 사라진 장소면 **객체 통째로 null** 이고, 그때도 항목은 남는다.
+  **항목당 `GET /places/{placeId}` 보강은 걷었다** ([#115](https://github.com/8llow8llowMe/hondigagae/issues/115)) — 3일·6항목이면 왕복 6번이던 것이 0번이다.
+  이 줄이 한동안 "아직 보강한다"로 남아 있었는데 코드는 이미 걷은 상태였다 ([#196](https://github.com/8llow8llowMe/hondigagae/issues/196) 에서 정정).
+- **`usePlaceEnrichment` 는 남아 있고, 남은 쓸모는 실내 대안 하나다.** 판정의 `indoorAlternatives` 는
+  `PlanAlternativePlaceItem`(`placeId`·`title`·`lat`·`lng`·`distanceMeters`)뿐이라 주소·실내 여부를
+  말하려면 여전히 장소 조회가 필요하다. **이것을 항목 보강의 잔재로 보고 지우지 않는다** —
+  key 를 `placeKeys.detail` 로 공유해 장소 상세를 보고 온 곳은 요청이 아예 나가지 않는다.
+- 장소 항목은 백엔드가 tour-service Feign으로 존재를 검증한다 → 없는 `placeId` 는 실패한다.
+- **`WALK` 은 검증되지 않는다.** `PlanItemType.PLACE_TARGETS` 에 `WALK` 가 없어(`PlanItemType.java:52`) 저장 전
+  존재 검증에서 빠진다 — **틀린 `walkCourseId` 가 조용히 저장되고** 그 항목은 상세에서 `walkCourse: null` 로
+  온다. `PLAN_004` 가 나지 않으므로 화면이 id 를 가공하지 않는다 (`docs/features/plan/올레담기-세부명세.md` D3-3).
+- **`WALK` 의 `targetId` 는 `walk_course.id` 다.** `place.id` 가 아니므로 **`/places/{id}` 링크를 만들지 않는다** —
+  `plan-item-row.tsx` 의 `PlanItemRow` `href` 주석과 `lib/plan/detail.test.ts` 의
+  `it('WALK 는 walk_course.id 라 부르지 않는다 — 남의 id 로 404 를 만든다')` ·
+  `lib/plan/day-items.test.ts` 의 `it('WALK 의 targetId 는 walk_course.id 라 장소로 세지 않는다')` 이
+  막고 있다.
+- **일정 항목 응답에 `walkCourse` 요약이 생겼다** (BE `efef555e` 2026-09-17 · #619). `PlanItemDetailItem.walkCourse`
+  = `name`·`courseLabel`·`distanceKm`·`durationText`·`durationMaxMinutes`·`lat`/`lng`·`firstImage`·`fitsActivityLevels`.
+  **`docs/api/openapi/*.json` 스냅샷(2026-09-14)보다 뒤에 들어와 스냅샷에는 없다** — dev 게이트웨이 실측(2026-09-18)으로
+  확인했다. `null` 인 경로가 셋이고(코스 없음 · tour-service 장애 · 수기 정리) **셋 다 행을 지우지 않는다.**
+  `durationMaxMinutes` 의 `null` 은 "제한 없음" 이 아니라 **"원문 파싱 실패"** 다.
+- **공유 링크 응답(`SharedPlanItemItem`)에는 `walkCourse` 가 없다.** 소유자에게는 거리·소요가 보이는 항목이
+  공유로 열면 제목만 남는다 (BE 후속 요청 — `올레담기-세부명세.md` D9-2).
+- **일정의 소유권은 plan-service에 있다.** AI는 제안만 하고 확정은 여기서만 일어난다.
+- **기간을 줄이면 백엔드가 `PLAN_008` 로 거부한다 — 고아 항목은 더 이상 생기지 않는다.** 예전에는 `PlanCommandProcessor.updatePlan` 이 `startDate`/`endDate` 만 바꾸고 `day > totalDays` 가 된 항목을 그대로 둬서 **화면이 기간 수정을 열지 않았다.** BE 가 `99c6a41f` 로 저장 앞에 검사를 넣으면서(`backend/docs/services/plan-service.md`) 그 근거가 사라졌고, **FE 는 #585 로 기간 편집을 열었다.** 화면이 어느 일차에 항목이 있는지 다시 세지 않는다 — 판정을 복제하면 서버 규칙이 바뀔 때 두 곳이 갈린다. 거부 문구는 서버 것을 폼 배너로 그대로 띄운다. 다른 경로로 이미 생긴 기간 밖 항목은 상세 화면이 별도 섹션으로 드러낸다.
+- **기간 상한 30일(`PLAN_009`)은 만들기·수정 두 폼이 `lib/plan/period.ts` 하나로 본다** (#585). 예전에는 어느 쪽도 보지 않아 31일짜리가 서버 왕복 뒤에 막혔다.
+- **날씨 브리핑(`PlanWeatherResponse`)의 `days` 는 일정 일수만큼 항상 채워진다.** (명세의 `dailyBriefings` 는 실제 필드명이 아니다 — `features/_index.md` 드리프트 표) 빈 배열을 방어할 필요가 없다. 대신 각 일자의 예보 필드가 null 일 수 있다 (§3-1 `DailyWeatherItem` 과 같은 타입).
+
+**출발 전 여행 브리핑** — [#626](https://github.com/8llow8llowMe/hondigagae/issues/626) (기록 [#534](https://github.com/8llow8llowMe/hondigagae/issues/534))
+
+| 화면           | 경로                       | API                                  | 상태                 |
+| -------------- | -------------------------- | ------------------------------------ | -------------------- |
+| 출발 전 브리핑 | `/plans/[planId]/briefing` | `GET /plans/{planId}/briefing?date=` | **구현 완료** (#626) |
+
+정본은 `docs/features/plan/여행브리핑-세부명세.md`, 진입점은 `일정상세-세부명세.md` D16.
+**FE 미연동 표에 있던 행이 여기로 옮겨 왔다** — #534 는 "붙일지는 화면이 정한다" 로 남겼고,
+#626 이 붙이기로 정했다.
+
+**새 판정이 아니라 기존 판정의 묶음이다.** 그날 일정 요약(항목 수 · 방문 수 · 첫/마지막
+항목 · 대표 장소) · 날씨/적합도 · 발효 중인 기상특보 · 산책 골든타임을 한 응답에 담는다.
+서버 설명이 _"전부 기존 판정을 그대로 중계하는 결정적 조합이고 LLM 을 부르지 않습니다"_
+라고 못박는다. **준비물은 여기 없다** — 서버가 일부러 뺐고, 일정 상세 레일에 이미 있다.
+
+- **`date` 는 필수이고 화면이 고른다.** 기간 밖이면 `PLAN_002` **400** 이라, 부를 날짜를
+  정할 수 없으면 요청 자체를 하지 않는다 (`pickBriefingDate`, 명세 D3-1).
+- **기상특보·골든타임은 `today=true` 일 때만 채워진다.** 과거·미래 날짜로 부르면 그 두
+  자리가 비고, 이유가 `weatherWarningUnavailableReason` · `walkTimesUnavailableReason` 로 온다.
+  **특보는 필드와 이유가 둘 다 null 일 때만 "특보 없음" 이다** — 이유가 있으면 "확인 못 함"
+  이라고 말한다. 이유를 "없음" 으로 접으면 태풍경보를 조용히 지운다.
+- **시간대 곡선은 이 응답에 없다.** 좌표(`walkTimes.lat/lng`)가 있을 때만 tour 의
+  `GET /insights/walk-times` 를 따로 부른다. **좌표는 `walkTimes` 안에만 있고 `schedule` 에는
+  없다** — 골든타임을 못 낸 날은 부를 좌표가 없다 (BE 후속 요청, 명세 D9-3).
+- **일정 상세와 겹치는 것은 왕복이 아니라 자리다.** 상세는 `GET /plans/{planId}` +
+  `/weather` 를 그대로 쓰고, 브리핑은 **별도 라우트**로 하루치만 본다 (응급 브리핑과 같은 꼴).
+
+## 5. AI 일정 생성 — **구현 완료**
+
+| 화면           | 경로                     | API                                                 | 상태                                                                                                                |
+| -------------- | ------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 조건 입력      | `/ai-plans/new`          | `POST /ai-plans` → 202 + jobId                      | **구현 완료** (#84 · 옵션 확장 #128) · **3층 표면** ([#473](https://github.com/8llow8llowMe/hondigagae/issues/473)) |
+| 생성 대기·결과 | `/ai-plans/jobs/[jobId]` | `GET .../jobs/{jobId}/stream` **SSE** (+ 폴링 폴백) | **구현 완료** (#84 · SSE #91) · **3층 표면** ([#473](https://github.com/8llow8llowMe/hondigagae/issues/473))        |
+| 결과 → 담기    | 위 화면 내               | `POST /plans` 로 확정                               | **구현 완료** — 매핑은 명세 S5                                                                                      |
+
+주의:
+
+- **실패가 HTTP 200 + `status=FAILED`** 다 (`api-integration-guide.md` §5).
+- **3층 표면** (`DESIGN.md §0`, #473 — 로드맵 #455 의 11번).
+  - **조건 입력은 카드 하나다.** `Canvas` + `SurfaceStack max-w-2xl`(일정 만들기 #453 ·
+    반려견 등록 #464 와 같은 폼 규약)에 `h1` 은 `sr-only`, 보이는 제목은 `Surface lead` 카드가
+    갖는다. 조회 중 · 조회 오류 · 반려견 0마리 · 폼 **넷이 그 카드 하나**에 든다 —
+    상태에 따라 카드가 생겼다 사라지지 않는다(#440). **접기 블록은 자기 카드가 아니다**:
+    카드 안 L2 로 남고 토글 제목이 `h3`, 그 안의 `추가 옵션` 이 `h4` 다.
+  - **폼 래퍼 여백은 폼의 `gap` 에서 나온다.** `AiPlanCreateForm` 은 `gap-6`(24)라
+    `pt-3 pb-6` 이다 — 일정 만들기 폼(`gap-5`)의 `pt-2 pb-5` 를 그대로 베끼면 12px 어긋난다.
+  - **꼭 넣을 장소 피커는 오버레이라 카드가 아니다**(§3-2 · radius 16 채널). 안의 목록만
+    `SurfaceList` + `li` 로 옮겼고 **선택 표시는 `--row-selected` 채움 그대로**다(§0 이 금지하는
+    것은 아이템 테두리다). 시트 안 좌우 축을 `INSET_CLASS.panel`(평평한 16) 하나로 모았다 —
+    `card` 가 아니다: 시트는 `md:max-w-sm`(384) 고정 폭 컨테이너이고 `md:` 는 뷰포트 기준이라
+    `md:px-5` 가 시트 자신의 머리·footer(`px-4`)와 4px 어긋난다(`src/lib/ui/inset.ts`).
+  - **작업 상태는 머리 + 카드 하나다.** 404 · 조회 오류 · 대기 · 작업 실패 · 취소 · 빈 초안
+    여섯이 `Surface aria-label` 하나 안이고, **`h1` 은 여섯 분기 전부에 있다**(없으면 문서
+    최상위 제목이 진행 표시의 `h2` 가 된다 — 하루 재생성 #451 과 같은 판단).
+  - **완료만 카드를 스스로 그린다.** 초안 개요(제목 · AI 배지 · 요약 · 미저장 문구 · 부분
+    생성 · `reasons`)가 카드 하나, **일자마다 카드 하나**(일정 상세 #447 과 같은 판정, 일자
+    제목이 `h3` → `h2`), **담기 패널은 액션이라 카드 밖 L0** 이다. 그래서
+    `AiPlanDraftPreview` 의 `footer` prop 을 걷고 배치를 `AiPlanJobView` 로 옮겼다
+    (반려견 폼 #464 가 `PetForm.footer` 를 걷은 것과 같은 이동).
+  - 이 전환으로 **2a 프리미티브(`Band`·`Section`·`Row`·`RowList`)의 production 사용처가 0** 이
+    됐고, 로드맵 #455 의 12번([#475](https://github.com/8llow8llowMe/hondigagae/issues/475))이
+    `surface.tsx` 에서 **네 개를 지웠다.**
+- **생성 옵션 두 개가 붙었다** ([#128](https://github.com/8llow8llowMe/hondigagae/issues/128), 아트보드 05): `preferFavorites`(저장한 곳 먼저 — 우선순위)와 `pinnedPlaceIds`(꼭 넣을 장소 — **배치 보장**, 최대 10). **두 문구를 섞지 않는다** — "먼저" 와 "꼭" 은 다른 약속이다.
+  - **필드명은 `preferFavorites` 다.** #128 이슈 본문의 `includeFavorites` 는 틀린 이름이고, 그대로 보내면 옵션이 조용히 무시된다.
+  - 꼭 넣을 장소는 **저장한 장소에서 고른다** (`/favorites` 와 같은 캐시). 아트보드의 `검색` 탭은 **BE `keyword` 가 열렸다 (#421).** 피커 검색 UI 는 FE 후속 (명세 S8-9).
+- **다중 반려견(`petIds`)은 생성과 저장 양쪽에 붙었다** ([#128](https://github.com/8llow8llowMe/hondigagae/issues/128) · [#174](https://github.com/8llow8llowMe/hondigagae/issues/174) · [다견선택-세부명세.md](features/ai-plan/다견선택-세부명세.md)). 조건 입력이 체크박스 그룹이고 한 마리여도 `petIds` 배열로 보낸다. 담기도 동반한 아이를 전부 실으며 **첫 번째가 대표 반려견**이 된다. 한때는 `PlanCreateRequest.petId` 가 단일이라 담기 직전에 사람이 한 마리를 골랐지만, [#152](https://github.com/8llow8llowMe/hondigagae/issues/152) 가 `develop` 에 들어오면서 그 컨트롤을 걷었다 (명세 S8-8).
+- **일자 판정이 어느 아이 기준인지 말한다** ([#176](https://github.com/8llow8llowMe/hondigagae/issues/176)). 서버가 준 `basisPetId` 는 그날 점수가 **가장 낮은** 아이라 대표와 다를 수 있고 **날마다 달라진다** — 그래서 일정 단위가 아니라 일자마다 말한다. **두 마리 이상일 때만** 나오고, 이름을 못 찾으면(삭제된 반려견·조회 실패) 생략한다. `petSuitabilities[]` 로 아이별 점수를 나열하는 것은 하지 않았다 — 아트보드에 그 화면이 없다.
+- **아트보드 01 을 이탈했다.** 아트보드는 "반려견은 라디오 — 한 마리 / 두 마리를 함께 고르면 판정 기준이 모호해진다" 로 반대 결정을 해 뒀다. 담기 직전의 명시 선택이 그 모호한 구간을 없애므로 이탈했고, 근거의 정본은 세부명세 D1 이다. **아트보드 갱신은 후속.**
+- **아트보드 06 절이 02 절의 진행 5단계를 정정했다.** "진행률 바를 그리지 않는다 … 점 3개(대기·짜는 중·완성)만 쓴다 — 02 아트보드의 5단계는 이 규칙으로 대체한다." 현재 화면은 서버 `description` + 스켈레톤만 쓴다.
+  - **[#91](https://github.com/8llow8llowMe/hondigagae/issues/91) 에서 점 3개를 붙이지 않았다.** 이 절이 금지한 것(진행률 바·지어낸 5단계)은 현재 화면이 이미 지키고 있고, 점 3개는 **표시 추가**라 SSE 배선의 범위가 아니다. 다만 근거는 생겼다 — 전이가 실시간으로 도착하므로 `PENDING`·`RUNNING`·`COMPLETED` 세 상태에 점 3개를 그대로 대응시킬 수 있고 **지어내는 단계가 없다.** 붙이려면 별도 이슈로 뗀다.
+- **SSE 를 쓴다** ([#91](https://github.com/8llow8llowMe/hondigagae/issues/91), 명세 S3). BFF 가 응답을 통째로 버퍼링해 스트림을 통과시키지 못했던 것을 함께 고쳤다 — 요청 `Accept: text/event-stream` 이면 `response.body` 를 그대로 흘려보낸다. **구독이 앞에 서고 끊기면 폴링이 받는다.** 계약 함정(이벤트 이름 `job-update` · `data` 에 공통 래퍼 없음 · 종결 후 자동 재연결)은 명세 S3 의 함정표가 정본이다.
+- **LLM 어댑터는 `OllamaLlmAdapter` 하나다.** 플래그(`ai-llm.enabled`)와 `StubLlmAdapter` 는 2026-09-03 에 제거했다 — 프론트 개발자가 백엔드를 로컬에 띄우지 않고 dev 서버에 붙기로 해서다.
+  - 로컬 백엔드에 Ollama 가 없으면 생성 잡이 타임아웃으로 `FAILED` 된다. 화면 결함이 아니다. `BACKEND_API_URL` 을 dev 서버로 돌려 확인한다.
+  - 결과는 매번 다르다(실 LLM). 고정 샘플이 필요하면 FE mock(`src/lib/api/mock`)을 쓴다.
+- XAI `reasons` 가 포함된다 → 서버 `description` 을 그대로 노출한다.
+- 저장·확정은 plan-service 몫이다. ai-service에 저장 API가 없다.
+- **항목 행에 직선거리가 붙는다** (#100). 계산·30km 임계값·문구를 일정 상세와 **같은 모듈**
+  (`lib/geo/distance.ts`)에서 가져온다 — 두 화면이 같은 초안을 두 말로 말하지 않게 하려는 것이
+  요점이다. 기준은 직전 항목 하나뿐이고(초안 `itemType` 이 LLM raw string 이라 숙소를 못 믿는다)
+  좌표를 모르는 항목은 거리 줄이 없다. **실내 여부도 붙였다** ([#112](https://github.com/8llow8llowMe/hondigagae/issues/112)).
+- **`AiPlanCreateRequest` 가 `petIds`·`pinnedPlaceIds`·`includeFavorites`·`planId`+`regenerateDay`
+  를 받는다** (PR #78). 전부 선택이다. `petIds` · `pinnedPlaceIds` · `preferFavorites` 는
+  [#128](https://github.com/8llow8llowMe/hondigagae/issues/128) 로 붙였고(필드명은
+  `includeFavorites` 가 아니라 `preferFavorites` 다). **`planId`+`regenerateDay`(하루 재생성)도
+  #128 로 붙였다** — 다만 **이 화면이 아니라 일정 상세의 하루 재생성**(위 4절)에서만 실린다.
+  `planId` 가 저장된 일정에만 있어 담기 전 초안에서는 보낼 수 없다 (`하루재생성-세부명세.md` R1).
+- `petId` 와 `petIds` 가 함께 오면 **`petIds` 가 이기고 `petId` 는 무시된다.** 둘 다 없으면
+  **대표 반려견**을 쓴다 — 그런데 대표견 지정 UI 가 없다 (#126).
+
+### 5-0. 반려견 여행 준비물 — **구현** (#172 생성 · **#586 저장**)
+
+| 화면             | 경로                        | API                                              | 상태                  |
+| ---------------- | --------------------------- | ------------------------------------------------ | --------------------- |
+| 여행 준비물 조회 | `/plans/[planId]` 좌측 레일 | `GET /plans/{planId}/packing-items`              | **구현** (#586)       |
+| 준비물 생성      | 위 화면 내                  | `POST /ai-plans/packing-list/{planId}` → `PUT …` | **구현** (#172· #586) |
+| 직접 추가·삭제   | 위 화면 내                  | `POST` · `DELETE /plans/{planId}/packing-items`  | **구현** (#586)       |
+| 챙김 체크        | 위 화면 내                  | `PUT …/packing-items/{id}/checked`               | **구현** (#586)       |
+
+근거: ai-service `AiPlanWebController` / `PackingListResponse` **실측** (BE #155 · PR #157).
+
+- **동기 API 이고 수십 초가 걸릴 수 있다.** AI 일정 생성(202 + 폴링)과 다르다 — 출력이
+  짧아(8~15개) 잡을 두지 않았다. **화면이 걸리는 시간을 먼저 말한다.**
+- **결과를 plan-service 가 보관한다** (#398 BE · **#586 FE**). 화면은 **읽기 우선**이다 —
+  상세에 들어오면 `GET /plans/{planId}/packing-items` 를 먼저 읽고, `items` 가 비고
+  `generatedAt` 이 **null 일 때만** AI 생성을 권한 뒤 그 결과를 `PUT` 으로 저장한다.
+  예전에는 상세를 열 때마다 수십 초짜리 LLM 이 다시 돌았다.
+  - **`items` 가 비었다는 것만으로 "아직 만든 적 없다" 로 읽지 않는다.** 만든 뒤 전부
+    지웠을 수 있고, 그때 또 생성하면 사용자가 지운 것을 되살린다. 판정은
+    `lib/plan/packing.ts` 의 `shouldOfferGeneration` · `isCleared` 하나씩이다.
+  - **생성은 여전히 동기이고 수십 초다.** 저장이 붙어 그 대기가 **첫 1회**로 줄었을 뿐이라
+    대기 문구를 줄이지 않는다. 생성 자체를 비동기 잡으로 바꾸는 것은 **#590**(BE)이다.
+  - **생성과 저장이 한 mutation 이다.** 갈라 두면 "생성은 됐는데 저장만 실패" 한 목록이
+    화면에 남고, 새로고침하면 사라진다 — #586 이 없애려던 바로 그 증상이다.
+- 실패는 **`AIPLAN_016` 하나다** — 일정이 없거나 본인 소유가 아니면 같은 코드다.
+  화면이 두 경우를 구분해 말하지 않는다.
+- `category` 는 **enum 이 아니라 문자열이다.** 모르는 분류가 와도 버리지 않고 서버 순서대로 묶는다.
+- **다견 일정은 동행 반려견 전체가 근거다** ([#179](https://github.com/8llow8llowMe/hondigagae/issues/179) · `48214dd`).
+  `AiPackingProcessor` 가 `PlanOutlineResponse.petIds` 로 특성을 벌크 조회한다. 예전에는
+  대표 한 마리만 봐서 화면에 "대표 반려견 기준이에요" 를 붙여 뒀는데, 그 문구는
+  [#196](https://github.com/8llow8llowMe/hondigagae/issues/196) 에서 걷었다.
+- **그래도 화면이 "모든 아이 기준"이라고 말하지 않는다.** 특성 조회가 일부만 성공하면
+  백엔드는 그 아이를 빼고 WARN 만 남기고, `PackingListResponse` 에는 그 사실을 알려 주는
+  필드가 없다 — 몇 마리가 근거에 들어갔는지 화면은 모른다. 개수도 적지 않는다.
+  일자 판정의 `petConditionApplied` 에 해당하는 플래그가 준비물에는 **없다**.
+- **준비물의 다견 규칙은 합집합이다.** 일정 생성(가장 제약이 큰 아이 기준)과 **정반대**다 —
+  더위에 약한 아이의 쿨매트와 추위에 약한 아이의 옷이 둘 다 필요하다. 두 규칙을 섞은
+  문구를 쓰지 않는다 (`AiPlanPromptFactory` 의 `PACKING_MULTI_PET_RULE` / `PLAN_MULTI_PET_RULE`).
+- **이유 문장에 `반려견 2가 더위에 약해 …` 꼴로 어느 아이인지가 섞여 온다.** 합집합이라 흐려지는
+  근거를 서버가 이 표현으로 되살린다 — 화면이 이유를 손대거나 그 부분을 떼면 그 단서가 사라진다.
+  번호는 `petIds` 순서이고 아이 이름이 아니다. 대괄호 접두(`[반려견 2]`)는 BE #233 으로 없어졌고,
+  서버가 남은 대괄호를 걷어내 내려 준다 — 화면은 문장을 그대로 그린다.
+
+**저장 오퍼레이션 다섯 — 전부 연동됨 (#586)**
+
+| API                                                         | 무엇                | 화면이 지키는 것                                            |
+| ----------------------------------------------------------- | ------------------- | ----------------------------------------------------------- |
+| `GET /plans/{planId}/packing-items`                         | 여행 준비물 조회    | 상세 진입 시 **가장 먼저** 부른다                           |
+| `PUT /plans/{planId}/packing-items`                         | 저장 (AI 결과 교체) | 생성 직후에만 부른다. 빈 목록을 보내는 경로는 만들지 않는다 |
+| `POST /plans/{planId}/packing-items`                        | 직접 추가           | `PLAN_012`(중복) · `PLAN_013`(50개)를 **갈라** 말한다       |
+| `DELETE /plans/{planId}/packing-items/{packingItemId}`      | 삭제                | 응답이 `Void` 라 다시 읽는다                                |
+| `PUT /plans/{planId}/packing-items/{packingItemId}/checked` | 챙김 체크           | 응답이 `Void` 라 **낙관적**으로 그리고 실패하면 되돌린다    |
+
+- **`PUT` 은 AI 항목만 교체한다.** 사용자가 직접 추가한 항목(`source=USER`)은 남고, 같은
+  이름의 챙김 체크는 승계된다. 그래서 `다시 만들기` 옆에서 **무엇이 지워지지 않는지**를
+  문구로 말한다 — 말하지 않으면 짐을 반쯤 싸 둔 사람이 그 버튼을 누르지 못한다.
+- **직접 추가는 `reason` 을 받지 않는다.** _"이 여행의 일정·날씨를 읽은 AI 만 붙일 수 있는
+  값"_ 이라는 것이 서버 설명이다. 화면도 이유 칸을 주지 않고 그 이유를 힌트로 적는다.
+- `messages.plan.packingNotSaved`(_"저장되지 않는 제안이에요…"_)는 **지웠다.** 저장이
+  붙으면서 거짓말이 됐다 — 반대말(`packingSavedNote`)로 갈아탔다.
+
+**AI 선정 게이트(§7)에 걸리지 않는다고 판단했다** — §6 목록에 없고, §6 이 밝힌 기준("패키지
+자체가 없다")과 달리 `AiPackingProcessor` 가 있으며, BE 가 이슈 #155 로 추적해 출시했다.
+다만 **`CLAUDE.md` 가 가리키는 "README 의 AI 기능 10종 후보 풀" 이 지금 README 에 없다** —
+게이트 문서가 실체 없는 목록을 가리키고 있으므로 이 판단은 재확인이 필요하다.
+
+## 5-1. 주변 장소 검색 — **구현 완료**
+
+| 화면      | 경로               | API                  | 상태                                          |
+| --------- | ------------------ | -------------------- | --------------------------------------------- |
+| 주변 장소 | `/places?view=map` | `GET /places/nearby` | **구현** (#14) — 독립 화면이 아니라 지도 뷰다 |
+
+파라미터: `lat` `lng`(필수), `radius`(기본 5000, 최대 50000), `contentType` `petAllowanceType` `indoor` `allowedPetSize` `sourceCategory`, `size`(1~50, 기본 15)
+
+응답 `NearbyPlaceResponse`: `{ places: [{ place, distanceMeters }], totalCount, radius }`
+
+주의: 목록(`/places`)과 달리 **커서가 아니라 `totalCount`** 를 준다 → 건수 표기가 가능하다.
+
+## 5-2. 긴급 시설 (동물병원·약국) — **구현 완료**
+
+| 화면           | 경로         | API                           | 상태                                                                                                                                                                                                                                              |
+| -------------- | ------------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 주변 긴급 시설 | `/emergency` | `GET /emergencies/facilities` | **구현** (#13) · **지도 구현** (#14) · **조건 URL 소유** (#371) · **목록 필터 레일 2단** (#419) · **3층 표면** (#460) · **이름·주소 검색** (#584) · **목록 갈래 기본 · 위치 폴백 머리** (#639 — 지도는 `?view=map`, #353 의 지도 기본을 되돌렸다) |
+
+**FE 미연동 (백엔드는 구현됨 — PR #138)**
+
+| API                                        | 응답                              | 비고                                                                        |
+| ------------------------------------------ | --------------------------------- | --------------------------------------------------------------------------- |
+| `GET /emergencies/facilities/{facilityId}` | `EmergencyFacilityDetailResponse` | 목록 항목에서 `distanceMeters` 만 빠진 같은 필드다. **delisted 시설은 404** |
+
+**당장 붙일 곳이 없다.** 목록 응답이 이미 상세와 같은 필드를 주고 화면은 시트로 펼친다 —
+별도 상세 라우트가 생길 때 쓴다 ([#148](https://github.com/8llow8llowMe/hondigagae/issues/148)).
+
+파라미터: `lat` `lng`(필수), `radius`(기본 10000, 최대 50000), `type`(`ANIMAL_HOSPITAL`/`ANIMAL_PHARMACY`, 비우면 둘 다), `open24Only`(기본 false), `size`(**1~250**, 기본 10 — BE #285 로 50 에서 올랐다)
+
+> **`keyword` 는 이 API 에 없다.** 이름·주소 검색([#584](https://github.com/8llow8llowMe/hondigagae/issues/584))은
+> 받아 온 목록을 화면에서 좁힌다 — 이 화면은 개수를 세려고 이미 반경 안 전량을 받고 있어
+> 새 요청이 필요 없다. **전국으로 넓어져 `size` 로 잘리기 시작하면 그 판단이 깨지고**
+> 검색이 "받아 온 것 중에서" 가 된다. 그때 서버 계약을 연다
+> (`docs/features/emergency/공통명세.md` E3-0).
+
+**화면 설계에 직결되는 백엔드 지침** (스키마 설명에 명시돼 있다)
+
+- `operatingHoursKnown: false` → **"영업시간 정보 없음"으로 안내한다.** `operatingHours: null` 은 "휴무"가 아니라 "확인 필요"다
+- `open24Only=true` → **제주 동물병원 중 24시간은 3곳뿐**이라 결과가 매우 적다. 필터 UI에 이 사실을 알려야 한다
+- 응답에 `totalCount` 와 `providerName`(출처)이 있다. **`totalCount` 는 `size` 로 자르기 전 총계다** (BE #285 / PR #296) — 잘림 판정을 이 값으로 되돌렸다 ([#297](https://github.com/8llow8llowMe/hondigagae/issues/297))
+
+> [#8](https://github.com/8llow8llowMe/hondigagae/issues/8)(`facilityId` 정밀도)은 **해결·종료됐다.**
+> 백엔드가 `String` 으로 내린다 — _"Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로
+> 문자열로 내린다"_. FE 타입도 `string` 이고 **`number` 로 타이핑하면 정밀도가 손상된다.**
+
+## 5-3. 제주올레 코스 — **구현 완료**
+
+| 화면      | 경로                   | API                                | 상태                                                                                                                                                                           |
+| --------- | ---------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 코스 목록 | `/olle`                | `GET /walk-courses`                | **구현 완료** ([#618](https://github.com/8llow8llowMe/hondigagae/issues/618)) — 커서 없이 29개 전량. 이름·경로는 [#810](https://github.com/8llow8llowMe/hondigagae/issues/810) |
+| 코스 상세 | `/olle/[walkCourseId]` | `GET /walk-courses/{walkCourseId}` | **구현 완료** (#618) — 좌표가 있으면 `GET /insights/walk-times` 로 골든타임까지 이어진다                                                                                       |
+
+명세: `docs/features/walk-course/` (`공통명세.md` · `코스목록-세부명세.md` · `코스상세-세부명세.md`).
+
+> **이 절은 §6-1 "BE 착수됨. 아직 만들지 않는다" 였다.** #618 로 열리면서 §8 갱신 규칙대로 §1~5 형식으로 옮겼다.
+> 그전 기록: [#382](https://github.com/8llow8llowMe/hondigagae/issues/382) BE 착수(PR #384 · 2026-09-09 `1f021e90`) ·
+> [#383](https://github.com/8llow8llowMe/hondigagae/issues/383) 적재 배치 · [#409](https://github.com/8llow8llowMe/hondigagae/issues/409)
+> 원천이 두루누비가 아니라 **제주올레**로 교체 · [#534](https://github.com/8llow8llowMe/hondigagae/issues/534) 스냅샷 재수집에서 operation 둘 확인.
+
+**공개 API다.** dev OpenAPI 의 두 operation 모두 `security` 키가 없다 → `proxy.ts` `PROTECTED_PATHS` 에 넣지 않는다.
+`/places` 와 같다.
+
+**계약 실측 (dev 게이트웨이 실호출 · 2026-09-18 · 로컬 BE 미기동)**
+
+| 확인                                        | 결과                                                                                        |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `GET /walk-courses`                         | 200 · `courses[]` · `totalCount: 29` · `appliedPetActivityLevel` · `providerName`           |
+| `?petActivityLevel=LOW` / `MEDIUM` / `HIGH` | **6 / 24 / 29개** — `HIGH` 는 필터 없음과 결과가 같다                                       |
+| `?petActivityLevel=low`                     | **400** `WALKCOURSE_113` (enum 대소문자)                                                    |
+| `?maxDistanceKm=99`                         | **400** `WALKCOURSE_101` + `fieldErrors[0].field = maxDistanceKm`                           |
+| `GET /walk-courses/{없는 id}`               | **404** `WALKCOURSE_001` — **재시도 버튼을 달지 않는다**                                    |
+| `GET /walk-courses/abc`                     | **400** `WALKCOURSE_113` — `@PathVariable long` 이라 `/places/{placeId}` 와 같은 모양(#563) |
+
+파라미터: `petActivityLevel`(`LOW`/`MEDIUM`/`HIGH`), `maxDistanceKm`(0.1~50), `sort`(`COURSE_NO` 기본 ·
+`DISTANCE_ASC` · `DISTANCE_DESC` · `DURATION_ASC`). **커서가 없다** — 코스가 29개뿐이라 전량이 온다.
+
+**화면 설계에 직결되는 것**
+
+- **활동량 상한은 서버가 갖는다** — `LOW` 4시간(240분) · `MEDIUM` 6시간(360분) · `HIGH` 제한 없음
+  (`WalkCourseActivityFit`). **FE 가 다시 계산하지도, 상수로 적어 두지도 않는다** — 응답의
+  `appliedPetActivityLevel.maxDurationMinutes` 가 적용된 상한을 내려준다(#718 · FE 이관 #735).
+  소요시간을 모르는 코스는 어느 활동량에서도 걸러지지 않는다.
+- **`petActivityLevel` 기본값은 대표견의 활동량이다.** URL(`?activity=`)이 비어 있을 때만 서버 컴포넌트가 채우고,
+  미로그인·반려견 없음·펫 조회 실패·`HIGH` 면 **파라미터를 보내지 않는다**. 적용 여부는 응답의
+  `appliedPetActivityLevel`(객체 유무)로 판정한다 — 로컬 상태로 판정하지 않는다. **`null` 셋을 가른다**:
+  객체 자체가 null = 미적용 / `maxDurationMinutes` 만 null = `HIGH`(상한 없음) / 항목의
+  `durationMaxMinutes` null = **원문 파싱 실패**(제한 없음이 아니다).
+- **`lat`/`lng` 가 null 인 코스에는 골든타임 동선을 만들지 않는다** (`WalkCourseItem` 주석이 명시한다).
+  요청 자체를 보내지 않고 패널도 세우지 않는다. **`lat ?? 0` 을 쓰면 기니만 앞바다 예보가 200 으로 온다.**
+- **좌표가 있는 코스는 4개뿐이다** (2026-09-18 dev 실측 — 2 · 3(B) · 4 · 15(B)코스). 이슈·스키마 설명은
+  "20·18-2코스" 두 개로 적고 있지만 **실데이터가 다르다.** `firstImage` 가 있는 코스도 **정확히 같은 4개**다 —
+  둘 다 TourAPI 매칭에서 오고 그 매칭이 4건만 성공했다(적재 #383). 그래서 **좌표·이미지 없는 쪽이 기본 모양**이고,
+  목록은 사진 카드 그리드가 아니라 텍스트 행이다.
+- **`petActivityLevel=LOW` 를 적용하면 좌표 있는 코스가 0개가 된다** (4개 모두 `4~5시간`·`5~6시간`). 활동량 낮은
+  아이의 보호자는 골든타임을 한 번도 못 본다 — 결함이 아니라 데이터 분포다.
+- `walkCourseId` 는 응답에서 **문자열**이다(내부는 long · Snowflake). `number` 로 타이핑하면 정밀도가 손상된다.
+- **enum metadata 가 #718 로 생겼다** — 목록 `appliedPetActivityLevel.level`, 상세 `fitsActivityLevels[]`.
+  기준 줄의 활동량 이름은 이제 응답에서 온다. **선택지를 그리는 컨트롤만** FE 라벨을 쓴다(등록 폼과 같은 목록) —
+  응답은 _적용된_ 하나만 주기 때문이다 (`api-integration-guide.md` §6 의 인정된 예외).
+- **`durationText` 는 원문 문자열**(`4~5시간`)이다. 파싱하지 않는다. `durationMaxMinutes` 는 **이제 코스 목록·상세
+  항목에도 있다**(#718) — 정렬·비교용이고 사용자에게 분(minute)으로 그리지 않는다.
+- **`startEndPoint` 를 갈라 쓰지 않는다.** `제주민속촌주차장 입구-남원포구` 처럼 공백과 하이픈이 섞여 있다.
+- **`baseDate` 는 문자열이다.** `Date` 로 파싱하면 KST 기준 하루 밀린다.
+
+**일정에 코스 담기는 §4 다** — [#620](https://github.com/8llow8llowMe/hondigagae/issues/620) (`itemType=WALK`).
+
+## 5-4. 검색어 랜딩 — **구현 완료** ([#1134](https://github.com/8llow8llowMe/hondigagae/issues/1134))
+
+| 화면        | 경로            | API                                                                                | 상태                                                                                |
+| ----------- | --------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 검색어 랜딩 | `/jeju/[topic]` | `GET /places?contentType=…&petAllowanceType=ALLOWED&size=50[&lastPlaceId=]` (공개) | **구현 완료** — 숙소 · 관광지 · 식당·카페 3종. 서버 렌더만, 페이지는 `?after=` 링크 |
+
+명세: `docs/features/landing/검색랜딩-세부명세.md`. 모르는 `topic` 은 404, 5xx 는 `error.tsx`(500).
+
+## 6. 대기 — 백엔드 미착수
+
+**아래 화면은 만들지 않는다.** 호출부·mock도 만들지 않는다.
+
+| 화면                      | 필요한 백엔드          | 비고                           |
+| ------------------------- | ---------------------- | ------------------------------ |
+| 여행 후기 공유 · 피드     | plan-service           | 미착수 — 작성·보기는 §4 (#615) |
+| AI 여행 상담사 / 비서     | ai-service `assistant` | 미착수                         |
+| 반려견 성향 분석 리포트   | ai-service `analysis`  | 미착수                         |
+| 여행 스타일 학습 / 개인화 | —                      | AI 기능 후보, 선정 전          |
+
+**이 절에서 빠진 것 (백엔드가 구현했다)**
+
+| 화면                          | 어디로 갔나                       |
+| ----------------------------- | --------------------------------- |
+| 여행 적합도 분석 (점수 + XAI) | **§3-1 로 이동** — 구현됐다       |
+| 긴급 동물병원                 | **§5-2 와 중복이었다** — 구현됐다 |
+| 여행 후기 작성·보기           | **§4 로 이동** — #614 · #615      |
+| 일정 공유                     | **§4 로 이동** — #627 · #628      |
+
+확인 방법: `tour-service/domainlayer/` 에 `insight` · `emergency` 컨텍스트가 있고 각각 컨트롤러가 있다.
+`assistant` · `analysis` 는 **패키지 자체가 없다** — 그것이 미착수의 근거다.
+여행 후기 작성·보기는 plan-service `GET|POST|PUT /plans/{planId}/reviews` 로 **착수됐다** (#614 BE · #615 FE) — §4.
+**2026-09-10 재확인**: dev 게이트웨이 OpenAPI 재수집(operation 57개)에 세 컨텍스트의 경로가 하나도 없다.
+**`walkcourse` 는 이 목록에서 빠졌다** — §5-3 으로 옮겼다 (#618).
+
+## 7. AI 기능 선정 게이트
+
+루트 `README.md` 의 AI 기능 10종은 **후보 상태**다. 선정 전에는 §6 화면을 만들지 않는다.
+
+선정이 확정되면:
+
+1. 루트 `README.md` 표의 상태 열 갱신
+2. 이 문서의 §6 항목을 §1~5 형식으로 이동
+3. `docs/features/_index.md` 에 명세 항목 추가
+4. 백엔드 API 구현 여부를 `backend/docs/service-inventory.md` 로 재확인
+
+## 8. 갱신 규칙
+
+- 화면을 구현하면 상태를 `기획` → `구현` 으로 바꾼다.
+- 백엔드 동기화 후 `backend/docs/service-inventory.md` 와 이 문서를 대조한다.
+- `TODO(BE)` 로 임시 처리한 항목은 이 문서에도 남긴다.

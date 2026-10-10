@@ -1,0 +1,113 @@
+'use client'
+
+import type { ReactNode } from 'react'
+
+import { Button } from '@/components/button'
+import { useOnline } from '@/lib/hooks/use-online'
+import { messages } from '@/lib/messages'
+import { type StatePlacement, statePlacementClass } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
+
+export type ErrorStateProps = StatePlacement & {
+  title: string
+  description?: string | undefined
+  /** 필수 prop 이다. optional 로 두면 빠진다 (component-guide.md §10) */
+  onRetry: () => void
+  retryLabel?: string
+  /*
+    `inset` — 좌우 여백 축 (DESIGN.md §7). **좌측 레일 안에 놓을 때는 `rail` 을 준다.**
+    예전에는 `md:px-10` 이 하드코딩돼 있어, 홈 판정 자리에서 로딩(24) → 오류(40) →
+    성공(24) 이 서로 다른 인셋을 썼다 — 재시도를 누르는 동안 글자가 좌우로 움직였다.
+
+    `flush` — **폼 안처럼 담는 쪽이 이미 여백을 가진 자리**에서 자기 여백을 걷는다 (#1079).
+    둘은 `StatePlacement` 로 함께 주지 못한다 (`lib/ui/inset.ts`).
+  */
+  /**
+   * 제목의 heading 레벨 — **제목을 가진 `Surface` 안이면 `3`** 이다 (#456① · #469).
+   *
+   * 이게 없을 때 `/mypage` 오류의 실측 아웃라인이 `h1:내 정보` → `h2:내 정보`(카드) →
+   * `h2:내 정보를 불러오지 못했어요` 였다 — 카드 **내용**의 제목이 카드 **자신**의 제목과
+   * 형제로 읽힌다. 3a 가 "상태가 카드 머리를 공유한다"(#451)를 규약으로 삼으면서 제목 있는
+   * 카드 안에 상태가 들어가는 자리가 계속 늘었고, 목록 항목은 이미 `h3` 로 한 단
+   * 내려갔는데(#464 · #466) 상태 컴포넌트만 예외로 남아 있었다.
+   *
+   * 기본값·유도하지 않는 이유·크기를 그대로 두는 이유는 `EmptyState` 쪽 주석이 정본이다.
+   */
+  headingLevel?: 2 | 3
+  /**
+   * 재시도 옆에 서는 두 번째 출구 — **셸이 없는 경계만 쓴다** (#907).
+   *
+   * `app/error.tsx` · `app/global-error.tsx` 는 `AppShell` 밖이라 헤더로 돌아갈 길이 없어
+   * "홈으로" 를 여기 둔다. 셸 안의 상태(세그먼트 경계 · 섹션 오류)는 헤더가 이미 그 일을
+   * 하므로 넘기지 않는다 — 출구가 둘이면 재시도가 덜 눌린다.
+   */
+  action?: ReactNode
+  className?: string
+}
+
+/**
+ * 일시 장애(5xx·무응답) 전용. 데이터 부재는 EmptyState 를 쓴다.
+ *
+ * **오류는 섹션 단위로만 그린다. 화면 전체를 오류로 덮지 않는다** (가이드 §5) —
+ * 일정 자료는 우리 DB이고 판정은 외부 예보라, 한쪽이 죽어도 다른 쪽은 살아 있다.
+ *
+ * 제목을 붉게 칠하지 않는다. 표면은 흰색으로 두고 danger 는 아이콘에만 쓴다 —
+ * 배경·제목까지 붉히면 일시 장애가 경보처럼 읽힌다.
+ */
+export function ErrorState(props: ErrorStateProps) {
+  return <ErrorStateView {...props} offline={!useOnline()} />
+}
+
+/**
+ * 표시만 — `offline` 을 밖에서 받는다. node 환경에서 두 갈래를 모두 렌더해 재려고 뽑았다
+ * (`testing-guide.md` §1 — 훅은 서버 스냅샷(온라인)으로만 렌더된다).
+ *
+ * **오프라인이면 원인을 바꿔 말하고 재시도를 걷는다** (#912). 끊긴 채 다시 눌러도 같은
+ * 실패이고, "잠시 문제가 생겼어요" 는 서버 탓으로 읽혀 사용자가 제자리에서 버튼만 누른다.
+ * 연결이 돌아오면 `useOnline` 이 바뀌어 원래 제목·버튼이 다시 선다 — React Query 조회는
+ * 그 순간 스스로 다시 돈다(`refetchOnReconnect`). `action`(셸 없는 경계의 홈으로)은 남긴다.
+ */
+export function ErrorStateView({
+  title,
+  description,
+  onRetry,
+  retryLabel = messages.common.retry,
+  inset,
+  flush,
+  headingLevel = 2,
+  action,
+  className,
+  offline,
+}: ErrorStateProps & { offline: boolean }) {
+  const Heading = `h${headingLevel}` as const
+
+  return (
+    <div
+      className={cn(
+        'flex flex-col items-start gap-2',
+        statePlacementClass({ inset, flush }),
+        className,
+      )}
+    >
+      <Heading className="text-body-1 text-fg font-semibold">
+        {offline ? messages.common.offlineTitle : title}
+      </Heading>
+      {offline ? (
+        <p className="text-body-2 text-fg-muted">{messages.common.offlineDescription}</p>
+      ) : (
+        description !== undefined && <p className="text-body-2 text-fg-muted">{description}</p>
+      )}
+      {(!offline || action !== undefined) && (
+        <div className="mt-1 flex flex-wrap gap-2">
+          {/* 이 상태에서 화면의 **주된** 조작 대상이라 44 를 준다 — §7 하한이 아니라 그 사실이 근거다 (#883). `action` 은 셸 없는 경계만 쓴다 */}
+          {!offline && (
+            <Button variant="secondary" size="md" onClick={onRetry}>
+              {retryLabel}
+            </Button>
+          )}
+          {action}
+        </div>
+      )}
+    </div>
+  )
+}

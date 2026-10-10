@@ -1,0 +1,333 @@
+# Tour Service
+
+## 책임
+
+- 장소(관광지/음식점/숙박/카페) 검색·상세 조회 — 반려견 동반 조건 필터 포함
+- 관광지별 연관 관광지 조회 (코스 생성 기반 데이터)
+- 두루누비 산책·레저 코스 조회
+- 여행 적합도 분석 — 날씨 + 혼잡도 + 반려견 동반 조건 결합, score + XAI reasons
+- 위치 기준 동물병원·동물약국 반경 조회 (긴급 상황 도우미)
+- 좌표 반경 장소 검색 (식당·카페 포함)
+
+## 컨텍스트
+
+- `place` — 장소 마스터, 반려견 동반 조건, 연관 관광지
+- `walkcourse` — 제주올레 코스 (조회 구현). **두루누비를 쓰지 않는다** — 걷기 코스 142개가
+  코리아둘레길 축이라 제주가 0개다(실호출 검증). 원천은 공공데이터포털 올레코스현황 CSV(공식
+  거리·소요시간·시종점) + TourAPI 레포츠(28) 올레 항목(시작점 좌표·대표이미지) 결합이다 (#382)
+- `insight` — 여행 적합도, 산책 위험도, 혼잡도, 날씨 (구현 완료, `weather-insight-integration.md`)
+- `emergency` — 동물병원·동물약국 등 긴급 시설
+
+## 주요 API (계획)
+
+- `GET /api/v1/places` — 검색 (지역, 유형, 반려견 동반 조건, **keyword** 단어별 이름·주소 AND 검색, 커서 기반 `SliceResponse`).
+  선택 파라미터 **`lat`·`lng`(기준 좌표)를 함께 주면 거리순**이고 항목에 `distanceMeters` 가 실린다(#1202). 주지 않으면 지금처럼
+  `placeId` 오름차순이고 `distanceMeters` 는 null 이다. 하나만 주면 400(`PLACE_109`). 커서는 어느 쪽이든 `lastPlaceId` 하나다 —
+  규칙은 아래 "장소 목록 정렬" 과 "장소 목록 거리순 결정 (#1202)"
+- `GET /api/v1/places/sitemap` — 사이트맵용 장소 전량 (#1135). `placeId` · `petAllowanceType` · `modifiedAt` 만,
+  페이지 없이 `placeId` 오름차순. 노출 규칙은 목록·주변과 같은 `visible()` 이라 병합·delisted 는 빠지고, 동반 구분으로는 거르지 않는다.
+  `modifiedAt` 은 **원천 수정일(`sourceModifiedAt`)** 이다 — 배치 upsert 가 매번 `updated_at = NOW()` 로 모든 행을 다시 써서
+  적재 시각은 lastmod 로 뜻이 없다. 원천에 수정일이 없으면 null 이다. 제주 2,300여 곳이라 한 번에 주고,
+  사이트맵 파일 하나의 상한(5만 URL)에 다가가면 페이지를 다시 설계한다
+- `GET /api/v1/places/{placeId}` — 상세 (출입 조건: 실내/실외, 크기 제한, 목줄/케이지 조건)
+- `GET /api/v1/places/{placeId}/related` — 연관 관광지
+- `GET /api/v1/places/{placeId}/suitability` — 여행 적합도 (`score` + `reasons`, `api-design-guide.md` §9).
+  고온 규칙은 **최고기온과 하루 최고 체감온도 중 큰 값**에 반려견 기준 28/31℃ 를 건다 — 같은 기온이라도 습한 날이 더 깎인다
+  (산책 위험도의 33/35℃ 는 사람 폭염특보 척도로 등급을 말하는 값이라 여기 쓰지 않는다)
+  `petSociality=LOW` 는 혼잡 감점을 키운다 — 소음 민감(소리)과 별개 감점(대면)이라 둘 다면 함께 깎인다 (#425)
+  **`headline` 은 화면 결론 자리에 쓰는 서술형 한 문장이다** (#1234, 정본 `SuitabilityHeadline`). 출입 사실과 발효 중인 특보는 날씨 예보와 무관하게 알아서 `INSUFFICIENT` 여도 결론으로 말하고(특보는 판정기가 날씨 없이는 근거로 남기지 않아 발효 여부를 따로 받는다), 그 밖에 `INSUFFICIENT` 면 null(화면은 등급 name 폴백).
+  결론을 뒤집는 감점(`scoreDelta < 0`)이 있으면 그 사실이 먼저다 — 동반 불가 `반려견과 함께 들어갈 수 없는 곳이에요` >
+  기상특보 `기상특보가 있어 오늘은 바깥 활동을 줄이는 게 좋아요` > 크기 제한 `반려견 크기 제한이 있어 확인이 필요해요` > 동반 미확인
+  `반려견 동반 여부를 확인하고 가세요`. 순서는 근거 정렬(영향 크기)이 아니라 사실의 결정성이고, delta 0 인 크기 제한 안내는 결론을 바꾸지 않는다.
+  특보는 제주 전역 한 지점 기준이라 모든 장소에 같은 감점이 붙어 "다른 곳" 을 권하지 않는다. 동반 미확인은 감점이 10점뿐이라 맑은 날이면
+  HIGH 인데, 반려견 여행에서 `가기 좋아요` 는 들어갈 수 있다는 말이라 확인을 결론으로 둔다(부분 동반은 들어갈 수 있는 곳이라 등급 문구를 따른다). 그 밖에는 등급 — HIGH `오늘 가기 좋아요` · MEDIUM
+  `가도 괜찮지만 챙길 게 있어요` · LOW `오늘은 다른 곳이 더 나아요`. **"오늘" 은 기준 일자가 오늘일 때만 쓴다**(다른 날이면 `가기 좋아요` ·
+  `다른 곳이 더 나아요` · `기상특보가 있어 바깥 활동을 줄이는 게 좋아요`). 오늘 판정은 특보를 붙일지와 같은 한 번의 `targetDate.equals(LocalDate.now())` 다.
+  반려견 이름은 넣지 않는다(화면이 `오늘 몽과` 로 붙인다). **산책 위험도에는 headline 을 두지 않는다** — 지도 미리보기(#1233 ⑤)는 산책을
+  결론이 아니라 근거 사실 한 줄(`walkSafetyLevel.name` · 체감온도)로만 쓴다. 결론은 적합도 하나가 말한다
+- `GET /api/v1/places/{placeId}/walk-safety` — 산책 위험도 (추정 노면온도 + 기상청 여름철 체감온도 + 안전 시간대).
+  체감온도는 기상청 산식으로 계산하며 폭염특보 기준(33/35℃)이 판정 임계다. NOAA 열지수는 참고로 병기하고,
+  두 값 모두 계산 근거 문구(feelsLikeBasis/heatIndexBasis)를 함께 내린다
+  단두종 · 더위 민감 규칙은 적합도와 같은 반려견 기준(기온과 체감온도 중 큰 값 ≥ 28℃)으로 켜진다 (#977)
+- `GET /api/v1/walk-courses` — 산책 코스 목록. `petActivityLevel` 로 반려견 활동량 필터
+  (LOW 4시간·MEDIUM 6시간 이하 — `WalkCourseActivityFit` 이 상한의 단일 출처), 거리 필터·정렬.
+  **좌표가 있는 코스는 `/api/v1/insights/walk-times?lat=&lng=` 로 이어진다** — 골든타임을 코스
+  시작점에서 그대로 재사용하므로 "오늘 이 코스 언제 걷기 좋은가"에 신규 API 없이 답한다.
+  **29개 코스 전부에 시작점 좌표가 있다** (#722, 2026-09-19 재적재 기준). 한동안 4개뿐이었던 것은
+  원천에 없어서가 아니라 적재 쪽 결함 둘이 겹쳐서였다 — 지역 필터가 `areaCode=39` 였고(TourAPI 가
+  법정동 체계로 옮기며 비운 값), 제목 파서가 바뀐 변형 표기(`[제주올레 3-A코스]`)를 못 읽었다.
+  **"20·18-2 는 TourAPI 에 없다"는 옛 서술도 틀렸다 — 둘 다 원천에 있다.**
+  좌표가 없는 코스가 생기면 그 코스는 골든타임 동선을 만들지 않는다(설계는 그대로다).
+  **경로 좌표열(폴리라인)은 내리지 않는다 — 공개 원천에 없다. 조사는 끝났다**
+  ([#736](https://github.com/8llow8llowMe/hondigagae/issues/736), 2026-09-19). CSV 헤더는 여섯이고
+  좌표 컬럼이 없으며, TourAPI `searchKeyword2` 는 시작점 한 쌍만 준다. 경로를 주는 두루누비는
+  코리아둘레길 전용이라 제주가 0개고, 전국길관광정보표준데이터는 좌표 필드 자체가 없으며,
+  제주 공간정보포털에는 노선 레이어가 없다. **제주올레 공식 사이트조차 시작점·종점 2점만 갖고
+  있고 경로 선을 그리지 않는다.** 네 원천의 확인 방법과 근거는
+  `data-api-analysis.md` §9 에 있다 — **다시 뒤지기 전에 그 절을 먼저 읽을 것.**
+  그래서 상세에 경로 선 지도는 세우지 않는다. 시작점 좌표만으로 붙는 골든타임 동선은 그대로다.
+  **대신 종점 좌표까지는 준다 — 코드 기준 29개 전부다(2026-07-31 판. dev 는 2026-09-28 23개, #960 배포 뒤
+  `olleCourseImportJob forceImport=true` 재적재로 29개)**
+  ([#816](https://github.com/8llow8llowMe/hondigagae/issues/816), [#960](https://github.com/8llow8llowMe/hondigagae/issues/960)).
+  목록·상세 둘 다 `startPointName` · `endPointName` · `endLat` · `endLng` 를 싣는다. 새 원천을
+  붙인 것이 아니라 **인접 코스의 시작점**에서 끌어온 값이다 — 올레는 한 코스의 종점이 다음 코스의
+  시작점이라 지점명으로 되찾으면 된다(`OlleCourseEndpointResolver`). 체이닝이 닿지 않는 여섯(표기가
+  다르거나 그 종점에서 출발하는 코스가 없는 9 · 10 · 10-1 · 14-1 · 21 · 18-2코스)은 **사람이 확인한 별칭·수기
+  좌표**로 채운다(`OlleCourseEndpointOverrides`). 이 값은 지점명이 정확히 같을 때만 쓰여, 원천이 이름을 바꾸면
+  그 코스의 종점은 다시 null 이 된다 — **종점 null 은 여전히 정상 값이다.**
+  **순환 코스 1-1(우도)은 시작점과 종점이 같은 값이고, 두 점이 겹친다고 코스 길이가 0 인 것이
+  아니다**(2025-04-28 판 11.3km, 2026-07-31 판 11.5km). 두 점 사이 직선은 실제 걷는 길이 아니므로 화면이 경로로 그리면 안 된다.
+  **적용된 활동량과 그 상한은 `appliedPetActivityLevel` 로 응답이 실어 내린다** (#718) —
+  `{ level: {code,name,description}, maxDurationMinutes }` 다. 상한의 정본은 `WalkCourseActivityFit`
+  하나(`maxMinutesOf`)라 화면이 4시간·6시간을 제 상수로 적으면 서버가 상한을 바꿔도 화면만 옛 숫자를 말한다.
+  세 가지 null 을 구분한다 — 객체 자체가 null 이면 **활동량으로 거르지 않았다**,
+  객체는 있고 `maxDurationMinutes` 만 null 이면 **HIGH(상한 없음)** 다.
+  **적용 여부를 말하는 것은 이 객체 하나다.** 같은 사실을 말하던 `petActivityLevelApplied: boolean`
+  은 [#747](https://github.com/8llow8llowMe/hondigagae/issues/747) 에서 지웠다 — #718 이 객체로
+  대체하면서 `@Deprecated(forRemoval = true)` 로 한동안 남겨 둔 것이고, 남겨 둔 조건(화면이 그 값으로
+  "기준" 줄을 그린다)은 [#735](https://github.com/8llow8llowMe/hondigagae/issues/735) ·
+  [#746](https://github.com/8llow8llowMe/hondigagae/pull/746) 에서 화면이 새 필드로 옮기며 풀렸다.
+  프론트 목(`frontend/src/lib/api/mock/walk-course-data.ts`)도 같은 PR 에서 `appliedPetActivityLevel`
+  과 `durationMaxMinutes` 를 내도록 옮겼고, 목 테스트가 `petActivityLevelApplied` 의 부재를 계약으로
+  고정한다. 두 곳이 같은 사실을 말하는 상태를 길게 두면 둘이 어긋나는 날 소비처가 어느 쪽을 믿을지
+  그때 정하게 되므로, 화면이 옮긴 직후가 지우기 가장 싼 시점이었다.
+  `level.description` 은 **반려견 성향** 문구(`ActivityLevel` 의 설명)이며 소요시간 상한이 아니다 —
+  내부 API(`/internal/v1/walk-courses/candidates`)가 plan-service 로 내려보내는 값과 같아야 해서,
+  여기에 "4시간 이하" 를 섞지 않고 상한을 별도 숫자 필드로 낸다
+- `GET /api/v1/walk-courses/{walkCourseId}` — 산책 코스 상세.
+  목록 항목과 상세 모두 `durationMaxMinutes`(소요시간 상한, 분)를 싣는다 — **null 은 "제한 없음"이
+  아니라 원문(`durationText`)을 파싱하지 못했다는 뜻이다.** 내부 API·plan-service 의 같은 필드와
+  같은 축의 설명이라 화면은 파싱 실패 시 원문을 보여 준다.
+  상세에는 `fitsActivityLevels`(이 코스를 걸을 만한 활동량의 `{code,name,description}` 목록)를 더한다.
+  plan-service 의 `PlanItemWalkCourseItem.fitsActivityLevels` 와 같은 모양이라 화면이 렌더를 재사용한다.
+  **목록 항목에는 싣지 않는다** — 목록은 이미 활동량으로 걸러 내려가므로 항목마다 반복하면 응답만 부푼다
+- `GET /api/v1/places/nearby?lat=&lng=&radius=&sigunguCode=&contentType=&petSizeType=&petWeightKg=&keyword=` — 좌표 반경 장소 검색. keyword 는 목록과 같은 단어별 이름·주소 AND 검색.
+  선택 `sigunguCode` 는 목록(`GET /places`)과 같은 의미·형식이다 — 지도의 "이 지역에서 재검색" 이 목록에서 주변 검색으로 바뀌어도
+  시군구 필터를 잃지 않게 한다. 생략하면 시군구를 가리지 않는 예전 동작 그대로다 (#1316)
+  빈 값(`sigunguCode=`)도 생략으로 본다 — 목록은 아직 빈 값을 `sigungu_code = ''` 로 걸어 0건이 된다(같은 정규화는 후속).
+- `GET /api/v1/emergencies/facilities?lat=&lng=&radius=&type=&open24Only=&openNowOnly=&size=` — 긴급 시설 반경 검색.
+  `size` 상한은 **250** 이다 — 제주 전역 시설이 213곳이라 반경을 최대로 넓혀도 잘리지 않는다.
+  화면이 유형·24시간을 클라이언트에서 좁히며 칩마다 개수를 보여주므로 한 번에 전량을 받아야 한다.
+  두 조회 모두 **`totalCount` 는 `size` 로 자르기 전 총계**다 (`api-design-guide.md` §5-1, 이슈 #285)
+- `GET /api/v1/emergencies/facilities/{facilityId}` — 긴급 시설 상세.
+  내려간(delisted) 시설은 404 다 — 목록에 없는 곳을 상세로만 볼 수 있으면 폐업한 병원 주소를 들고 찾아가게 된다
+- `GET /api/v1/insights/regional-weather?date=` — 제주 권역(5곳) 날씨 비교 + "나가기 좋은 권역" 추천.
+  **특보 경보 중에는 추천하지 않는다**(비교표는 그대로) — 적합도는 0점, 산책은 위험이라고 하는
+  같은 서비스가 여기서만 나가라고 하면 안 된다.
+  한라산이 섬을 기후로 갈라 놓아 성립하는 비교다. 권역마다 **대표 격자 하나**만 봐서 기존 격자 캐시에 얹힌다.
+  예보를 못 받은 권역도 `weatherScore = null` 로 목록에 남는다.
+  권역 항목에는 최저·최고기온과 **`maxFeelsLikeTemperature`(하루 최고 체감온도)** 가 실린다 —
+  장소 상세 `weather.maxFeelsLikeTemperature` 와 같은 규칙(기상청 여름철 체감온도)이라 두 화면의 숫자가 어긋나지 않는다.
+  `weatherScore` 의 고온 규칙도 적합도와 같다 — 최고기온과 체감온도 중 큰 값에 28/31℃ 라, 습한 권역은 점수가 내려간다
+- `GET /api/v1/insights/walk-times?lat=&lng=` — 오늘 남은 시간의 산책 안전 곡선 + 골든타임.
+  `goldenStart` 가 null 이면 남은 시간이 전부 위험이거나 특보 경보 중이다 —
+  아무 구간이나 주면 사용자가 허락으로 읽는다.
+  **`hourly` 가 빈 배열이어도 200 이다** — 기상청 23시 회차부터 자정까지는 오늘의 시각별 예보가
+  원천에 없다(정상). 빈 이유는 `forecastCoverage` 로 가른다
+  (`weather-insight-integration.md` §5-2)
+- `GET /api/v1/places/{placeId}/congestions?fromDate=&days=` — 기간 혼잡도.
+  "이번 주 언제 덜 붐비나"에 답한다. 혼잡도 예측은 30일 rolling 이라 예보(약 11일)보다 멀리 간다 —
+  적합도로는 근거가 없는 날짜도 붐빔 정도는 알 수 있다.
+  **데이터가 없는 날짜도 UNKNOWN 으로 목록에 남긴다** — 빠뜨리면 날짜 축에 구멍이 생겨 사용자가 그 날을 한산한 날로 읽는다.
+  `leastCrowded` 가 기간 중 가장 덜 붐비는 날이다(아는 날 중 최저 집중률, 동률이면 가장 이른 날짜,
+  전부 UNKNOWN 이면 null) — 고르는 규칙은 `CongestionSnapshot.leastCrowded` 한 곳이다 (#425)
+- `GET /internal/v1/places/visible-ids?placeIds=` — (내부 전용) 일정 항목 검증용 벌크 존재 확인.
+  게이트웨이가 라우팅하지 않으며, delisted 를 제외해 새 일정 항목이 사라진 장소를 참조하지 못하게 한다
+- `GET /internal/v1/places/candidates?placeIds=` — (내부 전용) 아이디로 후보 요약 조회.
+  ai-service 의 필수 포함 장소를 프롬프트 후보에 합칠 때 쓴다. enum 은 표시명으로 변환해 준다
+- `GET /internal/v1/walk-courses/candidates?walkCourseIds=` — (내부 전용) 아이디로 산책 코스 요약 조회 (#619).
+  plan-service 가 일정 상세의 `WALK` 항목에 이름표·거리·소요시간·대표 이미지를 붙일 때 쓴다.
+  **없는 아이디는 조용히 빠진다** — plan-service 의 `WALK` `targetId` 는 저장 시 검증되지 않아 없는 코스를
+  가리킬 수 있고(수기로 정리된 행도 마찬가지다), 그 항목 하나 때문에 일정이 통째로 안 보이면 안 된다.
+  적재는 upsert 뿐이라 **재적재로 행이 사라지지는 않는다** — 근거를 거기 두면 나중에 이 정책이 되돌려진다.
+  `fitsActivityLevels` 로 **이 코스를 걸을 만한 활동량**(`ActivityLevel` 의 `{code, name, description}` 목록)을 함께 내린다.
+  내부 DTO 라 공통 metadata 타입 대신 세 값을 펴서 주고(`WeatherWarningInternalResponse` 와 같은 이유),
+  소비 측이 자기 웹 응답에서 metadata 로 씌운다.
+  판정의 주인이 이 서비스(`WalkCourseActivityFit`)라 여기서 계산하며, 그래야 plan-service 가 남의 반려견 활동량을
+  tour-service 로 넘기지 않아도 된다. 소요시간을 모르는 코스(`durationMaxMinutes` null)는 세 값이 다 담기는데,
+  이는 "아무 아이나 된다"가 아니라 "모른다"는 뜻이다
+- `GET /internal/v1/weather/daily?areaCode=` — (내부 전용) 제주 대표 지점의 일자별 예보(단기+중기, 약 11일).
+  ai-service 가 일정 생성·준비물 프롬프트에 싣는다. 기존 격자 캐시를 타 KMA 호출이 늘지 않고, 제주(39) 외 코드는 빈 목록
+- `GET /internal/v1/weather/warnings` — (내부 전용) 제주에 발효 중인 특보 중 **가장 무거운 한 건**. 없으면 `dataBody` 가 null 인 200.
+  plan-service 여행 브리핑이 당일 일정에 붙인다. 고르는 규칙은 웹 응답 4곳과 같고(`WeatherWarning.heaviest`), 경보 판정
+  `recommendationSuppressed` 를 함께 내려 소비 측이 단계 문자열로 다시 판정하지 않게 한다 (#357)
+
+## 데이터 흐름
+
+- 장소/코스/연관 관광지/혼잡도 예측: batch-service가 적재한 DB를 조회한다.
+  장소 키워드 검색(`keyword`)은 공백을 한 칸으로 정규화한 뒤 최대 5개 단어로 나눈다. 각 단어는
+  이름 또는 주소 중 한 곳에 부분 일치해야 하고, 모든 단어를 만족한 장소만 찾는다. `%`·`_`·`\`는
+  와일드카드가 아니라 리터럴이다. 공백/빈 값은 필터 없음이며 원문 길이 상한은 50자다. 검색 원천은
+  DB `LIKE`이고, 같은 조건의 반복 조회만 Redis 에 5분 TTL 로 둔다. 검색 의미 변경 전 캐시와 섞이지
+  않도록 목록·주변 키 네임스페이스는 각각 `list:v3`, `nearby:v3`를 쓴다(목록은 #1202 에서 기준 좌표가 키에 들어가고
+  저장 봉투에 `distanceMeters` 가 더해져 v3 로, 주변은 #1316 에서 `sigunguCode` 가 키에 들어가 v3 로 올렸다). Redis 장애는 캐시 미스로 취급한다. Elasticsearch
+  는 인프라 미구성이라 이 경로를 쓰지 않는다 (#421).
+- 날씨: 기상청 실시간 호출(`WeatherObservationPort`) + Redis **격자별** 캐시.
+  TTL 은 고정값이 아니라 다음 발표 시각에 맞춘다 — 캐시는 성능 최적화가 아니라
+  일 1,000건 제한을 방어하는 쿼터 정책이다.
+- 적합도 산출: `insight` 컨텍스트의 Processor가 날씨·혼잡도·동반 조건을 조합해 점수화한다.
+  LLM 해설이 필요한 부분은 ai-service 책임이고, 이 서비스는 규칙 기반 점수와 근거 데이터만 제공한다.
+
+## 구현 주의점
+
+- 조회 중심 서비스 — `QueryResult` / `Info` / Presenter 구조를 사용한다.
+- 기상청 응답 등 외부 원본 스키마는 adapter 밖으로 새지 않는다 (`external-api-guide.md` §3).
+- 적합도 등급은 `SuitabilityLevel`, 동반 구분은 `PetAllowanceType` enum 사용 (`coding-conventions.md` §8-3).
+- 좌표 기반 조회는 DB 사각 범위 필터 + 애플리케이션 하버사인 정렬 조합을 쓴다 (`place-data-integration.md` §9-2). 데이터가 커지면 공간 인덱스로 옮긴다.
+  목록 거리순(#1202)은 반경이 없어 사각 범위 없이 필터에 맞는 후보 좌표 전량을 같은 하버사인으로 정렬한다.
+- **장소 목록 정렬은 `id` 오름차순이고, 그것이 곧 원천 우선순위다 (필수).** `PlaceIdFactory` 가
+  TourAPI 행에는 `contentId`(제주 실측 12만~344만)를, 문화정보원·식약처 행에는 SHA-256 해시를
+  2^62 이상으로 접어 주므로 **오름차순 = TourAPI 먼저**다. 사진·개요·동반 조건을 가진 쪽이
+  TourAPI 행이라(dev 실측 985건 중 917건에 사진) 첫 페이지가 내용 있는 장소로 채워진다.
+  - 내림차순이던 것을 #321 에서 뒤집었다. 이미지가 아예 없는 문화정보원·식약처 행부터 내려보내
+    관광지·문화시설·숙박·음식점의 첫 화면이 전부 회색 일러스트였다.
+  - **"최신순" 의 뜻은 없다.** 같은 원천 안에서는 적재 순서이고 시간순이 아니다. 최신순이
+    필요해지면 커서를 정렬 키와 함께 다시 설계한다 — `lastPlaceId` 하나로는 표현되지 않는다.
+  - 커서 조건은 정렬 방향과 함께 움직인다(`id > lastPlaceId`). 한쪽만 바꾸면 같은 페이지를
+    무한히 돌려준다.
+  - **예외는 기준 좌표가 있을 때 하나다 — 거리순(#1202).** `lat`·`lng` 를 함께 주면 (반올림 거리 m, `id`) 오름차순이다.
+    "다음에 갈 곳" 을 고르는 화면(일정 장소 담기 목록)은 원천 우선순위가 아니라 직전 장소에서 가까운 순이어야 하고,
+    클라이언트가 받은 페이지만 정렬하면 다음 장에 더 가까운 곳이 있어도 모르는 거짓이 된다. 좌표가 없으면 위 규칙
+    그대로라 좌표 없이 부르는 쪽(ai-service 후보 조회)의 쿼리·순서는 바뀌지 않는다. 세부는 "장소 목록 거리순 결정 (#1202)".
+- 동물병원 운영시간은 원천의 절반이 비어 있다(약국은 98% 채워짐). null 을 "휴무"로 표현하지 말고 `operatingHoursKnown=false` 로 "정보 없음"임을 드러낸다.
+- 서버는 카카오 API 를 호출하지 않는다. 지도는 클라이언트 JS SDK 담당이다.
+- `petSizeType` 필터는 "받아 주지 않는 것으로 확인된 곳만 뺀다"이다. 크기 정보가 없는 곳(UNKNOWN)은
+  남기고 응답의 `allowedPetSize` metadata 로 정보 없음임을 드러낸다. `petWeightKg` 는 상한이 kg 로
+  명시된 곳(`maxPetWeightKg`)만 정확히 거른다 — enum 은 10kg 경계로 뭉개져 "12kg 미만"을 표현 못한다.
+- 긴급 시설 `openNow` 는 3상이다: true/false/null(영업시간을 몰라 판정 불가). null 을 "닫힘"으로
+  표시하면 실제로는 열려 있는 병원이 급한 사람의 화면에서 사라진다. `openNowOnly=true` 는 반대로
+  확실히 열린 곳만 남긴다.
+- delisted 장소는 목록·주변·긴급 검색에서 빠지지만 **상세는 계속 응답**한다(기존 일정 보호,
+  응답에 `delisted` 플래그). 새 참조는 내부 검증 API 가 막는다 — `data-refresh-guide.md` 2절.
+- 동적 검색은 `repository/custom`(QueryDSL) 이 담당한다. 병합·delisted 제외는
+  `PlaceCustomRepositoryImpl.visible()` 한곳에 있다 — 새 검색을 추가하면 반드시 이것을 거친다.
+
+## 장소 키워드 토큰 검색 결정 (#1161)
+
+- **명세**: 목록과 주변 검색 모두 공백 기준 최대 5개 단어를 받고, 단어마다 `(이름 OR 주소)`를 적용한 뒤 단어 조건을 AND로 결합한다.
+- **계획/작업**: 정규화·상한 판단은 `PlaceKeyword`에 모으고, 공개 API는 Bean Validation으로 `PLACE_108`과 `keyword` 필드 오류를 응답한다. Processor는 같은 규칙으로 캐시 전에 정규화·방어 검증한다.
+- **결정**: 기존 필터·노출·커서·대소문자 무시·LIKE 리터럴 이스케이프는 유지한다. 캐시는 기존 전체 구문 검색 결과를 재사용하지 않도록 v2 네임스페이스로 분리한다.
+
+## 장소 목록 거리순 결정 (#1202)
+
+- **명세**: `GET /api/v1/places` 에 선택 파라미터 `lat`·`lng` 를 더한다. **둘 다 있으면 거리순, 둘 다 없으면 `placeId` 오름차순**이고
+  별도 `sort` 파라미터는 두지 않는다 — `api-design-guide.md` §5 의 enum 정렬 파라미터 대신 좌표 유무로 가른다. 좌표 없는
+  거리순은 뜻이 없고, `sortType` 을 두면 lat·lng 짝 검증과 같은 것을 두 번 묻게 된다. 범위 검증은 주변 검색과 같은 `PLACE_103`·`PLACE_104` 다. 응답 `PlaceItem.distanceMeters`
+  (nullable)는 거리순 목록에서만 값이 있다 — 좌표 없는 목록과 주변 검색 안쪽 `place` 에서는 null 이고, 주변 검색의 거리는
+  바깥 `NearbyPlaceItem.distanceMeters` 다. 계기는 FE 일정 장소 담기 목록 보기가 그날 장소와 무관하게 제주시·한경면부터
+  나오던 것이다(`frontend/docs/features/plan/담기지도-세부명세.md` D9·D10). `/places/nearby` 는 커서가 없고 `size` 상한이 있어
+  무한 스크롤 목록을 대신하지 못한다.
+- **정렬 키**: (반올림한 거리 m, `placeId`) 오름차순. 주변 검색과 같은 `GeoDistance.meters` + `Math.round` + 아이디 동률 규칙이고
+  응답 `distanceMeters` 가 그 키라 순서와 숫자가 어긋나지 않는다. 반경 제한은 없다.
+- **필터**: 목록과 **완전히 같다** — `visible()` + 공통 필터 + 지역(`PlaceCustomRepositoryImpl.listFilters` 한곳을 두 목록이 거친다).
+  여기에 **좌표가 둘 다 있는 행만** 남긴다. 좌표 없는 장소는 거리를 잴 수 없어 거리순 목록에서 빠진다(주변 검색과 같은 판단).
+- **커서**: 그대로 `lastPlaceId` 하나다(클라이언트 계약 변화 최소). 서버가 그 장소의 좌표를 **노출 여부와 무관하게** PK 로 읽어
+  커서 키 (d0, id0) 를 되살리고 키가 그보다 큰 항목부터 준다. (거리, id) 가 전순서라 같은 반올림 거리 동률이 많아도 페이지 사이에
+  중복·누락이 없다. 직전 페이지의 마지막 장소가 그사이 병합·delisted 되어도 좌표 행은 남아 있어 이어진다. 커서 장소가 없거나
+  좌표가 없으면 400 `PLACE_110` 이다.
+- **에러 코드**: `PLACE_109` lat 과 lng 중 하나만 옴(`PlaceSearchCriteria` 생성자가 거절해 유스케이스까지 내려가지 않는다) ·
+  `PLACE_110` 거리순 커서를 되살릴 수 없음. 둘 다 `PlaceErrorCode` 의 1xx 대역(필드 단위 Bean Validation 이 아니라 상수 클래스에는 없다).
+- **계산 위치**: 주변 검색과 같이 Processor 다. 포트는 후보 행의 `(id, lat, lng)` 3컬럼 projection 전량(`findCoordinates`)과
+  커서 좌표(`findCoordinateById`)를 주고, 거리 계산·정렬·커서 비교·`size + 1` 자르기는 `PlaceQueryProcessor` 가 한다. 고른 아이디로
+  엔티티를 IN 한 번에 읽고 **고른 순서대로 다시 세운다**(IN 조회는 순서를 보장하지 않는다). 그사이 숨겨진 장소는 조용히 빠진다.
+- **규모 한계**: 제주 2,300여 곳이라 페이지마다 후보 좌표 전량을 읽어 메모리에서 정렬한다(3컬럼이라 싸다). 전국으로 넓히면
+  공간 인덱스나 DB 정렬로 옮길 지점이 `PlaceQueryProcessor#findPlacesByDistance` 와 `findCoordinatesByCriteria` 다.
+- **캐시**: 키워드 목록 캐시는 거리순도 같이 탄다. 키에 `lat`·`lng` 가 들어가고 봉투의 `PlaceSummaryInfo` 모양이 바뀌어
+  네임스페이스를 `list:v3` 로 올렸다. 주변 검색은 키 의미가 그대로이고 옛 항목이 `distanceMeters` 없이도 읽혀 그때는 `nearby:v2` 를 유지했다
+  (이후 #1316 에서 시군구 필터가 키에 들어가 `nearby:v3` 로 올렸다).
+- **하위 호환**: 좌표가 없으면 예전 `searchByCriteria` 경로 그대로다(거리 포트를 부르지 않는다 — `PlaceQueryProcessorDistanceSortTest`).
+  응답에 `distanceMeters: null` 이 더해지는 것만 다르고, ai-service 의 `PlaceSliceClientResponse` 는 `@JsonIgnoreProperties(ignoreUnknown = true)`
+  라 모르는 필드를 무시한다.
+
+## 필수 파라미터 누락 응답 (필수)
+
+`@RequestParam` 필수 파라미터는 **Bean Validation 이 닿지 않는다.** 값이 아예 없을 때뿐
+아니라 `?lat=` 처럼 비어 온 경우도 스프링이 변환 후 `MissingServletRequestParameterException`
+을 던지므로, 파라미터에 `@NotNull` 을 붙여 둬도 실행되지 않는다.
+`NearbyFacilityParameterValidationTest` 가 이 동작을 고정한다.
+
+그래서 검증 애노테이션이 아니라 **advice 에서 받는다.** 핸들러가 없으면 스프링 기본 응답이
+나가 `dataHeader` 봉투 밖 형태가 되고, 모든 오류를 같은 봉투로 받는다고 전제하는 클라이언트의
+파싱이 깨진다. 코드는 각 도메인 1xx 대역 끝의 `{DOMAIN}_114` 다.
+
+## 기상특보 (필수)
+
+발효 중인 특보는 `suitability` / `walk-safety` / `walk-times` / `regional-weather` 응답의
+`weatherWarning` **옵셔널 필드**로 나간다. **네 곳이 같은 말을 해야 한다** — 한 화면만
+특보를 모르면 사용자는 같은 서비스에서 상반된 안내를 받는다. 기존 클라이언트는 모르는 필드를 무시하므로 계약이 깨지지 않는다.
+
+**경보는 감점이 아니라 0점이다.** 감점으로 다루면 다른 조건이 좋을 때 상쇄되어
+태풍경보에 "여행 적합 82점"이 나간다. 경보는 기상청이 "나가지 말라"고 말하는 단계라 정도의
+문제가 아니다. 다만 등급은 `INSUFFICIENT` 가 아니라 `LOW` 다 — 그것은 "판단 근거가 없다"는
+뜻인데 지금은 근거가 있고, 나쁘다고 말하고 있다. 주의보는 큰 감점(45)이다.
+
+산책 위험도에서는 **경보를 예보보다 먼저 본다.** 시각별 예보가 없어도 태풍경보에
+"판단 근거 부족"을 돌려주면 안 된다. 주의보는 최소 `CAUTION` 이다.
+
+**단계 문구(`WeatherWarningLevel.description`)는 일정 유무를 전제하지 않는다** (#1173).
+홈 특보 띠는 이 문장을 그대로 그린다. 다가오는 일정이 없는 사람에게도 같은 문장이 나가므로
+"일정을 조정하라"·"야외 일정을 취소하라"고 말하지 않는다. 종류별 사실(풍랑이면 바다, 폭염이면
+노면)은 `WeatherWarningType.description` 이 맡고, 단계 문구는 바깥 활동 주의만 말한다.
+말투는 같은 화면의 다른 insight enum 과 같이 **합니다체**를 유지한다. 이 문장만 해요체로
+바꾸면 바로 아래 판정 근거와 말투가 갈린다.
+
+| 단계 | `description` |
+| ---- | ------------- |
+| 주의보 | 기상 조건이 나빠지고 있습니다. 바깥 활동은 주의가 필요합니다. |
+| 경보 | 기상청이 위험을 경고한 단계입니다. 바깥 활동은 피하는 편이 좋습니다. |
+
+### 원천 사용법 (2026-09-01 실호출로 확정)
+
+기상특보 조회서비스(`WthrWrnInfoService`)는 단기·중기예보와 **따로 활용신청**해야 한다.
+신청 전에는 같은 키로도 `SERVICE_KEY_IS_NOT_REGISTERED` 였고 신청 후 열렸다.
+승인 상태와 쿼터가 따로 움직이므로 서킷도 `kma` 와 나눠 `kma-warning` 으로 둔다.
+
+**오퍼레이션은 `getPwnStatus`(특보 현황)다. `getWthrWrnList` 가 아니다.**
+이름만 보면 후자가 맞아 보이지만 그쪽은 **통보문 이력**이라 해제분까지 한 행으로 온다.
+
+```
+[특보] 제08-108호 : 2026.08.28.10:00 / 호우주의보 해제 (*)
+```
+
+이것을 발효 중으로 읽으면 **이미 풀린 경보로 사용자의 일정을 취소시킨다.**
+
+**`stnId` 는 응답을 필터하지 않는다.** 제주(184)와 서울(108)에 같은 전국 문구가 왔다.
+지역 필터는 파라미터가 아니라 문구 해석에서 한다(`WeatherWarningStatusText`) —
+빠뜨리면 전라남도 폭염주의보를 제주 특보로 읽는다.
+
+`t6` 형식은 이렇다. 특보가 없으면 `o 없음` 한 줄이다.
+
+```
+o 폭염주의보 : 전라남도(...), 제주도(제주시서부, 서귀포시남부, ...), 광주, 대구
+o 열대야주의보 : 전라남도(...), 제주도(...), 광주
+```
+
+- 발효시각은 `tmEf` 다. `tmFc` 는 발표시각이라 다를 수 있다
+- 현황 조회에는 날짜 파라미터를 보내지 않는다. 구간을 주면 6일 제한(`resultCode=99`)에 걸린다
+- 실측에서 **열대야주의보**가 나왔다. 밤에도 안 식는 더위라 "저녁 산책"이라는 회피 수단
+  자체가 막히는 특보다 — 반려견 기준으로 폭염 못지않게 중요해서 종류로 넣었다
+
+캐시는 예보와 다르다. 발효/해제가 예고 없이 일어나 발표 주기에 맞출 수 없으므로 **짧은 고정
+TTL(10분)** 을 쓰고 **스테일 폴백을 두지 않는다** — 이미 해제된 태풍경보를 계속 보여 주면
+사용자가 멀쩡한 날 일정을 취소한다.
+
+## 적합도/위험도 구현 주의점
+
+- 점수와 근거는 **규칙**에서 나온다. 같은 입력에 같은 점수가 나와야 하고, LLM 은 문장만 다듬는다.
+- **근거가 없으면 점수를 만들지 않는다.** `score` 는 Wrapper 이고 날씨를 못 쓰면 null 이며
+  등급은 `INSUFFICIENT` 다. 근거 없는 0점을 주면 사용자는 "여기는 별로다"로 읽는다 —
+  동물병원 운영시간에 `operatingHoursKnown` 을 둔 것과 같은 판단이다.
+- 예보를 못 쓴 이유를 둘로 나눈다 — `FORECAST_OUT_OF_RANGE`(정상, 기다릴 일)와
+  `FORECAST_UNAVAILABLE`(장애, 다시 시도할 일). 사용자에게 할 말이 다르다.
+- **적합도와 산책 위험도를 합치지 않는다.** 전자는 "여기 갈 만한가"(하루 단위),
+  후자는 "지금 걸어도 되는가"(시각 단위)를 묻는다. 합치면 둘 중 하나가 반드시 희석된다.
+- 노면온도는 **추정치**다. 응답 필드명(`estimatedPavementCelsius`)과 문구 모두 단정을 피한다.
+- 반려견 조건은 사본을 두지 않고 요청 파라미터로 받는다. 이유는
+  `weather-insight-integration.md` §7 참고.
+- **원문 텍스트는 뜻을 읽고 판정한다** (#231). 추가 요금 원문은 원천이 요금 없음을 "없음" 이라는 낱말로 보내므로
+  `!isBlank()` 로 보면 요금 없는 장소 대부분이 3점 깎이고 "요금이 있습니다 (없음)" 이 나간다. `PetExtraFee` 가
+  원문을 CHARGED(금액·유료 표현) / NONE(없음·무료·0원) / UNKNOWN(별도 문의 등)으로 읽고, **CHARGED 일 때만** 감점과
+  근거를 만든다. 해석은 배치 정규화가 아니라 판정 단계에서 한다 — 원문은 장소 상세에 그대로 보여 주는 값이고,
+  규칙이 바뀔 때 재적재하지 않기 위해서다.
+- 임계값은 `InsightProperties`(`insight.*`)로 빼 둔다. 확정된 수의학 기준이 아니라
+  현재의 판단이므로 배포 없이 조정할 수 있어야 한다.

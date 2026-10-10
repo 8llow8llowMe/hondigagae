@@ -1,0 +1,186 @@
+package com.hondigagae.domainlayer.planner.adapter.in.web.controller;
+
+import com.hondigagae.common.dto.Response;
+import com.hondigagae.domainlayer.planner.adapter.in.web.dto.request.AiPlanCreateRequest;
+import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanJobStatusResponse;
+import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.PackingListResponse;
+import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanSubmitResponse;
+import com.hondigagae.domainlayer.planner.adapter.in.web.sse.AiPlanJobSseStreamer;
+import com.hondigagae.domainlayer.planner.application.port.in.AiPlanWebUseCase;
+import jakarta.servlet.http.HttpServletResponse;
+import com.hondigagae.security.common.dto.MemberLoginActive;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/v1/ai-plans")
+@Tag(name = "AI 여행 플래너", description = "반려견 특성과 여행 조건으로 AI 여행 일정을 생성하고 작업 상태를 조회하는 API를 제공합니다.")
+public class AiPlanWebController {
+
+    private final AiPlanWebUseCase aiPlanWebUseCase;
+    private final AiPlanJobSseStreamer aiPlanJobSseStreamer;
+
+    @Operation(summary = "AI 여행 일정 생성 제출",
+        description = "여행 조건과 반려견 정보를 받아 일정 생성 작업을 큐에 올리고 202와 함께 jobId를 반환합니다. "
+            + "동일 사용자의 동일 요청이 진행 중이면 기존 jobId를 그대로 반환합니다(멱등). "
+            + "생성된 일정은 제안(draft)이며, 확정 저장은 plan-service API로 수행합니다.\n\n"
+            + "**필수: areaCode, startDate, endDate (JSON 바디).** 나머지는 전부 생략 가능합니다. "
+            + "반려견을 지정하지 않으면 회원의 대표 반려견 기준으로 짜고, 예산·메모를 비우면 그 조건 없이 짭니다. "
+            + "시작일은 오늘 또는 그 이후여야 하고 여행 기간은 최대 10일입니다. "
+            + "sigunguCode 를 주면 그 시군구(제주시=4 · 서귀포시=3) 안에서만 후보를 고릅니다 — "
+            + "후보가 없으면 지역 전체로 넓히지 않고 AIPLAN_012 로 실패합니다. "
+            + "planId 와 regenerateDay 를 함께 주면 그 일차만 다시 짜는 하루 재생성이 됩니다(하나만 주면 AIPLAN_014).\n\n"
+            + "흐름\n"
+            + "1. `POST /api/v1/ai-plans` → 202 + jobId (상태 PENDING)\n"
+            + "2. `GET /api/v1/ai-plans/jobs/{jobId}` 를 폴링하거나 `GET /api/v1/ai-plans/jobs/{jobId}/stream` 을 구독합니다 "
+            + "(PENDING → RUNNING → COMPLETED/FAILED). RUNNING 중에는 step 으로 세부 진행을 그릴 수 있습니다\n"
+            + "3. status=COMPLETED 면 planDraft 를 화면에 보여 주고, 확정하려면 plan-service 저장 API 로 넘깁니다\n"
+            + "- 대기 중 그만두려면 `POST /api/v1/ai-plans/jobs/{jobId}/cancel`\n\n"
+            + "호출 예: `POST /api/v1/ai-plans` 바디 `{\"areaCode\":\"39\",\"startDate\":\"2026-09-11\",\"endDate\":\"2026-09-13\"}`",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @PostMapping
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<AiPlanSubmitResponse>> submitPlan(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Valid @RequestBody AiPlanCreateRequest request
+    ) {
+        AiPlanSubmitResponse response = aiPlanWebUseCase.submitPlan(loginActive.memberId(), request.toCommand());
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Response.success(response));
+    }
+
+    @Operation(summary = "반려견 여행 준비물 목록 생성",
+        description = "저장된 일정을 근거로 반려견 여행 준비물 목록을 AI 로 생성합니다. 일정 항목·여행 기간의 기상청 예보·"
+            + "반려견 특성(체중·더위/추위 민감 등)이 근거로 쓰이며, 각 항목에 이 여행 데이터 기반의 이유가 붙습니다. "
+            + "동기 API 라 LLM 응답까지 수십 초가 걸릴 수 있습니다. **AI 일정 생성이 도는 중이면 차례를 "
+            + "기다리므로 최악 210초(대기 90초 + 생성 120초)까지 걸리고, 차례를 못 받으면 503 AIPLAN_021 입니다.** "
+            + "결과는 저장되지 않는 제안입니다. "
+            + "일정이 없거나 본인 소유가 아니면 AIPLAN_016 으로 응답합니다.\n\n"
+            + "**필수: planId(경로).** 요청 바디와 쿼리 파라미터는 없습니다. "
+            + "반려견 특성(일정에 등록된 동행 반려견 전체)과 여행 기간 예보는 서버가 알아서 붙이며, 가져오지 못하면 그만큼 일반적인 목록이 됩니다.\n\n"
+            + "호출 예: `POST /api/v1/ai-plans/packing-list/{planId}` (바디 없음)",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @PostMapping("/packing-list/{planId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<PackingListResponse>> generatePackingList(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "[필수] plan-service 에 저장된 일정 아이디. 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 plan-service 일정 목록·생성 응답의 planId 를 그대로 씁니다", required = true, example = "1234567890123456789") @PathVariable long planId
+    ) {
+        PackingListResponse response = aiPlanWebUseCase.generatePackingList(loginActive.memberId(), planId);
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(summary = "AI 여행 일정 생성 작업 조회",
+        description = "작업 상태와 결과를 조회합니다. 본인 작업만 조회할 수 있으며 타인의 jobId는 404로 응답합니다. "
+            + "작업 실패는 200 OK + status=FAILED + errorCode/errorMessage 로 표현합니다.\n\n"
+            + "**필수: jobId(경로).** 쿼리 파라미터는 없습니다. "
+            + "status.code 는 PENDING 대기 중 · RUNNING 생성 중 · COMPLETED 완료 · FAILED 실패 · CANCELED 취소됨 이며, "
+            + "COMPLETED 일 때만 planDraft 가, FAILED 일 때만 errorCode/errorMessage 가 채워집니다. "
+            + "RUNNING 이면 `step`·`stepOrder`·`totalSteps` 로 세부 진행을 그릴 수 있습니다 — "
+            + "**PENDING 이면 step 이 null 이니 0/1 단계로 그리지 마세요.** "
+            + "대기·실행 제한 시간(기본 300초·300초)을 넘긴 작업은 조회 시점에 FAILED(AIPLAN_006)로 바뀌고, "
+            + "작업 기록은 보관 기간(기본 24시간)이 지나면 사라져 404 가 됩니다.\n\n"
+            + "**혼잡으로 인한 실패는 조건 문제와 코드가 다릅니다.** `AIPLAN_004`(제출 시점에 대기열이 차서 "
+            + "곧바로 종결) 와 `AIPLAN_021`(실행 중 AI 차례를 받지 못함) 은 **조건을 그대로 두고 잠시 후 다시** "
+            + "누르면 되고, `AIPLAN_020`(내 차례에 모델이 제한 시간 초과) 만 여행 기간·조건을 줄여야 합니다. "
+            + "셋 다 200 OK + status=FAILED 로 오므로 errorCode 로 문구를 가르세요. "
+            + "`AIPLAN_022`(두 번 불러도 방문할 곳이 하루도 없는 초안) 도 조건을 그대로 두고 다시 누르면 됩니다.\n\n"
+            + "**`conditions` 에 제출 때 쓴 생성 조건(지역·기간·반려견·예산·메모)이 상태와 무관하게 함께 내려갑니다.** "
+            + "초안을 일정으로 담으려면 이 값들이 필요한데, 브라우저에 보관해 두면 다른 기기·시크릿창에서 "
+            + "작업 주소를 열었을 때 담기가 막힙니다. 화면은 이 블록으로 조건을 복원하면 됩니다. "
+            + "`petIds` 는 Snowflake 라 문자열 배열이고, 제출 때 생략한 값은 null 입니다.\n\n"
+            + "**`committedPlanId` 는 이 초안을 이미 담은 일정 아이디(문자열)입니다.** COMPLETED 이고 담은 적이 있을 때만 "
+            + "채워지고, 담기 전·담은 일정을 삭제한 뒤·그 외 상태에서는 null 입니다. 값이 있으면 화면은 담기 버튼 대신 "
+            + "그 일정으로 가는 링크를 보여 주면 됩니다. 담긴 사실의 정본은 plan-service 라 조회 때마다 물어 오며, "
+            + "그 조회가 실패해도 이 API 는 실패하지 않고 null 을 싣습니다 — 그때 다시 담아도 plan-service 가 같은 "
+            + "작업(sourceAiJobId)을 알아보고 기존 일정을 돌려주므로 일정이 두 개 생기지 않습니다.\n\n"
+            + "호출 예: `GET /api/v1/ai-plans/jobs/8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00`",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @GetMapping("/jobs/{jobId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<AiPlanJobStatusResponse>> getJobStatus(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "[필수] 작업 식별자(UUID). 제출 응답의 jobId 를 그대로 복사합니다. 예시는 형식 안내용이며 실제 값은 제출 응답에서 복사합니다", required = true, example = "8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00") @PathVariable String jobId
+    ) {
+        AiPlanJobStatusResponse response = aiPlanWebUseCase.getJobStatus(jobId, loginActive.memberId());
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(summary = "AI 여행 일정 생성 작업 취소",
+        description = "대기·생성 중인 작업을 취소합니다. 본인 작업만 취소할 수 있으며 타인의 jobId 는 404 입니다.\n\n"
+            + "**실행 중인 AI 호출을 즉시 끊지는 못합니다.** 상태를 CANCELED 로 못 박고, 워커가 단계 경계마다 "
+            + "그것을 확인해 멈춥니다. 그래서 취소의 실익은 **가장 오래 걸리는 일정 구성(DRAFTING) 에 들어가기 전에 "
+            + "서는 것**이고, 이미 들어간 뒤라면 돌아온 결과를 버립니다 — 어느 쪽이든 planDraft 는 내려가지 않습니다.\n\n"
+            + "취소하면 중복 방지 키도 함께 풀립니다. 같은 조건으로 바로 다시 제출할 수 있습니다.\n\n"
+            + "이미 취소된 작업을 또 취소하면 200 으로 같은 상태를 돌려줍니다(멱등). "
+            + "이미 완료·실패한 작업은 **409 AIPLAN_019** 입니다 — 취소할 것이 없다는 뜻이니 화면은 결과를 보여 주면 됩니다.\n\n"
+            + "**필수: jobId(경로).** 바디와 쿼리 파라미터는 없습니다.\n\n"
+            + "호출 예: `POST /api/v1/ai-plans/jobs/8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00/cancel`",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @PostMapping("/jobs/{jobId}/cancel")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<AiPlanJobStatusResponse>> cancelJob(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "[필수] 작업 식별자(UUID). 제출 응답의 jobId 를 그대로 복사합니다", required = true, example = "8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00") @PathVariable String jobId
+    ) {
+        AiPlanJobStatusResponse response = aiPlanWebUseCase.cancelJob(jobId, loginActive.memberId());
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(
+        summary = "일정 생성 작업 상태 스트리밍 (SSE)",
+        description = """
+            비동기 일정 생성 작업의 상태 변경을 Server-Sent Events 로 스트리밍합니다.
+            이벤트 data 는 작업 상태 조회 응답의 dataBody 와 동일한 JSON 입니다. 본인이 제출한 작업만 구독할 수 있습니다.
+            폴링 응답과 같은 모양이라 `conditions`(제출 때 쓴 생성 조건)도 매 이벤트에 함께 실립니다 — 구독만으로 화면이 조건을 복원할 수 있습니다.
+            `committedPlanId`(이미 담은 일정 아이디)도 폴링과 같은 규칙으로 실립니다 — COMPLETED 이고 담은 적이 있을 때만 채워지고 그 외에는 null 입니다.
+
+            수신 주기: 이벤트는 주기적으로 오지 않고 상태가 바뀔 때만 전송됩니다.
+            일반적으로 구독 즉시 현재 상태 스냅샷 1회 -> RUNNING 전이 1회 -> COMPLETED/FAILED 1회, 총 2~3회 수신 후
+            서버가 연결을 종료합니다 (일정 생성은 로컬 LLM 기준 수십 초 소요).
+            25초 간격 하트비트는 SSE 코멘트 프레임이라 onmessage 로 수신되지 않으며 클라이언트 처리가 필요 없습니다.
+
+            브라우저 기본 EventSource 는 Authorization 헤더를 지원하지 않으므로
+            fetch 기반 SSE 클라이언트(예: @microsoft/fetch-event-source)를 사용하세요.
+            연결이 끊기면 GET /jobs/{jobId} 폴링으로 폴백하면 됩니다.
+
+            이벤트 이름은 `job-update` 하나입니다(클라이언트는 이 이름으로 리스너를 등록합니다).
+            종료 조건: status.code 가 COMPLETED / FAILED / CANCELED 인 이벤트를 보낸 직후 서버가 연결을 닫습니다.
+            취소는 별도 이벤트가 아니라 CANCELED 상태 이벤트로 옵니다 — 취소 버튼을 눌렀으면 이 이벤트로 화면을 정리하면 됩니다.
+            구독 시점에 이미 종결 상태면 그 스냅샷 1회를 보내고 바로 닫습니다.
+            jobId 가 없거나 타인의 것이면 스트림이 열리기 전에 일반 JSON 오류(404, AIPLAN_002)로 응답합니다.
+
+            **필수: jobId(경로).** 쿼리 파라미터는 없습니다.
+
+            호출 예: `GET /api/v1/ai-plans/jobs/8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00/stream` (Accept: text/event-stream, Authorization: Bearer 토큰)""",
+        security = {@SecurityRequirement(name = "bearerAuth")}
+    )
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping(value = "/jobs/{jobId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamJobStatus(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "[필수] 작업 식별자(UUID). 제출 응답의 jobId 를 그대로 복사합니다. 예시는 형식 안내용이며 실제 값은 제출 응답에서 복사합니다", required = true, example = "8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00") @PathVariable String jobId,
+        HttpServletResponse response
+    ) {
+        // nginx 등 리버스 프록시가 이 응답을 버퍼링하지 않도록 응답 단위로 지시한다 (프록시 설정과 이중 방어).
+        response.setHeader("X-Accel-Buffering", "no");
+        return aiPlanJobSseStreamer.stream(jobId, loginActive.memberId());
+    }
+
+}

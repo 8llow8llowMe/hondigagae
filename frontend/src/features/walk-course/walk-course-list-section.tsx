@@ -1,0 +1,329 @@
+'use client'
+
+import type { ReactNode } from 'react'
+
+import { Button } from '@/components/button'
+import { EmptyState } from '@/components/empty-state'
+import { ErrorState } from '@/components/error-state'
+import { Skeleton } from '@/components/skeleton'
+import { Surface } from '@/components/surface'
+import { WalkCourseCardGrid, WalkCourseRow } from '@/features/walk-course/walk-course-row'
+import {
+  WALK_COURSE_SKELETON_COUNT,
+  WalkCourseRowSkeleton,
+} from '@/features/walk-course/walk-course-row-skeleton'
+import { classify } from '@/lib/api/error'
+import { toMessage } from '@/lib/api/response'
+import { formatDuration } from '@/lib/format/duration'
+import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
+import { hasCoordinates } from '@/lib/walk-course/coordinates'
+import type { WalkCourseFilters, WalkCourseSummary } from '@/types/walk-course'
+
+/**
+ * 사진을 **바로 받는** 앞쪽 카드 수 (#1132). 나머지는 지연 로드다.
+ *
+ * 첫 카드 사진이 `/olle` 의 LCP 인데 lazy 라, 브라우저가 레이아웃을 마친 뒤에야 요청을
+ * 냈다 (2026-10-03 Lighthouse 모바일 LCP 6.8s · `lcp-lazy-loaded` 실패). 모바일 1열에서
+ * 첫 화면에 서는 것은 첫 장과 둘째 장의 윗부분이다. 1280+ 3열의 셋째 장은 지연 로드로
+ * 남지만 첫 화면이라 곧바로 요청된다 — **이 값은 LCP 후보를 앞세우는 것이지 첫 화면을
+ * 전부 세는 것이 아니다.** 원본 사진(장당 500~780KB)이라 늘릴수록 첫 요청이 무거워진다.
+ */
+export const WALK_COURSE_PRIORITY_CARD_COUNT = 2
+
+/**
+ * 기준 줄에 들어갈 값. **응답의 `appliedPetActivityLevel` 이 있을 때만 만든다** — 로컬
+ * 상태가 아니라 **응답**을 믿는다 (공통명세 S4-1 규칙 5).
+ *
+ * **셋 다 서버 값이다** (#735). `levelName` 은 `appliedPetActivityLevel.level.name`,
+ * `maxDurationMinutes` 는 같은 객체의 상한이다 — 전에는 이름을 반려견 프로필에서 가져오고
+ * 상한은 FE 상수(4·6시간)로 적었다.
+ *
+ * `petName` 만 반려견 프로필에서 온다. **URL 이 비어 대표견으로 채운 경우에만** 채워지므로
+ * `null` 일 수 있다 (`walk-course-list-view.tsx`).
+ */
+export type WalkCourseBasis = {
+  petName: string | null
+  levelName: string
+  /** 서버가 적용한 상한(분). **`HIGH`(상한 없음)는 기준 줄 자체를 만들지 않는다** */
+  maxDurationMinutes: number
+}
+
+export type WalkCourseListSectionProps = {
+  courses: readonly WalkCourseSummary[]
+  totalCount: number
+  /** 서버가 활동량을 실제로 적용했을 때만 준다. `null` 이면 **기준 줄을 만들지 않는다** */
+  basis: WalkCourseBasis | null
+  /** 출처. **서버 `providerName` 을 그대로 쓴다** — FE 가 출처 문자열을 만들지 않는다 */
+  providerName: string | null
+  loading: boolean
+  /** 실패한 요청의 HTTP 상태. 성공이면 null */
+  errorStatus: number | null
+  /** 서버가 준 `resultMessage` (문자열이 아닐 수 있다) */
+  errorMessage?: unknown
+  onRetry: () => void
+  /** `?activity=ALL` 로 보낸다 — 0건·400 에서 주는 **다음 행동**이다 */
+  onShowAll: () => void
+  /** 조건 컨트롤. **라우터를 아는 쪽이 만들어 넘긴다** — 이 컴포넌트는 순수하게 남는다 */
+  tools?: ReactNode
+  /**
+   * 지금 보고 있는 조건 ([#783](https://github.com/8llow8llowMe/hondigagae/issues/783)).
+   * 행이 상세 링크에 실어 보내면 상세의 `코스 목록으로` 가 같은 목록으로 돌아온다.
+   */
+  filters?: WalkCourseFilters | undefined
+}
+
+/**
+ * 코스 목록 카드 — **이 화면의 L1 카드다** (`DESIGN.md §0`).
+ *
+ * **좌측 필터 레일을 두지 않는다** (D1). 축이 둘(걷는 시간·정렬)뿐이라 280 레일을 세우면
+ * 빈 열이 된다. 도구는 카드 **머리**, 결과는 **본문** 이다 (`Surface` 의 `fill` 절).
+ *
+ * 표시 전용이다 — 조회 상태는 `WalkCourseListView` 가 props 로 변환해 넘긴다
+ * (`docs/testing-guide.md` §1: 훅을 쓰는 컴포넌트는 node 환경에서 렌더되지 않는다).
+ */
+export function WalkCourseListSection({
+  courses,
+  totalCount,
+  basis,
+  providerName,
+  loading,
+  errorStatus,
+  errorMessage,
+  onRetry,
+  onShowAll,
+  tools,
+  filters,
+}: WalkCourseListSectionProps) {
+  // 개수는 목록이 실제로 있을 때만 말한다 — 로딩 중에는 아직 모르고 오류에는 셀 수 없다
+  const countable = !loading && errorStatus === null
+
+  return (
+    <Surface
+      lead
+      titleId="walk-course-list-heading"
+      title={messages.walkCourse.pageTitle}
+      description={
+        /*
+          **화면이 무엇을 무슨 기준으로 고르는 곳인지 말한다** (#811).
+
+          **조건과 무관한 줄이라 `countable` 을 타지 않는다.** 스켈레톤 화면에서도 제목 아래
+          이 줄은 남는다 — 처음 들어온 사람이 가장 오래 보는 화면이 그것이다.
+
+          **`aria-live` 를 붙이지 않는다.** 바뀌지 않는 문장이라, 붙이면 조건을 만질
+          때마다 다시 읽히고 정작 알려야 할 결과 수가 그 안에 묻힌다 (D6).
+        */
+        <p className="text-body-2 text-fg-muted break-keep">
+          {messages.walkCourse.listDescription}
+        </p>
+      }
+      tools={tools}
+    >
+      {/*
+        **결과 줄 — 머리(제목 · 설명 · 조건)와 결과(그리드)를 가르는 자리.**
+
+        예전에는 `코스 29개` · 기준 줄이 제목 설명 바로 아래, 필터 **위**에 끼어 있었다. 머리
+        안에 설명 → 개수 → 필터 라벨 → 필터가 같은 인셋 · 비슷한 크기로 네 층 쌓여 무엇이
+        제목이고 무엇이 결과인지 갈리지 않았고, 필터와 그리드 사이에는 선도 없었다. 개수는
+        **조건의 결과**라 조건 아래 · 결과 위에 선다 — `/places` 목록 머리와 같은 순서다.
+
+        **위에 1px 선을 긋는다.** 머리와 본문의 경계다 (`오늘 갈 만한 곳` 목록 #530 과 같다).
+
+        **줄 자체는 늘 있다.** `aria-live` 영역은 DOM 에 남아 있어야 바뀐 내용을 읽는다 —
+        조건부로 붙였다 떼면 조건을 바꾼 직후 첫 결과를 놓치는 보조기기가 있다. 로딩 중에는
+        같은 높이의 스켈레톤이라 결과가 오는 순간 그리드가 밀리지 않는다(#800). 오류에는 셀
+        것이 없어 선만 남는다.
+      */}
+      <div
+        className={cn(
+          'border-border flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t',
+          (countable || loading) && 'pt-4 pb-3',
+          INSET_CLASS.card,
+        )}
+      >
+        {/* 높이는 결과 줄(`text-body-2` 22)과 같다 — 20 이면 결과가 오는 순간 그리드가 2px 밀린다 */}
+        {loading && <Skeleton className="h-5.5 w-20" />}
+        {/*
+          **조건을 바꾸면 결과 수를 알린다** (D6). 세그먼트는 URL 을 바꾸고 목록이
+          통째로 갈리는데, 보조기기에는 그 변화를 말해 주는 것이 이 줄뿐이다.
+        */}
+        <p aria-live="polite" className="text-body-2 text-fg font-semibold tabular-nums">
+          {countable && messages.walkCourse.listCount.replace('{count}', String(totalCount))}
+        </p>
+        {countable && basis !== null && (
+          <p className="text-caption text-fg-muted break-keep">{basisLine(basis)}</p>
+        )}
+      </div>
+
+      <WalkCourseListBody
+        courses={courses}
+        loading={loading}
+        errorStatus={errorStatus}
+        errorMessage={errorMessage}
+        basisApplied={basis !== null}
+        filters={filters}
+        onRetry={onRetry}
+        onShowAll={onShowAll}
+      />
+
+      {/*
+        **출처는 서버 문자열이다.** 목록이 비었거나 실패했을 때는 세울 근거가 없다.
+        카드 안 마지막 블록이라 위에 1px 선을 둔다 — 목록의 끝이 어디인지 카드 테두리만으로는
+        말할 수 없다 (`/favorites` 의 AI 안내 줄과 같은 자리).
+      */}
+      {countable && providerName !== null && courses.length > 0 && (
+        <p
+          className={cn(
+            'border-border text-caption text-fg-subtle border-t py-4 break-keep',
+            INSET_CLASS.card,
+          )}
+        >
+          {providerName}
+        </p>
+      )}
+    </Surface>
+  )
+}
+
+/**
+ * 기준 줄. 반려견 이름을 모르면 이름 없는 문장으로 떨어진다 — 사용자가 세그먼트로 직접
+ * 골랐거나, 대표견 조회가 실패했는데 `?activity=LOW` 를 손으로 들고 들어온 경우다.
+ * **없는 이름을 지어내지 않는다.**
+ *
+ * **상한은 서버 분(minute)을 `formatDuration` 으로 옮겨 적는다** — `240` → `4시간`.
+ * 단위 변환일 뿐이라 서버가 상한을 `270` 으로 바꾸면 화면도 `4시간 30분` 으로 따라간다.
+ */
+function basisLine({ petName, levelName, maxDurationMinutes }: WalkCourseBasis): string {
+  const filled = (template: string) =>
+    template.replace('{limit}', formatDuration(maxDurationMinutes)).replace('{level}', levelName)
+
+  if (petName === null) {
+    return filled(messages.walkCourse.activityBasisWithoutPet)
+  }
+
+  return filled(messages.walkCourse.activityBasis).replace('{pet}', petName)
+}
+
+/**
+ * 카드 안 네 상태. **배타적으로** 렌더한다 (D5).
+ *
+ * **0건과 404 를 한 컴포넌트로 합치지 않는다** (공통명세 S5). 목록의 "0개" 는 200 + 빈
+ * 배열이라 `resultMessage` 자체가 없다 — 404 문구를 재활용하면 **빈 문구가 나간다.**
+ */
+function WalkCourseListBody({
+  courses,
+  loading,
+  errorStatus,
+  errorMessage,
+  basisApplied,
+  filters,
+  onRetry,
+  onShowAll,
+}: Pick<
+  WalkCourseListSectionProps,
+  'courses' | 'loading' | 'errorStatus' | 'errorMessage' | 'onRetry' | 'onShowAll' | 'filters'
+> & {
+  basisApplied: boolean
+}) {
+  const inset = 'card'
+
+  if (loading) {
+    return (
+      /*
+        **열 머리가 사라진 자리다** (#837). 표였을 때는 로딩 중에도 열 머리를 세워야
+        결과가 오는 순간 한 줄이 끼어들지 않았는데(#800), 카드 그리드에는 머리가 없다 —
+        스켈레톤과 카드가 같은 골격이면 그것으로 점프가 끝난다.
+      */
+      <WalkCourseCardGrid aria-busy inset={inset}>
+        {Array.from({ length: WALK_COURSE_SKELETON_COUNT }, (_, index) => (
+          <WalkCourseRowSkeleton key={index} />
+        ))}
+      </WalkCourseCardGrid>
+    )
+  }
+
+  if (errorStatus !== null) {
+    /*
+      **400 에 재시도를 주지 않는다** — 손으로 고친 URL 이라 같은 요청은 같은 400 이다.
+      대신 서버 `resultMessage` 를 그대로 노출하고 **다음 행동**(전체 코스 보기)을 준다.
+      `WALKCOURSE_101`(maxDistanceKm 범위) · `WALKCOURSE_113`(enum 형식)이 여기로 온다.
+    */
+    if (classify(errorStatus) === 'validation') {
+      return (
+        <ErrorState
+          inset={inset}
+          headingLevel={3}
+          title={messages.common.validationErrorTitle}
+          description={toMessage(errorMessage, messages.walkCourse.emptyDescription)}
+          retryLabel={messages.walkCourse.emptyAction}
+          onRetry={onShowAll}
+        />
+      )
+    }
+
+    // 5xx · 무응답 — 재시도를 제공한다
+    return (
+      <ErrorState
+        inset={inset}
+        headingLevel={3}
+        title={messages.walkCourse.errorTitle}
+        description={messages.common.temporaryErrorDescription}
+        onRetry={onRetry}
+      />
+    )
+  }
+
+  if (courses.length === 0) {
+    return (
+      <EmptyState
+        inset={inset}
+        headingLevel={3}
+        title={messages.walkCourse.emptyTitle}
+        description={messages.walkCourse.emptyDescription}
+        action={
+          <Button variant="secondary" size="md" onClick={onShowAll}>
+            {messages.walkCourse.emptyAction}
+          </Button>
+        }
+      />
+    )
+  }
+
+  /*
+    **좁힌 결과에 좌표 있는 코스가 하나도 없으면 그 사실을 말한다** (D8-2 ②).
+
+    실측에서 `LOW`(4시간 이내)가 정확히 그 경우다 — 좌표가 있는 넷이 모두 `4~5시간`·
+    `5~6시간` 이라 전부 걸러진다. 활동량 낮은 아이의 보호자는 골든타임을 한 번도 못 본다.
+
+    **`activity === 'LOW'` 로 판정하지 않는다.** 데이터에서 읽으면 적재(#383)가 좌표를
+    채우는 순간 이 줄이 저절로 사라진다 — 상수로 박으면 그때 거짓말이 된다.
+    좁히지 않은 목록(29개)에는 좌표 있는 코스가 있으므로 이 줄이 서지 않는다.
+  */
+  const noGoldenInScope = basisApplied && courses.every((course) => !hasCoordinates(course))
+
+  return (
+    <>
+      {noGoldenInScope && (
+        <p className={cn('text-caption text-fg-muted pb-3 break-keep', INSET_CLASS[inset])}>
+          {messages.walkCourse.noGoldenInScope}
+        </p>
+      )}
+
+      {/*
+        **`InfiniteScrollSentinel` 이 없다.** 커서가 없고 29개 전량이 한 번에 온다
+        (공통명세 S3) — 목록 끝의 `마지막 장소예요` 줄도 이 화면의 말이 아니다.
+      */}
+      <WalkCourseCardGrid inset={inset}>
+        {courses.map((course, index) => (
+          <WalkCourseRow
+            key={course.walkCourseId}
+            course={course}
+            filters={filters}
+            priority={index < WALK_COURSE_PRIORITY_CARD_COUNT}
+          />
+        ))}
+      </WalkCourseCardGrid>
+    </>
+  )
+}

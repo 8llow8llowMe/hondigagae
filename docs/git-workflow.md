@@ -1,0 +1,481 @@
+# Git 협업 워크플로
+
+> 저장소 전체(BE/FE 공통) 기준이다. 엔트리는 루트 `CLAUDE.md`.
+> 이 문서가 브랜치·PR·머지 규칙의 정본이다.
+
+## 1. 전체 흐름
+
+```text
+이슈 생성 → 브랜치 생성 → 작업·커밋 → PR 생성 → CI 통과 → Rebase and merge → 브랜치 삭제 → 이슈 갱신
+```
+
+| 단계 | 지킬 것 |
+|------|---------|
+| 이슈 생성 | 화면 / 기능 단위 |
+| 브랜치 생성 | 이름에 이슈 번호 포함 |
+| PR 생성 | `Issue Number` · assignee · 라벨 |
+| Rebase and merge | develop 선형 유지 |
+| **이슈 갱신** | **체크박스 갱신 → 전부 끝났으면 닫기** |
+
+**이슈 없이 브랜치를 만들지 않는다.** 이슈가 작업 단위이자 추적 지점이다.
+
+## 2. 이슈
+
+### 단위
+
+> **화면 / 기능 단위로 쪼갠다.**
+
+| 좋음 | 나쁨 |
+|------|------|
+| `장소 상세 화면 구현` | `장소 상세 명세 작성` (너무 잘음 — 중간 상태가 develop 에 쌓인다) |
+| `반려견 등록 화면 구현` | `장소 탐색 영역 구현` (너무 큼 — PR 이 100파일을 넘는다) |
+
+명세·구현·테스트는 **한 이슈에 묶는다.** 하나의 이슈가 하나의 PR 이 되고, PR 은 **30파일 이내**를 목표로 한다.
+
+### 템플릿·라벨
+
+- 템플릿: `.github/ISSUE_TEMPLATE/` (기능 / 버그)
+- 제목: 커밋과 같은 `[영역] type: 요약` 형식
+- 라벨: 해당 서비스 라벨을 붙인다 (`frontend-web`, `backend-tour-service` 등)
+
+## 3. 브랜치
+
+### 네이밍 (필수)
+
+```text
+<type>/<영역>/<이슈번호>-<요약>
+```
+
+| 자리 | 값 |
+|------|-----|
+| `type` | `feature` \| `fix` \| `chore` \| `refactor` \| `docs` \| `test` \| `style` |
+| `영역` | `fe` \| `be` \| `infra` \| `common` (양쪽에 걸치면 `common`) |
+| `이슈번호` | GitHub 이슈 번호 |
+| `요약` | 영문 kebab-case, 2~4단어 |
+
+```bash
+feature/fe/12-place-detail
+fix/be/8-facility-id-type
+docs/common/15-git-workflow
+chore/infra/20-ci-cache
+```
+
+**이슈 번호를 넣는 이유**: `git log` 나 브랜치 목록만 봐도 어느 이슈인지 추적된다. PR 본문의 `Issue Number` 에만 의존하면 로컬에서는 알 수 없다.
+
+### 시작
+
+```bash
+git checkout develop
+git pull --ff-only origin develop
+git checkout -b feature/fe/12-place-detail
+```
+
+> **클론 직후 한 번은 훅을 켠다** — `git config core.hooksPath .githooks` (§8-3).
+> 저장소마다 한 번이면 되고, 켜 두면 프론트 검사를 빠뜨린 push 가 걸린다.
+
+## 4. 커밋
+
+- 형식: `[영역] type: 요약` — 루트 `CLAUDE.md` 기준
+- **의미 단위로 나눈다.** `Rebase and merge` 라서 **커밋이 그대로 develop 에 남는다.**
+  "wip", "fix typo" 같은 커밋을 남기지 않는다. 필요하면 `git rebase -i` 로 정리한다.
+
+### 4-1. 작업 트리를 혼자 쓰지 않는다
+
+**같은 작업 트리에서 다른 세션·사람이 동시에 파일을 고치고 있을 수 있다.** 2026-09-08 에
+실제로 겪었다 — 세션 시작 때 `git status` 가 깨끗했는데, 작업 중 다른 쪽이 같은 트리에서
+홈 화면 16파일을 건드리기 시작했고 하마터면 한 커밋에 섞일 뻔했다.
+
+| 하지 않는다 | 대신 |
+|-------------|------|
+| `git add -A` · `git add .` | **경로를 하나씩 적는다.** 커밋 전에 `git diff --cached --name-only` 로 확인한다 |
+| `git stash` | 남의 진행 중 작업을 통째로 치운다. 중간 상태를 검증해야 하면 **워크트리**를 쓴다 (아래) |
+| `SKIP_HOOKS=1` 로 pre-push 훅 끄기 | 훅이 남의 미완성 파일에 걸린 것이다. **깨끗한 워크트리에서 push 한다** (아래) |
+| 남의 파일에 `prettier --write` | 같은 이유. 내 변경이 아닌 파일을 고치지 않는다 |
+
+**커밋 전에 항상 `git status --short` 로 내 것이 아닌 변경이 있는지 먼저 본다.**
+
+`.githooks/pre-push` 는 **작업 트리 기준**으로 `pnpm format:check && pnpm verify` 를 돈다
+(push 에 `frontend/` 문서만 담겼으면 `format:check` 만 — §8-3).
+그래서 남의 미완성 파일 하나로 내 push 가 막힌다. 훅을 끄지 말고 푸시할 커밋만 담긴
+워크트리에서 민다.
+
+```bash
+git worktree add --detach <scratch>/wt HEAD
+ln -s "$(pwd)/frontend/node_modules" <scratch>/wt/frontend/node_modules
+cd <scratch>/wt && git push -u origin HEAD:refs/heads/<branch>
+```
+
+`tsc` · `vitest` · `eslint` · `prettier` 는 심볼릭 링크한 `node_modules` 로 충분하다
+(Turbopack 은 아니다 — `frontend/docs/local-run-guide.md`).
+
+**훅을 끄는 쪽이 더 나쁜 이유**: 이 저장소는 free 플랜이라 required status check 가 없다
+([#286](https://github.com/8llow8llowMe/hondigagae/issues/286)). 훅이 develop 빨간불을 막는
+마지막 문턱이다.
+
+> 리베이스 머지 뒤 `git branch -d` 가 거부하면 `git cherry -v develop <branch>` 로 전부
+> `-` 인지(= 이미 develop 에 있음) 확인하고 `-D` 한다.
+
+## 5. develop 동기화는 rebase 로 한다
+
+작업 중 develop 이 앞서 나갔으면 **merge 가 아니라 rebase** 를 쓴다.
+
+```bash
+git fetch origin
+git rebase origin/develop
+```
+
+```bash
+# 금지 — 머지 커밋이 생기면 Rebase and merge 가 깨진다
+git merge origin/develop
+```
+
+**이유**: 이 저장소는 develop 히스토리에 머지 커밋이 하나도 없다. 브랜치에 머지 커밋이 섞이면
+GitHub 의 `Rebase and merge` 가 히스토리를 예상과 다르게 평탄화한다.
+
+## 6. PR
+
+### 생성
+
+```bash
+git push -u origin feature/fe/12-place-detail
+gh pr create --base develop \
+  --title "[FE] feat: 장소 상세 화면 구현" \
+  --body-file <본문> \
+  --assignee @me \
+  --label frontend-web
+```
+
+- 본문은 `.github/PULL_REQUEST_TEMPLATE.md` 를 채운다. `/pr` 스킬을 쓰면 된다.
+- **`Issue Number: #12` 를 반드시 채운다.** 비워 두지 않는다.
+- 제목은 이슈 제목과 같게 둔다.
+
+### assignee / 라벨 (필수)
+
+> **PR 을 만들 때 assignee 와 라벨을 함께 지정한다.** 나중에 붙이려고 미루지 않는다.
+
+| 항목 | 값 |
+|------|-----|
+| assignee | **작성자 본인** (`--assignee @me`). 여럿이 작업했으면 전부 추가한다 |
+| 라벨 | **이슈와 같은 서비스 라벨** (`--label frontend-web` 등) |
+
+라벨은 이슈(§2)와 같은 목록을 쓴다.
+
+| 변경 범위 | 라벨 |
+|-----------|------|
+| `frontend/` | `frontend-web` |
+| `backend/service/tour-service` | `backend-tour-service` |
+| `backend/service/auth-service` | `backend-auth-service` |
+| `backend/service/plan-service` | `backend-plan-service` |
+| `backend/service/ai-service` | `backend-ai-service` |
+| `backend/service/batch-service` | `backend-batch-service` |
+| `backend/core/**` | `backend-core` |
+| 게이트웨이 / 유레카 | `backend-api-gateway` / `backend-service-discovery` |
+| 백엔드 문서 | `backend-docs` |
+
+여러 영역에 걸치면 해당 라벨을 **모두** 붙인다 (`--label frontend-web --label backend-tour-service`).
+
+> **예외: 저장소 공통 변경(`[DOCS]` / `[INFRA]`)은 라벨을 붙이지 않는다.**
+> 루트 `docs/`, `.github/`, `.claude/`, CI 설정처럼 어느 워크스페이스도 가리키지 않는 변경에는
+> 해당하는 라벨이 없다. **라벨을 새로 만들지 않고 생략한다.** assignee 는 그대로 지정한다.
+
+**이유**: 라벨은 **배포 대상을 정하는 값**이다. Jenkins 가 PR 라벨로 배포 스코프를 정하고
+라벨이 없으면 배포하지 않는다(fail-closed). 라벨을 빠뜨린 PR 은 머지돼도 배포가 나가지
+않는다 — [#217](https://github.com/8llow8llowMe/hondigagae/pull/217) ·
+[#219](https://github.com/8llow8llowMe/hondigagae/pull/219) ·
+[#223](https://github.com/8llow8llowMe/hondigagae/pull/223) 이 그랬다.
+assignee 가 비어 있으면 "누가 들고 있는 작업인지" 를 PR 목록에서 알 수 없다.
+
+**연달아 머지해도 앞 PR 의 라벨이 산다** ([#1269](https://github.com/8llow8llowMe/hondigagae/issues/1269)).
+머지 빌드는 **이전 성공 빌드 이후 그 잡의 범위(자기 경로 · 공용 코드 · 자기 파이프라인 파일)에 닿은
+커밋마다** 그 브랜치로 머지된 PR 을 찾아 라벨을 합친다. 전에는 HEAD 커밋의 PR 하나만 봐서, 두 PR 을
+몇 초 사이에 머지하면 대기 빌드가 하나로 합쳐져 앞 PR 의 서비스가 배포되지 않았다 — #1258 · #1262
+(ai-service) 가 바로 뒤 #1259 · #1263 의 라벨만 읽혀 그랬다. 그래도 빠진 커밋은 해당 잡을
+`FORCE_DEPLOY` 로 한 번 돌려 올린다.
+
+#### 라벨은 자동으로도 붙는다 — 그래도 확인은 한다
+
+`.github/workflows/label.yml` 이 **경로를 보고 라벨을 붙인다** (매핑은
+`.github/labeler.yml`). 위 표를 그대로 자동화한 것이라, 보통은 손으로 붙일 필요가 없다.
+
+**더하기만 한다** (`sync-labels: false`) — 사람이 넓혀 둔 스코프를 지우지 않는다.
+
+**자동으로 다 되지 않는 경우가 하나 있다.** `backend/core/**` 는 공용 모듈이라 바뀌면 그것을
+쓰는 서비스 전부의 런타임이 바뀌는데, Jenkins 배포 스코프는 `backend-{service}` 단위다.
+그래서 `backend-core` 만 붙은 PR 은 **아무 서비스도 배포되지 않는다.** 자동으로 5개 서비스를
+다 붙이지도 않는다 — "의도한 대상만 배포한다" 가 fail-closed 설계의 요점이라, 자동으로 전체
+배포를 열면 그 설계가 무너진다. **core 를 건드렸다면 배포할 서비스 라벨을 직접 더한다.**
+
+이미 만든 PR 에 붙이려면:
+
+```bash
+gh pr edit <번호> --add-assignee @me --add-label frontend-web
+```
+
+### 크기
+
+> **30파일 / 1,000줄을 넘으면 쪼갤 수 있는지 먼저 검토한다.**
+
+넘겨야 한다면 PR 본문에 **왜 쪼갤 수 없는지** 적는다 (예: 초기 부트스트랩이라 중간 상태가 빌드되지 않음).
+
+### 머지 조건
+
+| 조건 | |
+|------|---|
+| **CI 통과** | 필수. `frontend-ci` · `backend-ci` 가 실패하면 머지하지 않는다 |
+| **완료 체크리스트** | BE `backend/docs/done-checklist.md` / FE `frontend/docs/done-checklist.md` |
+| 리뷰어 승인 | **현재는 선택.** 1인 개발 체제라 셀프 머지를 허용한다 |
+
+#### 초록불이 무엇을 보장하는가
+
+**체크 이름마다 보장 범위가 다르다.** 전부 초록이어도 안 본 것이 있다.
+
+| 체크 | 언제 도는가 | 무엇을 보장하는가 |
+|------|-------------|-------------------|
+| `label` | 모든 PR | **아무것도 검증하지 않는다.** 배포 대상 라벨이 붙었다는 뜻뿐이다 |
+| `frontend-ci / verify` | `frontend/**` 변경 | format · lint · typecheck · 단위 테스트 · 빌드. **문서만 바뀌면 format 만** (#1004) |
+| `frontend-ci / e2e (1~3)` | `frontend/**` 코드 변경 | 레이아웃·보호 라우트 (Playwright, 목 API). 3 샤드. **문서만 바뀌면 건너뛴다** |
+| `backend-ci / check` | `backend/**` 변경 | 컴파일 + 테스트. **PR 은 바뀐 서비스 · cloud 모듈만, core · 빌드 설정이 바뀌면 전 모듈, 문서만이면 건너뛴다** (#1211). develop push 는 늘 전 모듈 |
+
+> **`backend/**` 만 바꾼 PR 에서 오래도록 도는 체크가 `label` 하나였다** ([#764](https://github.com/8llow8llowMe/hondigagae/issues/764)).
+> 그 초록불은 "테스트가 통과했다" 가 아니라 "라벨이 붙었다" 였는데 그렇게 읽히지 않았다.
+
+- **`backend-ci` 는 PR 에서 바뀐 모듈만 돈다** ([#1211](https://github.com/8llow8llowMe/hondigagae/issues/1211)).
+  범위는 `scripts/classify-backend-changes.sh` 가 바뀐 경로로 정한다.
+  - `backend/service/<x>/**` · `backend/cloud/<x>/**` 만 바뀌면 → `:service:<x>:check` · `:cloud:<x>:check`
+    (서비스 모듈끼리는 컴파일 의존이 없다)
+  - `backend/core/**` · 빌드 설정(`*.gradle` · `gradle/**` 등) · `backend-ci.yml` · 이 스크립트 · 모르는 경로가
+    있으면 → **전 모듈** `check`. core 는 여러 서비스가 함께 쓰므로 부분 빌드가 위험하다
+    (`Jenkinsfile.backend-common.groovy` 머리말)
+  - `backend/docs/**` · `backend/*.md` 만 바뀌면 → **Gradle 을 건너뛴다**(체크는 초록으로 남는다)
+  - **판정이 실패하면 전 모듈이다.** develop push 는 판정 없이 늘 전 모듈이다 — 머지된 develop 을 검사하는
+    유일한 장치라 좁히지 않는다(아래 #830)
+  - **PR 라벨을 읽지 않는다.** 결과는 자동 라벨과 같은 모듈이지만 `label` 잡과 동시에 시작해 라벨이 아직
+    없을 수 있고, core PR 의 라벨은 사람이 배포용으로 더한 것이라 바뀐 모듈과 다르다
+  - job summary 머리에 **이번에 돈 범위**(`./gradlew …`)를 적는다. 건수를 볼 때 범위도 같이 본다
+- **실행된 테스트 건수를 job summary 에 남긴다.** Gradle 이 캐시로 테스트를 건너뛰면
+  한 건도 안 돈 채 `BUILD SUCCESSFUL` 이 나오므로(`backend/docs/done-checklist.md` §1),
+  0건이면 통과했어도 빨간불로 떨어뜨린다. **초록불을 봤으면 건수도 같이 본다.**
+- **Jenkins 의 PR 빌드 결과는 GitHub 체크로 올라오지 않는다.** Jenkins 도 PR 에서
+  테스트를 돌지만(`Jenkinsfile.backend-common.groovy`, `RUN_TESTS` 기본 true) 라벨이
+  가리키는 **한 모듈만** 본다. PR 화면에서 읽을 수 있는 백엔드 근거는 `backend-ci` 다.
+- **두 워크플로는 `develop` push 에서도 돈다** ([#830](https://github.com/8llow8llowMe/hondigagae/issues/830)).
+  머지된 develop 자체를 검사하는 유일한 장치다 — `pull_request` 는 머지 **전** 트리를 본다.
+  Actions 캐시가 기본 브랜치 스코프에서만 PR 로 상속되는 것도 이 실행이 채운다.
+
+> **셀프 머지를 허용하는 것이지 PR 을 생략하는 것이 아니다.** PR 은 변경 기록이자
+> 되돌리기 단위다. develop 에 직접 커밋하지 않는다.
+>
+> 팀원이 늘면 이 표의 "리뷰어 승인"을 필수로 바꾼다.
+
+## 7. 머지
+
+**develop 으로 가는 PR 은 `Rebase and merge` 를 쓴다.** develop 을 선형으로 유지한다.
+(develop → main 릴리스만 예외다 — 아래 "릴리스" 절)
+
+```bash
+gh pr merge <번호> --rebase --delete-branch
+```
+
+- `Squash and merge` 는 **저장소 설정에서 껐다.** `Create a merge commit` 은 릴리스 때문에 켜 두었지만
+  **develop 에는 ruleset 이 머지 커밋을 막는다** (§8-1) — 기능 PR 에서 눌러도 머지되지 않는다.
+- `--delete-branch` 는 그대로 쓴다. 저장소 자동 삭제를 켜 뒀지만(§8-1) 명령에 남겨 두면
+  **로컬에서 바로 결과를 확인할 수 있고**, 설정이 되돌려져도 브랜치가 남지 않는다.
+- 로컬 정리:
+
+```bash
+git checkout develop && git pull --ff-only origin develop
+git branch -d feature/fe/12-place-detail
+```
+
+### 릴리스 (develop → main) — merge commit 으로 머지한다
+
+운영 배포는 `main` 에 들어간 커밋이 부른다 (`main` → `deployEnv=prod`). 릴리스 PR 은 **`Create a merge commit`** 으로 머지한다.
+
+```bash
+gh pr merge <릴리스 PR 번호> --merge     # --delete-branch 를 붙이지 않는다 (head 가 develop 이다)
+```
+
+- **라벨**: 릴리스 PR 에 **이번에 배포할 서비스 라벨을 전부** 붙인다. 파이프라인은 배포 대상을 이 PR 의
+  라벨로 정한다 — 기능 PR 에 붙어 있던 라벨은 develop 으로 머지된 PR 이라 `main` 배포에서 세지 않는다.
+- **왜 merge commit 인가** — 두 가지 이유다.
+  1. **rebase 머지가 실패한다.** 첫 릴리스 #1325(1,568 커밋)가 "This branch cannot be rebased due to
+     conflicts" 로 막혔다. `main` 이 develop 의 조상이고 범위 안 머지 커밋도 0개라 내용 충돌은 없었다.
+     GitHub 의 rebase 머지는 커밋을 하나씩 다시 적용해 새 SHA 를 만드는데, 그 재적용이 실패한 것이다.
+     매 릴리스가 같은 위험을 지고, 성공해도 `main` 과 develop 의 SHA 가 갈라져 다음 릴리스가 더 어려워진다.
+  2. **배포 라벨이 정확히 읽힌다.** 파이프라인은 `main` 빌드의 HEAD 커밋에서 `merge_commit_sha` 가 같은
+     PR 을 배포 근거로 고른다(`Jenkinsfile.*-common.groovy` `resolveDeployLabelContext`). merge commit 이면
+     그 PR 이 릴리스 PR 이다. **fast-forward 로 올리면** HEAD 가 develop 의 마지막 커밋이라 그 커밋을 만든
+     **기능 PR 의 라벨만** 읽혀 일부 서비스만 배포된다.
+- `main` 에만 머지 커밋이 쌓인다. develop 은 계속 선형이고, 머지 커밋은 내용을 바꾸지 않아 다음 릴리스에
+  충돌을 만들지 않는다.
+- 라벨을 빠뜨렸거나 일부만 다시 내보내야 하면 해당 잡의 `main` 빌드를 **`FORCE_DEPLOY=true`** 로 수동 실행한다.
+
+### 머지 후 이슈 갱신 (필수)
+
+> **머지로 작업이 끝나는 것이 아니다. 연결된 이슈의 체크박스를 갱신하고, 전부 끝났으면 닫는다.**
+
+PR 템플릿의 `Issue Number: #N` 은 **GitHub 자동 닫기 키워드가 아니다.** 머지해도 이슈는 열려 있다.
+(`Closes #N` 을 쓰면 자동으로 닫히지만, 이 저장소는 **판단해서 닫기 위해** 일부러 쓰지 않는다.)
+
+| 상황 | 처리 |
+|------|------|
+| 완료 조건을 **전부** 만족 | 체크박스를 전부 체크하고 **이슈를 닫는다** |
+| **남은 것이 있다** | **체크박스만 갱신하고 닫지 않는다.** 무엇이 왜 남았는지 코멘트로 남긴다 |
+
+```bash
+# 체크박스 갱신 — 본문을 받아 [ ] → [x] 로 고치고 되돌린다
+gh issue view <번호> --json body -q .body > /tmp/issue.md
+gh issue edit <번호> --body-file /tmp/issue.md
+
+# 전부 끝났으면
+gh issue close <번호> --comment "PR #<번호> 로 머지됐습니다."
+```
+
+**규칙**
+
+- **실제로 끝낸 항목만 체크한다.** 안 한 것을 체크하면 이슈가 거짓 기록이 된다.
+- 완료 조건에 없던 잔여 작업이 생겼으면 **체크박스를 추가한다.** 열린 상태가 스스로 설명되어야
+  나중에 "이거 왜 안 닫혔지" 를 다시 조사하지 않는다.
+- 닫지 않을 때는 **왜 못 했는지와 언제 할 수 있는지**를 코멘트에 적는다 (예: "백엔드 미기동이라
+  Swagger 대조 불가 — 로컬 기동 후 `/fe-api-check`").
+- 구현 도중 발견한 **다른 영역의 문제는 별도 이슈로 뗀다.** 원래 이슈에 매달아 두면 닫히지 않는다.
+
+<a id="auto-close-decision"></a>
+
+**이 선택은 재검토했고 유지하기로 했다** ([#150](https://github.com/8llow8llowMe/hondigagae/issues/150)).
+근거는 아래 실측이다 (**2026-09-14 기준**) — 머지된 PR 200건과 그때 열려 있던 이슈 9건을 대조했다.
+
+| 항목 | 값 |
+|------|-----|
+| `Issue Number: #N` 을 채운 머지 PR | 최근 100건 중 **100건** |
+| GitHub 이 인식한 자동 닫기 참조 | **0건** |
+| 머지 PR 이 참조했는데 **그 시점에 열려 있던** 이슈 | **5건** |
+| 그중 **참조한 PR 이 머지된 뒤에도 열려 있어야 했던** 이슈 | **3건** — [#286](https://github.com/8llow8llowMe/hondigagae/issues/286) (PR #288 · 4/5 · B 미결) · [#430](https://github.com/8llow8llowMe/hondigagae/issues/430) (PR #527 · 1/9) · [#569](https://github.com/8llow8llowMe/hondigagae/issues/569) (PR #579 · 4/5) |
+| **정리 누락** (끝났는데 체크박스가 안 갱신됨) | **2건** — [#570](https://github.com/8llow8llowMe/hondigagae/issues/570) (PR #580) · [#596](https://github.com/8llow8llowMe/hondigagae/issues/596) (PR #597) |
+
+이 표는 **그 시점의 스냅숏**이다. 위 이슈들은 이후 각자 닫히거나 진행되므로, 지금 상태를 보려면
+아래 `check-issue-sync.sh` 를 돌린다.
+
+**도입했다면 3건이 그 PR 머지 시점에 잘못 닫혔다.** 부분 완료가 예외가 아니다 — 이슈를 화면/기능 단위로 쪼개도
+완료 조건 하나하나가 다 끝나는 PR 은 오히려 드물다. 위 처리 표의 두 갈래가 그 현실이고,
+자동 닫기는 그 분기를 없앤다. 잘못 닫힌 것을 되돌리는 비용이 안 닫힌 것을 닫는 비용보다 크다.
+
+**남은 문제를 자동 닫기가 고쳐 주지도 않는다.** 정리 누락 2건은 "닫히지 않았다" 이전에
+**체크박스가 갱신되지 않았다** 이고, 자동 닫기를 켰다면 "닫혔는데 체크박스는 빈" 이슈가 됐을
+뿐이다 — 지금과 반대 방향의 부정확이다. 그래서 정책 대신 **탐지**를 붙였다.
+
+**어긋난 곳을 찾는다**
+
+체크리스트에 적어 두는 것만으로는 새어나간다 — 위 정리 누락 2건이 그렇게 쌓였다.
+대조는 손으로 하지 않는다.
+
+```bash
+sh scripts/check-issue-sync.sh        # 최근 머지 PR 100건
+sh scripts/check-issue-sync.sh 200    # 개수 지정
+```
+
+머지된 PR 이 참조한 이슈 중 **아직 열린 것**을 체크박스 진행률(`[완료/전체]`)과 함께 낸다.
+체크된 항목이 하나도 없으면 `정리 누락 의심` 으로 표시한다.
+
+**열려 있다고 전부 잘못은 아니다.** 부분 완료는 열려 있는 것이 맞고, 스크립트는 그것을 구분하지
+않는다 — **막지 않고 보이게 할 뿐이다.** 판단은 위 처리 표대로 사람이 한다.
+
+## 8. 강제되는 것과 규칙으로만 지키는 것
+
+이 저장소는 오랫동안 **비공개 무료 플랜이라 GitHub 브랜치 보호 규칙을 쓸 수 없었다.**
+
+```text
+GET /repos/8llow8llowMe/hondigagae/branches/develop/protection
+→ 403 "Upgrade to GitHub Pro or make this repository public to enable this feature."
+```
+
+**그래도 무료로 강제할 수 있는 것이 있고, 그것부터 걸어 뒀다** ([#286](https://github.com/8llow8llowMe/hondigagae/issues/286)).
+
+> **저장소가 public 으로 바뀌어 위 403 은 더 이상 나지 않는다** (2026-09-21 확인,
+> 같은 호출이 `404 "Branch not protected"` — 즉 **걸 수 있는데 안 걸어 둔 상태**다).
+> 무엇을 required status check 로 지정할지는 [#286](https://github.com/8llow8llowMe/hondigagae/issues/286)
+> 에서 정한다. 정해지기 전까지 아래 8-2 는 그대로 "규칙으로만" 남는다.
+
+### 8-1. 이미 강제된다
+
+| 규약                    | 강제 수단                                            |
+| ----------------------- | ---------------------------------------------------- |
+| develop 은 Rebase and merge 만 쓴다 | 저장소 설정 **Squash 끔** + ruleset `develop-linear-history`(`required_linear_history`) — develop 에 머지 커밋이 들어가지 못한다 |
+| 릴리스(develop → main)는 merge commit | 저장소 설정 **Merge commit 켬** (제목 `PR_TITLE` · 본문 비움, 2026-10-10 #1328) |
+| develop 삭제 금지       | ruleset `develop-linear-history`(`deletion`) — 릴리스 PR 의 head 가 develop 이라 자동 삭제를 이중으로 막는다 |
+| 머지 후 브랜치 삭제      | 저장소 설정 **Automatically delete head branches** 켬 |
+| PR 라벨 (배포 대상)      | `.github/workflows/label.yml` — **경로 기반 자동 부여** |
+| CI 빨간불을 develop 에 올리지 않기 | `.githooks/pre-push` (§8-3) — push 단계에서 끊는다 |
+
+GitHub UI 에는 `Rebase and merge` 와 `Create a merge commit` 이 뜬다. 후자는 릴리스용이고,
+develop 으로 가는 PR 에서는 ruleset 이 막으므로 **develop 에 머지 커밋이 섞여 선형 히스토리가 깨지는 일은
+여전히 설정으로 막혀 있다.**
+
+### 8-2. 아직 규칙으로만 지킨다
+
+브랜치 보호가 필요한 것들이다. **공개 전환 또는 플랜 업그레이드가 정해지면** 건다.
+
+- `develop` **직접 푸시 금지** (§1 이 금지하지만 기술적으로는 열려 있다)
+- PR 머지 전 **`verify` · `backend-ci / check` 통과 필수** (required status check)
+- Jenkins `pr-merge` 도 필수 — Jenkins 는 통과했는데 Actions 만 빨간 경우가 있었다
+
+> **이게 왜 급한지** — [#282](https://github.com/8llow8llowMe/hondigagae/pull/282) 가
+> `verify` **실패 상태로 머지**돼 develop 이 빨간불이 됐다. GitHub Actions 는 PR 을
+> **현재 develop 에 머지한 트리**로 빌드하므로, 그동안 **뒤따르는 모든 PR 이 그 실패를
+> 물려받는다** — [#283](https://github.com/8llow8llowMe/hondigagae/pull/283) 이 건드리지도
+> 않은 파일 때문에 빨간불이 됐고 원인 추적에 시간이 들었다.
+
+### 8-3. pre-push 훅 — **한 번 켜 두면 된다**
+
+```bash
+git config core.hooksPath .githooks
+```
+
+**`frontend/` 가 한 줄이라도 바뀐 push 에서 `format:check` + `verify` 를 돌린다.**
+작업 영역과 무관하다 — #282 는 백엔드 PR 이었고 프론트 문서 하나를 함께 고쳤다.
+"나는 백엔드 작업이니 프론트 검사는 필요 없다" 는 판단이 정확히 그 사고를 만들었다.
+
+**문서만 바뀐 push 는 `format:check` 만 돈다** ([#1004](https://github.com/8llow8llowMe/hondigagae/issues/1004)).
+#282 가 걸린 자리가 바로 그 포맷 검사라 문서에서도 빠지지 않는다. `frontend/docs/**` 와 그 밖의
+`frontend/**/*.md` 가 문서이고, 테스트가 읽는 `frontend/DESIGN.md` 는 코드로 본다. 판정은 CI 의 `changes`
+잡과 같은 `scripts/classify-frontend-changes.sh` 다.
+
+백엔드는 돌리지 않는다 — `./gradlew check` 가 분 단위라 push 훅에 맞지 않다.
+**대신 `backend-ci` 가 PR 에서 본다** (§6). 훅은 프론트 전용으로 남긴다.
+
+일회성으로 건너뛰려면 `SKIP_HOOKS=1 git push`. **머지를 막는 장치가 아니라 실수를 줄이는
+장치다** — 진짜 강제는 8-2 가 열려야 한다.
+
+## 9. 요약 체크리스트
+
+작업 시작 전:
+
+- [ ] 이슈가 있다 (화면/기능 단위)
+- [ ] `develop` 최신 상태에서 브랜치를 팠다
+- [ ] 브랜치명이 `<type>/<영역>/<이슈번호>-<요약>` 이다
+- [ ] **훅을 켰다** — `git config core.hooksPath .githooks` (클론당 한 번, §8-3)
+
+PR 올리기 전:
+
+- [ ] develop 동기화를 **rebase** 로 했다 (머지 커밋 없음)
+- [ ] 커밋이 의미 단위이고 prefix 가 맞다
+- [ ] 완료 체크리스트를 통과했다
+- [ ] 30파일을 넘으면 이유를 본문에 적었다
+- [ ] **assignee 를 본인으로 지정했다**
+- [ ] **라벨을 확인했다** — 자동 부여되지만 `backend/core/**` 는 배포할 서비스 라벨을 직접 더한다 (§6)
+
+머지할 때:
+
+- [ ] CI 통과 — **`verify` · `backend-ci` 와 Jenkins 전부.** 빨간불로 머지하면 develop 이
+      오염되고 뒤따르는 모든 PR 이 그 실패를 물려받는다 (§8-2)
+- [ ] **백엔드 PR 이면 `backend-ci` job summary 의 범위와 실행 건수를 봤다** — 0건이면 초록불이
+      거짓이다. 문서만 바뀐 PR 은 "건너뛰었다" 가 맞다 (§6)
+- [ ] `Issue Number` 가 채워져 있다
+- [ ] **Rebase and merge** 로 머지하고 브랜치를 삭제했다
+
+머지한 뒤:
+
+- [ ] **이슈 체크박스를 실제 완료 여부대로 갱신했다**
+- [ ] 완료 조건에 없던 잔여 작업이 있으면 **체크박스로 추가했다**
+- [ ] **전부 끝났으면 이슈를 닫았고, 남은 게 있으면 이유를 코멘트로 남기고 열어 뒀다**
+- [ ] 주기적으로 `sh scripts/check-issue-sync.sh` 로 어긋난 곳을 대조했다 (§7 "머지 후 이슈 갱신")

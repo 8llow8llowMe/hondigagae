@@ -1,0 +1,403 @@
+# Batch Service
+
+## 책임
+
+외부 공공 데이터 수집·대량 적재. 서비스들이 조회하는 장소/코스/혼잡도 DB의 원천 파이프라인.
+
+## 배치 잡
+
+| 잡 | 원천 | 주기(안) | 비고 |
+|-----|------|----------|------|
+| `placeDataPipelineJob` | (자식 잡 6개) | 주 1회 + 수동 | 장소 적재 6단계를 순서대로 잇는 flow job (#377). 수동 실행은 이 한 줄이면 된다 |
+| `placeImportJob` | 국문 관광정보 GW API (TourAPI) | 주 1회 + 수동 | 관광지/음식점/숙박 마스터 + 운영시간(detailIntro2) + 추가 이미지(detailImage2). 상세 두 단계는 실행당 상한 + 증분 선정 |
+| `cultureFacilityImportJob` | 문화정보원 문화시설 (CSV 파일데이터) | 월 1회 | 문화시설 + 긴급 시설. 포털에서 직접 내려받고 갱신됐을 때만 적재 (#379) |
+| `petRestaurantImportJob` | 식약처 반려동물 동반출입 음식점 (xlsx) | 주 1회 | 좌표는 VWorld 지오코딩으로 채운다 |
+| `placeMergeJob` | (DB) | 적재 뒤 1회 | 원천이 다른 같은 장소를 `merged_into_id` 로 묶는다 (#363). 이어서 동반 가능 여부 재계산 스텝을 돈다 (#886) |
+| `placeImageBackfillJob` | TourAPI 키워드 검색 | 적재 뒤 1회 | 이미지 없는 문화정보원·식약처 장소에 대표 이미지를 빌려 채운다 |
+| `petTourImportJob` | 반려동물 동반여행 API (KorPetTourService2) | 파이프라인 마지막 | TourAPI 장소에 동반 조건(`place_pet_info`)을 붙인다 (#877). 동기화 목록 1콜로 대상을 좁히고 교집합에만 상세를 부른다. 쿼터는 KorService2 와 따로다. 적재 뒤 재계산 스텝 `placePetAllowanceReflectStep` 이 TourAPI 노출 행의 `pet_allowance_type` · `allowed_pet_size` 를 `place_pet_info` 와 흡수 행에서 다시 계산한다 (#886, 가장 제한적인 값) |
+| `congestionImportJob` | 관광지 집중률 방문자 추이 예측 API | 일 1회 | 30일 rolling. **주기가 달라 파이프라인에 넣지 않는다** |
+| `olleCourseImportJob` | 제주올레 공공 CSV + TourAPI 좌표 | 주 1회 + 수동 | 산책 코스 마스터 (#383). 포털에서 내려받고 갱신됐을 때만 적재 (#441). 장소 파이프라인과 별개다 |
+
+## 스케줄 (#378)
+
+주기 실행은 **batch-service 프로세스 안 Quartz** 가 맡는다
+(`domainlayer/schedule/adapter/in/scheduler`). 배포 호스트 cron 을 쓰지 않은 이유는 컨테이너가
+`restart: unless-stopped` 로 상시 떠 있어서다 — 스케줄이 저장소 밖 crontab 이 아니라 배포 단위와
+함께 움직인다.
+
+| 무엇 | 언제 |
+| --- | --- |
+| `placeDataPipelineJob` | dev 월 03:00 KST (`0 0 3 ? * MON`) · **prod 화 03:00 KST** (`0 0 3 ? * TUE`) — 같은 TourAPI 키의 일 한도를 같은 날 나눠 쓰지 않게 요일을 가른다 (#1326) |
+| `olleCourseImportJob` | 월 05:00 KST (`0 0 5 ? * MON`) — dev · prod 공통. TourAPI 는 1콜뿐이다 |
+| `congestionImportJob` | 매일 06:00 KST (`0 0 6 * * ?`) |
+
+> **이 표는 컨테이너가 떠 있을 때의 이야기다.** 2026-09-23 dev 를 재 보니 `BATCH_JOB_EXECUTION` 27건이
+> 전부 수동 로컬 실행이고 스케줄 창(03·05·06시) 실행은 **0건**이었다 — dev 에서 스케줄이 한 번도 돌지
+> 않았다 (#878). 스케줄이 실제로 도는지는 `../batch-dev-runbook.md` §3 으로 본다.
+
+- **스위치**: `batch.schedule.enabled` (`BATCH_SCHEDULE_ENABLED`). dev 기본 true, local·CI·prod 기본 false.
+  **prod 는 Vault 에서 `true` 로 켰다** (2026-10-10, #1323). dev 와 prod 는 같은 TourAPI 키(상품당 일 1,000콜)를
+  쓰므로 장소 파이프라인 요일을 갈랐다 — dev 월 · prod 화 03:00 (#1326, 위 표). 같은 날 돌면 한도를 나눠 써
+  한쪽이 상세 수집을 덜 하고 끝난다. 요일은 compose 기본값이 정하고 `BATCH_SCHEDULE_PLACE_PIPELINE_CRON_{DEV,PROD}` 로 덮을 수 있다.
+  조건은 `batch.schedule.enabled=true` **그리고** `spring.batch.job.enabled=false` 둘 다라,
+  `docker exec` 로 잡 하나만 돌리려 띄운 **수동 JVM 에서는 트리거가 등록되지 않고 스케줄러도
+  시작되지 않는다.** `auto-startup` 은 `application.yml` 에서 고정 false 이고, 조건을 통과한
+  컨텍스트의 `SchedulerFactoryBeanCustomizer` 만 그것을 true 로 되돌린다.
+- **조건은 SpEL 이 아니라 `@ConditionalOnProperty` 조합**(`ScheduleEnabledCondition`)이다.
+  `@ConditionalOnExpression` 은 치환된 값을 문자열로 파싱하므로 값이 불리언 리터럴이 아니면
+  (빈 문자열·`yes`·`1`) 컨텍스트 refresh 가 깨져 컨테이너가 crash-loop 에 빠진다. compose 의
+  `${VAR:-}` 는 변수를 부재가 아니라 **빈 문자열**로 만들기 때문에 실제로 밟을 수 있는 길이었다.
+  지금은 **`true` 가 아닌 값이 전부 꺼짐**으로 떨어진다.
+- **잡 스토어는 메모리**다. 인스턴스가 하나고 트리거가 코드에 있어 영속할 상태가 없다 —
+  tour 스키마에 `QRTZ_*` 테이블을 더하지 않는다. Quartz 스레드는 1개라 두 잡이 동시에 돌지 않는다
+  (JobKey 가 달라 `@DisallowConcurrentExecution` 만으로는 안 막힌다). 그리고 **데몬 스레드**다 —
+  `SchedulerFactoryBean` 은 auto-startup 과 무관하게 스레드를 만들므로, non-daemon 이면
+  `--spring.main.web-application-type=none` 수동 실행 JVM 이 잡을 끝내고도 죽지 않는다.
+- **실행 중 가드**: 겹치면 안 되는 잡이 돌고 있으면 이번 주기를 건너뛴다. 장소 파이프라인과 혼잡도는
+  place 를 건드리는 잡 7개 전부(파이프라인·자식 다섯·혼잡도)를 본다 — 자식 잡 하나만 단독으로 수동
+  실행 중이어도 장소가 반쯤 들어온 상태라 혼잡도가 UNMATCHED 를 대량으로 남기기 때문이다. 올레는
+  `walk_course` 만 건드리므로 자기 자신만 본다. 판정 근거는 Quartz 가 아니라 **배치 메타데이터**다 —
+  수동 JVM 의 실행은 Quartz 가 모른다. 단 6시간을 넘긴 STARTED 는 죽은 JVM 의 잔재로 보고 무시한다.
+  방치된 행 하나에 스케줄이 영원히 막히는 쪽이 더 나쁘다.
+- **수동 실행과의 관계**: 겹쳐도 스케줄 쪽이 양보한다(`schedule fire skipped ...` WARN). 반대는
+  막지 않으므로 수동 실행은 스케줄 창을 피하는 편이 낫다. 수동 실행 명령은
+  `jenkins-cicd-dev-deploy-guide.md` §8.
+- `runAt` 은 발화 시각을 `Asia/Seoul` 초 단위로 자른 `2026-09-14T03:00:00` 꼴이다. 시간대를 트리거가
+  직접 못박는다 — `-Duser.timezone` 은 배포 환경변수(`TIME_ZONE`)라 그 값으로 03:00 이 흔들린다.
+- 발화는 `batch_schedule_fire_total{job,result}` / `batch_schedule_last_fire_timestamp{job}` 로
+  드러난다 (`observability-guide.md`).
+
+### 계획 (미착수)
+
+| 잡 | 원천 API | 비고 |
+|-----|----------|------|
+| `RelatedPlaceImportJob` | 관광지별 연관 관광지 API | 코스 생성용 연결성 |
+| `VisitorStatsJob` | 관광빅데이터 정보 서비스 API | 방문자 수 분석 |
+
+두루누비 걷기 코스는 제주가 0건이라 계획에서 뺐다 — 산책 코스는 `olleCourseImportJob` 이 적재한다 (아래 올레 절).
+
+## 구현 주의점
+
+- Spring Batch 기반, 실행 파라미터 중심 운영 (지역 코드, 기준일 등).
+- 모든 잡은 재실행 가능(idempotent)해야 한다. upsert 키와 `syncedAt`을 기록한다 (`external-api-guide.md` §5).
+- 대량 적재는 JPA 대신 JDBC 배치(`*BulkPort`)를 우선 검토한다.
+  상태 전이(delist·병합 표시)는 `*CommandPort` 를 쓴다 (`coding-conventions.md` §12-3) —
+  `*BulkPort` 와 이름이 겹치면 "어느 bulk 인가"를 되묻게 된다.
+- 공공 API 쿼터를 고려해 페이지 단위 호출 간격과 실패 재시도 정책을 명시한다.
+- **공공 API 호출은 서킷으로 감싼다** (`coding-conventions.md` §10). 제공처 단위로 인스턴스를
+  나눈다 — `tourapi` / `tats` / `vworld` / `mfds` / `datagokr`.
+  반려동물 동반여행(KorPetTourService2)은 같은 제공처(B551011)라 `tourapi` 를 함께 쓴다 — 앞 단계에서 서킷이
+  열리면 `petTourImportJob` 도 `TOUR_API_CIRCUIT_OPEN` 으로 실패한다 (#877).
+  배치라 사용자 응답이 없는데도 거는 이유는 호출량이다. 원천이 죽으면 수천 건을 타임아웃까지
+  기다리며 두드려 쿼터만 태우고 잡 시간이 몇 시간씩 늘어진다. 빨리 포기하는 것이 값어치다.
+  서킷은 **전송 호출만** 감싼다 — 응답 해석 실패나 키 누락은 그 밖에서 도메인 예외로 변환된다.
+- **문화정보원은 포털에서 내려받고 갱신 감지 후에만 적재한다** (#379). 상세 페이지의 JSON-LD 에서
+  파일 주소를 찾아 임시 디렉터리로 스트리밍하고, `atchFileId` 와 바이트 수를
+  `import_source_snapshot` 의 직전 행과 비교해 같으면 적재를 통째로 건너뛴다. 건너뛴 실행도
+  `last_success` 를 갱신한다 — 원천을 확인해 최신임을 안 것이라 성공이다.
+  **`/app/data` 는 이제 우회용이다.** 읽기 전용 볼륨이라 내려받은 파일을 거기에 쓸 수 없고,
+  포털이 막혔을 때만 그 파일로 물러난다. 그때는 포털 스냅샷 대신 **우회 행**(`file_id='LOCAL_FALLBACK'`)을
+  남겨, 포털이 되살아난 첫 실행이 파일이 그대로여도 다시 적재한다 (#887, `data-refresh-guide.md` §5
+  "우회 적재가 남기는 것"). 판정 규칙은 올레와 함께 `SourceFileSnapshotRule` 하나를 쓴다.
+  스냅샷 DDL 은 `resources/db/import-source-snapshot-mysql.sql` 하나가 정본이고 prod 는 런북 적용이다.
+- **스냅샷 `file_name` 은 `global.support.ContentDispositionFileName` 하나가 읽는다** (#888, 문화정보원·올레 공용).
+  포털은 `filename*` 없이 plain `filename="…"` 에 UTF-8 바이트를 싣고 HTTP 클라이언트는 헤더를 ISO-8859-1 로 읽어
+  `ì ì£¼…` 로 깨진다. `filename*` 이 있으면 그것을 우선하고, plain 은 모든 글자가 U+00FF 이하이고 그 바이트가
+  UTF-8 로 엄격 디코딩될 때만 되읽는다 — 진짜 latin1 이름·이미 올바른 유니코드는 그대로. 판정은 `file_id`·`content_length`
+  만 보므로 #888 이전의 깨진 행은 표시만 깨져 있다 (`data-refresh-guide.md` §5).
+- **적재 범위와 병합 범위는 한 값에서 나와야 한다.** 지역 코드를 상수로 박으면 다른 시도로
+  잡을 돌렸을 때 그 지역을 적재해 놓고 제주만 병합하는 조용한 어긋남이 난다.
+  시도 명칭 → 관광 지역코드 변환은 `RegionCodeMapping` 한곳에 있고, 매핑에 없는 지역이면
+  적재를 시작하기 전에 실패시킨다.
+- **병합은 독립 잡 `placeMergeJob`** 이다(#363). 적재 파사드는 병합을 부르지 않으므로 적재 잡 뒤에
+  이어 돌린다. 판정 상수의 정본은 `PlaceIdentityPolicy`.
+- **TourAPI 장소의 `pet_allowance_type` · `allowed_pet_size` 는 재계산 스텝 하나가 소유한다**(#886).
+  `placePetAllowanceReflectStep` 한 정의를 `petTourImportJob`(적재 뒤)과 `placeMergeJob`(병합 뒤)이 마지막 단계로 붙인다.
+  근거는 `place_pet_info` 와 병합으로 흡수된 행이고, 가장 제한적인 값을 쓴다(규칙 정본 `PetAllowancePolicy`).
+  매 실행 처음부터 다시 계산하므로 근거가 사라지면 값도 돌아간다. 적재 · 병합 SQL 은 두 칸을 쓰지 않는다
+  (`JdbcPlaceBulkAdapterSqlTest`). 운영 확인은 `data-refresh-guide.md` §10.
+- **`placeDataPipelineJob` 은 자식이 실패해도 다음 단계로 계속 가고, 실패한 자식이 있으면 부모를
+  FAILED 로 내린다**(#377). 계속 가는 쪽이 나은 이유는 여섯 잡이 모두 멱등이고 실패해도 기존 데이터를
+  지우지 않기 때문이다 — 원천 하나가 죽었다고 병합·이미지 백필까지 멈추면 지난 주 데이터마저 손대지
+  않은 채 남는다. 대신 실패를 숨기지 않으려고 `PipelineExitStatusListener` 가 부모 상태를 내린다.
+  지역 파라미터는 이름이 잡마다 다르므로(`areaCode`/`sido`/`region`) 실행 전에
+  `PipelineRegionParametersValidator` 가 세 값을 같은 areaCode 로 환산해 비교한다.
+- 부분 실패가 전체 적재를 막지 않게 잡 단위로 격리한다.
+- 반려동물 동반 정보가 없는 장소는 삭제하지 않고 `PetAllowanceType.UNKNOWN`으로 적재한다.
+
+## olleCourseImportJob (제주올레 산책 코스)
+
+```bash
+./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=olleCourseImportJob"
+```
+
+공식 수치(거리·소요시간·시종점)는 공공데이터포털 [올레코스현황 CSV](https://www.data.go.kr/data/15043496/fileData.do)가,
+시작점 좌표·대표이미지는 TourAPI 레포츠(28)의 올레 항목이 낸다. **CSV 가 기준 목록**이다 —
+TourAPI 에만 있는 항목(하영올레 등)은 코스가 되지 않는다. 매칭 키(코스번호+A/B 변형)의 단일
+출처는 `OlleCourseParser` 다.
+
+**종점 좌표는 인접 코스 체이닝(#816)에 사람이 확인한 값을 덧대 채운다** (#960, `OlleCourseEndpointOverrides`).
+코스 N 의 종점명과 같은 이름에서 출발하는 코스의 시작점을 먼저 쓰고, 없으면 **별칭**(종점 key → 시작 key,
+`모슬포항하모체육공원 → 하모체육공원` 처럼 짝을 하나씩 적는다. 부분일치 규칙은 쓰지 않는다), 그래도 없으면
+**수기 종점**((사)제주올레 공식 사이트 end 좌표와 교차검증 근거)을 쓴다. 덧댄 값은 코스 시작점과의 직선거리가 `distanceKm` 를 넘으면 버리고 WARN,
+시작점 좌표나 길이가 없으면 쓰지 않는다. 값은 **지점명이 정확히 같을 때만** 쓰여 원천 판본이 이름을 바꾸면
+자동으로 빠진다 — 그러면 적재 로그 `olle courses without end coordinates` 에 나오니 새 이름을 확인해 목록에
+적는다. **적재 중 지오코딩은 하지 않는다**(VWorld 에 `하동포구` 를 물으면 경남 하동군이 나온다). 2026-07-31 판
+기준 코드상 29/29 이고 근거는 `data-api-analysis.md` §9-4. 원천 파일이 같으므로 #960 배포 뒤
+`forceImport=true` 로 1회 재적재한다(`batch-dev-runbook.md` §4-3).
+
+**소요시간 표기는 적재할 때 `N~M시간` 한 모양으로 맞춘다** (#987, `OlleCourseParser.durationText`). 2026-07-31 판은
+28행이 `3~4시간` 인데 18-2코스 하나만 `3-4시간` 이라 목록에 두 모양이 섞여 나갔다. 숫자 사이의 범위 기호(`-` ·
+전각 `－` · en/em dash · 물결 변형)만 `~` 로 바꾸고 그 밖의 글자는 건드리지 않는다. `durationMaxMinutes` 는 `시간`
+바로 앞 숫자만 읽어 **정규화 전후 값이 같다**(둘 다 240분) — 활동량 판정은 바뀌지 않는다.
+원천 파일이 같아 월요일 스케줄은 이 변경을 반영하지 않고 건너뛴다. 배포 뒤 `olleCourseImportJob forceImport=true` 를
+1회 돌리고 아래로 확인한다 — 2026-09-29 dev 는 `18-2 | 3-4시간` 한 줄이 나온다(재적재 뒤 0 행).
+
+```sql
+SELECT course_key, duration_text FROM walk_course WHERE duration_text NOT REGEXP '^[0-9]+~[0-9]+시간$';
+```
+
+### 원천이 한 번에 두 계약을 조용히 바꿨다 (#722)
+
+29개 중 25개가 좌표 없이 적재돼 있었다. **원천에 없어서가 아니라 적재 쪽 결함 둘이 곱해진
+결과**였고, 둘 다 TourAPI 가 2026-09-09~11 경 이관하며 말없이 바꾼 것이다.
+
+| 무엇이 바뀌었나 | 코드가 기대하던 것 | 결과 |
+|---|---|---|
+| 지역 코드 체계 | `areaCode=39` | 33건 중 **3건**만 조회됨 (#726 과 같은 원인) |
+| 제목의 변형 표기 | `[제주올레 3코스] … (A)` | `[제주올레 3-A코스]` 를 파서가 못 읽어 **4건 탈락** |
+
+**"20·18-2 는 TourAPI 에 없다"는 옛 서술은 틀렸다 — 둘 다 원천에 있다.** 두 필터에 가려져
+있었을 뿐이다. 고친 뒤 **29/29 가 좌표를 얻는다**(실측).
+
+제목 형식이 바뀐 것은 **DB 로 역추적된다** — 옛 형식으로만 나올 수 있는 `3-B`·`15-B` 좌표가
+남아 있었다. 그래서 파서는 **두 형식을 모두 받는다.** 원천이 되돌리거나 섞어도 안 깨진다.
+
+정규식에서 **숫자 부번호가 변형 문자보다 먼저 먹는 순서가 핵심이다** — `(?:-[0-9]+)?` 가 `-2` 를
+먼저 가져가야 `18-2` 가 `18`+변형 `2` 로 오독되지 않는다. 두 그룹의 순서를 바꾸면 조용히 깨진다.
+
+`arrange=A` 도 함께 뺐다. **A/C/D 는 정렬이 아니라 "대표이미지 있는 것만" 필터**다
+(`data-api-analysis.md`). 지금은 올레 항목이 전부 이미지를 가져 아무것도 걸러내지 않지만,
+이미지 없는 코스가 등록되는 날 조용히 사라진다. 한 페이지(`totalCount=33` < `numOfRows=100`)를
+맵으로 모으므로 정렬은 결과에 영향이 없다.
+
+- **기본은 포털에서 직접 내려받는다** (#441). `atchFileId` 와 바이트 수가 직전과 같으면
+  받지도 적재하지도 않는다. `forceImport=true` 면 같은 파일도 다시 적재한다
+- 포털이 막히면 `OLLE_COURSE_CSV_PATH`(기본 `data/olle_course.csv`) 우회 파일로 물러난다.
+  **원본이 CP949 라도 어댑터가 판별해 읽는다** — UTF-8 엄격 디코딩 실패 시 MS949 로 되읽는다
+- 우회 적재는 포털 스냅샷 대신 **우회 행**(`file_id='LOCAL_FALLBACK'`)을 남긴다 (#887). 우회 파일을 포털 판본처럼
+  남기면 다음 실행이 포털을 보지 않고 건너뛰고, 아무것도 남기지 않으면 포털 복귀 첫 실행이 마지막 포털 적재분과
+  같은 파일로 보고 건너뛴다. 직전 행이 우회 행이면 같은 파일이어도 적재한다 — 규칙은 문화정보원과 같은
+  `SourceFileSnapshotRule`
+- **다운로드 주소는 상세 페이지 버튼 경로로 얻는다** (#876). `fn_fileDataDown(...)` 인자 →
+  `POST /tcs/dss/selectFileDataDownload.do` → `fileDownload.do?atchFileId=…`. 페이지의 JSON-LD 는
+  제공기관 설명 문구의 따옴표 때문에 JSON 으로 읽히지 않아(2026-09-23) 더 쓰지 않는다 — 실측과
+  판단은 `data-refresh-guide.md` §5 "올레 포털", 요청·응답은 `data-api-analysis.md` 10절
+- 우회 여부는 `walk_course_import_rows{source="OLLE",result="fallback"}` 1/0 게이지로 드러난다
+  (`observability-guide.md`). 스냅샷 키는 `atchFileId` 그대로라 기존 스냅샷이 이어진다
+- 우회에서 포털로 돌아온 뒤 `forceImport=true` 를 따로 돌릴 필요는 없다 (#887 이전에는 운영 절차였다).
+  예외는 #887 배포 전에 우회로 적재된 환경과, 우회 적재가 도중에 실패한 경우다 (`data-refresh-guide.md` §5)
+- `walk_course` 스키마 원천은 tour-service 의 `WalkCourseEntity` 다 — 로컬에서는 tour-service 를
+  먼저 한 번 기동해 테이블을 만든다 (place 와 같은 소유 구조)
+- id 는 코스키에서 결정적으로 나와(`OlleCourseParser.walkCourseId`) 재실행이 멱등하다.
+  TourAPI 호출은 **잡 전체에서 1건**(searchKeyword2 한 페이지)이라 쿼터 부담이 없다
+
+## placeImportJob (TourAPI 장소 적재)
+
+```bash
+./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=placeImportJob areaCode=39 runAt=<ISO 시각>"
+```
+
+### 지역 키가 둘이다 — 나가는 조회 키와 안에서 쓰는 범위 키 (#726)
+
+**TourAPI 로 나가는 지역 필터는 `lDongRegnCd=50` 이고, 저장소 안의 적재 범위 키는 관광
+`areaCode=39` 다.** 둘을 같은 값으로 맞추려 하지 마라 — 서로 다른 체계이고, 섞으면 조용히 깨진다.
+
+- **나가는 쪽**: TourAPI 가 법정동 체계로 이관하며 제주 콘텐츠의 `areacode` 를 빈 값으로 비웠다.
+  `areaCode=39` 로 거르면 제주 콘텐츠의 58.6% 가 조회되지 않는데 **호출은 성공으로 끝난다**
+  (`data-api-analysis.md` §2 실측표). 그래서 `RegionCodeMapping` 으로 39 → 50 을 환산해 건다.
+  환산할 수 없는 지역이면 `REGION_NOT_SUPPORTED` 로 **즉시 실패시킨다** — 필터 없이 도는 것은
+  전국을 적재한다는 뜻이라 조용히 넘어가면 안 된다.
+- **안에서 쓰는 쪽**: `place.area_code` 는 원천 필드가 아니라 **적재 범위 키**다. delisting
+  (`source, area_code`), 병합(`findMergeCandidates`), tour-service 의 조회 필터
+  (`GET /api/v1/places?areaCode=39`) 가 전부 이 값으로 범위를 자른다. 그래서 원천이 `areacode` 를
+  비워 보내면 **요청 범위 값(39)으로 스탬프한다.** 안 그러면 새로 들어온 행이 `area_code = NULL`
+  이 되어 delist·병합·사용자 조회에서 통째로 보이지 않는다. `sigungu_code` 도 같은 이유로
+  `lDongSignguCd`(제주시 110 → 4, 서귀포시 130 → 3) 에서 채운다.
+- 원천이 값을 주면 그 값을 쓰고, 비었을 때만 스탬프한다. 구 체계 행의 값을 덮어쓰지 않는다.
+- 잡 파라미터는 계속 `areaCode=39` 다. 문화정보원·식약처 적재도 이미 `RegionCodeMapping` 으로
+  환산한 범위 값을 넣고 있어 세 원천이 같은 범위 키를 공유한다.
+
+### 재적재 절차 (#726 수정 반영 시)
+
+> **선행조건 — #753 을 먼저 반영한다.** 관광 API 적재가 `indoor`/`outdoor` 에 리터럴 `false` 를
+> 넣고 있어, 재적재하면 1,114행(dev 실측)에 "실외"라는 근거 없는 값이 새로 박힌다. 그 뒤에는 사후
+> UPDATE 가 유일한 길이다. 되돌리는 운영 SQL 과 확인 쿼리는 `data-refresh-guide.md` **§8** 에 있다.
+> **코드 머지 순서가 아니라 배치 실행 순서 기준이다** — #726 이 먼저
+> 머지돼도 상관없지만, 재적재 실행보다는 #753 이 앞서야 한다.
+>
+> **선행조건 둘 — #763 도 먼저 반영한다.** 같은 이유로 `tel` 이 걸려 있었다. 병합이 문화정보원에서
+> 옮겨 온 번호를 관광 API 재적재가 `tel = VALUES(tel)` 로 지우고 있었고, **재적재는 survivor 가
+> 2.4배로 느는 작업이라 고치기 전에 돌리면 손실 범위도 비례해 는다.** 되살리는 운영 SQL 은
+> `data-refresh-guide.md` **§9** 에 있다 — `indoor` 와 마찬가지로 `placeMergeJob` 재실행으로는
+> 복구되지 않는다.
+
+**dev 실측 — 재적재는 2026-09-21 에 끝났다. prod 는 아직이고, 아래 절차는 prod 런북으로 남는다.**
+
+| 항목 | 재적재 전 | 재적재 후 |
+| --- | --- | --- |
+| `place` 전체 | 1,315 | 2,447 |
+| TOUR_API 활성 | 985 | **2,099** |
+| 병합 쌍 (`merged_into_id IS NOT NULL`) | 54 | **101** |
+| `walk_course` 좌표 보유 | 4 / 29 | **29 / 29** |
+
+타입별 활성(재적재 후): 관광지(12) 560 · 문화시설(14) 98 · 레포츠(28) 137 · 숙박(32) 210 ·
+쇼핑(38) 395 · 음식점(39) 699. 여행코스(25)는 0 이고(원천에 제주 여행코스가 없다) 축제(15)는
+적재 대상이 아니다. **#726 본문의 원천 실측표와 정확히 일치한다** — 적재가 원천을 다 가져왔다는 뜻이다.
+
+새로 보이게 된 1,114건은 **기존 행을 건드리지 않았다.** 근거는 식별자 전략이다 —
+`PlaceIdFactory` 가 TourAPI 행의 id 를 `contentId` 로 결정하고 고유 키가 `(source, source_key)`
+라, 새 콘텐츠는 전부 INSERT 이고 기존 985건은 같은 행에 UPDATE 된다 (`merged_into_id` 는
+upsert 가 건드리지 않아 기존 병합이 풀리지 않는다 — 병합 쌍 54 → 101 은 3번의 `placeMergeJob`
+이 새로 접은 것이다).
+
+1. `placeImportJob` 을 돌린다. 기존 행은 `synced_at` 이 갱신되고 `delisted_at` 은 NULL 로 되살아난다.
+2. **delisting 은 안전하다.** 적재(2,099) > 직전 활성(985) 이라 급감 가드에 걸리지 않고,
+   전량 적재가 성공하면 `synced_at < runStartedAt` 인 행이 거의 없어 내려갈 행도 없다.
+   적재가 중간에 실패하면 예외가 파사드까지 올라가 delisting 자체가 실행되지 않는다.
+3. **`placeMergeJob` 을 반드시 이어 돌린다.** 지금까지 짝이 될 TourAPI 행이 없어 단독으로 남아 있던
+   문화정보원 행들이 이때 흡수된다. 즉 **화면에 보이는 장소 수는 새로 들어온 만큼 그대로 늘지 않는다**
+   — 일부는 기존 중복을 접는 데 쓰인다. 병합을 건너뛰면 같은 장소가 두 행으로 보인다.
+   **단 이미 병합된 쌍은 다시 판정하지 않는다** — 후보 조회가 `merged_into_id IS NULL` 로 거르기
+   때문이다. 새로 들어온 TourAPI 행이 기존 쌍보다 더 가까운 짝이어도 그 쌍은 그대로 남는다.
+   데이터를 잃는 것은 아니지만, **재실행으로 기존 병합이 개선되리라 기대하면 안 된다.**
+4. 운영 DB 에 직접 SQL 을 쓰지 않는다. 위 세 잡의 재실행만으로 수렴한다 (전부 멱등).
+   **다만 #753 · #763 처럼 "병합이 옮겨 둔 값을 적재가 덮어쓰는" 결함을 되돌릴 때는 예외다** —
+   그쪽은 `placeMergeJob` 재실행으로 복구되지 않는다(위와 같은 이유로 이미 병합된 쌍이 후보에서
+   빠진다). 일회성 `UPDATE JOIN` 이 필요하며 절차는 `data-refresh-guide.md` §8 에 있다.
+
+**잡이 `PLACE_IMPORT_023`(적재 건수가 기대 범위를 벗어났습니다) 으로 끝나면** 새로 들어온 절대
+건수 가드에 걸린 것이다 (`place-import-volume.min-rows` / `max-rows`, 기본 **1,680 / 4,200**).
+하한은 원천 필터가 조용히 어긋난 경우를, 상한은 지역 필터가 풀려 전국이 들어오거나 같은 장소가
+여러 행으로 부푸는 경우를 잡는다.
+
+**값은 숫자부터 고른 것이 아니라 "몇 % 어긋나면 신호인가" 에서 끌어냈다.** 기준선은 실측 총량
+2,099 다 (`2,124 - 축제(15) 25`, 여행코스(25)는 0).
+
+| | 신호로 보는 선 | 값 |
+| --- | --- | --- |
+| 하한 | 실측 대비 **20% 감소** | `floor(2,099 x 0.8) = 1,679` → **1,680** |
+| 상한 | 실측 대비 **2배** | `2,099 x 2 = 4,198` → **4,200** |
+
+- **왜 20% 인가.** 이 가드가 잡을 것은 "타입 하나가 빠짐" 이 아니라 **원천이 통째로 어긋남**이다.
+  타입 단위 사고는 이미 둘이 본다(0건 WARN, delist 타입 스코프). 20% 선은 가장 큰 두 타입
+  (음식점 699 = 33% · 관광지 560 = 27%)이 통째로 빠지는 것을 잡고, #726 의 880건(-58%)은 여유 있게 잡는다.
+- **왜 더 조이지 않는가.** 원천의 정상 변동 폭을 아직 한 번밖에 재지 못했다. 10%(1,889)로 조이면
+  계절 변동 한 번에 잡이 멈추는데, 이 가드는 실패 시 **뒤따르는 스텝(이미지·운영시간·delist)까지
+  멈춘다.** 놓치는 비용보다 잘못 멈추는 비용이 큰 자리다. **두 번째 실측이 쌓이면 다시 조인다.**
+- **왜 상한을 20,000 에서 내렸는가.** 20,000 은 실측의 9.5배라 "전국 유입(수만 건)" 만 잡고, 총량이
+  2~3배로 부푸는 사고(예: `source_key` 가 갈려 같은 장소가 여러 행으로 들어옴)는 그냥 통과시켰다.
+  2배 선이면 그것도 걸린다. 제주 원천이 정상적으로 두 배가 되는 일은 없고, 된다면 그 자체가
+  사람이 봐야 하는 변화다.
+- **부분 실행은 이 가드를 타지 않는다** (`fullRun` 에서만 부른다). contentType 몇 개만 돌리는 수동
+  실행이 하한에 걸릴 걱정은 없다.
+- 급할 때는 `PLACE_IMPORT_MIN_ROWS` / `PLACE_IMPORT_MAX_ROWS` 로 덮는다. 다만 뒤집힌 범위
+  (min >= max)는 기동에서 죽는다.
+
+이 가드는 **총합**만 본다 — 타입 하나가 통째로 0건인 실행은 바로 아래의 delist 범위 축소가 막는다.
+
+**delist 범위는 `(source, area_code, content_type_id)` 다 (#726).** 적재가 지역·타입 단위로 도는데
+delist 가 타입을 보지 않으면, 한 타입이 0건으로 들어온 실행 하나가 그 타입의 기존 행을 **전부**
+내린다. 그래서 delist 대상은 **이번 실행에서 1건 이상 들어온 contentType** 뿐이고, 0건인 타입은
+범위에서 빠져 손대지 않는다. 급감 가드의 분모(활성 건수)도 같은 타입 집합으로 센다 — 범위가
+어긋나면 비율 비교가 의미를 잃는다.
+
+- `place import returned 0 rows for contentType=COURSE. no active rows.` (INFO) — **정상이다.**
+  여행코스(25)는 `areaCode=39`·`lDongRegnCd=50` 어느 쪽으로 물어도 `totalCount=0` 이다.
+  원천에 제주 여행코스가 없다.
+- `place import returned 0 rows for contentType=... but N active rows exist` (WARN) — **진짜 신호다.**
+  DB 에 활성 행이 N 개 남아 있는데 원천이 0건을 줬다. 자동으로 내리지 않는다("원천이 지웠다"와
+  "원천이 깨졌다"를 구분할 수 없다). 그 타입을 `contentTypeIds` 파라미터로 단독 실행해 원천 쪽부터
+  확인한다.
+- `place delist skipped. reason=no_content_type_imported` (WARN) — 전 타입 0건. 원천을 통째로 못 읽은
+  상태로 보고 delist 를 아예 돌리지 않는다.
+
+**`placeImageBackfillJob` 이 `PLACE_IMPORT_015`(관광 지역코드로 옮길 수 없는 지역입니다) 로 끝나면**
+`areaCode` 파라미터가 관광 코드가 아니다(법정동 코드 50 을 넣는 실수가 흔하다). 예전에는 이 경우
+대상마다 예외를 삼키며 `COMPLETED` + `backfilled=0` 으로 끝나 "매칭이 안 됐나 보다"로 읽혔다.
+지금은 루프 전에 막는다 — `areaCode=39` 로 다시 돌린다.
+
+**쿼터를 먼저 확인하고 날짜를 고른다.** 대상이 약 964곳에서 2,099곳으로 늘면서 목록 호출이
+17 → 약 24콜로 늘고, 장소당 1콜인 두 상세 단계의 전량 순환이 길어졌다 — 이미지는 3주에서
+약 6주(상한 380), 운영시간은 최대 7주(상한 300, 대상이 5종뿐이라 실제로는 더 짧다)다.
+**이미지 상한을 400 → 380 으로 내렸다** — 400 을 그대로 두면 아래 최악 합이 1,001 로 일 한도를
+넘긴다. 목록 콜 24 는 `2,099 ÷ 100 = 23콜 + 여행코스(25) 1콜`이고 원천 건수가 늘면 같이 늘므로
+**첫 재적재 실측으로 24콜이 확인됐다** — 타입별 페이지 합이 `6+1+2+3+4+7 = 23` 이고 여행코스가 1 이다.
+수동 이미지 백필(276콜)과 같은 날에 겹치지 않게 잡는 것이 안전하다.
+→ 새로 들어온 장소들은 **당분간 사진·운영시간 없이 보인다.** 결함이 아니라 쿼터 순환이다.
+
+목록 적재(`placeImportStep`) 뒤에 **장소당 1회 상세 호출**을 도는 단계 둘이 이어진다. 둘 다
+`place` 테이블의 TourAPI 원천 행이 대상 목록이라 목록 적재 뒤에 와야 한다. **둘의 순서는 곧
+예산 우선순위다** — 하루 한도가 하나뿐이라 먼저 도는 쪽이 예산을 갖는다.
+
+1. **운영시간(`placeIntroImportStep`, #361)** — detailIntro2 를 불러 place_intro 를 upsert 하고
+   `weekly_hours_spec`·`open24` 를 함께 구조화한다. 장소 상세의 `intro.openNow` 가 이 값으로
+   판정된다. 운영시간 필드가 없는 숙박(32)·여행코스(25)·축제(15)는 호출하지 않는다.
+   커버리지는 적재 로그의 `withWeeklyHoursSpec`·`open24` 로 본다
+   (`place-data-integration.md` §10-3). **아직 없는 데이터라 예산을 먼저 쓴다**
+2. **추가 이미지(`placeImageImportStep`, #478)** — detailImage2 를 장소당 1회 불러 place_image 를
+   교체(멱등)한다. 문화정보원·식약처 원천은 추가 이미지 API 가 없어 대상에서 빠지며, 그 장소들의
+   상세 갤러리는 tour-service 의 대표 이미지 폴백이 담당한다. 실행당 상한
+   (`place-image-import.max-calls-per-run`, 기본 380)을 두고 **한 번도 부르지 않은 곳 먼저 →
+   `place.image_synced_at` 오래된 순 → id** 로 고른다 — 전량(2,099곳) 커버는 약 6주 순환이다.
+   이미 적재돼 있는 데이터의 갱신이라 **한도에 닿으면 남은 장소를 건너뛰고 조용히 끝낸다** —
+   기존 행이 그대로 남으므로 잃는 것은 이번 주 갱신뿐이다
+
+**쿼터가 이 잡의 제약이다.** 개발계정은 일 1,000건인데 장소당 1콜인 단계가 둘이라 둘 다
+전량(각 2,099콜)을 돌면 넘친다. 그래서 **두 단계 모두** 실행당 상한 + 증분 대상 선정으로 나눠
+덮는다. 같은 날 최악 합은 `24(목록) + 300(운영시간) + 380(이미지) + 276(수동 이미지 백필) +
+1(올레) = 981` 다 (#726 기준. 이전 964곳 기준 계산은
+`features/478-incremental-image-import.md` 에 그대로 남아 있다).
+
+상한 합이 예산 안이라 평상시에는 둘 다 제 몫을 받지만, 모자란 날에는 **먼저 도는 쪽이 이긴다** —
+운영시간이 아직 없는 데이터라 앞에 둔다.
+
+**커서는 원천에서 확정 답을 받았을 때만 전진한다.** 빈 응답(이미지 0장)과 한 곳 실패도 확정
+답이라 커서를 민다 — 안 밀면 원천이 갤러리를 주지 않는 장소(약 30%)와 영영 실패하는 장소가
+순환 앞자리를 영원히 차지해 나머지 장소의 차례가 오지 않는다.
+
+서킷 오픈·키 누락은 한 곳 실패로 넘기지 않고 단계를 즉시 끝낸다 — 남은 대상을 다 돌아도 결과가
+같은데, 계속 가면 상한만큼의 장소가 아무것도 받지 못한 채 커서만 밀려 한 바퀴 뒤로 간다.
+**두 단계가 같은 판정을 공유한다** (`PlaceImportErrorCode.stopsTheStep`).
+
+**일일 한도 초과**(`TOUR_API_QUOTA_EXCEEDED`)는 그 둘과 다르게 다룬다. 포털이 HTTP 200 + 오류
+본문으로 답해 서킷이 세지 못하므로 응답 코드로 따로 구분하고, 운영시간 단계는 단계를 실패로
+끝내지만 **이미지 단계는 커서를 밀지 않은 채 조용히 멈춘다** — 그 단계에서는 예산 소진이 정상
+경로다. 어느 쪽이든 채우지 못한 장소는 순환 앞자리에 그대로 남는다.
+
+`placeImageBackfillJob` (독립 실행) — 문화정보원·식약처 원천에는 이미지 필드 자체가 없어,
+같은 장소가 TourAPI 에 있으면 키워드 검색으로 대표 이미지를 빌려 채운다. **정규화 제목 일치 +
+좌표 500m** 이중 검증을 통과한 곳만 채우며(틀린 이미지 > 없는 이미지), 못 채운 곳은 화면
+placeholder 가 담당한다. culture/petRestaurant 적재 이후에 돌려야 하고 재실행은 멱등이다.
+
+## congestionImportJob (관광지 집중률)
+
+```bash
+./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=congestionImportJob"
+```
+
+- **`placeImportJob` 이후에 돌려야 한다.** 장소가 비어 있으면 전부 UNMATCHED 로 적재되고
+  적합도 응답에서 혼잡도가 계속 빠진다.
+- 30일 rolling 원천이라 **일 1회 주기 실행**이 전제다. 같은 날짜가 다시 오면 예측이 갱신된
+  것이므로 upsert 로 덮어쓴다 — 의도한 동작이다.
+- 이 API 는 관광 areaCode(39)가 아니라 **법정동 코드**(제주=50, 제주시=50110, 서귀포시=50130)를
+  쓴다. 두 체계를 섞으면 조용히 0건이 온다 (`JejuLegalRegion` 으로 못박았다).
+- **지역 단위로 실패를 격리한다.** 제주시가 실패해도 서귀포시 적재는 진행한다.
+- 명칭 매칭은 `PlaceNameMatcher`(장소 병합에 쓰던 것)를 **재사용**한다. 같은 문제에 다른
+  정규화 규칙을 쓰면 "같은 곳"의 뜻이 두 곳에서 갈라진다.
+- 좌표로 보정할 수 없다 — **이 원천에 좌표가 없다.** 그래서 완전일치를 우선하고, 부분일치는
+  후보가 정확히 하나일 때만 받는다. 여럿이면 매칭하지 않는다 — 찍어서 맞히면 이득이 작고
+  틀리면 엉뚱한 장소에 혼잡도가 붙는다. 잘못 이은 혼잡도는 없는 혼잡도보다 나쁘다.
+- **매칭 실패도 저장한다**(`match_type=UNMATCHED`, `place_id=NULL`). 실패를 행 없이 버리면
+  커버리지가 얼마인지 아무도 모르게 되고, 수동 보정 대상 목록도 사라진다.
+- 매칭률은 배치 로그로 남긴다. 커버리지가 조용히 떨어지는 것이 이 방식의 가장 큰 위험이다.

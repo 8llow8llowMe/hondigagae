@@ -1,0 +1,199 @@
+# 혼디가개 batch-service 배포 정의.
+#
+# 배치:
+#   dev  -> main-server (192.168.0.11), 호스트 포트 7080  (혼디가개 dev 는 7xxx 대역)
+#   prod -> backend-1   (192.168.0.13), 호스트 포트 5080  (혼디가개 prod 는 5xxx 대역)
+#
+#   BossPickSeoul 이 dev 6xxx / prod 9xxx 를 이미 점유하고 있어 같은 호스트에 올리려면
+#   대역을 달리해야 한다. (Infra README §4 배치 원칙 5번)
+#   storage(192.168.0.12)에는 올리지 않는다 — 총 1.9GB / swap 0 에 nginx 가 함께 있어
+#   OOM 이 나면 전 도메인의 인그레스가 같이 죽는다.
+#
+# 컨테이너 안에서 앱이 듣는 포트는 dev/prod 가 같다(8080). 호스트 포트만 다르다.
+# 서비스 간 호출과 Eureka 등록은 같은 호스트의 8llow8llowme-net 브리지 안에서 컨테이너명으로 이뤄지므로,
+# SERVICE_DISCOVERY_HOSTNAME 에는 사설 IP 가 아니라 discovery **컨테이너명**을 넣는다.
+
+# 데이터 파일 마운트 (우회용)
+#   문화정보원 CSV 는 이제 배치가 포털에서 직접 내려받는다 (#379). 받은 파일은 컨테이너 임시
+#   디렉터리로 흘리므로 /app/data 에 쓰지 않는다 - 이 볼륨은 :ro 라 애초에 쓸 수도 없다.
+#
+#   BATCH_DATA_DIR 은 **포털이 막혔을 때의 우회용 파일**을 담는 곳이다. 비어 있어도 컨테이너는
+#   뜨고 적재도 된다. 우회 파일을 두려면 배포 호스트에 한 번 내려받아 둔다.
+#     mkdir -p ~/deploy/hondigagae/backend/data
+#     # data.go.kr/data/15111389 에서 받은 CSV 를 pet_culture.csv 로 저장
+#   포털도 막히고 이 파일도 없을 때만 cultureFacilityImportJob 이 CULTURE_CSV_NOT_FOUND 로
+#   실패한다. 컨테이너 기동과 다른 잡에는 영향이 없다.
+#
+#   prod 스키마: import_source_snapshot 은 spring.sql.init.mode=never 라 애플리케이션이 만들지
+#   않는다. 배포 전에 런북으로 적용한다 (backend/docs/deploy-guide.md "DB 스키마 준비").
+#
+# 배포와 적재는 분리한다
+#   이 서비스는 기동 시 잡을 자동 실행하지 않는다(spring.batch.job.enabled=false).
+#   적재는 몇 분씩 걸리고 외부 API 상태에 좌우되므로 배포 파이프라인에 넣지 않는다.
+#   주기 실행은 프로세스 안 Quartz 가 맡는다(#378) — dev 기본 켬, 스위치는 BATCH_SCHEDULE_ENABLED.
+#   자세한 절차는 backend/docs/data-refresh-guide.md.
+#
+#   수동으로 한 잡만 돌릴 때. 같은 컨테이너 안에 두 번째 JVM 이 뜨므로 메모리 상한을 낮추고
+#   웹·Eureka 를 끈다(8080 재바인딩·중복 등록 방지):
+#     docker exec hondigagae-batch-service-dev \
+#       java -XX:MaxRAMPercentage=25 -XX:InitialRAMPercentage=5 -jar /app/batch-service.jar \
+#         --spring.main.web-application-type=none \
+#         --eureka.client.enabled=false \
+#         --spring.batch.job.enabled=true \
+#         --spring.batch.job.name=petRestaurantImportJob region=제주 runAt=2026-09-14T03:00:00
+
+x-batch-service-environment: &batch_service_environment
+  TIME_ZONE: ${TIME_ZONE}
+  # prod 로 띄우면서 이 값이 dev 로 남아 있으면 ddl-auto:update 로
+  # 운영 스키마가 배포마다 자동 변경된다. 환경별 Vault secret 에서 반드시 갈라 둔다.
+  SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+  SPRING_APPLICATION_NAME: ${BATCH_SERVICE_APP_NAME}
+  BATCH_SERVICE_PORT: ${BATCH_SERVICE_PORT}
+  # 같은 호스트 같은 브리지 안이라 컨테이너명으로 해석된다.
+  # 예) dev = hondigagae-service-discovery-dev / prod = hondigagae-service-discovery-prod
+  SERVICE_DISCOVERY_HOSTNAME: ${SERVICE_DISCOVERY_HOSTNAME}
+  # 컨테이너 내부 포트(8761)다. 호스트 포트(7761/5761)가 아니다.
+  SERVICE_DISCOVERY_PORT: ${SERVICE_DISCOVERY_PORT}
+  # tour 와 같은 스키마를 본다. 적재 대상이 tour 의 place 테이블이기 때문이다.
+  BATCH_DB_URL: ${BATCH_DB_URL}
+  DB_USERNAME: ${DB_USERNAME}
+  DB_PASSWORD: ${DB_PASSWORD}
+  # 한국관광공사. 공공데이터포털 "디코딩(원문)" 키.
+  # 비면 관광 데이터 적재가 전부 실패한다.
+  TOUR_API_SERVICE_KEY: ${TOUR_API_SERVICE_KEY}
+  TOUR_API_BASE_URL: ${TOUR_API_BASE_URL:-https://apis.data.go.kr/B551011}
+  # 식약처 원천이 주소만 주므로 좌표를 여기서 채운다. 일 40,000건 무료.
+  # 비면 반려동물 동반 음식점이 좌표 없이 적재돼 반경 검색에 잡히지 않는다.
+  VWORLD_API_KEY: ${VWORLD_API_KEY}
+  VWORLD_BASE_URL: ${VWORLD_BASE_URL:-https://api.vworld.kr}
+  # 비우면 식약처 원천에서 xlsx 를 직접 내려받는다. 인증키는 없다.
+  MFDS_PET_RESTAURANT_FILE_PATH: ${MFDS_PET_RESTAURANT_FILE_PATH:-}
+  # 아래 volumes 로 붙인 경로다. 포털에서 받지 못했을 때만 읽는 우회용 파일이다 (#379).
+  # Dockerfile 에 WORKDIR 이 없어 상대 경로는 / 기준으로 풀리므로 절대 경로로 준다.
+  CULTURE_FACILITY_CSV_PATH: ${CULTURE_FACILITY_CSV_PATH:-/app/data/pet_culture.csv}
+  # BATCH_SCHEDULE_ENABLED 는 이 공통 anchor 에 두지 않는다. dev/prod 기본값이 다르고,
+  # compose 의 `:-` 는 값을 부재가 아니라 빈 문자열로 만들어 Spring 기본값이 먹지 않기 때문이다.
+  # 각 서비스의 environment 에서 실제 값을 준다.
+  # 장소 파이프라인 cron 도 같은 이유로 각 서비스에 둔다 — dev/prod 기본 요일이 다르다 (#1326).
+  # [선택] 올레 적재 cron (Quartz, 초부터 6~7 필드). 기본 월 05:00 KST — application.yml 기본값과 같다.
+  # 전에는 여기서 넘기지 않아 .env.example 의 BATCH_SCHEDULE_OLLE_CRON 이 효과가 없었다 (#1326).
+  BATCH_SCHEDULE_OLLE_CRON: "${BATCH_SCHEDULE_OLLE_CRON:-0 0 5 ? * MON}"
+  # [선택] 포털 자동 다운로드 스위치 (#379). 기본은 켬.
+  # .env 에 키만 있고 값이 비면 컨테이너에 빈 문자열이 들어가 yml 의 ${...:true} 가 아니라 "" 가
+  # 이긴다. 그 빈 문자열은 래퍼 타입 Boolean 에 null 로 떨어지고 CultureFacilityProperties 가
+  # 기본값 true 로 접으므로 기동은 깨지지 않는다(CultureFacilityPropertiesTest). 여기에 :-true 를
+  # 두는 것은 그 접힘에 기대지 않고 "켠 것이 의도"임을 배포 파일에서도 읽히게 하려는 것이다.
+  CULTURE_FACILITY_DOWNLOAD_ENABLED: ${CULTURE_FACILITY_DOWNLOAD_ENABLED:-true}
+  # [선택] 내려받을 디렉터리. 비면 컨테이너 임시 디렉터리(java.io.tmpdir). 30MB 가 들어간다.
+  CULTURE_FACILITY_DOWNLOAD_DIR: ${CULTURE_FACILITY_DOWNLOAD_DIR:-}
+  # 올레 CSV 우회용. 포털에서 받지 못했을 때만 읽는다.
+  OLLE_COURSE_CSV_PATH: ${OLLE_COURSE_CSV_PATH:-/app/data/olle_course.csv}
+  OLLE_COURSE_DOWNLOAD_ENABLED: ${OLLE_COURSE_DOWNLOAD_ENABLED:-true}
+  OLLE_COURSE_DOWNLOAD_DIR: ${OLLE_COURSE_DOWNLOAD_DIR:-}
+  # [선택] TourAPI 운영시간(detailIntro2) 수집의 실행당 호출 상한 (#361). 기본 300.
+  # 개발계정 쿼터가 일 1,000건이라 함부로 올리지 않는다. 이미지 단계도 상한을 갖는다 (#478).
+  # 실제로 성공하는 호출 수는 이 상한이 아니라 그날 남은 예산이 정한다 (place-data-integration.md §10-3).
+  PLACE_INTRO_MAX_CALLS_PER_RUN: ${PLACE_INTRO_MAX_CALLS_PER_RUN:-300}
+  # [선택] TourAPI 추가 이미지(detailImage2) 수집의 실행당 호출 상한 (#478). 기본 380 (#726 에서 400 → 380).
+  # 24(목록) + 300(운영시간) + 380(이미지) + 276(수동 백필) + 1(올레) = 981 로 일 1,000건 안이다.
+  # lDongRegnCd 로 조회하면서 대상이 약 964곳 → 2,099곳이 됐고 목록 콜도 17 → 24 이상으로 늘었다.
+  # 전량 커버는 3주 → 약 6주 순환이다. 운영계정 키를 받으면 이 값만 올린다.
+  PLACE_IMAGE_MAX_CALLS_PER_RUN: ${PLACE_IMAGE_MAX_CALLS_PER_RUN:-380}
+  # [선택] 반려동물 동반 조건(detailPetTour2) 적재의 실행당 호출 상한 (#877). 기본 350.
+  # 쿼터는 KorService2 와 따로 센다. 제주 동반 정보 336건이라 평소에는 걸리지 않는 천장이다.
+  PET_TOUR_MAX_CALLS_PER_RUN: ${PET_TOUR_MAX_CALLS_PER_RUN:-350}
+  # [선택] TourAPI 장소 전량 적재의 건수 가드 (#726, #828 로 조였다). 벗어나면 잡을 실패시킨다.
+  # 2026-09-21 첫 재적재 실측 2,099 기준으로, 하한은 20% 감소선(1,680) 상한은 2배선(4,200)이다.
+  # 근거는 batch-service.md 재적재 절차. min-rows < max-rows 가 아니면 기동에서 죽는다.
+  PLACE_IMPORT_MIN_ROWS: ${PLACE_IMPORT_MIN_ROWS:-1680}
+  PLACE_IMPORT_MAX_ROWS: ${PLACE_IMPORT_MAX_ROWS:-4200}
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "5m"
+    max-file: "2"
+
+services:
+  batch-service-dev:
+    image: hondigagae-batch-service:latest
+    container_name: hondigagae-batch-service-dev
+    labels:
+      observability.project: hondigagae
+      observability.group: service
+      observability.service: batch-service
+      observability.env: dev
+      observability.application: ${BATCH_SERVICE_APP_NAME}
+      observability.deployment: hondigagae-batch-service-dev
+    build:
+      context: .
+      dockerfile: batch-service.Dockerfile
+    ports:
+      - "${BATCH_SERVICE_PORT_DEV}:${BATCH_SERVICE_PORT}" # host:container
+    environment:
+      <<: *batch_service_environment
+      # 프로세스 안 Quartz 스케줄 (#378). dev 는 기본 켬.
+      # compose 의 `:-` 는 값을 빈 문자열로 만들어 Spring 쪽 `${...:false}` 기본값이 먹지 않으므로
+      # 여기서 실제 값을 준다. "true" 가 아닌 값은 전부 꺼짐이다.
+      BATCH_SCHEDULE_ENABLED: ${BATCH_SCHEDULE_ENABLED:-true}
+      # 장소 파이프라인 cron. dev 는 월 03:00 KST — prod(화)와 TourAPI 일 한도를 같은 날 나눠 쓰지 않게 한다 (#1326).
+      BATCH_SCHEDULE_PLACE_PIPELINE_CRON: "${BATCH_SCHEDULE_PLACE_PIPELINE_CRON_DEV:-0 0 3 ? * MON}"
+    volumes:
+      # 포털 실패 시 우회용 CSV. 읽기 전용으로만 붙인다 - 내려받은 파일은 여기에 쓰지 않는다.
+      # 값이 비면 볼륨 스펙이 ':/app/data:ro' 가 돼 compose config 가 원인을 말하지 않는 에러로 죽는다.
+      # `:?` 로 무엇이 빠졌는지를 배포 로그에 직접 찍는다 (#878).
+      - ${BATCH_DATA_DIR:?BATCH_DATA_DIR is empty - set the host CSV dir in Vault kv/hondigagae/backend/<env>/env}:/app/data:ro
+    # 컨테이너 메모리 상한. JVM heap 은 Dockerfile 의 MaxRAMPercentage 가 이 값을 기준으로 산정한다.
+    deploy:
+      resources:
+        limits:
+          memory: ${BATCH_SERVICE_MEM_LIMIT_DEV:-512m}
+    restart: unless-stopped
+    logging:
+      <<: *default-logging
+    networks:
+      - 8llow8llowme-net
+
+  batch-service-prod:
+    image: hondigagae-batch-service:latest
+    container_name: hondigagae-batch-service-prod
+    labels:
+      observability.project: hondigagae
+      observability.group: service
+      observability.service: batch-service
+      observability.env: prod
+      observability.application: ${BATCH_SERVICE_APP_NAME}
+      observability.deployment: hondigagae-batch-service-prod
+    build:
+      context: .
+      dockerfile: batch-service.Dockerfile
+    ports:
+      - "${BATCH_SERVICE_PORT_PROD}:${BATCH_SERVICE_PORT}" # host:container
+    environment:
+      <<: *batch_service_environment
+      # prod 기본은 끔이고, 켜는 것은 Vault 가 정한다 (2026-10-10 에 켰다, #1323).
+      # dev 와 같은 이유로 여기서 실제 값을 준다(빈 문자열이면 Spring 기본값이 먹지 않는다).
+      BATCH_SCHEDULE_ENABLED: ${BATCH_SCHEDULE_ENABLED:-false}
+      # 장소 파이프라인 cron. prod 는 화 03:00 KST (#1326).
+      # dev 와 prod 가 같은 TourAPI 키를 쓰고 한도는 상품당 일 1,000콜이다. 같은 날 돌면 둘이 한도를
+      # 나눠 써 한쪽이 상세(운영시간 · 이미지) 수집을 덜 하고 끝난다. 한도는 하루 단위라 요일만 갈라도 겹치지 않는다.
+      BATCH_SCHEDULE_PLACE_PIPELINE_CRON: "${BATCH_SCHEDULE_PLACE_PIPELINE_CRON_PROD:-0 0 3 ? * TUE}"
+    volumes:
+      # 포털 실패 시 우회용 CSV. 읽기 전용으로만 붙인다 - 내려받은 파일은 여기에 쓰지 않는다.
+      # 값이 비면 볼륨 스펙이 ':/app/data:ro' 가 돼 compose config 가 원인을 말하지 않는 에러로 죽는다.
+      # `:?` 로 무엇이 빠졌는지를 배포 로그에 직접 찍는다 (#878).
+      - ${BATCH_DATA_DIR:?BATCH_DATA_DIR is empty - set the host CSV dir in Vault kv/hondigagae/backend/<env>/env}:/app/data:ro
+    deploy:
+      resources:
+        limits:
+          memory: ${BATCH_SERVICE_MEM_LIMIT_PROD:-768m}
+    restart: unless-stopped
+    logging:
+      <<: *default-logging
+    networks:
+      - 8llow8llowme-net
+
+networks:
+  8llow8llowme-net:
+    name: 8llow8llowme-net
+    external: true

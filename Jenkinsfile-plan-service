@@ -1,0 +1,29 @@
+// 혼디가개 plan-service 배포 잡.
+// 여행 일정 소유. tour-service 를 내부 호출한다.
+//
+// Jenkins 멀티브랜치 파이프라인 이름: hondigagae-plan-service
+// 배포 대상 PR 라벨:                  backend-plan-service
+//   dev  -> main-server (192.168.0.11), 호스트 포트 7083
+//   prod -> backend-1   (192.168.0.13), 호스트 포트 5083
+def backendPipeline
+node('builder-backend') {
+    checkout scm
+    backendPipeline = load 'Jenkinsfile.backend-common.groovy'
+}
+
+backendPipeline.run([
+    serviceGroup       : 'service',
+    serviceName        : 'plan-service',
+    modulePath         : 'service:plan-service',
+    fsPath             : 'backend/service/plan-service',
+    dockerfile         : 'plan-service.Dockerfile',
+    composeFile        : 'docker-compose-plan-service.yml',
+    composeServiceName : 'plan-service',
+    containerNamePrefix: 'hondigagae-plan-service',
+    deploySubdir       : 'service/plan-service',
+    buildAgentLabel    : 'builder-backend',
+    deployAgentLabels  : [
+        dev : 'deploy-backend-dev',
+        prod: 'deploy-backend-prod'
+    ]
+])

@@ -1,0 +1,648 @@
+package com.hondigagae.domainlayer.plan.application.service.processor;
+
+import java.util.Collection;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlanItemCountQueryResult;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo;
+import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo.PetSuitabilityInfo;
+import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo.PlanDayWeatherInfo;
+import com.hondigagae.domainlayer.plan.application.port.out.PetConditionQueryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlaceSuitabilityQueryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQueryResult;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlaceSuitabilityQueryResult;
+import com.hondigagae.shared.travel.plan.PlanItemType;
+import com.hondigagae.domainlayer.plan.domain.enums.PlanDayWeatherUnavailableReason;
+import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
+import com.hondigagae.domainlayer.plan.domain.model.Plan;
+import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
+import com.hondigagae.domainlayer.plan.domain.model.PlanPetCondition;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+/**
+ * 다견 날씨 브리핑 검증.
+ *
+ * <p>고정하는 것은 넷이다.
+ * <ul>
+ *   <li><b>누구 기준인가</b> — 점수가 가장 낮은 아이. 화면이 "몽실이 기준" 이라고 말할 수 있어야 한다
+ *   <li><b>몇 번 부르는가</b> — 조건이 다른 아이 수만큼. 조건이 같으면(특성을 못 받아 전부 일반 조건이 됐을 때 포함) 한 번
+ *   <li><b>한 아이의 특성이 없어도</b> — 그 아이는 일반 조건으로 판정에 남고, 브리핑은 나간다
+ *   <li><b>못 낸 이유를 넷으로 가른다</b> — 지난 날짜 · 장소 미지정 · 예보 범위 밖 · 조회 실패 (#492).
+ *       뭉뚱그리면 지난 날짜에 "잠시 후 다시 시도" 라는 지켜지지 않을 안내가 나간다
+ * </ul>
+ *
+ * <p>"오늘" 은 {@link Clock} 으로 고정한다 — {@code DAY_1} 이 오늘이다. 시스템 시각을 쓰면
+ * 이 파일의 날짜가 지나는 순간 "지난 날짜" 분기가 모든 테스트를 삼킨다.
+ */
+class PlanWeatherProcessorTest {
+
+    private static final long PLAN_ID = 900L;
+    private static final long PLACE_ID = 100L;
+    private static final long MONGSIL = 2L;
+    private static final long BORI = 5L;
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+    private static final LocalDate DAY_1 = LocalDate.of(2026, 9, 12);
+    private static final Clock CLOCK = Clock.fixed(DAY_1.atStartOfDay(SEOUL).toInstant(), SEOUL);
+
+    private static final String SCORE_DESCRIPTION = "점수가 높을수록 날씨/동반 조건이 반려견에게 유리합니다.";
+
+    private static final PetConditionQueryResult HEAT_SENSITIVE = PetConditionQueryResult.builder()
+        .sizeType("SMALL").heatSensitive(true).build();
+    private static final PetConditionQueryResult ROBUST = PetConditionQueryResult.builder()
+        .sizeType("LARGE").build();
+
+    private StubPlanItemRepositoryPort planItemRepositoryPort;
+    private StubPetConditionQueryPort petConditionQueryPort;
+    private StubPlaceSuitabilityQueryPort placeSuitabilityQueryPort;
+    private StubPlanPetConditionRepositoryPort planPetConditionRepositoryPort;
+    private PlanWeatherProcessor processor;
+
+    @BeforeEach
+    void setUp() {
+        planItemRepositoryPort = new StubPlanItemRepositoryPort();
+        petConditionQueryPort = new StubPetConditionQueryPort();
+        placeSuitabilityQueryPort = new StubPlaceSuitabilityQueryPort();
+        planPetConditionRepositoryPort = new StubPlanPetConditionRepositoryPort();
+        processor = new PlanWeatherProcessor(
+            planItemRepositoryPort, petConditionQueryPort, planPetConditionRepositoryPort,
+            placeSuitabilityQueryPort, CLOCK);
+    }
+
+    private static Plan plan() {
+        return planOn(DAY_1);
+    }
+
+    /** 하루짜리 일정. 날짜를 옮겨 가며 일자 판정 사유를 가른다. */
+    private static Plan planOn(LocalDate date) {
+        return Plan.builder()
+            .id(PLAN_ID).memberId(1L).petId(MONGSIL).areaCode("39").title("몽실이·보리와 제주 당일치기")
+            .startDate(date).endDate(date).status(PlanStatus.DRAFT).build();
+    }
+
+    private static PlanDayWeatherInfo firstDay(PlanWeatherInfo info) {
+        return info.days().get(0);
+    }
+
+    @Test
+    @DisplayName("점수가 가장 낮은 아이가 그날의 기준이 된다 — 한 마리라도 힘든 날이면 그날은 힘든 날이다")
+    void basisIsTheLowestScoringPet() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE, BORI, ROBUST);
+        placeSuitabilityQueryPort.scoreOf = condition -> condition.heatSensitive() ? 42 : 81;
+
+        PlanWeatherInfo info = processor.brief(1L, plan(), List.of(MONGSIL, BORI));
+
+        PlanDayWeatherInfo day = firstDay(info);
+        assertThat(day.basisPetId()).isEqualTo(MONGSIL);
+        assertThat(day.suitability().score()).isEqualTo(42);
+        assertThat(day.petSuitabilities()).extracting(PetSuitabilityInfo::petId).containsExactly(MONGSIL, BORI);
+        assertThat(day.petSuitabilities()).extracting(PetSuitabilityInfo::score).containsExactly(42, 81);
+        assertThat(info.petIds()).containsExactly(MONGSIL, BORI);
+        assertThat(info.petConditionApplied()).isTrue();
+    }
+
+    /**
+     * 등급 점수 해석 문장이 out-port 계약에서 application 표현까지 건너오는지 고정한다 (#759).
+     *
+     * <p>adapter 가 옮기지 않으면 어디서도 실패하지 않은 채 {@code null} 로 남는다. 기준
+     * 반려견의 {@code suitability} 와 아이별 요약은 <b>서로 다른 매핑</b>이라 한쪽만 이어지는
+     * 일이 실제로 있었다 — 둘 다 찍는다.
+     */
+    @Test
+    @DisplayName("등급 점수 해석 문장이 기준 반려견·아이별 요약 모두로 건너온다")
+    void levelScoreDescriptionCrossesThePortBoundary() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE, BORI, ROBUST);
+
+        PlanDayWeatherInfo day = firstDay(processor.brief(1L, plan(), List.of(MONGSIL, BORI)));
+
+        assertThat(day.suitability().levelScoreDescription()).isEqualTo(SCORE_DESCRIPTION);
+        assertThat(day.petSuitabilities())
+            .extracting(PetSuitabilityInfo::levelScoreDescription)
+            .containsOnly(SCORE_DESCRIPTION);
+    }
+
+    @Test
+    @DisplayName("조건이 다른 아이 수만큼만 tour-service 를 부른다 — 두 마리면 하루에 두 번")
+    void callsOncePerDistinctCondition() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE, BORI, ROBUST);
+
+        processor.brief(1L, plan(), List.of(MONGSIL, BORI));
+
+        assertThat(placeSuitabilityQueryPort.calls).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("조건이 같은 아이들은 한 번만 묻는다 — 특성을 못 받아 전부 일반 조건이 됐을 때 마리 수만큼 반복하지 않는다")
+    void deduplicatesIdenticalConditions() {
+        petConditionQueryPort.conditions = Map.of(); // auth-service 장애: 아무 특성도 못 받았다
+
+        PlanWeatherInfo info = processor.brief(1L, plan(), List.of(MONGSIL, BORI));
+
+        assertThat(placeSuitabilityQueryPort.calls).isEqualTo(1);
+        assertThat(info.petConditionApplied()).isFalse();
+        // 판정은 두 마리 몫으로 나눠 준다 — 응답의 아이 목록은 요청한 아이 전부다
+        assertThat(firstDay(info).petSuitabilities()).extracting(PetSuitabilityInfo::petId).containsExactly(MONGSIL, BORI);
+        assertThat(firstDay(info).basisPetId()).isEqualTo(MONGSIL);
+    }
+
+    @Test
+    @DisplayName("한 아이의 특성만 없으면 그 아이는 일반 조건으로 판정에 남는다 — 특성 부재가 그 아이를 지우지 않는다")
+    void missingConditionFallsBackToUnknownForThatPet() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        placeSuitabilityQueryPort.scoreOf = condition -> condition.heatSensitive() ? 42 : 70;
+
+        PlanWeatherInfo info = processor.brief(1L, plan(), List.of(MONGSIL, BORI));
+
+        assertThat(placeSuitabilityQueryPort.calls).isEqualTo(2);
+        assertThat(firstDay(info).petSuitabilities()).extracting(PetSuitabilityInfo::score).containsExactly(42, 70);
+        assertThat(info.petConditionApplied()).isTrue();
+    }
+
+    @Test
+    @DisplayName("한 마리 일정은 예전과 같다 — 기준은 그 아이, 아이별 목록은 원소 하나")
+    void singlePetBehavesAsBefore() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+
+        PlanWeatherInfo info = processor.brief(1L, plan(), List.of(MONGSIL));
+
+        assertThat(placeSuitabilityQueryPort.calls).isEqualTo(1);
+        assertThat(firstDay(info).basisPetId()).isEqualTo(MONGSIL);
+        assertThat(firstDay(info).petSuitabilities()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("점수를 못 낸(예보 밖) 날은 첫 아이를 기준으로 두어 날씨·이유는 보여 준다")
+    void fallsBackToFirstPetWhenNoScore() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE, BORI, ROBUST);
+        placeSuitabilityQueryPort.scoreOf = condition -> null;
+
+        PlanWeatherInfo info = processor.brief(1L, plan(), List.of(MONGSIL, BORI));
+
+        assertThat(firstDay(info).basisPetId()).isEqualTo(MONGSIL);
+        assertThat(firstDay(info).suitability().score()).isNull();
+        assertThat(firstDay(info).unavailableReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("tour-service 조회가 전부 실패하면 LOOKUP_FAILED 다 — 넷 중 이것만 재시도가 의미 있는 상태다")
+    void unavailableWhenEveryLookupFails() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE, BORI, ROBUST);
+        placeSuitabilityQueryPort.unavailable = true;
+
+        PlanWeatherInfo info = processor.brief(1L, plan(), List.of(MONGSIL, BORI));
+
+        assertThat(firstDay(info).unavailableReason()).isEqualTo(PlanDayWeatherUnavailableReason.LOOKUP_FAILED);
+        assertThat(firstDay(info).basisPetId()).isNull();
+        assertThat(firstDay(info).petSuitabilities()).isEmpty();
+        // 장소는 알고 있었다 — 못 낸 것은 판정이지 대표 장소가 아니다
+        assertThat(firstDay(info).representativePlaceId()).isEqualTo(PLACE_ID);
+    }
+
+    @Test
+    @DisplayName("지난 날짜는 PAST_DATE 다 — 예보가 소급되지 않으므로 묻지 않고, 재시도도 권하지 않는다 (#492)")
+    void pastDateIsNeverAsked() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+
+        PlanWeatherInfo info = processor.brief(1L, planOn(DAY_1.minusDays(1)), List.of(MONGSIL));
+
+        PlanDayWeatherUnavailableReason reason = firstDay(info).unavailableReason();
+        assertThat(reason).isEqualTo(PlanDayWeatherUnavailableReason.PAST_DATE);
+        // 일시적 장애와 같은 말을 하지 않는다 — 이 구분이 이 이슈의 본체다
+        assertThat(reason.getDescription())
+            .isNotEqualTo(PlanDayWeatherUnavailableReason.LOOKUP_FAILED.getDescription())
+            .doesNotContain("다시 시도");
+        // 물어도 답이 정해져 있는 날이라 원격 호출이 나가지 않는다
+        assertThat(placeSuitabilityQueryPort.calls).isZero();
+        // 장소는 지정돼 있었다 — "장소가 없어서" 가 아니라는 것이 응답에 남는다
+        assertThat(firstDay(info).representativePlaceId()).isEqualTo(PLACE_ID);
+        assertThat(firstDay(info).petSuitabilities()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("예보가 닿지 않는 먼 미래는 BEYOND_FORECAST_RANGE 다 — 오늘+11일부터")
+    void beyondForecastRangeIsNeverAsked() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        int horizon = PlanDayWeatherUnavailableReason.FORECAST_HORIZON_DAYS;
+
+        PlanWeatherInfo lastCovered = processor.brief(1L, planOn(DAY_1.plusDays(horizon)), List.of(MONGSIL));
+        PlanWeatherInfo beyond = processor.brief(1L, planOn(DAY_1.plusDays(horizon + 1L)), List.of(MONGSIL));
+
+        // 경계 안쪽(오늘+10)은 실제로 물어본다
+        assertThat(firstDay(lastCovered).unavailableReason()).isNull();
+        assertThat(firstDay(beyond).unavailableReason())
+            .isEqualTo(PlanDayWeatherUnavailableReason.BEYOND_FORECAST_RANGE);
+        assertThat(placeSuitabilityQueryPort.calls).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("장소가 없는 날은 NO_PLACE_ITEM 이다 — 날씨의 문제가 아니라 일정의 문제다")
+    void noPlaceItemKeepsItsOwnReason() {
+        planItemRepositoryPort.items = List.of();
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+
+        PlanWeatherInfo info = processor.brief(1L, plan(), List.of(MONGSIL));
+
+        assertThat(firstDay(info).unavailableReason()).isEqualTo(PlanDayWeatherUnavailableReason.NO_PLACE_ITEM);
+        assertThat(firstDay(info).representativePlaceId()).isNull();
+        assertThat(placeSuitabilityQueryPort.calls).isZero();
+    }
+
+    @Test
+    @DisplayName("여행 중 일정은 일자마다 사유가 갈린다 — 지난 일차는 PAST_DATE, 오늘은 판정이 나간다")
+    void reasonsDifferPerDayWithinOnePlan() {
+        planItemRepositoryPort.items = List.of(
+            PlanItem.builder().id(1L).planId(PLAN_ID).day(1).sequence(0)
+                .itemType(PlanItemType.PLACE).targetId(PLACE_ID).title("성판악").build(),
+            PlanItem.builder().id(2L).planId(PLAN_ID).day(2).sequence(0)
+                .itemType(PlanItemType.PLACE).targetId(PLACE_ID).title("협재해수욕장").build());
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        Plan plan = Plan.builder()
+            .id(PLAN_ID).memberId(1L).petId(MONGSIL).areaCode("39").title("여행 중인 일정")
+            .startDate(DAY_1.minusDays(1)).endDate(DAY_1).status(PlanStatus.DRAFT).build();
+
+        PlanWeatherInfo info = processor.brief(1L, plan, List.of(MONGSIL));
+
+        assertThat(info.days()).extracting(PlanDayWeatherInfo::unavailableReason)
+            .containsExactly(PlanDayWeatherUnavailableReason.PAST_DATE, null);
+        // 지난 일차 몫의 호출이 빠져 오늘치 한 번만 나간다
+        assertThat(placeSuitabilityQueryPort.calls).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("WALK 항목은 대표 장소가 되지 않는다 — targetId 가 walk_course.id 라 장소 적합도를 물을 수 없다 (#89)")
+    void walkItemIsNotTheRepresentativePlace() {
+        planItemRepositoryPort.items = List.of(
+            PlanItem.builder().id(1L).planId(PLAN_ID).day(1).sequence(0)
+                .itemType(PlanItemType.WALK).targetId(777L).title("올레 7코스").build(),
+            PlanItem.builder().id(2L).planId(PLAN_ID).day(1).sequence(1)
+                .itemType(PlanItemType.PLACE).targetId(PLACE_ID).title("협재해수욕장").build());
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+
+        processor.brief(1L, plan(), List.of(MONGSIL));
+
+        assertThat(placeSuitabilityQueryPort.lastPlaceId).isEqualTo(PLACE_ID);
+    }
+
+    // ── 그날 장소 전체 판정 (#1045) ─────────────────────────────────────────
+
+    private static final long SEONGSAN = 200L;
+
+    private static PlanItem place(long itemId, int sequence, long placeId, String title) {
+        return PlanItem.builder().id(itemId).planId(PLAN_ID).day(1).sequence(sequence)
+            .itemType(PlanItemType.PLACE).targetId(placeId).title(title).build();
+    }
+
+    @Test
+    @DisplayName("뒤 장소가 더 나쁘면 그 장소가 그날을 정한다 — 한 곳이라도 힘든 날이면 그날은 힘든 날이다")
+    void laterWorsePlaceDecidesTheDay() {
+        planItemRepositoryPort.items = List.of(
+            place(1000L, 0, PLACE_ID, "협재해수욕장"),
+            place(1001L, 1, SEONGSAN, "성산일출봉"));
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        placeSuitabilityQueryPort.scoreAtPlace = Map.of(PLACE_ID, condition -> 81, SEONGSAN, condition -> 35);
+
+        PlanDayWeatherInfo day = firstDay(processor.brief(1L, plan(), List.of(MONGSIL)));
+
+        assertThat(day.representativePlaceId()).isEqualTo(SEONGSAN);
+        assertThat(day.representativePlaceTitle()).isEqualTo("성산일출봉");
+        assertThat(day.representativePlanItemId()).isEqualTo(1001L);
+        assertThat(day.suitability().score()).isEqualTo(35);
+        assertThat(day.suitability().placeId()).isEqualTo(SEONGSAN);
+        assertThat(day.petSuitabilities()).extracting(PetSuitabilityInfo::score).containsExactly(35);
+    }
+
+    @Test
+    @DisplayName("(장소 × 반려견) 중 가장 낮은 조합이 기준이다 — 아이별 요약은 아이마다 그날 가장 힘든 장소의 점수다")
+    void decisiveIsTheLowestPlaceAndPetCombination() {
+        planItemRepositoryPort.items = List.of(
+            place(1000L, 0, PLACE_ID, "협재해수욕장"),
+            place(1001L, 1, SEONGSAN, "성산일출봉"));
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE, BORI, ROBUST);
+        // 협재: 몽실 50 · 보리 90 / 성산: 몽실 70 · 보리 40 → 보리 × 성산이 가장 낮다
+        placeSuitabilityQueryPort.scoreAtPlace = Map.of(
+            PLACE_ID, condition -> condition.heatSensitive() ? 50 : 90,
+            SEONGSAN, condition -> condition.heatSensitive() ? 70 : 40);
+
+        PlanDayWeatherInfo day = firstDay(processor.brief(1L, plan(), List.of(MONGSIL, BORI)));
+
+        assertThat(day.basisPetId()).isEqualTo(BORI);
+        assertThat(day.representativePlaceId()).isEqualTo(SEONGSAN);
+        assertThat(day.suitability().score()).isEqualTo(40);
+        assertThat(day.petSuitabilities()).extracting(PetSuitabilityInfo::petId).containsExactly(MONGSIL, BORI);
+        assertThat(day.petSuitabilities()).extracting(PetSuitabilityInfo::score).containsExactly(50, 40);
+        // 장소 2 × 조건 2
+        assertThat(placeSuitabilityQueryPort.calls).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("점수가 같으면 순서가 앞선 장소가 그날을 정한다 — 예전과 같은 결과가 나온다")
+    void tieKeepsTheEarlierPlace() {
+        planItemRepositoryPort.items = List.of(
+            place(1001L, 1, SEONGSAN, "성산일출봉"),
+            place(1000L, 0, PLACE_ID, "협재해수욕장"));
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+
+        PlanDayWeatherInfo day = firstDay(processor.brief(1L, plan(), List.of(MONGSIL)));
+
+        assertThat(day.representativePlaceId()).isEqualTo(PLACE_ID);
+        assertThat(day.representativePlanItemId()).isEqualTo(1000L);
+    }
+
+    @Test
+    @DisplayName("일부 장소만 조회에 실패하면 남은 장소로 판정한다 — 반려견 축과 같은 규칙이다")
+    void partialPlaceFailureJudgesTheRest() {
+        planItemRepositoryPort.items = List.of(
+            place(1000L, 0, PLACE_ID, "협재해수욕장"),
+            place(1001L, 1, SEONGSAN, "성산일출봉"));
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        placeSuitabilityQueryPort.failingPlaces = Set.of(PLACE_ID);
+        placeSuitabilityQueryPort.scoreAtPlace = Map.of(SEONGSAN, condition -> 77);
+
+        PlanDayWeatherInfo day = firstDay(processor.brief(1L, plan(), List.of(MONGSIL)));
+
+        assertThat(day.unavailableReason()).isNull();
+        assertThat(day.representativePlaceId()).isEqualTo(SEONGSAN);
+        assertThat(day.suitability().score()).isEqualTo(77);
+    }
+
+    @Test
+    @DisplayName("모든 장소 조회가 실패해야 LOOKUP_FAILED 다 — 장소는 순서가 가장 앞선 곳을 싣는다")
+    void lookupFailedOnlyWhenEveryPlaceFails() {
+        planItemRepositoryPort.items = List.of(
+            place(1001L, 1, SEONGSAN, "성산일출봉"),
+            place(1000L, 0, PLACE_ID, "협재해수욕장"));
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        placeSuitabilityQueryPort.failingPlaces = Set.of(PLACE_ID, SEONGSAN);
+
+        PlanDayWeatherInfo day = firstDay(processor.brief(1L, plan(), List.of(MONGSIL)));
+
+        assertThat(day.unavailableReason()).isEqualTo(PlanDayWeatherUnavailableReason.LOOKUP_FAILED);
+        assertThat(day.representativePlaceId()).isEqualTo(PLACE_ID);
+        assertThat(day.representativePlanItemId()).isEqualTo(1000L);
+    }
+
+    @Test
+    @DisplayName("같은 장소를 두 번 담아도 한 번만 묻는다 — 항목은 순서가 앞선 쪽이 남는다")
+    void samePlaceTwiceIsJudgedOnce() {
+        planItemRepositoryPort.items = List.of(
+            place(1000L, 0, PLACE_ID, "협재해수욕장"),
+            place(1001L, 1, SEONGSAN, "성산일출봉"),
+            place(1002L, 2, PLACE_ID, "협재해수욕장"));
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+
+        PlanDayWeatherInfo day = firstDay(processor.brief(1L, plan(), List.of(MONGSIL)));
+
+        assertThat(placeSuitabilityQueryPort.placeIds).containsExactly(PLACE_ID, SEONGSAN);
+        assertThat(day.representativePlanItemId()).isEqualTo(1000L);
+    }
+
+    @Test
+    @DisplayName("아이마다 실패한 장소가 달라도 아이별 요약은 그 아이가 받은 장소 중 가장 힘든 곳이다")
+    void perPetSummaryUsesThePlacesEachPetGot() {
+        planItemRepositoryPort.items = List.of(
+            place(1000L, 0, PLACE_ID, "협재해수욕장"),
+            place(1001L, 1, SEONGSAN, "성산일출봉"));
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE, BORI, ROBUST);
+        // 협재는 더위 민감 조건(몽실)만 실패한다. 보리는 협재 30 · 성산 60, 몽실은 성산 55 만 받는다
+        placeSuitabilityQueryPort.failingCondition = (placeId, condition) -> placeId == PLACE_ID && condition.heatSensitive();
+        placeSuitabilityQueryPort.scoreAtPlace = Map.of(
+            PLACE_ID, condition -> 30,
+            SEONGSAN, condition -> condition.heatSensitive() ? 55 : 60);
+
+        PlanDayWeatherInfo day = firstDay(processor.brief(1L, plan(), List.of(MONGSIL, BORI)));
+
+        assertThat(day.petSuitabilities()).extracting(PetSuitabilityInfo::petId).containsExactly(MONGSIL, BORI);
+        assertThat(day.petSuitabilities()).extracting(PetSuitabilityInfo::score).containsExactly(55, 30);
+        assertThat(day.basisPetId()).isEqualTo(BORI);
+        assertThat(day.representativePlaceId()).isEqualTo(PLACE_ID);
+    }
+
+    @Test
+    @DisplayName("점수를 못 낸 장소와 낸 장소가 섞이면 점수가 있는 장소가 그날을 정한다 — 모르는 것을 좋은 것으로 읽지 않는다")
+    void scoredPlaceBeatsUnscoredPlace() {
+        planItemRepositoryPort.items = List.of(
+            place(1000L, 0, PLACE_ID, "협재해수욕장"),
+            place(1001L, 1, SEONGSAN, "성산일출봉"));
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        placeSuitabilityQueryPort.scoreAtPlace = Map.of(PLACE_ID, condition -> null, SEONGSAN, condition -> 88);
+
+        PlanDayWeatherInfo day = firstDay(processor.brief(1L, plan(), List.of(MONGSIL)));
+
+        assertThat(day.representativePlaceId()).isEqualTo(SEONGSAN);
+        assertThat(day.suitability().score()).isEqualTo(88);
+    }
+
+    @Test
+    @DisplayName("모든 장소가 점수를 못 내면 첫 장소 · 첫 아이를 두어 날씨·이유는 보여 준다")
+    void allUnscoredFallsBackToFirstPlace() {
+        planItemRepositoryPort.items = List.of(
+            place(1000L, 0, PLACE_ID, "협재해수욕장"),
+            place(1001L, 1, SEONGSAN, "성산일출봉"));
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE, BORI, ROBUST);
+        placeSuitabilityQueryPort.scoreOf = condition -> null;
+
+        PlanDayWeatherInfo day = firstDay(processor.brief(1L, plan(), List.of(MONGSIL, BORI)));
+
+        assertThat(day.representativePlaceId()).isEqualTo(PLACE_ID);
+        assertThat(day.basisPetId()).isEqualTo(MONGSIL);
+        assertThat(day.unavailableReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("하루에 판정하는 장소는 최대 여덟 곳이다 — 호출 수가 장소 수에 비례해 늘기 때문이다")
+    void judgesAtMostEightPlacesPerDay() {
+        List<PlanItem> items = new ArrayList<>();
+        for (int i = 0; i < PlanWeatherProcessor.MAX_PLACES_PER_DAY + 3; i++) {
+            items.add(place(2000L + i, i, 5000L + i, "장소 " + i));
+        }
+        planItemRepositoryPort.items = items;
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+
+        processor.brief(1L, plan(), List.of(MONGSIL));
+
+        assertThat(placeSuitabilityQueryPort.calls).isEqualTo(PlanWeatherProcessor.MAX_PLACES_PER_DAY);
+        assertThat(placeSuitabilityQueryPort.placeIds).first().isEqualTo(5000L);
+    }
+
+    @Test
+    @DisplayName("지난 날짜는 묻지 않고 순서가 가장 앞선 장소를 싣는다 — 항목 아이디도 함께 내린다")
+    void pastDateCarriesTheFirstPlaceWithItemId() {
+        planItemRepositoryPort.items = List.of(
+            place(1001L, 1, SEONGSAN, "성산일출봉"),
+            place(1000L, 0, PLACE_ID, "협재해수욕장"));
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+
+        PlanDayWeatherInfo day = firstDay(processor.brief(1L, planOn(DAY_1.minusDays(1)), List.of(MONGSIL)));
+
+        assertThat(placeSuitabilityQueryPort.calls).isZero();
+        assertThat(day.unavailableReason()).isEqualTo(PlanDayWeatherUnavailableReason.PAST_DATE);
+        assertThat(day.representativePlaceId()).isEqualTo(PLACE_ID);
+        assertThat(day.representativePlanItemId()).isEqualTo(1000L);
+    }
+
+    // ── 스텁 ───────────────────────────────────────────────────────────────
+
+@Test
+    @DisplayName("완료된 일정은 완료 시점 스냅샷으로 판정한다 — 다녀온 뒤 프로필을 고쳐도 그때 기준이 흔들리지 않는다")
+    void completedPlanUsesSnapshot() {
+        // 지금 프로필은 더위에 강하다고 말하지만, 다녀올 당시에는 더위에 약했다.
+        petConditionQueryPort.conditions = Map.of(MONGSIL, ROBUST);
+        planPetConditionRepositoryPort.saveAll(List.of(snapshot(MONGSIL, true)));
+        placeSuitabilityQueryPort.scoreOf = condition -> condition.heatSensitive() ? 42 : 81;
+
+        PlanWeatherInfo info = processor.brief(1L, completedPlan(), List.of(MONGSIL));
+
+        assertThat(firstDay(info).suitability().score()).isEqualTo(42);
+        // 스냅샷이 있으면 원천을 묻지 않는다 — 기록을 읽는 데 남의 서비스를 왕복할 이유가 없다.
+        assertThat(petConditionQueryPort.calls).isZero();
+    }
+
+    @Test
+    @DisplayName("진행 중인 일정은 지금 프로필을 읽는다 — 아이 상태가 바뀌면 다음 판정에 곧바로 반영된다")
+    void ongoingPlanUsesLiveConditions() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        // 초안인데도 스냅샷이 남아 있는 상황(완료했다가 되돌림). 진행 중이면 쓰지 않는다.
+        planPetConditionRepositoryPort.saveAll(List.of(snapshot(MONGSIL, false)));
+        placeSuitabilityQueryPort.scoreOf = condition -> condition.heatSensitive() ? 42 : 81;
+
+        PlanWeatherInfo info = processor.brief(1L, plan(), List.of(MONGSIL));
+
+        assertThat(firstDay(info).suitability().score()).isEqualTo(42);
+        assertThat(petConditionQueryPort.calls).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("스냅샷이 없는 완료 일정은 예전처럼 원천을 읽는다 — 없는 기록을 지어내지 않는다")
+    void completedPlanWithoutSnapshotFallsBackToLive() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        placeSuitabilityQueryPort.scoreOf = condition -> condition.heatSensitive() ? 42 : 81;
+
+        PlanWeatherInfo info = processor.brief(1L, completedPlan(), List.of(MONGSIL));
+
+        assertThat(firstDay(info).suitability().score()).isEqualTo(42);
+        assertThat(petConditionQueryPort.calls).isEqualTo(1);
+    }
+
+    private static Plan completedPlan() {
+        return planOn(DAY_1).toBuilder().status(PlanStatus.COMPLETED).build();
+    }
+
+    private static PlanPetCondition snapshot(long petId, boolean heatSensitive) {
+        return PlanPetCondition.builder()
+            .id(petId).planId(PLAN_ID).petId(petId)
+            .sizeType("SMALL").heatSensitive(heatSensitive)
+            .build();
+    }
+
+    private static class StubPetConditionQueryPort implements PetConditionQueryPort {
+
+        private Map<Long, PetConditionQueryResult> conditions = Map.of();
+        private int calls;
+
+        @Override
+        public Map<Long, PetConditionQueryResult> findConditions(long memberId, List<Long> petIds) {
+            calls++;
+            Map<Long, PetConditionQueryResult> found = new HashMap<>();
+            petIds.forEach(petId -> {
+                if (conditions.containsKey(petId)) {
+                    found.put(petId, conditions.get(petId));
+                }
+            });
+            return found;
+        }
+
+        @Override
+        public Optional<Long> findRepresentativePetId(long memberId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Set<Long> findOwnedPetIds(long memberId, List<Long> petIds) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static class StubPlaceSuitabilityQueryPort implements PlaceSuitabilityQueryPort {
+
+        private int calls;
+        private Long lastPlaceId;
+        private boolean unavailable;
+        private Function<PetConditionQueryResult, Integer> scoreOf = condition -> 60;
+        /** 장소별 점수를 따로 줄 때. 없으면 {@link #scoreOf} 를 쓴다 */
+        private Map<Long, Function<PetConditionQueryResult, Integer>> scoreAtPlace = Map.of();
+        private Set<Long> failingPlaces = Set.of();
+        private BiPredicate<Long, PetConditionQueryResult> failingCondition = (placeId, condition) -> false;
+        private final List<Long> placeIds = new ArrayList<>();
+
+        @Override
+        public Optional<PlaceSuitabilityQueryResult> findSuitability(long placeId, LocalDate targetDate, PetConditionQueryResult pet) {
+            calls += 1;
+            lastPlaceId = placeId;
+            placeIds.add(placeId);
+            if (unavailable || failingPlaces.contains(placeId) || failingCondition.test(placeId, pet)) {
+                return Optional.empty();
+            }
+            Integer score = scoreAtPlace.getOrDefault(placeId, scoreOf).apply(pet);
+            return Optional.of(PlaceSuitabilityQueryResult.builder()
+                .placeId(placeId).placeTitle("장소 " + placeId).targetDate(targetDate)
+                .score(score)
+                .levelCode(score == null ? null : score >= 70 ? "HIGH" : "LOW")
+                .levelName(score == null ? null : score >= 70 ? "여행 적합" : "주의")
+                .levelScoreDescription(score == null ? null : SCORE_DESCRIPTION)
+                .reasons(List.of())
+                .indoorAlternatives(List.of())
+                .build());
+        }
+    }
+
+    private static class StubPlanItemRepositoryPort implements PlanItemRepositoryPort {
+
+        @Override
+        public List<PlanItemCountQueryResult> countByPlanIds(Collection<Long> planIds) {
+            throw new UnsupportedOperationException();
+        }
+
+        private List<PlanItem> items = List.of(PlanItem.builder()
+            .id(1000L).planId(PLAN_ID).day(1).sequence(0)
+            .itemType(PlanItemType.PLACE).targetId(PLACE_ID).title("협재해수욕장")
+            .build());
+
+        @Override
+        public List<PlanItem> findByPlanId(long planId) {
+            return items;
+        }
+
+        @Override
+        public List<PlanItem> saveAll(List<PlanItem> items) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<PlanItem> findById(long planItemId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public PlanItem save(PlanItem item) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void deleteByPlanIdAndDay(long planId, int day) {
+            throw new UnsupportedOperationException();
+        }
+    }
+}

@@ -1,0 +1,382 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+
+import { describe, expect, it } from 'vitest'
+
+import { PlaceRow } from '@/features/place/place-row'
+import { messages } from '@/lib/messages'
+import { placeSummary } from '@/test/fixtures/place'
+import type { PlaceSummary } from '@/types/place'
+
+/** TourAPI 의 두 크기 — 940×627 원본과 150×100 썸네일 (2026-10-03 실측) */
+const LARGE_IMAGE = 'http://tong.visitkorea.or.kr/cms/resource/60/2666460_image2_1.jpg'
+const SMALL_IMAGE = 'http://tong.visitkorea.or.kr/cms/resource/60/2666460_image3_1.jpg'
+
+function render(place = placeSummary) {
+  return renderToStaticMarkup(createElement(PlaceRow, { place }))
+}
+
+describe('PlaceRow — 서버 metadata 렌더', () => {
+  it('제목과 서버 metadata name 을 그대로 쓴다', () => {
+    const markup = render()
+
+    expect(markup).toContain('제주특별자치도립김창열미술관')
+    expect(markup).toContain('부분 동반 가능')
+    expect(markup).toContain('관광지')
+  })
+
+  it('동반 가능 여부에 등급 색을 쓰지 않는다 (DESIGN.md §2-3)', () => {
+    const markup = render()
+
+    // 태그는 전부 중립(band)이다. metric-* tint 가 행에 새어들면 안 된다.
+    expect(markup).not.toContain('metric-high')
+    expect(markup).not.toContain('metric-mid')
+    expect(markup).not.toContain('metric-critical')
+  })
+
+  it('목록 API 가 점수를 주지 않으므로 적합도 숫자를 그리지 않는다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain('/100')
+  })
+})
+
+describe('PlaceRow — L2 항목 (DESIGN.md §0 · 3a)', () => {
+  it('카드가 아니다 — 라운드·그림자를 쓰지 않는다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain('rounded-lg')
+    expect(markup).not.toContain('shadow')
+  })
+
+  /*
+    **구분선을 행이 그리지 않는다.** `SurfaceList` 가 `[&>li+li]` 로 항목 사이에만
+    긋는다 — 그래서 이 행에는 `last` prop 이 없다. 행이 선을 다시 그리면 목록의 첫
+    항목 위에도 선이 생기고(제목 아래 허공에 선) 마지막 항목 아래는 두 줄이 된다.
+  */
+  it('자기 테두리를 두르지 않는다 — 구분선은 SurfaceList 가 소유한다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain('border-b')
+    expect(markup).not.toContain('border-t')
+  })
+
+  it('기본 인셋은 카드 안 값(16/20)이다 — 3a 가 정본이라 카드가 기본 자리다', () => {
+    const markup = render()
+
+    expect(markup).toContain('px-4')
+    expect(markup).toContain('md:px-5')
+    // 페이지 인셋 40 을 카드 안에서 쓰면 내용이 두 번 밀린다 (§0)
+    expect(markup).not.toContain('md:px-10')
+  })
+
+  it('카드 밖 사용처는 페이지 인셋을 스스로 밝힌다 — 지도 SDK 실패 폴백 목록', () => {
+    const markup = renderToStaticMarkup(
+      createElement(PlaceRow, { place: placeSummary, inset: 'main' }),
+    )
+
+    expect(markup).toContain('md:px-10')
+    expect(markup).not.toContain('md:px-5')
+  })
+})
+
+describe('PlaceRow — 메타 줄 (아트보드 01·03)', () => {
+  it('주소를 읍·면·동까지 줄이고 실내/야외를 붙인다', () => {
+    const markup = render()
+
+    // fixture 의 addr1 은 `제주특별자치도 제주시 한림읍 용금로 906-107` 이다. 분류가 맨 앞이다 (#1267)
+    expect(markup).toContain('관광지 · 제주시 한림읍 · 실내')
+    expect(markup).not.toContain('용금로')
+  })
+
+  it('indoor 가 false 면 야외로 쓴다', () => {
+    expect(render({ ...placeSummary, indoor: false })).toContain(
+      `한림읍 · ${messages.place.rowOutdoor}`,
+    )
+  })
+
+  it('아트보드의 거리(4.1km)는 목록 응답에 없으므로 그리지 않는다', () => {
+    expect(render()).not.toContain('km')
+  })
+})
+
+describe('PlaceRow — nullable 처리', () => {
+  /*
+    **사진 없는 장소가 대부분이다** — dev 실측(제주 400건) 281건(70%). 그래서 그 자리를
+    카테고리 일러스트가 채운다 (`lib/place/illustration.ts`). 어느 갈래든 **타일 크기는
+    그대로**여서 행 높이가 흔들리지 않는다.
+  */
+  it('firstImage 가 null 이면 카테고리 일러스트로 같은 크기의 타일을 채운다', () => {
+    const markup = render({ ...placeSummary, firstImage: null })
+
+    expect(markup).toContain('/illustrations/place-tourist_spot.webp')
+    // 장식이므로 이름을 읽히지 않는다 — 카테고리는 배지가 낱말로 말한다
+    expect(markup).toContain('alt=""')
+    expect(markup).toContain('size-20')
+  })
+
+  /*
+    #67 B. **"사진이 없다" 와 "사진이 있는데 못 쓴다" 는 다른 갈래다.** 계약은 사진이 있다고
+    말하는데 `next.config.ts` 의 `remotePatterns` 에 없는 호스트라 `next/image` 에 넘길 수 없다.
+
+    **넘겨 버리면 런타임에 던져 화면 전체가 죽는다** (`lib/image/remote-host.ts` 머리주석).
+    `imageSrc` 의 거절만 단위 테스트로 잠가 두면 부족하다 — 호출부가 그 `null` 을 받아
+    자리를 채우는 것까지가 이 갈래다. mock 이 이 케이스를 한 곳에 싣고 있다
+    (`api/mock/place-data.ts` 의 `UNREGISTERED_HOST_IMAGE`).
+  */
+  it('허용 목록 밖 호스트면 URL 을 내보내지 않고 사진 없음과 같은 자리를 채운다', () => {
+    const markup = render({
+      ...placeSummary,
+      firstImage: 'http://cdn.not-allowed.invalid/photo/a.jpg',
+    })
+
+    expect(markup).not.toContain('not-allowed.invalid')
+    expect(markup).toContain('/illustrations/place-tourist_spot.webp')
+    expect(markup).toContain('size-20')
+  })
+
+  it('자산이 없는 카테고리는 "이미지 없음" 타일로 떨어진다 — 카테고리를 지어내지 않는다', () => {
+    const markup = render({
+      ...placeSummary,
+      firstImage: null,
+      contentType: { code: 'NEW_CODE_FROM_SERVER', name: '새 분류', description: null },
+    })
+
+    expect(markup).toContain(messages.place.noImage)
+    expect(markup).not.toContain('/illustrations/')
+    expect(markup).toContain('size-20')
+  })
+
+  /*
+    **사진에 장소명을 alt 로 주지 않는다** (#1132 에서 다시 따졌다). 사진은 행 링크 **안**에
+    있고 같은 링크 안 `h3` 가 장소명을 말한다 — alt 에도 이름을 주면 링크 이름이
+    `{장소명} {장소명} …` 으로 두 번 읽힌다. 지도 패널(선택 버튼 안)·담기 화면(제목 옆)도
+    같은 `PlaceRowContent` 라 이름이 늘 바로 옆에 있다.
+  */
+  it('썸네일 사진의 alt 는 빈 문자열이다 — 이름은 같은 행 제목이 말한다', () => {
+    const markup = render({ ...placeSummary, firstImage2: SMALL_IMAGE })
+    const img = /<img[^>]*>/.exec(markup)?.[0] ?? ''
+
+    expect(img).toContain('alt=""')
+    expect(img).not.toContain(`alt="${placeSummary.title}"`)
+  })
+
+  it('addr1 이 null 이면 주소를 빼고 실내/야외만 남긴다', () => {
+    const markup = render({ ...placeSummary, addr1: null })
+
+    expect(markup).not.toContain('제주시 한림읍')
+    expect(markup).toContain(messages.place.rowIndoor)
+  })
+
+  it('addr1 · indoor 가 모두 없어도 분류는 남는다 — 메타 줄은 분류로 시작한다 (#1267)', () => {
+    const markup = render({ ...placeSummary, addr1: null, indoor: null })
+
+    expect(markup).toContain(`>${placeSummary.contentType.name}</p>`)
+  })
+
+  /*
+    **목록 행에서 `실내 여부 미확인` 을 뺐다** (#1267). 모르는 정보를 행마다 반복하면 잡음이고,
+    제주 실데이터는 대부분이 이 갈래였다. 메타 줄에서 낱말이 빠지는 것은 그대로고, 점선 배지는
+    상세 · 미리보기에 남는다.
+  */
+  it('indoor 가 null 이면 메타 줄에서 낱말만 빠지고 점선 배지를 붙이지 않는다', () => {
+    const markup = render({ ...placeSummary, indoor: null })
+
+    expect(markup).not.toContain(messages.place.rowIndoorUnknown)
+    expect(markup).not.toContain('border-dashed')
+    expect(markup).toContain('관광지 · 제주시 한림읍<')
+  })
+})
+
+describe('PlaceRow — 썸네일 모양 (#1276)', () => {
+  it('넓은 칸에서는 3:2 가로형이다 — 원본이 3:2 라 정사각은 가로 1/3 을 잘랐다', () => {
+    const markup = render()
+
+    expect(markup).toContain('@lg:w-36')
+    expect(markup).toContain('@lg:h-24')
+  })
+})
+
+describe('PlaceRow — 링크', () => {
+  it('행 전체가 상세로 가는 링크다', () => {
+    const markup = render()
+
+    expect(markup).toContain(`href="/places/${placeSummary.placeId}"`)
+  })
+
+  it('중첩 링크를 만들지 않는다 — 행 안에 a 는 하나뿐이다', () => {
+    const markup = render()
+
+    expect(markup.match(/<a /g)).toHaveLength(1)
+  })
+})
+
+describe('PlaceRow — 좁은 컨테이너에서도 제목이 남는다 (#240)', () => {
+  /*
+    **뷰포트 breakpoint 가 컨테이너 폭을 모르는 것이 원인이었다.** 태그 우측 열
+    (`w-56` = 224px)을 `lg:` 로 두었더니 데스크톱의 지도 좌측 패널(폭 400px)에서
+    96px 썸네일 + gap + 224px 을 빼고 제목에 40~50px 만 남아 `테…` 로 잘렸다.
+    컨테이너 쿼리로 바꿨으므로 **소비처가 `@container` 를 주고 규칙이 컨테이너 기준이어야
+    한다** — 둘 중 하나가 빠지면 그 자리에서 잘림이 되살아난다.
+
+    **배지 열의 전환점만 `@xl`(576)이다** (#553). `@lg`(512)였을 때 `/places` 2열 목록의
+    칸 폭이 511/512 로 경계를 스쳐 **같은 목록의 두 칸이 다른 배치**로 그려졌다.
+    자세한 근거는 `place-row.tsx` 머리주석이 정본이다.
+  */
+  it('부모가 컨테이너를 열고 크기 규칙이 컨테이너 기준이다', () => {
+    const markup = render()
+
+    expect(markup).toContain('@container')
+    /*
+      뷰포트 기준 규칙이 남아 있으면 같은 결함이 재발한다. `@` 가 붙지 않은 `lg:` 만
+      잡아야 하므로 부분문자열로 보지 않는다 — `@lg:hidden` 이 `lg:hidden` 을 포함한다.
+    */
+    expect(markup).not.toMatch(/[^@]lg:(hidden|flex|size-24)/)
+  })
+
+  /*
+    **우측 배지 열을 걷었다** (#1267). 칩이 동반 판정 하나라 176 열을 따로 둘 까닭이 없다 —
+    그 열이 1024 1열 목록에서 제목 폭을 262 로 묶었다. 이제 어느 폭이든 이름 → 칩 → 메타다.
+  */
+  it('배지를 우측 열로 빼지 않는다 — 폭과 상관없이 이름 아래 한 자리다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain('@xl:flex')
+    expect(markup).not.toContain('order-first')
+    expect(markup.split('부분 동반 가능')).toHaveLength(2)
+  })
+
+  it('시각 · DOM 순서가 같다 — 이름 → 동반 칩 → 메타', () => {
+    const markup = render()
+    const title = markup.indexOf('제주특별자치도립김창열미술관')
+    const badge = markup.indexOf('부분 동반 가능')
+    const meta = markup.indexOf('관광지 · 제주시')
+
+    expect(title).toBeLessThan(badge)
+    expect(badge).toBeLessThan(meta)
+  })
+})
+
+/*
+  #530 — 동반 정보가 없는 장소가 서버 `name` 그대로 `정보 없음` 배지를 달고 카테고리
+  태그 옆에 섰다. 낱말을 갖고 있는 이웃 때문에 **무엇의 정보가 없다는 것인지** 더
+  안 읽혔다 — 홈 행 · 상세 헤더와 같은 처리다.
+*/
+describe('PlaceRow — 동반 정보 없음 (#530)', () => {
+  const unknown: PlaceSummary = {
+    ...placeSummary,
+    petAllowanceType: { code: 'UNKNOWN', name: '정보 없음', description: null },
+  }
+
+  it('UNKNOWN 이면 동반 배지를 그리지 않는다', () => {
+    expect(render(unknown)).not.toContain('정보 없음')
+  })
+
+  /* 동반 배지만 빠진다 — 분류는 메타 줄에 그대로다 */
+  it('분류는 함께 사라지지 않는다', () => {
+    const markup = render({ ...unknown, indoor: null })
+
+    expect(markup).toContain(`>${placeSummary.contentType.name} · `)
+  })
+
+  /*
+    **문구가 아니라 `code` 로 거른다.** `name` 은 서버 문구라 언제든 바뀌고, 문구 비교는
+    그때 조용히 어긋난다 (api-integration-guide.md §6).
+  */
+  it('같은 문구라도 code 가 다르면 그린다', () => {
+    const sameWording: PlaceSummary = {
+      ...placeSummary,
+      petAllowanceType: { code: 'NOT_ALLOWED', name: '정보 없음', description: null },
+    }
+
+    expect(render(sameWording)).toContain('정보 없음')
+  })
+})
+
+describe('PlaceRow — 썸네일 전송량 (#1132)', () => {
+  /*
+    80~96px 칸에 940px 원본(`firstImage`, 500~780KB)을 받던 것을 같은 응답의
+    `firstImage2`(150×100, ~20KB)로 바꿨다. 판정 규칙은 `lib/image/thumbnail.ts` 가 잠그고,
+    여기서는 **행이 그 함수를 거쳐 작은 쪽을 고르는지**만 본다.
+  */
+  it('firstImage2 가 있으면 작은 사진을 쓰고 원본을 내보내지 않는다', () => {
+    const markup = render({ ...placeSummary, firstImage: LARGE_IMAGE, firstImage2: SMALL_IMAGE })
+
+    expect(markup).toContain('2666460_image3_1.jpg')
+    expect(markup).not.toContain('2666460_image2_1.jpg')
+  })
+
+  it('firstImage2 가 없으면 firstImage 로 떨어진다', () => {
+    const markup = render({ ...placeSummary, firstImage: LARGE_IMAGE, firstImage2: null })
+
+    expect(markup).toContain('2666460_image2_1.jpg')
+  })
+
+  it('작은 사진도 허용 목록 판정을 거친다 — 밖 호스트면 URL 을 내보내지 않는다', () => {
+    const markup = render({
+      ...placeSummary,
+      firstImage: null,
+      firstImage2: 'http://cdn.not-allowed.invalid/photo/a.jpg',
+    })
+
+    expect(markup).not.toContain('not-allowed.invalid')
+    expect(markup).toContain('/illustrations/place-tourist_spot.webp')
+  })
+})
+
+describe('PlaceRow — 첫 화면 사진 우선 로드 (#1132)', () => {
+  function img(markup: string) {
+    return /<img[^>]*>/.exec(markup)?.[0] ?? ''
+  }
+
+  it('기본은 지연 로드다', () => {
+    const tag = img(render({ ...placeSummary, firstImage2: SMALL_IMAGE }))
+
+    expect(tag).toContain('loading="lazy"')
+    // HTML 속성 이름은 대소문자를 가리지 않는다 — React 가 `fetchPriority` 로 내보낸다
+    expect(tag).not.toMatch(/fetchpriority/i)
+  })
+
+  it('priority 면 바로 받고 우선순위를 올린다', () => {
+    const tag = img(
+      renderToStaticMarkup(
+        createElement(PlaceRow, {
+          place: { ...placeSummary, firstImage2: SMALL_IMAGE },
+          priority: true,
+        }),
+      ),
+    )
+
+    expect(tag).toContain('loading="eager"')
+    expect(tag).toMatch(/fetchpriority="high"/i)
+  })
+})
+
+/*
+  **카페 칩으로 찾은 결과가 `음식점` 배지였다** (#1181). 칩과 같은 판정(음식점 + 원천 분류 `카페`)
+  이면 배지도 `카페` 다 — 쓰는 글자는 서버가 준 원천 분류 그대로다.
+*/
+describe('PlaceRow — 카페 분류의 유형 낱말 (#1181)', () => {
+  const restaurant = {
+    ...placeSummary,
+    contentType: { code: 'RESTAURANT', name: '음식점', description: null },
+  } as PlaceSummary
+
+  it('카페 분류인 음식점은 카페라고 쓴다', () => {
+    const markup = render({ ...restaurant, sourceCategory: '카페' })
+
+    expect(markup).toContain('>카페 · ')
+    expect(markup).not.toContain('음식점')
+  })
+
+  it('원천 분류가 없거나 다른 음식점은 서버 유형 이름 그대로다', () => {
+    expect(render({ ...restaurant, sourceCategory: null })).toContain('>음식점 · ')
+    expect(render({ ...restaurant, sourceCategory: '한식' })).toContain('>음식점 · ')
+  })
+
+  it('음식점이 아닌 유형은 원천 분류가 카페여도 바꾸지 않는다 — 칩과 같은 판정이다', () => {
+    const markup = render({ ...placeSummary, sourceCategory: '카페' })
+
+    expect(markup).toContain(`>${placeSummary.contentType.name} · `)
+  })
+})

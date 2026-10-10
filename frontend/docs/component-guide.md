@@ -1,0 +1,456 @@
+# Frontend Component Guide
+
+> **컴포넌트의 계약(contract)을 고정하는 문서다.** `styling-guide.md` 가 "무엇을 쓸 수 있는가"(토큰·컴포넌트 목록)를 정하고, 이 문서는 "그 컴포넌트를 어떻게 만들고 어떻게 부르는가"를 정한다.
+> 이 규약이 없으면 컴포넌트마다 prop 이름이 달라지고(`loading` vs `isLoading`), 리뷰에서 지적할 근거도 없다.
+
+## 1. prop 네이밍 (고정)
+
+| 종류                  | 규칙                    | 좋음                                                      | 금지                               |
+| --------------------- | ----------------------- | --------------------------------------------------------- | ---------------------------------- |
+| boolean               | 접두사 없이 형용사/명사 | `loading`, `disabled`, `selected`, `required`, `readOnly` | `isLoading`, `hasError`, `canEdit` |
+| 이벤트                | `on<Event>`             | `onClick`, `onChange`, `onSelect`, `onRetry`              | `handleClick`, `clickHandler`      |
+| 값 변경 콜백          | `onValueChange`         | `onValueChange(next: string)`                             | `onUpdate`, `setValue`             |
+| 아이콘/부가 요소 슬롯 | `leading` / `trailing`  | `leading={<PawIcon />}`                                   | `icon`, `iconLeft`, `prefix`       |
+| 본문                  | `children`              |                                                           | `content`, `body`                  |
+| 외형 분기             | `variant`               |                                                           | `type`, `kind`, `theme`, `color`   |
+| 크기                  | `size`                  |                                                           | `scale`, `dimension`               |
+
+**boolean에 `is`/`has` 를 붙이지 않는 이유**: React DOM 속성(`disabled`, `required`, `checked`)과 일관되고, JSX에서 축약형이 자연스럽게 읽힌다 — `<Button loading>`.
+
+**`type` 을 외형 prop으로 쓰지 않는 이유**: `<button type="submit">` 과 충돌한다.
+
+**`character` 는 `leading` / `trailing` 의 예외다** (#939). `EmptyState` · `Banner` 가 받는 캐릭터
+prop 은 `ReactNode` 슬롯이 아니라 **자세 유니온**(`StateCharacterPose`)이다 — 아무 그림이나 넣는
+칸을 열면 DESIGN.md §0-5 의 허용 자리 · 자세 제한이 호출부마다 풀린다. `Banner.leading` 을 쓰지
+않는 이유는 그 칸이 `text-danger-500` 을 두른 위급 아이콘 자리라서다 — 캐릭터가 들어가면 상시
+진입점이 병원 배너와 같은 모양이 된다.
+
+## 2. variant / size 표준 집합
+
+**새 값을 임의로 추가하지 않는다.** 추가는 `DESIGN.md` 갱신과 함께 한다.
+
+| 컴포넌트      | `variant`                                                                                                      | `size`               | 기본값                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------------- | -------------------- | ------------------------------------------ |
+| `Button`      | `primary` \| `secondary` \| `ghost` \| `danger` \| `dangerOutline` \| `kakao` \| `inverse` \| `inverseOutline` | `sm` \| `md` \| `lg` | `primary` / `md`                           |
+| `Badge`       | `neutral` \| `brand` \| `accent` \| `danger`                                                                   | `sm` \| `md`         | `neutral` / `md`                           |
+| `MetricBadge` | `tone`: `critical` \| `high` \| `mid` \| `low` \| `unknown` · `axis`: `suitability` \| `congestion` (#652)     | `sm` \| `md`         | 톤 없음 (필수) / `md` · 축 없음            |
+| `MetricWord`  | `tone` 위와 동일                                                                                               | — (`emphasis` 고정)  | 없음 (필수)                                |
+| `MetricValue` | `tone` 위와 동일 (생략 = 중립)                                                                                 | `hero` \| `row`      | `row`                                      |
+| `Chip`        | `selected` \| `exclusive` (외형 variant 없음)                                                                  | —                    | 다중 축                                    |
+| `Input`       | — (에러는 `error` prop)                                                                                        | `md` \| `lg`         | `md`                                       |
+| `BackLink`    | `inline` \| `titleRow`                                                                                         | —                    | `inline`                                   |
+| `ViewToggle`  | — (반대쪽 보기로 가는 글자 버튼 하나, #1125)                                                                   | `sm` \| `md`         | `md` (지도 위 44 · 카드 제목 줄은 `sm` 36) |
+
+> **`Badge` 의 `warn` · `info` 톤은 3차 세트에서 폐기했다** (DESIGN.md §2-7).
+> 측정값은 경고가 아니므로 등급은 `MetricBadge` 로 가고, 파란 정보 톤은 팔레트에 없다.
+> **`Badge` 의 `brand` 톤을 등급 표시로 전용하지 않는다.**
+>
+> **`Card` 는 폐기했다** — 표면은 `Canvas` / `SurfaceStack` / `Surface` / `SurfaceList`
+> 넷이다 (`src/components/surface.tsx`, DESIGN.md §0). 그 사이에 있던 2a 프리미티브
+> (`Band` / `Section` / `Row` / `RowList`)도 #475 에서 지웠다.
+
+> **`BackLink` 의 `titleRow` 는 모바일 전용 차이다** (#539). `md` 이상에서는 `inline` 과
+> 같은 모습으로 되돌아가므로, 데스크톱에서 일곱 호출부가 한 모양이다. 제목 줄 왼쪽 아이콘은
+> **`h1` 이 보이는 화면**에서만 뜻이 있다 — 마이페이지 하위 두 화면처럼 보이는 제목이 카드
+> 안 `h2` 인 곳에는 그 자리가 없다.
+
+> **`Button` 의 `dangerOutline` 은 저강조 파괴 액션이다** (DESIGN.md §2-6 표).
+> 화면에 그냥 놓여 있는 삭제 버튼이 이것이고, `danger`(채움)는 **확인 다이얼로그의 확정
+> 버튼**처럼 그 순간의 주 행동일 때만 쓴다. 더보기 메뉴 안의 삭제는 버튼이 아니라
+> `Menu` 의 `destructive` 항목이다.
+
+> **`Button` 의 `inverse` · `inverseOutline` 은 소개 페이지(`/about`) 그린 밴드 전용이다**
+> (DESIGN.md §0-2). 밴드 배경(`--brand-700`) 위에서 대비를 맞춘 반전 버튼이라 다른 화면의
+> 흰/연한 배경 위에서는 쓰지 않는다.
+
+- **같은 의미에 다른 이름을 쓰지 않는다.** 어떤 컴포넌트는 `danger`, 다른 건 `error` 가 되면 사용처에서 매번 확인해야 한다.
+- `size` 값은 항상 `sm`/`md`/`lg` 에서 고른다. `xs`/`xl` 이 필요하면 정말 필요한지 먼저 검토한다.
+
+### 구현 방식
+
+`cva` 같은 라이브러리를 도입하지 않는다. **`Record` 맵 + `cn()`** 으로 충분하다.
+
+```tsx
+const VARIANT: Record<ButtonVariant, string> = {
+  primary: 'bg-brand-500 text-fg-inverse hover:bg-brand-600',
+  secondary: 'border border-border-strong text-fg hover:bg-band',
+  ghost: 'text-fg-muted hover:bg-band',
+  danger: 'bg-danger-700 text-fg-inverse',
+}
+
+const SIZE: Record<ButtonSize, string> = {
+  sm: 'h-8 px-3 text-body-2', // 시각 32 — 실제 히트 영역은 `::before` 로 위아래 8px 씩 넓힌다 (#905 R3)
+  md: 'h-11 px-4 text-body-1', // 폼 컨트롤 높이 44 — Input 과 같은 줄에 선다 (#883)
+  lg: 'h-12 px-5 text-body-1',
+}
+```
+
+`Record<Union, string>` 으로 선언하면 **union에 값을 추가할 때 맵 누락을 타입체커가 잡는다.** `Partial` 이나 인덱스 시그니처를 쓰지 않는다.
+
+### 44 는 이제 규칙이 아니라 두 가지 다른 이유다 ([#883](https://github.com/8llow8llowMe/hondigagae/issues/883) · [#891](https://github.com/8llow8llowMe/hondigagae/issues/891))
+
+`DESIGN.md` §7 의 **모바일 최소 터치 영역 44×44** 는 **지도 위 타깃(마커·묶음 원)에만** 남았다.
+그래서 컴포넌트에 남아 있는 44 를 _"규칙이 그렇다"_ 로 설명하면 이제 거짓이다. 둘 중 하나로 적는다.
+
+| 종류                    | 자리                                                                 | 적을 근거                                                                                 |
+| ----------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **폼 컨트롤 높이**      | `Button` `md` · `Input` · `Textarea`(`min-h`) · `DateField`          | **정렬**이다. 같은 줄에 서는 입력과 버튼이 서로 맞는 값이라 **한쪽만 내리면 어긋난다**    |
+| **그 자리에서 고른 값** | `Checkbox`·`RadioGroup` 행 · `Menu` 항목 · `Calendar` 칸 · `InfoTip` | 규칙이 아니라 선택이다. **줄이려면 375 에서 재고 줄인다** — 근거는 측정이지 문서가 아니다 |
+
+- **일괄로 내리지 않는다.** #883 이 실제로 측정한 것은 `/emergency` 시트의 칩 한 자리이고,
+  거기서만 모바일 36 으로 내렸다(`Chip` 의 `size="sm"`). 나머지는 **그 화면에서 세로가
+  모자란 것을 재고 나서** 내린다.
+- **내릴 때도 기본값을 바꾸지 않는다.** `Button` 은 이미 `sm`(32) · `md`(44) · `lg`(48) 을
+  갖고 있고 `Chip` 은 `size` 를 갖는다 — **호출부가 고르는 축**이 이미 있다. 기본값을 내리면
+  한 커밋이 전 화면을 바꾸고 되돌릴 때도 전 화면이 함께 움직인다.
+- **시각 크기를 줄여도 누르는 자리는 줄이지 않는다** (#905 R3). `Button` `sm`(시각 32)은
+  `::before` 로 위아래 8px 씩, `Chip` `sm`(모바일 시각 36)은 6px 씩 히트 영역을 넓힌다 —
+  기준 상자가 패딩 상자라 1px 테두리만큼 줄어 실측은 버튼 46~48 · 칩 46 이다. `#883` 이 정한
+  시각 크기는 그대로 두고 접근성 하한만 의사요소로 되찾는다.
+- **`overflow-x-auto` 스크롤 레일 안의 칩은 레일이 세로 여백을 줘야 잘리지 않는다.** 칩의
+  히트 영역이 `::before` 로 카드 밖까지 나가는데, 레일 자신이 세로로 꽉 차 있으면(`py-0`)
+  그 의사요소가 `overflow` 에 잘려 위아래 절반이 눌리지 않는다.
+
+## 3. `className` 정책 (중요)
+
+**허용하되 레이아웃 유틸리티만.** `cn()` 으로 병합한다.
+
+| 허용                                                                                          | 금지                                                                         |
+| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `margin`(`mt-4`, `mb-2`), `width`/`flex`/`grid` 배치, `self-*`/`justify-self-*`, `col-span-*` | 색(`bg-*`, `text-*`), `rounded-*`, `shadow-*`, `padding`, `height`, `font-*` |
+
+**근거**: 배치는 **사용처**가 알고, 외형은 **컴포넌트**가 소유한다. 외형까지 뚫어주면 `<Button className="bg-[#333] p-[13px]">` 로 `DESIGN.md` 토큰 규약 전체가 우회된다.
+
+- arbitrary value(`p-[13px]`, `text-[#333]`)는 lint가 이미 막는다 (`tooling-guide.md` §5).
+- **`cn()` 은 커스텀 타이포 스케일을 `extendTailwindMerge` 로 등록해 두었다.** 등록하지 않으면
+  tailwind-merge 가 `text-caption` 을 글자 색으로 오인해 `text-fg-muted` 를 지운다.
+  **`DESIGN.md` §3-2 에 타이포 토큰을 추가하면 `src/lib/utils/cn.ts` 의 목록도 함께 갱신한다.**
+- **토큰 클래스로 외형을 덮는 것**(`className="bg-danger-500"`)은 lint가 못 잡는다 → `fe-reviewer` 체크 항목이다.
+- 전면 금지하지 않는 이유: 금지하면 배치를 위해 wrapper `<div>` 를 남발하게 되고 DOM이 지저분해진다.
+
+```tsx
+// 좋음 — 배치만
+<Button className="mt-4 w-full" variant="primary">저장</Button>
+
+// 금지 — 외형 덮어쓰기. variant를 추가하거나 DESIGN.md를 갱신한다
+<Button className="bg-accent-500 rounded-full">저장</Button>
+```
+
+## 4. 합성 vs prop 확장
+
+**판단 기준을 숫자로 고정한다.** 감각으로 정하면 사람마다 갈린다.
+
+> **"표시 여부를 제어하는 prop"이 3개를 넘으면 합성으로 전환한다.**
+
+```tsx
+// prop 폭발 — 전환 대상
+<PlaceRow
+  showImage showBadge showDistance showPetInfo showBookmark
+  title={...} imageUrl={...} />
+
+// 합성
+<PlaceRow>
+  <PlaceRow.Image src={...} />
+  <PlaceRow.Title>{...}</PlaceRow.Title>
+  <PlaceRow.Meta>
+    <Badge>반려견 동반 가능</Badge>
+    <PlaceRow.Distance meters={1200} />
+  </PlaceRow.Meta>
+</PlaceRow>
+```
+
+- 데이터 prop(`title`, `imageUrl`)은 개수에 포함하지 않는다. **표시 토글(`showX`, `hideX`, `withX`)만** 센다.
+- 합성 컴포넌트는 같은 파일에 두고 `Parent.Child` 로 붙인다. 파일을 쪼개지 않는다.
+- 반대로 **합성이 2단계를 넘으면 과설계**다. 그때는 feature 전용 컴포넌트로 만든다.
+
+## 5. controlled 전용
+
+**상호작용 컴포넌트는 controlled만 제공한다.** `value` + `onValueChange` 쌍.
+
+- uncontrolled(내부 state) 모드를 함께 지원하지 않는다. 두 모드 지원은 "값이 안 바뀌는" 버그의 대표 원인이다.
+- 폼 라이브러리와의 결합도 controlled가 전제다 (`form-guide.md`).
+- 예외: `Modal`/`BottomSheet` 의 열림 상태는 사용처가 항상 소유한다 (`open` + `onClose`).
+- **값이 아닌 표시 상태는 컴포넌트가 갖는다.** `InfoTip` 의 열림, `PasswordInput` 의 가려짐/보임(#1080)이 그렇다 — 제출에 실리지 않고 사용처가 읽거나 되돌릴 일이 없다. 이것은 "두 모드 지원" 이 아니다: 그 상태에는 controlled 모드가 **아예 없다.** 값(`value`)은 여전히 controlled 다. 사용처가 그 상태를 알아야 하는 순간(예: 제출 뒤 다시 가리기)이 생기면 그때 controlled 로 **바꾼다** — 두 모드를 함께 열지 않는다.
+
+### `PasswordInput` — 비밀번호 칸은 이것 하나다 ([#1080](https://github.com/8llow8llowMe/hondigagae/issues/1080))
+
+`Input` 을 감싸 입력란 **안**에 눈 토글(`ghost` · `md` · `iconOnly`, 44×44)을 세운다. `type` · `action` · `suffix` 는 받지 않는다 — 표시 상태와 토글 자리가 정한다.
+
+| prop              | 뜻                                                                                                          |
+| ----------------- | ----------------------------------------------------------------------------------------------------------- |
+| `Input` 의 나머지 | `id` · `value` · `onValueChange` · `invalid` · `autoComplete` · `ref` 그대로                                |
+| `revealLabels?`   | `{ show, hide }` 버튼 이름. 기본 `비밀번호 표시` / `비밀번호 숨기기`. **한 화면에 칸이 둘 이상이면 넘긴다** |
+
+- 토글은 `aria-label`(상태별) · `aria-pressed` · `aria-controls={id}` 를 단다. 아이콘은 `aria-hidden`.
+- 규칙 안내는 이 컴포넌트가 아니라 감싸는 `Field.hint` 가 한다 (`messages.form.passwordRule`).
+- 쓰는 곳: 로그인 · 회원가입 3단계 · 비밀번호 재설정 · 마이페이지 변경/설정. 로그인은 #1081 에서 옮겼다 — `LoginFormFields` 의 `showPassword` · `onTogglePassword` prop 이 걷혔고, Caps Lock 안내용 키 이벤트는 native prop 으로 그대로 넘긴다.
+
+## 6. ref
+
+**React 19 기준으로 `ref` 를 일반 prop으로 받는다.** `forwardRef` 를 쓰지 않는다.
+
+```tsx
+type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
+```
+
+- 상호작용 컴포넌트(`Button`, `Input`)는 `ref` 를 반드시 받는다. 포커스 이동·스크롤 대상이 된다.
+
+### 버튼 외형의 **이동** 은 `ButtonLink` 다
+
+**`Button` 에 `href` 를 뚫지 않는다.** 버튼과 링크는 시맨틱(스페이스 vs 엔터), 새 탭·주소
+복사·컨텍스트 메뉴가 다르고, 한 컴포넌트가 둘을 오가면 호출부가 어느 쪽을 만드는지 알 수 없다.
+
+**외형 상수(`VARIANT`/`SIZE`)를 두 컴포넌트가 공유하는 것이 핵심이다.** 이것이 없어서 화면
+다섯 곳이 버튼 외형을 손으로 복제했고, `--brand-500` 을 바꿔도 복제본은 그대로 남았다 (#70).
+
+같은 이유로 **`MenuItem` 은 `href` 를 받고**(이동) **`Banner` 는 `<Link>` 를 렌더한다.**
+컴포넌트가 이동을 표현하지 못하면 화면이 우회하고, 우회는 조용히 갈린다.
+`Textarea` · `Select` 는 **아직 만들지 않았다** — 필요한 화면이 생기면 같은 규칙으로 추가한다.
+
+#### icon-only 는 타입이 `aria-label` 을 강제한다 (`Button` · `ButtonLink` 둘 다)
+
+**하이픈이 든 JSX 속성은 TypeScript 가 props 타입과 대조하지 않는다.** props 에 없는
+`aria-label` 을 컴포넌트에 넘기면 **컴파일은 통과하고 값만 조용히 버려진다** — 아이콘
+버튼에 접근 가능한 이름이 사라지는데 타입도 lint 도 잡지 못하는 유일한 경로다.
+`ButtonLink` 에서 실제로 겪었다 (#75).
+
+그래서 두 컴포넌트 모두 유니온으로 강제한다. 아이콘은 `leading` 에 넣고 `children` 은 두지 않는다.
+
+```tsx
+{ iconOnly: true; 'aria-label': string; children?: never } | { iconOnly?: false; children: ReactNode }
+```
+
+- 순수 표시 컴포넌트(`Badge`, `Skeleton`, `PetAvatar`)는 필요할 때만 추가한다.
+
+### 도메인 표시 조각도 `src/components/` 에 둔다
+
+`PetAvatar`(반려견 원형 아바타)는 홈과 일정 목록이 함께 쓴다. feature 폴더에 두면
+`features/plan` 이 `features/home` 을 임포트하게 되어 경계가 무너진다 — `metric.tsx`
+(등급 표시)가 같은 자리에 있는 이유와 같다.
+
+**뽑기 전에 인라인 복제가 몇 개인지 센다.** `PetAvatar` 는 홈에만 두 벌(96/112 · 24)이
+있었고 일정이 세 벌을 더 만들 참이었다. `describePet`(`src/lib/pet/describe.ts`)도 같은
+경위로 뽑았다 — 크기를 넣는 자리와 빼는 자리가 달라 옵션 하나로 갈린다.
+
+## 7. 접근성 계약 (컴포넌트가 보장할 것)
+
+프로젝트 전체 a11y 규칙은 `styling-guide.md` §6이다. 여기서는 **각 컴포넌트가 자체적으로 보장해야 하는 것**을 정한다.
+
+| 컴포넌트                    | 보장                                                                                                                                                                               |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Button`                    | `type` 기본값 `"button"` (form 안에서 의도치 않은 submit 방지). `loading` 이면 `disabled` + `aria-busy`                                                                            |
+| `Chip` / `Tab`              | `aria-pressed` / `aria-selected` 를 상태와 동기                                                                                                                                    |
+| `Input` 계열                | `label` 연결(`id`/`htmlFor`), `error` 시 `aria-invalid`. `aria-describedby` 는 `Field` 가 보인 안내 · 오류 하나 + `extraDescribedBy` (#1100 · #1295)                               |
+| `Modal` / `BottomSheet`     | focus trap, `Esc` 닫기, 열릴 때 body 스크롤 잠금, 닫힐 때 트리거로 포커스 복귀. `BottomSheet` 의 Tab 가두기는 `trapFocus` 옵트인, 복귀 자리는 `triggerRef` 로 바꿀 수 있다 (#1295) |
+| `RadioGroup`                | `<fieldset>` + `<legend>` 로 그룹 라벨. 각 항목의 `<label htmlFor>` 가 자기 input 을 가리킴. `error` 시 `aria-invalid` + `aria-describedby`                                        |
+| `Checkbox`                  | 자체 `<label htmlFor>`. `error` 시 `aria-invalid` + `aria-describedby`                                                                                                             |
+| `Skeleton`                  | `aria-hidden` (스크린리더에 의미 없는 반복 읽기 방지)                                                                                                                              |
+| `EmptyState` / `ErrorState` | 제목이 heading 요소여야 한다. **레벨은 담는 곳이 정한다** — `headingLevel` (`styling-guide.md` §3-1)                                                                               |
+| `InfoTip`                   | hover · focus · click **셋 다** 열고 `Esc`·바깥 클릭이 닫는다. `title` 속성을 쓰지 않는다. `md` 미만은 `BottomSheet` 로 떨어뜨린다                                                 |
+
+### 폼 실패 표시는 한 길로만 읽힌다 — `announce` ([#1102](https://github.com/8llow8llowMe/hondigagae/issues/1102))
+
+`FormAlert` · `FormFailure` 는 `role="alert"`(`announce="live"`)이거나 포커스 대상(`announce="focus"`,
+역할 없음)이거나 **둘 중 하나**다. 둘 다면 알림이 나타나며 한 번, 포커스가 옮겨 오며 한 번 같은
+문구를 읽는다. 판정과 예외는 `form-guide.md` §8 이 정본이다.
+
+- `FormAlert.announce` 는 **선택, 기본값 `live`** — 지금까지의 동작이다. 쓰는 30개 파일(39곳) 중
+  `FormFailure` 만 `announce` 를 넘긴다. 포커스를 옮기지 않는 자리에 `focus` 를 주면 아무것도 읽히지 않는다.
+- `FormFailure.announce` 는 **필수** — 호출부 일곱 자리(로그인 · 가입 세 단계 · 재설정 두 단계 ·
+  반려견 폼)가 포커스 effect 와 같은 판정(`submitFailureAnnounce`)으로 넘긴다. `submitting` 을
+  필수로 둔 것과 같은 이유다.
+- `tabIndex={-1}` · `data-form-alert` · `data-form-temporary-error` 는 두 값 모두 그대로다 — 포커스를
+  찾는 쪽은 역할이 아니라 이 속성을 본다.
+
+### `role="radiogroup"` 은 키보드 규약까지 함께 온다 ([#825](https://github.com/8llow8llowMe/hondigagae/issues/825))
+
+`role="radiogroup"` + `role="radio"` 를 쓰는 순간 WAI-ARIA 가 요구하는 것이 둘 더 있다. 문법만 맞추고
+키보드를 두고 오면 **보조기기에는 라디오라고 말하면서 라디오처럼 움직이지는 않는** 컨트롤이 된다.
+
+| 요구                                                   | 구현                                            |
+| ------------------------------------------------------ | ----------------------------------------------- |
+| 묶음 전체가 **탭 스톱 하나** (roving `tabindex`)       | 각 칸에 `tabIndex={radioTabIndex(selected)}`    |
+| **←/→ ↑/↓** 로 이동, 끝에서 감고 `Home`·`End` 가 양 끝 | 각 칸에 `onKeyDown={handleRadioGroupKeyDown}`   |
+| 이동하면서 **선택도 바뀐다**                           | 위 핸들러가 `focus()` 와 `click()` 을 함께 한다 |
+
+정본은 `lib/ui/radio-group-keys.ts` 다. **둘 다 칸(`<button role="radio">`)에 붙는다** — 묶음은 눌린
+칸에서 `closest('[role="radiogroup"]')` 로 거슬러 찾는다. 컨테이너에 `onKeyDown` 을 걸면
+`jsx-a11y/interactive-supports-focus` 가 "포커스를 받을 수 없는 요소가 키를 듣는다" 로 잡고, APG 의
+참조 구현도 칸에 붙인다. `ref` 를 요구하지 않으므로 이미 `ref` 를 사용처에 내준 묶음
+(`ChipGroup` + `useScrollRail`)에도 그대로 붙고, `tabIndex` 와 자리가 같아 둘 중 하나만 빠뜨리기
+어렵다.
+
+**붙는 곳은 다섯이다** — `FilterList(exclusive)` · `ChipGroup(exclusive)` ·
+`walk-course-filter-fields` · `emergency-type-segment` · `PlanStatusTabs`. 새 배타 묶음을 만들면 여기에
+더한다. 화면마다 "탭 스톱이 정확히 하나" 를 `lib/ui/radio-group-keys.test.ts` 가 잠그므로, 빠뜨리면
+빨간불이 된다.
+
+**다중 축에는 붙이지 않는다.** `role="checkbox"` 와 `aria-pressed` 토글은 칸마다 탭 스톱이 규약이고,
+화살표로 선택이 바뀌면 안 된다. `FilterList`·`ChipGroup` 은 `exclusive` 한 값으로 둘을 가른다.
+
+**폼의 `RadioGroup`(`components/radio-group.tsx`)은 손대지 않는다.** 그쪽은 네이티브
+`<input type="radio">` 라 브라우저가 roving `tabindex` 와 화살표 이동을 이미 준다 — 직접 구현하면
+오히려 어긋난다.
+
+### `aria-describedby` 는 `Field` 가 정한다 ([#1100](https://github.com/8llow8llowMe/hondigagae/issues/1100))
+
+입력란이 가리키는 설명은 **화면에 실제로 보이는 것만**이다. 무엇이 보이는지는 `Field` 만 안다 —
+오류가 있으면 hint 를 감추고 그 자리에 오류를 그린다(#1080).
+
+| `Field` 상태     | 그리는 것        | 입력란 `aria-describedby` |
+| ---------------- | ---------------- | ------------------------- |
+| hint 만          | `fieldHintId()`  | `<id>-hint`               |
+| 오류 (hint 무관) | `fieldErrorId()` | `<id>-error` 하나         |
+| 둘 다 없음       | —                | 걸지 않는다               |
+
+`extraDescribedBy`(#1295)를 주면 위 값 **뒤에** 덧붙인다 — 예: 가입 단계 첫 칸의 `code-error signup-step-status`,
+안내 · 오류가 없으면 `signup-step-status` 만. 고칠 정보(안내 · 오류)가 먼저 읽히게 뒤에 둔다. 주지 않으면 위 표 그대로다.
+
+- id 규칙(`fieldErrorId` · `fieldHintId`)과 판정(`fieldDescription`)은 `components/field.tsx` 한 곳이다.
+  `Field` 의 렌더도 같은 판정을 본다 — 그리는 조건과 가리키는 조건이 갈리지 않게.
+- **`Field` 가 context 로 내려준다** (`components/field-context.tsx`). 입력은
+  `useFieldDescribedBy(id, fallback)` 로 읽는다. 사용처의 입력에 prop 을 하나 더 두면 `Field` 의 `hint` 와
+  따로 놀아, 열다섯 곳 중 한 곳이 빠져도 아무도 모른다.
+- **id 가 같을 때만 가져간다.** `Field` 밖이거나 id 가 다르면 지금처럼
+  `invalid ? fieldErrorId(id) : undefined` 다 — 오류 문구를 직접 그리는 자리의 동작이다.
+- **`'use client'` 는 `field-context.tsx` 에만 있다.** `createContext` 는 서버 그래프에 없다. `Field` 는
+  지시어 없이 그 Provider 를 렌더하므로 서버 컴포넌트에서도 그려지고, id 규칙도 서버에서 부를 수 있다.
+  훅을 읽는 `Input` · `Textarea` 는 `'use client'` 다.
+- 쓰는 입력: `Input` · `Textarea` · `DateField`, 그리고 `Input` 을 감싼 `PasswordInput` · `AmountInput` ·
+  `VerificationCodeInput`. 새 입력을 만들면 같은 훅을 쓴다. 잠그는 테스트는
+  `components/field-description.test.ts` 다.
+- 선택 계열(`RadioGroup` · `CheckboxGroup` · `Checkbox`)은 `Field` 를 쓰지 않고 hint 도 없다 — 선택지
+  설명은 라벨 안에 있어 이름과 함께 읽힌다(아래 절).
+
+### 선택 계열은 `Field` 로 감싸지 않는다
+
+`Field` 는 `<label htmlFor>` 로 **단일 입력 요소**를 가리킨다. 선택 계열 둘은 그 전제가 깨진다.
+
+| 컴포넌트     | `Field` 를 쓰지 않는 이유                                                 | 대신 쓰는 것              |
+| ------------ | ------------------------------------------------------------------------- | ------------------------- |
+| `RadioGroup` | 라디오 _그룹_ 은 labelable 요소가 아니다. `htmlFor` 가 가리킬 대상이 없다 | `<fieldset>` + `<legend>` |
+| `Checkbox`   | 체크박스는 스스로 labelable 이고, 라벨이 위가 아니라 **옆**에 와야 한다   | 자체 `<label>` 로 감싸기  |
+
+**오류 요소 id 규칙은 공유한다.** 둘 다 `fieldErrorId()` 를 쓴다 — 규칙이 갈리면
+`aria-describedby` 가 실제로 연결됐는지 컴포넌트마다 따로 확인해야 한다.
+
+`RadioGroup` 이 `select` 가 아닌 이유는 선택지의 `description` 이다. "소형견 / 중형견 / 대형견"만
+보여주면 사용자가 체중 기준을 알 수 없는데, `select` 는 그 설명을 숨긴다
+(`docs/features/pet/공통명세.md` S5-2). 선택지가 3~4개를 넘어가면 재검토한다.
+
+### icon-only 버튼은 타입으로 강제한다
+
+주석으로 "aria-label 붙이세요"라고 쓰면 반드시 누락된다. **타입으로 막는다.**
+
+```ts
+type IconOnly = { iconOnly: true; 'aria-label': string; children?: never }
+type WithLabel = { iconOnly?: false; children: React.ReactNode }
+
+export type ButtonProps = (IconOnly | WithLabel) & BaseButtonProps
+```
+
+`iconOnly` 를 주고 `aria-label` 을 빼면 **컴파일이 실패한다.** 이런 식으로 리뷰 항목을 타입으로 내리는 것을 우선한다.
+
+### `InfoTip` — 보조 설명은 hover 만으로 열지 않는다
+
+응답에 근거 문장은 있는데 화면에 자리가 없는 필드를 여는 채널이다 (#313). 상시 노출로
+세우면 밀도만 키우고 행동은 바꾸지 않는 문장들이다.
+
+| 규칙                                  | 이유                                                                    |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| hover + focus + click **셋 다**       | hover 만이면 터치에서 안 열리고 키보드로도 못 연다                      |
+| `Esc` · 바깥 클릭으로 닫는다          | 덮개가 없는 팝오버라 문서에서 직접 듣는다 (`Menu` 와 같은 방식)         |
+| **`title` 을 쓰지 않는다**            | 모바일에서 안 뜨고 스크린리더 지원이 제각각이며 지연을 우리가 못 정한다 |
+| `md` 미만은 `BottomSheet`             | 근거 문장이 100자를 넘어 390px 말풍선에 안 들어간다                     |
+| **하나만 mount 한다**                 | `md:hidden` 으로 감춘 시트도 `useOverlay` 로 Esc·포커스를 가로챈다      |
+| **포커스를 옮기지 않는다**            | 팝오버는 읽는 것이다. 옮기면 focus 로 연 것이 blur 로 곧바로 닫힌다     |
+| `aria-describedby` + `role="tooltip"` | 트리거에 머문 채 내용이 읽힌다                                          |
+| 누르는 자리 44                        | 아이콘 16 + `p-3`. `-m-3` 로 레이아웃 폭은 20 으로 되돌린다             |
+
+**클릭으로 연 것은 고정된다** — hover 가 끝나도 닫히지 않는다. 읽는 도중에 사라지면 읽을 수 없다.
+
+**팝오버를 펴는 쪽은 `align` 이 정한다** (#1065). 기본 `end` 는 아이콘 오른쪽 끝에 맞춰 왼쪽으로
+편다 — 값 오른쪽에 붙는 아이콘(체감온도 라벨)의 자리다. **카드 제목 옆 아이콘은 `start`** 다.
+제목이 카드 왼쪽에서 시작해, 왼쪽으로 펴면 768 한 컬럼에서 말풍선이 화면 밖으로 나간다. 제목 옆에
+둘 때는 `Surface` 의 `titleTrailing` 자리를 쓴다 — `title` 안에 넣으면 버튼 이름이 섹션 이름
+(`aria-labelledby`)에 섞인다.
+
+## 8. 파일 내부 순서
+
+```tsx
+'use client'                    // 필요할 때만, 최상단
+
+// imports (coding-conventions.md §2 4그룹)
+
+// 1. 타입
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+export type ButtonProps = ...
+
+// 2. 상수 (variant/size 맵)
+const VARIANT: Record<ButtonVariant, string> = { ... }
+
+// 3. 컴포넌트 (파일당 1개가 기본)
+export function Button({ ... }: ButtonProps) { ... }
+
+// 4. 합성 하위 컴포넌트
+Button.Group = function ButtonGroup() { ... }
+
+// 5. 파일 내부 전용 helper
+function resolveTone() { ... }
+```
+
+- 타입을 파일 하단에 두지 않는다. 계약이 먼저 읽혀야 한다.
+- 재사용되는 helper는 `src/lib/` 로 뺀다. 파일 내부 helper는 그 파일에서만 쓰는 것만.
+
+## 9. 승격 / 확장 규칙
+
+### feature 전용 → 공통으로 승격
+
+> **2곳 이상의 feature에서 쓰이면 `src/components/` 로 올린다.** 1곳이면 feature 안에 둔다.
+
+- "나중에 쓸 것 같아서" 미리 공통으로 만들지 않는다. 사용처가 하나면 추상화가 틀릴 확률이 높다.
+- 승격할 때 feature 고유 개념(장소·일정 같은 도메인 용어)을 prop 이름에서 제거한다.
+
+### 기존 공통 컴포넌트 확장
+
+- 새 prop은 **항상 optional + 기존 동작을 유지하는 기본값**으로 추가한다.
+- 기본 동작을 바꾸는 변경은 **모든 사용처를 grep해 확인**하고 PR에 목록을 적는다.
+- variant/size 값 추가는 `DESIGN.md` 갱신과 같은 PR에서 한다.
+
+## 10. 상태 표현 컴포넌트 (재확인)
+
+`styling-guide.md` §2에서 분리한 3종의 계약을 여기서 고정한다. **이 셋을 하나로 합치지 않는다.**
+
+| 컴포넌트     | prop                                                  | 재시도 버튼   |
+| ------------ | ----------------------------------------------------- | ------------- |
+| `Skeleton`   | `count?`, `variant?: 'text' \| 'card' \| 'thumbnail'` | —             |
+| `EmptyState` | `title`, `description?`, `action?`, `character?`      | **슬롯 없음** |
+| `ErrorState` | `title`, `description?`, `onRetry` (**필수**)         | 필수          |
+
+둘 다 여백 축을 **`inset` 이거나 `flush`** 로 받는다 (`StatePlacement`, `src/lib/ui/inset.ts`). `flush`
+는 담는 쪽이 이미 여백을 가진 자리(인증 셸 카드 · 폼 안) 전용이고 상태 자신의 세로 48 과 좌우 인셋을
+둘 다 걷는다 (#1079). 둘을 함께 주는 것은 타입이 막는다. `EmptyState.headingLevel` 의 `1` 은 화면
+전체가 그 상태이고 위에 `h1` 이 없을 때만이다(소셜 콜백) — 크기는 그대로다.
+
+- `Skeleton.surface?: 'default' | 'band'` — `band` 는 `--band` 채움 카드 안의 골격이다. 기본 골격도 `--band`
+  라 그 위에서 사라지므로 `--bg` 로 칠한다 (#1233 지도 미리보기 판정 카드). 색을 `className` 으로 덮지 않는다(§3).
+- `EmptyState` 에 `onRetry` prop을 추가하자는 요청은 거절한다. 404에 재시도 버튼을 붙이는 경로가 열린다 (`api-integration-guide.md` §3).
+- `ErrorState` 의 `onRetry` 는 **필수 prop**이다. optional로 두면 빠진다.
+- `EmptyState.action` 은 재시도가 아니라 **다음 행동**이다 (예: "다른 지역 선택하기").
+- `EmptyState.character` 는 DESIGN.md §0-5 표의 자리만 넘긴다 — `src/components/character.test.ts` 가 호출부를 목록과 대조한다. 필터 결과 0건에는 넘기지 않는다.
+
+## 11. 체크리스트
+
+새 공통 컴포넌트를 만들거나 확장할 때:
+
+- [ ] prop 이름이 §1 표를 따른다
+- [ ] `variant`/`size` 값이 §2 표준 집합 안에 있다
+- [ ] `Record<Union, string>` 으로 맵을 선언했다 (누락을 타입체커가 잡는다)
+- [ ] `className` 을 받고 `cn()` 으로 병합한다 (레이아웃 유틸리티 용도)
+- [ ] 표시 토글 prop이 3개 이하다 (넘으면 합성)
+- [ ] controlled 전용이다
+- [ ] 상호작용 컴포넌트면 `ref` 를 받는다
+- [ ] §7 접근성 계약을 지킨다. icon-only는 타입으로 강제했다
+- [ ] 파일 내부 순서가 §8을 따른다
+- [ ] 확장이면 새 prop이 optional이고 기존 사용처가 깨지지 않는다
+- [ ] `md` 사이즈가 폼 컨트롤 높이(44)를 지킨다 — `Input`·`DateField` 와 같은 줄에 서는 값이다

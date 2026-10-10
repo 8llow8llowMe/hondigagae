@@ -1,0 +1,1305 @@
+# Plan Service
+
+## 책임
+
+- 여행 일정(plan) CRUD — 일자별 항목(장소/식사/숙박/산책/이동) 관리
+- 여행 후기 관리 (AI 자동 작성 초안은 ai-service, 저장·공개는 이 서비스)
+- 일정 공유 (향후 카카오 메시지 API 연계)
+
+## 컨텍스트
+
+- `plan` — 일정, 일정 항목
+- `review` — 여행 후기(v1 저장은 `plan` 패키지). 사진은 미착수
+
+## 도메인 모델 (기획)
+
+- `Plan` — 회원, 대표 반려견(petId), 지역, 기간, 예산, 상태(초안/확정/완료)
+- `PlanPet` — 일정에 동행하는 반려견 한 마리 (plan ↔ pet 다대다, `plan_pet`). 첫 행이 `Plan.petId` 와 같다
+- `PlanItem` — 일자(day), 순서(sequence), 항목 유형(`PlanItemType`: PLACE/MEAL/LODGING/WALK/MOVE), 대상 참조(placeId 또는 walkCourseId), 메모
+- `Review` — 대상 plan, 만족도, 본문, 사진, 방문 장소별 평가(성향 분석 입력)
+
+## 주요 API (계획)
+
+- `GET|POST /api/v1/plans` — GET 목록 항목은 `itemCount`(일정 전체 항목 수, 모든 일자·유형 합, 빈 일정 0)를 싣는다. 페이지의 일정 id 로 `plan_item` 을 `in` 절 + `group by` 한 번에 집계하고 항목 없는 일정은 0 이다 (#1242). 일정 브리핑 `itemCount`(하루 단위)와 같은 정의다. POST 는 `sourceAiJobId` 를 실으면 **AI 초안 담기 멱등**이다 (아래 "AI 초안 담기 멱등" 절, #970)
+- `GET|PUT|DELETE /api/v1/plans/{planId}`
+- `POST /api/v1/plans/{planId}/copy` — 지난 일정을 새 DRAFT 로 복제
+- `PUT /api/v1/plans/{planId}/days/{day}/items` — 일자 단위 항목 일괄 편집. 생성과 함께 **일정 전체 항목 100개 상한**을 진다 —
+  한 날 목록이 넘으면 `PLAN_136`, 교체 뒤 일정 전체가 넘으면 `PLAN_028` (아래 "일정 항목 수 상한" 절, #1243)
+- `GET|POST|PUT /api/v1/plans/{planId}/reviews` — 일정당 후기 하나. 작성·수정은 완료된 일정만, 조회는 상태와 무관. 사진은 없음
+- `GET|POST|DELETE /api/v1/plans/{planId}/share-link` — 읽기 전용 공유 링크 발급·조회·폐기 (인증)
+- `GET /api/v1/shared-plans/{token}` — 공유 링크로 일정 열기 (**비인증**)
+- `GET /api/v1/plans/companions/{petId}` — 반려견 삭제 확인창용 동행 일정 집계 (인증, #972).
+  `{ petId, editablePlanCount, soleCompanionPlanCount, completedPlanCount }` — 아래 "반려견이 삭제되면" 절 참고
+
+## 구현 주의점
+
+- **일정의 소유권은 이 서비스에 있다.** ai-service는 일정안을 생성·제안만 하고, 저장·확정은 이 서비스 API를 통해서만 일어난다.
+- AI가 생성한 일정을 저장할 때도 일반 생성과 같은 검증(장소 존재 여부, 날짜 정합성)을 거친다.
+  장소 검증은 tour-service 내부 벌크 API(`GET /internal/v1/places/visible-ids`)를 **한 번** 불러
+  수행한다 — 항목마다 따로 부르면 저장 한 번에 원격 왕복이 항목 수만큼 생긴다 (coding-conventions §9-7).
+  delisted 장소는 존재하지 않는 것으로 오므로, 원천에서 사라진 장소를 새 항목이 참조하는 것도 여기서 막힌다.
+- **항목 타깃 검증의 입구는 `PlanCommandProcessor.verifyItemTargets` 하나다 (#715).** 유형마다
+  `targetId` 의 아이디 공간이 달라 장소와 산책 코스를 따로 묻되, **종류마다 원격 호출은 한 번**이고
+  Facade 가 트랜잭션 밖에서 부른다(생성 · 일자 교체).
+  - **`WALK` 의 `targetId` 도 이제 검증된다** — 없는 코스를 가리키면 `PLAN_025` 400
+    (`NOT_FOUND_PLAN_WALK_COURSE`, "일정 항목의 산책 코스를 찾을 수 없습니다."). 전에는 그대로
+    저장돼 제목만 남은 항목이 됐고, 상세의 빈 `walkCourse` 는 "코스 없음" 과 "tour-service 일시
+    장애" 를 구분해 주지 못해 사용자에게 원인을 말해 줄 수 없었다.
+  - **`PLAN_004`(장소)를 재사용하지 않는다.** 문구가 "장소를 찾을 수 없습니다" 라 코스에 대해서는
+    사실이 아니고, 코드가 있는 이유는 클라이언트가 **무엇이** 잘못됐는지 알기 위해서다. 성격은
+    같아서(같은 본문을 다시 보내면 같은 400) 프론트는 둘 다 재시도 버튼 없는 400 으로 다룬다.
+  - **`isPlaceTarget()` 을 넓혀 장소 검증에 태우지 않는다 (필수).** 그 판정의 뜻은 "`targetId` 가
+    `place.id` 인가" 이고, 응급 브리핑(`PlanEmergencyProcessor`)과 상세 요약
+    (`PlanQueryProcessor.placeTargetIdOf`)이 같은 판정으로 조회 대상을 고른다 — 넓히면 그 두 경로가
+    `walk_course.id` 를 장소 아이디 공간에서 찾는다. 이름이 흐려지는 문제가 아니라 동작이 깨진다.
+  - 존재 확인에 **코스 요약 조회(`PlanWalkCourseQueryPort.findSummaries`)를 그대로 쓴다.** 목록에
+    없는 아이디는 결과에서 빠지므로 아이디 집합 비교로 충분하다. 전용 엔드포인트를 새로 열면 검증에
+    필요 없는 본문은 덜지만 tour-service 내부 API 가 하나 늘고 두 경로가 같은 표를 각자 묻게 된다 —
+    한 번 저장에 담기는 코스는 몇 개 수준이고, 같은 API 를 일정 상세가 이미 매 조회 부른다.
+  - **같은 포트를 읽기는 관용으로, 저장은 거부로 쓴다.** 상세 조회는 빠진 아이디의 항목을 지우지 않고
+    요약만 비우고(사용자가 담아 둔 자료다), 저장은 그 상태를 새로 만들지 않도록 거절한다. 포트
+    javadoc 이 두 의미를 함께 적고 있다.
+  - `targetId` 가 null 인 항목은 **묻지 않는다** — 장소 경로와 같은 처리다(대상 없이 제목만 있는 줄).
+- **일정 상세 항목에 장소 요약이 붙는다** (`addr1` · `indoor` · `firstImage` · `lat` · `lng`).
+  tour-service 내부 후보 API(`GET /internal/v1/places/candidates`)를 **한 번** 부르고 중복
+  아이디는 제거한다 — 프론트가 항목마다 `GET /places/{placeId}` 를 부르던 것을 없애기 위한
+  것이라, 같은 문제를 백엔드로 옮기면 의미가 없다.
+  - `PlanDetailResponse` 를 내려주는 경로는 **전부** 요약을 붙인다(생성·조회·수정·일자 교체).
+    조회에만 붙이면 같은 DTO 가 진입 경로에 따라 주소를 갖거나 안 갖게 되고, 화면은 항목을
+    편집한 직후에만 주소가 사라진다.
+  - 내부 outline 조회와 응급 브리핑은 요약 없는 `getPlanInfo` 를 쓴다 — 쓰지 않는 원격 호출을
+    그 두 경로에 만들지 않는다.
+  - **tour-service 장애를 상세 조회 실패로 번지게 하지 않는다.** 요약을 못 받으면 비운 채
+    응답한다(즐겨찾기 목록과 같은 판단). 응급 브리핑은 반대로 삼키지 않는다 — 그쪽은 시설
+    없는 브리핑이 "가까운 병원이 없다" 는 착각을 준다.
+  - **원천에서 사라진(delisted) 장소는 요약만 null 이고 항목은 남는다.** 사용자가 담아 둔 자료다.
+  - `indoor` 의 null 은 "실외" 가 아니라 "원천에 정보 없음" 이다. `false` 로 바꾸지 않는다.
+- **일정 상세의 `WALK` 항목에 산책 코스 요약이 붙는다** (#619, `courseLabel` · `distanceKm` ·
+  `durationText` · `durationMaxMinutes` · `firstImage` · `lat` · `lng` · `fitsActivityLevels`).
+  `WALK` 의 `targetId` 는 `walk_course.id` 라 장소 요약 경로에서 빠지고, 그래서 산책 항목만
+  이름 말고는 아무것도 없는 줄로 내려가고 있었다. tour-service 내부 코스 API
+  (`GET /internal/v1/walk-courses/candidates`)를 **한 번** 부르고 중복 아이디는 제거한다.
+  - **장소 요약과 같은 자리의 같은 판단이다 — tour-service 장애를 상세 조회 실패로 번지게 하지
+    않는다.** 코스 요약은 장식이라, 못 받으면 `walkCourse` 만 비운 채 항목은 그대로 응답한다.
+    두 요약은 서로 독립이다: 코스 조회가 실패해도 장소 요약은 붙고 그 반대도 같다.
+  - **코스를 찾지 못하면 요약만 null 이고 항목은 남는다.** 사용자가 담아 둔 자료다.
+  - 활동량 적합 판정(`fitsActivityLevels`)은 **tour-service 가 한다.** 여기서 상한을 다시
+    계산하면 두 서비스가 같은 코스를 다르게 읽는다 — 그리고 남의 반려견 활동량을 tour-service 로
+    넘기지 않아도 된다.
+  - 공개 응답에서는 **`{code, name, description}` metadata 객체**로 내린다 (coding-conventions §11).
+    같은 `PlanItemDetailItem` 안의 `itemType` 이 이미 metadata 라, 한쪽만 raw 문자열이면 화면이
+    두 가지 해석 코드를 갖게 된다. 내부 경계(Feign·QueryResult·Info)에서는 세 값을 편 채 나르고
+    metadata 는 Presenter 가 씌운다 — 기상특보가 같은 방식이다.
+  - `durationMaxMinutes` 의 null 은 "제한 없음" 이 아니라 "원천 문구를 파싱하지 못했다" 이다.
+    그래서 `durationText` 원문을 함께 내린다.
+  - **남은 위험 / 후속** (#619 검토에서 드러남, 이 변경에서 고치지 않았다)
+    - ~~**[DB MEDIUM] `WALK` 의 `targetId` 는 저장 시 검증되지 않는다.**~~ **#715 에서 닫았다** —
+      `verifyItemTargets` 가 코스 존재를 확인하고 없으면 `PLAN_025` 400 이다(위 "항목 타깃 검증" 절).
+      검증 전에 저장된 행은 **남아 있을 수 있다** — 코드로 정리하지 않았고, 읽기 경로가 관용적이라
+      화면은 죽지 않는다(요약만 빈다).
+    - ~~**[DB MEDIUM] 일정 항목 수 상한이 없어 `IN` 절·질의문자열이 무한정 길어질 수 있다.**~~
+      **#1243 에서 닫았다** — 일정 전체 항목을 **100개**(`Plan.MAX_ITEMS`)로 묶었다. 생성은 `@Size`
+      (`PLAN_136`), 하루 교체는 `@Size` + 교체 뒤 전체 수 검증(`PLAN_028`)이다(아래 "일정 항목 수 상한" 절).
+      장소 경로와 산책 코스 경로가 같은 상한 아래 있어 둘 다 한 번에 묻는다 — 비대칭은 없다.
+      상한 전에 이미 넘은 일정은 **남아 있을 수 있다** — 코드로 정리하지 않았고, 240개를 넘은 것은
+      여전히 요약만 빈다(읽기 경로가 관용적이라 화면은 죽지 않는다).
+    - **[검증 공백] 서비스 간 계약을 고정하는 테스트가 없다.** tour 의 `WalkCourseCandidateInternalResponse` 와
+      plan 의 `PlanWalkCourseClientResponse` 필드 일치는 사람이 눈으로 맞춘 것이라, 한쪽 필드명을 바꿔도
+      컴파일·테스트가 전부 통과한 채 **런타임에 조용히 null** 이 된다. 저장소에 내부 컨트롤러 슬라이스·
+      client-adapter 테스트 선례가 한 건도 없어 이 변경만의 이탈은 아니다.
+    - **[참고] `durationMaxMinutes == null` 은 "제한 없음" 이 아니라 "원문 파싱 실패" 다.**
+      FE 가 무제한으로 읽으면 활동량 판정이 뒤집힌다.
+- **일정 항목 수 상한 — 일정 전체 100개 ([#1243](https://github.com/8llow8llowMe/hondigagae/issues/1243)).**
+  준비물 50 · 반려견 5 · 후기 항목 50 은 `@Size` 가 있는데 일정 항목만 없었다.
+  - **값은 `Plan.MAX_ITEMS` 한 곳이다.** 요청 `@Size` · 검증 문구(`PLAN_136`) · 에러 문구(`PLAN_028`) · Swagger
+    설명이 전부 이 상수를 읽는다(정수 상수를 이은 문자열도 컴파일 상수라 annotation 에 쓸 수 있다). FE 계약이라
+    값을 바꿀 때는 FE 와 맞춘다. 100 은 하루 10곳 × 10일(AI 일정 생성의 최대 기간) 수준이다. 직접 만드는 일정은
+    30일까지라 그 끝에서는 하루 평균 3곳 남짓이 된다 — 이슈가 이 값을 "FE 확인 필요" 로 남긴 이유다.
+  - **산술.** 상세의 요약 조회는 GET 질의 문자열로 아이디를 싣는다(Feign `List` 파라미터는 이름을 되풀이한다).
+    산책 코스 `walkCourseIds=<19자리>&` 약 34바이트 × 100 = **약 3.4KB**, 장소 `placeIds=` 약 29바이트 × 100 =
+    **약 2.9KB** — Tomcat 기본 헤더 한도(8KB, 요청줄 + 헤더 합)에서 깨지던 약 240개보다 넉넉히 아래다.
+    tour-service 내부 API(`/places/candidates` · `/places/visible-ids` · `/walk-courses/candidates`)는 목록 크기를
+    따로 제한하지 않으므로 이 상한이 곧 질의 길이의 상한이다.
+  - **경로별.**
+
+    | 경로 | 막는 것 | 코드 |
+    | --- | --- | --- |
+    | `POST /plans` (생성 · AI 초안 담기) | 요청 `items` `@Size(max = 100)` — 새 일정은 빈 채로 시작해 요청 수가 곧 일정 수다 | `PLAN_136` 400 |
+    | `PUT /plans/{planId}/days/{day}/items` | 요청 `@Size(max = 100)`(한 날만으로 넘는 것) + 서비스 검증(교체 뒤 일정 전체 수) | `PLAN_136` / `PLAN_028` 400 |
+    | `POST /plans/{planId}/copy` | 검증하지 않는다 — 원본 항목을 그대로 옮겨 사본이 원본 수를 넘지 않는다 | — |
+    | `PUT /plans/{planId}` · 방문 체크 · 시작 시각 | 항목 수를 바꾸지 않는다(항목을 받지 않거나 제자리 수정) | — |
+
+    내부 API(`/internal/v1/plans/**`)는 동행견 대사 · 개요 · AI 담기 조회뿐이라 항목을 만들지 않는다.
+  - **하루 교체는 교체 뒤 일정 전체 수로 본다.** 그날의 옛 항목은 통째로 바뀌는 자리라 빼고 세고 새 목록을
+    더한다 — 다른 날 60 + 새 목록 41 은 요청 하나로는 상한 안이지만 일정은 101 이라 `PLAN_028` 이다. 검사는
+    `PLAN_002` · `PLAN_007` 다음, **삭제 · 저장 앞**이다(`PlanCommandProcessor.validateItemLimit`).
+  - **상한 전에 이미 넘은 일정은 늘지 않는 편집을 받는다** (`Plan.acceptsItemCount`). 줄이거나 같은 수로 순서 ·
+    메모만 고치는 교체까지 막으면 사용자가 그 일정을 상한 안으로 되돌릴 길이 없다. 120 → 115 는 받고 120 → 121 은
+    `PLAN_028` 이다. 복제도 같은 이유로 막지 않는다 — 사본을 늘리는 편집은 하루 교체가 막는다.
+    단 **한 날 목록은 언제나 100개 이하**다(요청 `@Size` → `PLAN_136` 이 서비스 판정보다 먼저) — 한 날만 100개를
+    넘은 옛 일정은 그날을 한 번에 100개 이하로 줄이는 교체만 통과한다.
+  - **세는 데 `findByPlanId` 한 번을 쓴다** — 준비물 상한(`PLAN_013`)과 같은 관례다. 교체될 그날 수와 전체 수가
+    둘 다 필요해 count 하나로는 모자라고, 행 수가 상한 언저리이며, 교체 응답(상세)도 곧바로 항목 전체를 다시 읽는다.
+  - **AI 초안 담기도 같은 문이다.** FE 가 초안을 `POST /plans` 로 담고(`draftToPlanPayload`), 하루 재생성 반영은
+    `PUT .../days/{day}/items` 로 한다(`toDraftItems`). ai-service 는 최대 10일이고 장소 후보가 50곳 안팎(숙박은
+    하루 한 곳)이라 실제 초안은 상한보다 한참 작다. 다만 일자 간 장소 중복을 로그로 감지만 하고 항목 수를 자르지는
+    않으므로 코드상 상한은 없다 — 넘는 초안은 `PLAN_136` 400 으로 담기가 거절된다(초안 단계에서 자르지 않는다).
+  - **하루 교체는 일정 행을 잠근 뒤 센다** (`findActiveByIdForUpdate`). 잠그지 않으면 같은 일정의 **다른 날**을
+    동시에 교체할 때 둘 다 옛 값으로 세어 통과한다 — 요청 하나가 최대 100개를 더하므로 동시 3건이면 240(IN 절이
+    깨지는 선)도 넘어, 준비물 상한(요청당 1개)과 넘치는 크기가 다르다. 잠금은 **세는 조회보다 앞**이다 — 트랜잭션의
+    첫 일관 읽기가 스냅숏을 잡으므로 잠금이 먼저여야 뒤 요청이 앞 요청의 커밋을 본다. 순서는 plan → plan_item 이라
+    동행견 교체 · 대사 배치의 plan → plan_pet 순서와 엇갈리지 않는다.
+- **기간을 줄일 때 범위 밖 항목이 남으면 `PLAN_008` 로 거부한다 (필수).** 자동 삭제하지 않는다 —
+  사용자가 담아 둔 기록을 말없이 지우는 일이고, 되돌릴 수단도 없다. 항목을 먼저 정리하게 한다.
+  - 검사는 **저장 앞**에 있어야 한다. 뒤에 두면 기간만 줄어든 채 고아가 남아 결함이 그대로 재현된다.
+  - 일수가 **줄어들 때만** 본다. 늘리거나 그대로면 기존 항목은 모두 범위 안이라 헛된 쿼리다.
+  - 끝나는 날을 당기는 것뿐 아니라 **시작일을 미뤄도 일수는 줄어든다.** 한쪽만 보면 프론트가
+    시작일 편집을 여는 순간 다시 고아가 생긴다.
+  - 고아가 생기면 지울 수단이 없다는 것이 이 규칙의 근거다 — 일자별 교체(`PUT .../days/{day}/items`)는
+    범위 밖 일차를 `PLAN_002` 로 막는다.
+- **생성 · 수정 · 복제는 지난 날짜를 받는다 — 기록용이다 (#973).** `validateDateRange` 는 역전
+  (`PLAN_003`)과 30일 상한(`PLAN_009`)만 본다. "오늘 이후" 제약은 예보가 있어야 짤 수 있는 AI 생성
+  (`AIPLAN_017`, ai-service)에만 있고, 그 차이는 의도다 — 막을 이유가 AI 에만 있다. FE 만들기 폼은
+  지난 시작일을 막지 않고 "날씨·적합도를 볼 수 없다" 는 안내만 붙인다 (FE `공통명세.md` S9
+  「날짜 정책」). 회귀는 `PlanCommandProcessorTest` "지난 날짜로도 만든다". 기록용 일정은 시작일이
+  이미 지나 아래 두 가드(`PLAN_026` · `PLAN_027`)에 걸리지 않는다.
+- **여행 전 상태 가드 — 시작일 전에는 완료(`COMPLETED`)로 넘어갈 수 없다 (`PLAN_026` 400, [#971](https://github.com/8llow8llowMe/hondigagae/issues/971)).**
+  떠나지 않은 여행을 다녀온 기록으로 남기지 않는다. **시작일 당일부터 허용한다** — 당일치기 여행은 떠난 그날 끝난다.
+  - "오늘" 은 서비스 기준(KST)이고 주입된 `Clock`(`PlanServiceBeansConfig`, Asia/Seoul)으로 읽는다.
+  - 판정은 `Plan.hasStarted(today)` **하나**다. 다녀옴 표시 가드(#983)도 같은 메서드를 쓴다 — 호출부마다
+    따로 쓰면 당일 포함 여부가 갈라진다.
+  - **수정 결과 기준**으로 본다. 같은 요청으로 시작일을 과거로 당기면서 완료하는 것은 허용된다.
+  - **이미 완료된 일정의 시작일을 옮겨 시작 전이 되는 것도 `PLAN_026`** 이다 — 완료 뒤 날짜를 미래로 밀면 같은 결과에
+    우회로로 닿는다. 시작일을 건드리지 않는 수정(제목·예산 등)은 막지 않는다 — 가드 이전에 쌓인 "시작 전인데 완료된"
+    일정의 제목 수정까지 깨지면 안 된다. 완료를 되돌리면서(결과 상태가 `COMPLETED` 가 아니면서) 날짜를 옮기는 것도 막지 않는다.
+  - 이미 완료된 일정에 `COMPLETED` 를 다시 보내는 것은 전이가 아니라(`completesNow`) 날짜와 무관하게 받는다.
+  - 지난 날짜 일정(기록용, `validateDateRange` 가 허용)은 이미 시작일이 지났으므로 완료할 수 있다.
+  - 검사는 `validateDateRange` 뒤, **저장 앞**이다.
+- **다녀옴 표시 가드 — 시작일 전에는 항목을 다녀옴(`visited: true`)으로 표시할 수 없다 (`PLAN_027` 400, [#983](https://github.com/8llow8llowMe/hondigagae/issues/983)).**
+  `PLAN_026` 과 같은 선이다 — 판정은 `Plan.hasStarted(today)` 하나, 시작일 당일부터 허용, 일정 상태(`DRAFT`/`CONFIRMED`/`COMPLETED`)는 보지 않는다.
+  - **해제(`visited: false`)는 언제나 받는다.** 가드 이전에 이미 찍힌 표시, 또는 일정을 미래로 옮긴 뒤 남은 표시를
+    사용자가 풀 수 있어야 한다. 해제까지 막으면 잘못된 표시를 되돌릴 길이 없어진다.
+  - **소유 확인이 가드보다 먼저다.** 남의 일정 항목은 날짜와 무관하게 `PLAN_005` 404 — 가드가 먼저 서면 이 일정의 것이 아닌
+    항목에도 `PLAN_027` 을 답해 요청이 틀린 진짜 이유를 가린다.
+- **지난 일정 복제 (`POST /plans/{planId}/copy`).** 항목만 새 `DRAFT` 로 옮긴다 — 준비물·후기·방문
+  체크는 가져오지 않는다. 본인 소유만(남의 일정은 `PLAN_001` 404). 제목은 요청 값 또는 원본 뒤
+  `" (복사)"`. 새 `startDate`/`endDate` 의 **일수는 원본과 같아야** 한다 — 일차 항목을 그대로
+  옮기므로 다르면 `PLAN_021` 400. **`PLAN_021` 문구에는 원본 일수가 들어간다** (#721) —
+  프론트는 서버 `resultMessage` 를 그대로 띄우므로 "같아야 한다" 만 말하면 사용자가 며칠로
+  맞춰야 하는지 모른 채 시행착오를 하게 된다. 값을 끼우는 것은 `PlanException(errorCode, args)`
+  오버로드이고, auth-service `MemberException` 의 같은 오버로드(`MEMBER_001`)와 같은 모양이다.
+  **판정 순서는 기간 자체 → 일수 비교다.** `validateDateRange` 가 역전(`PLAN_003`)과 30일
+  상한(`PLAN_009`)을 먼저 거른다 — 일수 비교를 앞에 두면 "3일이어야 합니다" 를 받은 사용자가
+  그대로 맞춰도 다시 거절당한다. 프론트가 클라이언트에서 역전·상한을 먼저 막는 것도 이 순서다.
+  동행 반려견은 원본 `petIds` 를 따르되 더 이상 소유하지 않은
+  아이는 빼고, 남은 아이가 없으면 `PLAN_010` 400(대표 반려견 폴백 없음). 복제 항목은
+  `visited=false`, 새 `planItemId`. **타깃 검증은 부르지 않는다** — delisted 장소도 항목은
+  남기고 상세 요약만 null 인 기존 규칙을 따른다. 생성 경로의 `verifyItemTargets` 를 그대로 쓰면
+  delisted 참조가 있는 일정을 복제할 수 없게 된다.
+  - **산책 코스도 같다 (#715).** 저장 경로에 코스 검증이 생겼지만 복제에는 걸지 않는다 — 검증이
+    없던 시절에 저장된 `targetId` 나 원천에서 사라진 코스를 참조하는 옛 일정을 복제할 수 없게 되고,
+    그것은 사용자가 고칠 수 없는 과거 자료 때문에 새 일정을 못 만드는 일이다. 회귀는
+    `PlanCopyTest` 가 고정한다(코스가 하나도 없는 스텁으로 복제가 통과하는지).
+- **`PlanItemType` 은 이 서비스가 아니라 `core/shared-travel` 에 있다 (필수).** ai-service 초안의
+  `itemType` 이 여기 저장 규칙을 그대로 따라야 하기 때문이다 — 문자열과 주석으로만 맞추던 때
+  실제로 어긋났다 (#89).
+- **`targetId` 가 `place.id` 인지의 판정은 `PlanItemType.isPlaceTarget()` 이 갖는다.** 저장 시
+  존재 검증과 상세 요약 조회가 같은 집합을 써야 해서 도메인으로 올렸다 — `WALK` 의 `targetId`
+  는 `walk_course.id` 라 장소로 조회하면 남의 아이디로 없는 장소를 찾는다.
+  - **이 집합에 `WALK` 를 넣어 코스 검증을 해결하지 않는다 (#715).** 같은 판정에 기대는 경로가
+    셋(저장 검증 · 상세 요약 · 응급 브리핑)이라, 넓히면 나머지 둘이 `walk_course.id` 를 장소로
+    조회한다. 코스는 `PlanItemType.WALK` 를 직접 보는 별도 검증으로 확인한다.
+- `PlanItem`의 다중 대상 FK는 `@Comment`에 분기 기준을 명시한다 (`coding-conventions.md` §9-4).
+- 후기 사진 업로드가 필요해지면 `storage-core` 모듈 추가를 검토한다 (`modules.md`). v1 은 만족도·본문·장소별 한 줄만 저장한다.
+
+## AI 초안 담기 멱등 (`plan.source_ai_job_id`)
+
+([#970](https://github.com/8llow8llowMe/hondigagae/issues/970)) 같은 AI 초안을 두 번 담으면(다시 누름·새로고침 뒤 재시도·다른 기기)
+일정이 두 개 생겼다. **담기 멱등 키는 저장하는 이 서비스가 가진다.**
+
+- `POST /api/v1/plans` 에 선택 필드 `sourceAiJobId`(ai-service jobId, UUID). 형식이 틀리면 `PLAN_135` 400.
+- **이미 담긴 작업이면 200 + 먼저 담긴 일정의 `PlanDetailResponse`** 다(409 아님). 두 번째 요청의 제목·항목·반려견은 반영하지 않는다 —
+  다시 누른 담기는 "새로 저장" 이 아니라 "이미 담긴 것 열기" 다. Swagger 에도 적었다.
+- **jobId 의 실재·소유는 검증하지 않는다.** plan → ai 호출은 순환이다(ai 가 이미 plan 을 부른다). 잘못된 값은 자기 memberId 네임스페이스의
+  키 하나를 쓸 뿐이다 — 조회·유니크 모두 `(member_id, source_ai_job_id)` 라 남의 일정에 닿지 않는다.
+- 상세 응답 `PlanDetailResponse.sourceAiJobId`(nullable). 목록(`PlanSummaryItem`)·공유 응답(`SharedPlanResponse`)에는 싣지 않는다.
+- 담긴 사실의 정본은 이 서비스다. ai-service 의 잡 조회는 내부 API `GET /internal/v1/plans/ai-commits/{jobId}` 로 묻는다 (아래 "서비스 간 내부 API").
+
+**동시성 — 두 겹**
+
+1. 빠른 경로: `PlanWebFacade.createPlan`(트랜잭션 없음)이 키가 있으면 먼저 `findAiCommittedPlan` 을 부르고, 있으면
+   **원격 검증(반려견 소유·항목 타깃)을 건너뛰고** 그 일정을 돌려준다.
+2. 경쟁: 두 요청이 모두 1을 지나면 유니크 `uk_plan_member_id_source_ai_job_id` 가 뒤의 커밋을 막는다. `PlanCommandProcessor.createPlan`
+   (`@Transactional`)이 던진 `DataIntegrityViolationException` 을 **Facade 가** 받아 재조회하고, 있으면 그 일정을 돌려준다.
+   **Processor 안에서 잡지 않는다** — 이미 rollback-only 라 커밋에서 다시 터진다. 재조회가 비거나(다른 제약 위반) 키가 없는 요청이면
+   원래 예외를 그대로 던진다 — 멱등이 다른 결함을 삼키지 않게 한다.
+   - `save` 는 merge 라 INSERT 가 **커밋 때** 나간다. 그 경로의 위반도 `DataIntegrityViolationException` 으로 번역되는 것을
+     `PlanSourceAiJobIdRepositoryTest` 가 테스트 트랜잭션 없이 커밋해 고정한다.
+- 유니크 대신 "조회 후 삽입" 만 두면 동시 요청이 둘 다 조회를 통과한다. Redis 잡에 담긴 일정을 적는 방식은 TTL 24h 에 사라지고,
+  Redis·MySQL 두 저장소의 커밋이 갈라져 고아 일정이 생긴다 (#970 에서 기각).
+
+**삭제·복제**
+
+- **삭제(soft delete)가 키를 비운다** (`Plan.markDeleted`). 유니크는 삭제된 행에도 걸리므로, 남기면 그 작업을 영영 다시 담을 수 없다.
+  삭제 뒤 잡 조회는 `committedPlanId: null`(담기 전 화면)이고, 다시 담으면 새 일정이 생긴다.
+- 조회 조건도 `deleted = false` 를 함께 건다 — 키를 비우기 전 행이 있어도 삭제된 일정을 "이미 담았다" 로 돌려주지 않는다.
+- **복제(`copyPlan`)는 출처를 복사하지 않는다.** 복제본은 AI 작업을 담은 결과가 아니고, 복사하면 원본과 같은 키가 되어 복제가 유니크에 막힌다.
+- 수정(`updatePlan`)은 `toBuilder` 라 키를 그대로 둔다.
+
+**마이그레이션**
+
+- local/dev(`ddl-auto: update`) — 기동 시 컬럼과 유니크가 만들어진다. 옛 행은 `NULL` 이라 그대로 둔다.
+- prod(`ddl-auto: none`) — 배포 전에 아래를 적용한다. Flyway 는 없다.
+
+```sql
+ALTER TABLE plan
+    ADD COLUMN source_ai_job_id VARCHAR(36) NULL
+        COMMENT 'AI 일정 생성 작업 아이디 (ai-service jobId, UUID). 담기 멱등 키 — 같은 작업을 다시 담으면 이 값으로 기존 일정을 찾는다. 삭제(soft delete) 때 비운다',
+    ADD UNIQUE KEY uk_plan_member_id_source_ai_job_id (member_id, source_ai_job_id);
+```
+
+- **검증 공백**: "유니크 인덱스에서 NULL 은 서로 다르다" 는 MySQL 의미론은 H2 슬라이스로 **증명되지 않는다**(H2 도 같게 굴어 테스트는 초록이다).
+  dev 반영 뒤 `SHOW INDEX FROM plan WHERE Key_name='uk_plan_member_id_source_ai_job_id'` 로 인덱스가 `Non_unique = 0` 으로 만들어졌는지,
+  키 없는 일정이 여럿인 회원의 새 일정 생성이 막히지 않는지 확인할 것.
+
+## 여행 후기 v1 (`plan_review`)
+
+다녀옴 다음에 남는 평가가 없었다. 성향 분석은 후기 데이터가 없으면 입력이 없다. 이번은 **구조화된 최소 후기**만 둔다.
+
+- **`plan` 컨텍스트 안에 둔다.** 후기는 `/api/v1/plans/{planId}/reviews` 하위 리소스라 소유권 검사가 일정의 것과 같아야 한다. 새 컨텍스트로 빼면 `getOwnedPlan` 을 복제하게 된다 — 준비물과 같은 판단이다. 컨트롤러만 `PlanReviewWebController` 로 나눴다.
+- **일정당 후기 하나.** `uk_plan_review_plan_id`. POST 는 생성만, 이미 있으면 `PLAN_017` 409. 수정은 PUT. **GET 에 후기가 없으면 200 + `dataBody: null`** 이다 (#979) — 후기는 일정당 0~1개인 선택적 하위 리소스라 "아직 안 씀" 은 정상 상태이고, 404 로 답하면 후기 패널을 열 때마다 브라우저 콘솔에 실패가 찍혔다. 고칠 대상이 있어야 하는 PUT 만 `PLAN_015` 404 로 남는다.
+- **쓰기는 완료(`COMPLETED`)된 본인 일정만.** 남의 일정은 `PLAN_001` 404. 초안·확정·재오픈에 POST/PUT 하면 `PLAN_016` 400. 존재 여부를 초안 단계에서 가르지 않는다.
+- **조회는 상태를 보지 않는다.** 본인 소유이기만 하면 초안·확정·완료 어디서든 읽힌다. 완료를 확정으로 되돌릴 수 있는데(재오픈) GET 까지 `COMPLETED` 로 막으면 되돌리는 순간 이미 쓴 후기가 API 에서 사라져 화면은 쓴 적 없는 것처럼 보인다. 되돌리기는 상태를 바꾸는 것이지 기록을 지우는 것이 아니다.
+- 본문은 선택(2000자). 장소별 평가는 다녀온 **장소 항목**(`PlanItemType.isPlaceTarget()` + `visited`)만. WALK 의 `targetId` 는 `walk_course.id` 라 장소 평가가 아니다. 제목·placeId 는 요청에 받지 않고 그때의 일정 항목에서 스냅샷한다.
+- **일차 교체로 항목이 사라져도 후기는 빼지 않는다.** PUT 은 `items` 전량 교체다. 이미 기억한 `planItemId` 는 제목·placeId 를 유지한 채 평점·한 줄만 고친다. 살아 있는 항목이면 제목·placeId 를 현재 값으로 갱신한다.
+- 장소 평가 행 삭제는 벌크 DML 로 즉시 내보낸다 — `plan_item`·준비물이 겪은 함정과 같다. 파생 delete 는 INSERT 가 먼저 나가 유니크 인덱스 위반으로 죽는다.
+- Facade 에 트랜잭션을 그대로 건다 — 이 유스케이스에는 원격 호출이 없다.
+- 범위 밖: 사진, 공개/비공개, 피드, AI 초안(`POST /reviews/drafts`), 성향 분석 조회.
+
+**마이그레이션**
+
+- local/dev(`ddl-auto: update`) — 기동 시 테이블이 만들어진다.
+- prod(`ddl-auto: none`) — 배포 전에 테이블을 만든다.
+
+```sql
+CREATE TABLE plan_review (
+    id              BIGINT       NOT NULL COMMENT '후기 아이디',
+    plan_id         BIGINT       NOT NULL COMMENT '여행 일정 아이디 (FK: plan.id)',
+    overall_rating  INT          NOT NULL COMMENT '전체 만족도 (1~5)',
+    body            VARCHAR(2000) NULL COMMENT '후기 본문',
+    created_at      TIMESTAMP    NOT NULL COMMENT '생성 날짜',
+    updated_at      TIMESTAMP    NOT NULL COMMENT '수정 날짜',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_plan_review_plan_id (plan_id)
+) COMMENT = '여행 일정 후기';
+
+CREATE TABLE plan_review_item (
+    id            BIGINT       NOT NULL COMMENT '후기 장소 평가 아이디',
+    review_id     BIGINT       NOT NULL COMMENT '여행 후기 아이디 (FK: plan_review.id)',
+    plan_item_id  BIGINT       NOT NULL COMMENT '일정 항목 아이디 (FK: plan_item.id, 항목 삭제 후에도 스냅샷 유지)',
+    place_id      BIGINT       NULL COMMENT '장소 아이디 (FK: place.id)',
+    title         VARCHAR(100) NOT NULL COMMENT '작성 시점의 일정 항목 이름',
+    rating        INT          NOT NULL COMMENT '장소 만족도 (1~5)',
+    comment       VARCHAR(200) NULL COMMENT '장소 한 줄 후기',
+    sort_order    INT          NOT NULL COMMENT '표시 순서 (0부터)',
+    created_at    TIMESTAMP    NOT NULL COMMENT '생성 날짜',
+    updated_at    TIMESTAMP    NOT NULL COMMENT '수정 날짜',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_plan_review_item_review_id_plan_item_id (review_id, plan_item_id),
+    KEY idx_plan_review_item_review_id_sort_order (review_id, sort_order)
+) COMMENT = '여행 후기 방문 장소 평가';
+```
+
+## 일정 공유 링크 (`plan_share_link`)
+
+짠 일정을 동행자·가족에게 보여 줄 수단이 없었다. 계정을 만들게 하지 않고 **주소만으로 읽히는 링크**를 연다.
+
+- **소유권.** 발급·조회·폐기는 전부 본인 일정만이다 — 남의 일정은 기존 `getOwnedPlan` 이 던지는 `PLAN_001` 404 로
+  존재 자체를 노출하지 않는다. 공개 조회만 인증 없이 열린다.
+- **소유자 조회(`GET /plans/{planId}/share-link`)는 유효한 링크가 없으면 200 + `dataBody: null`** 이다 (#979).
+  없음·폐기·만료를 가르지 않는다 — 소유자 경로에는 토큰이 없어 가를 입력이 없고, 할 일은 어느 쪽이든 "새로 발급" 이다.
+  링크는 일정당 0~1개인 선택적 하위 리소스라 "공유 중이 아님" 은 오류가 아니다. `PLAN_023` 404 는 **공개 토큰 조회에만** 남는다.
+- **확정·완료만 공유한다.** `PlanStatus.isShareable()`(`!= DRAFT`)이 판정하고, **발급 시점과 공개 조회 시점
+  양쪽에서** 본다. 발급 때만 보면 확정 후 초안으로 되돌린 일정이 이미 나간 링크로 계속 열린다 —
+  사용자는 "되돌렸으니 안 보이겠지" 로 읽는다. 발급 거부는 `PLAN_022` 400, 되돌린 뒤 공개 조회는 `PLAN_023` 404 다.
+- **만료는 발급 시각 + 30일 고정.** 요청 바디가 없다 — 무기한 링크를 만들 수단을 아예 두지 않는다.
+  시각은 **주입받은 `Clock` 빈**(`PlanServiceBeansConfig`, `Asia/Seoul`)으로만 읽는다. `LocalDateTime.now()` 를
+  직접 부르면 JVM 기본 시간대(`TIME_ZONE` 환경변수)에 따라 "30일" 이 29일이나 31일이 된다. `createdAt` 과 산술하지 않는다.
+- **발급은 멱등.** 유효한(미폐기·미만료) 링크가 있으면 새로 만들지 않고 그 토큰을 돌려준다. 여러 개를 흩뿌리면
+  어느 것이 도는지 알 수 없고 폐기가 그중 하나만 닫는 착각이 생긴다. **링크 회전은 DELETE 후 POST** 뿐이다.
+- **폐기는 행 삭제가 아니라 `revoked_at` 타임스탬프.** 지우면 "폐기된 링크" 와 "없던 토큰" 이 구분되지 않아
+  유출 경로를 추적할 근거가 사라진다. DELETE 는 해당 일정의 **미폐기 행을 전부** 닫고 0건이어도 200 이다 —
+  동시 INSERT 로 남은 형제 행이 살아남으면 "껐다" 고 믿는 동안 옛 링크가 열린다. 이미 폐기된 행의 시각은 덮어쓰지 않는다.
+- **토큰**은 `SecureRandom` 32바이트를 URL-safe Base64(패딩 없음)로 옮긴 43자다. 평문 저장 + `uk_plan_share_link_token`.
+  토큰 자체가 열람 권한이라 **게이트웨이 로그에서 마스킹한다** (`ShareTokenLogMasker`, `/api/v1/shared-plans/***`).
+  마스킹이 없으면 Loki 를 볼 수 있는 사람이 곧 그 일정을 볼 수 있는 사람이 된다. 마스킹은 **두 겹**이다 (#1281).
+  - **우리 줄은 `ShareTokenLogMasker` 를 직접 부른다** — 요청·응답·오류응답·지연요청(`LoggingGlobalApiGatewayFilter`),
+    JWT 거부(`JwtAuthExceptionWebHandler` — JWT 필터가 전역이라 공유 경로에도 걸린다). 세그먼트는 라우트처럼 퍼센트
+    디코딩하고 `;매개변수` 를 뗀 값으로 고르고, 원문 세그먼트를 통째로 `***` 로 바꾼다. 라우트는 대소문자를 가리지만
+    masker 는 가리지 않는다(더 넓다). 경로를 읽지 못하면(깨진 `%`) 원문 대신 `<해석 불가 경로>` 를 찍는다.
+  - **프레임워크 줄과 스택트레이스는 출력 단계에서 가린다** — 게이트웨이 `logback-spring.xml` 이 Boot 기본 콘솔 패턴의
+    메시지·예외 부분을 `ShareTokenMaskingConverter`(`%maskShareToken`)로 감싼다. 프레임워크가 경로를 원문으로 찍는 곳은
+    셋이고 모두 `HTTP <METHOD> "<path>?<query>"` 모양이라, 변환기가 그 따옴표 안을 masker 로 바꾼다:
+    부트 오류 핸들러(`AbstractErrorWebExceptionHandler`)는 **오류 응답 상태가 정확히 500 일 때** ERROR + 스택트레이스로,
+    `HttpWebHandlerAdapter` 는 **오류 핸들러가 다시 던진 오류**(응답이 이미 나갔거나 클라이언트가 끊겼다고 본 경우)를
+    `500 Server Error for …` 또는 `Error [..] for …, but ServerHttpResponse already committed` 로 찍는다.
+    `ExceptionHandlingWebHandler` 는 **체인까지 올라온 모든 오류**에 체크포인트를 suppressed 로 붙여, 그 예외의 스택트레이스가
+    찍힐 때마다 `*__checkpoint ⇢ HTTP GET "…"` 줄이 나온다. 이 문구 밖에서는 정규형 `/shared-plans` 세그먼트 뒤 한 세그먼트를 가리는
+    안전망만 돈다. 부트 오류 핸들러는 바꾸지 않는다 — `ErrorWebExceptionHandler` 를 올리면 기본 핸들러가 사라진다
+    (`api-design-guide.md` §2-2), 그리고 `HttpWebHandlerAdapter` 줄과 체크포인트는 핸들러를 바꿔도 남는다.
+    `ShareTokenLogOutputTest` 가 실제 앱 컨텍스트에서 업스트림 실패 500 을 일으켜 콘솔 출력 전체(메시지·스택트레이스·Suppressed)에
+    토큰이 없는지, 출력 모양이 Boot 기본과 같은지 본다.
+- **공개 조회는 발급 형식(`[A-Za-z0-9_-]{43}`)이 아닌 토큰을 DB 를 보지 않고 `PLAN_023` 404 로 끊는다** (#1244,
+  `PlanShareLinkProcessor#isWellFormedToken` — 정규식은 `TOKEN_BYTES`·`TOKEN_ENCODER` 에서 나온다). 토큰 컬럼의
+  `utf8mb4_bin` 은 PAD SPACE 콜레이션이라 `WHERE token = 'T '` 가 `T` 행에 맞는다. 형식을 보지 않으면 뒤 공백만
+  덧붙인 표기가 같은 일정을 열고, 게이트웨이는 그 표기마다 다른 레이트 리밋 버킷을 줘서 링크당 한도가 무너진다.
+  없는 토큰과 응답을 가르지 않는다(존재 비노출). 게이트웨이 `SharedPlanTokenKeyResolver` 가 **같은 정규식**을 쓴다 —
+  한쪽만 바꾸면 정상 토큰이 malformed 버킷 하나로 몰린다.
+- **실패 코드는 둘로만 갈린다.** 없음·폐기·일정 소프트삭제·비공유 상태는 전부 `PLAN_023` 404 로 **같게** 답한다 —
+  구분해 주면 토큰을 찍어 보는 쪽에 "이 토큰은 있었다" 를 흘린다. 만료만 `PLAN_024` 410 이다. 받은 사람이
+  "새 링크를 달라" 고 말할 수 있어야 하기 때문이다.
+- **공개 응답에서 뺀 것**(`SharedPlanResponse`·`SharedPlanItemItem`): `planId`(소유자 API 를 찍어 볼 실마리),
+  `petId`·`petIds`, `budget`, `planItemId`, `memo`, `visited`. 준비물·후기·응급 브리핑은 애초에 상세 응답에 없고
+  각자 별도 API 다. 이 감춤은 코드로 증명되지 않아 `PlanShareLinkPresenterTest` 가 **record component 이름 집합을
+  정확히 고정**한다 — 필드를 더하면 테스트가 깨져 "남에게 보여도 되는가" 를 다시 묻게 된다.
+- **`walkCourse` 는 공개한다** (#719). 위에서 뺀 것들은 **주인만 쓰는 값**이라 뺐고, 코스 요약은 제주올레
+  공공데이터라 이미 싣고 있는 `place` 와 성격이 같다. 빠져 있던 쪽이 비대칭이었다 — 장소 항목은 요약이
+  실리는데 `WALK` 만 제목 한 줄로 남아, 주인이 보는 화면과 공유받은 사람이 보는 화면이 같은 항목을 다르게
+  설명했다. 변환은 `PlanItemWalkCourseItem.from` 하나를 상세·공유가 **함께** 쓴다(장소와 같은 규칙) —
+  사본을 두면 필드가 늘 때 공유 응답만 비고, 그것이 이 증상의 원인이었다. 요약이 없으면(코스 아님 ·
+  원천에서 사라짐 · tour-service 장애) 셋을 가르지 않고 **객체 통째로 null** 이다.
+- **공개 여부를 가르는 기준은 "비인증으로 이미 조회할 수 있는 값인가" 다.** 코스 요약이 통과한 근거가
+  그것이다 — `fitsActivityLevels` 는 반려견이 아니라 **코스 소요시간만의 함수**(`WalkCourseActivityFit`)이고,
+  `GET /api/v1/walk-courses` 가 인증 없이 같은 값을 내린다. 공유 응답에는 이전부터 `targetId`(= `walk_course.id`)가
+  있어 누구나 그 코스를 조회할 수 있었으므로 **한계 노출량이 0** 이다. 반대로 주인만 쓰는 값(메모·예산·
+  방문 체크)은 어디서도 조회할 수 없어 기준에 걸린다. 필드를 더할 때 이 질문을 먼저 한다.
+- **중첩 DTO 도 이름 집합을 고정한다.** 상세와 공유가 `PlanItemWalkCourseItem`·`PlanItemPlaceItem` 을 **함께
+  쓰므로**, 소유자 화면을 위해 거기에 필드를 더하면 공개 응답이 따라 넓어진다. 최상위만 고정하면 그 연결에서
+  그물이 끊긴다.
+- **접두어를 따로 둔 이유** (`/api/v1/shared-plans`). `/api/v1/plans/**` 아래 두면 "인증이 필요한 일정 API" 와
+  "토큰만으로 열리는 API" 가 한 경로 트리에 섞인다. 나중에 게이트웨이·보안을 경로 기준으로 조일 때 공개
+  엔드포인트 하나 때문에 트리 전체를 열어 두게 된다. 접두어가 나뉘면 "이 접두어는 공개" 가 경로만 보고 읽힌다.
+  대신 **게이트웨이 라우트를 세 프로파일 모두에 추가해야 한다** — `GatewayRouteCoverageTest` 가 그것을 고정한다 (#202).
+- **`permitAll` 은 어노테이션을 안 쓰는 것으로 걸린다.** `ResourceServerSecurityConfigurer` 가 이미
+  `anyRequest().permitAll()` 이고 인증은 `@PreAuthorize` 로만 건다. `SharedPlanWebController` 에는
+  `@PreAuthorize`·`@AuthenticationPrincipal`·`@SecurityRequirement` 가 없고, `MemberLoginActive` import 도 없어야 한다.
+- **조회 흐름은 복제하지 않는다.** 소유자 경로와 갈라지는 지점은 `getOwnedPlan`(memberId 필터) ↔
+  `resolveSharedPlan`(token 필터) **하나뿐**이고, 그 뒤 `PlanQueryProcessor.getPlanDetailInfo` 로 합류한다.
+  항목 조회와 장소 요약(tour-service 1회 호출)이 두 벌이 되면 한쪽만 고쳐질 자리가 생긴다.
+- **공개 조회 Facade 메서드에는 트랜잭션을 걸지 않는다.** `getPlanDetailInfo` 가 tour-service 원격 호출을 하기
+  때문이다 (architecture-guide §3 의 문서화된 예외). 공유 링크는 주소만 알면 누구나 두드릴 수 있어 이 경로가
+  DB 커넥션을 오래 잡으면 영향이 특히 크다. 소유자 3종은 원격 호출이 없어 Facade 에 그대로 건다.
+
+**마이그레이션**
+
+- local/dev(`ddl-auto: update`) — 기동 시 테이블이 만들어진다.
+- prod(`ddl-auto: none`) — 배포 전에 테이블을 만든다.
+
+`expires_at`·`revoked_at` 은 **`DATETIME(6)`** 이다. 엔티티에 `columnDefinition` 이 없어 Hibernate 는
+`datetime(6)` 을 만드는데 문서 DDL 만 `TIMESTAMP` 면 **dev(`ddl-auto: update`)와 prod(수기 DDL)의 스키마가
+갈린다.** 게다가 `TIMESTAMP` 는 2038 천장이 있고, `expires_at` 이 이 테이블의 첫 TIMESTAMP 컬럼이라 서버
+설정에 따라 `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` 가 암묵적으로 붙을 수 있다.
+`entity-design.md` 의 다른 `LocalDateTime` 컬럼도 전부 `DATETIME` 이다.
+`created_at`/`updated_at` 의 `TIMESTAMP` 는 `BaseEntity` 의 `columnDefinition` 과 일치하므로 그대로 둔다 —
+엔티티에 `columnDefinition = "TIMESTAMP"` 를 다는 반대 방향은 택하지 않는다.
+
+```sql
+CREATE TABLE plan_share_link (
+    id          BIGINT      NOT NULL COMMENT '공유 링크 아이디',
+    plan_id     BIGINT      NOT NULL COMMENT '여행 일정 아이디 (FK: plan.id)',
+    token       VARCHAR(64) COLLATE utf8mb4_bin NOT NULL COMMENT '공유 토큰 (SecureRandom 32바이트의 URL-safe Base64, 43자). 대소문자를 구분해야 하므로 utf8mb4_bin',
+    expires_at  DATETIME(6) NOT NULL COMMENT '만료 시각 (발급 시각 + 30일)',
+    revoked_at  DATETIME(6) NULL COMMENT '폐기 시각. null 이면 유효한 링크다 (행을 지우지 않고 닫는다)',
+    created_at  TIMESTAMP   NOT NULL COMMENT '생성 날짜',
+    updated_at  TIMESTAMP   NOT NULL COMMENT '수정 날짜',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_plan_share_link_token (token),
+    KEY idx_plan_share_link_plan_id_revoked_at (plan_id, revoked_at)
+) COMMENT = '여행 일정 읽기 전용 공유 링크';
+```
+
+### 공개 경로 레이트 리밋 ([#1244](https://github.com/8llow8llowMe/hondigagae/issues/1244))
+
+공유 링크는 퍼지는 것이 정상 사용이라 크롤러·미리보기 봇이 같은 링크를 되풀이해 두드린다. 공개 조회 1건은
+plan-service 를 거쳐 tour-service 호출(최대 2회)로 **증폭**되고, tour-service 서킷이 열리면 로그인 사용자의 일정
+상세에서도 장소 요약이 빈다. 그래서 게이트웨이가 이 라우트에만 리밋을 건다.
+
+- **어디에** — api-gateway 의 `plan-service-shared-plans` 라우트에만 `SharedPlanRateLimit` 필터
+  (`SharedPlanRateLimitGatewayFilterFactory`)를 건다. 판정은 SCG `RedisRateLimiter`(Redis Lua 토큰 버킷)가 한다.
+  다른 라우트에는 없다 — `RateLimitRouteCoverageTest` 가 세 프로파일 yml 로 고정한다.
+  - **공유 링크 전용이다.** 키를 공유 토큰 전용 리졸버가 정하므로 다른 라우트에 걸면 키가 나오지 않아 **판정 없이
+    통과한다**(걸었다고 믿는 동안 아무것도 막지 않는다). 다른 라우트에 리밋이 필요하면 별도 리졸버·팩토리를 만든다.
+  - SCG 기본 `RequestRateLimiter` 필터 팩토리도 이 리졸버를 받아 자동 등록되지만 쓰지 않는다(거부가 빈 본문).
+    커버리지 테스트가 세 프로파일에서 그 사용을 막는다.
+- **키는 클라이언트 IP 가 아니라 공유 토큰으로 정한다** (`SharedPlanTokenKeyResolver`). 셋 중 하나다.
+  - 토큰 세그먼트가 없다 → 키 없음, **판정 없이 통과**(`/api/v1/shared-plans` 같은 요청 — plan-service 가 싼 4xx 로 끝낸다).
+  - 발급 형식(`[A-Za-z0-9_-]{43}`)이다 → `{infra.redis.key-prefix}:shared-plan:{SHA-256 앞 32 hex}`.
+  - 형식이 아니다 → 고정 키 `{infra.redis.key-prefix}:shared-plan:malformed`. **형식 위반 요청 전부가 버킷 하나**다 —
+    무작위·변형 토큰 플러드가 토큰마다 Redis 키를 만들지 않는다. 이 요청들은 plan-service 가 DB 조회 없이 404 로
+    끊으므로(위 "토큰" 항목) 버킷을 함께 써도 정상 사용자가 잃는 것이 없다.
+
+  근거는 아래와 같다.
+  - 공유 화면은 Next 서버 컴포넌트가 `BACKEND_API_URL` 로 부른다. **게이트웨이가 보는 클라이언트는 늘 Next 서버
+    하나**라, IP 키면 사이트 전체의 공유 트래픽이 버킷 하나를 나눠 써서 봇 하나가 모든 사용자를 막는다.
+  - 증폭은 **유효한 토큰**에서만 생기고 봇은 같은 링크를 반복한다. 링크 단위가 위협과 맞다.
+  - 토큰은 그 자체가 열람 권한이라 Redis 에는 **해시만** 남긴다. 원문은 키에도 로그에도 없다.
+  - **같은 링크는 표기를 바꿔도 같은 버킷이다 — 근거가 둘이다.** (1) 해시하는 값은 Spring 이 경로 변수로 읽는
+    토큰(퍼센트 디코딩, `;매개변수` 제거)이라 쿼리·뒤 슬래시·하위 경로·`%61bc` 같은 표기는 같은 키다. plan-service 도
+    같은 디코딩으로 읽는다. (2) 디코딩해도 남는 변형(뒤 공백 `%20` — PAD SPACE 로 같은 행이 열린다)은 형식 검사가
+    malformed 버킷으로 모으고, plan-service 는 **같은 정규식**으로 그 표기를 열지 않는다. 그래서 "해시 버킷을 받는
+    표기 = 일정을 여는 표기" 다.
+  - **로그 마스킹도 같은 방식으로 토큰을 고른다** (#1281 로 닫힘). 전에는 마스킹이 원문 문자열에서 리터럴
+    `indexOf("/api/v1/shared-plans/")` 로 찾아 `/api/v1/shared-%70lans/{token}` · `/api/v1/shared-plans;x=1/{token}` 처럼
+    표기만 바꾼 요청의 토큰을 가리지 못했다(#627 부터 있던 공백). 이제 `ShareTokenLogMasker` 가 `PathContainer` 로 읽어
+    디코딩한 세그먼트로 고른다. 프레임워크 줄도 출력 변환기가 같은 masker 로 바꾼다. "라우트 패턴이 `{token}` 으로
+    뽑는 값은 가린 결과에 남지 않는다" 를 `ShareTokenLogMaskerTest` 가 표기 조합 입력표로 잠근다.
+  - **key-prefix 는 키 안에 있지만 키 앞머리가 아니다.** `RedisRateLimiter` 는 `infra.redis.key-prefix` 를 모르고 이
+    id 를 감싸 `request_rate_limiter.{<routeId>.<id>}.tokens|timestamp` 로 쓴다 — 실제 키는
+    `request_rate_limiter.{plan-service-shared-plans.<prefix>:shared-plan:…}.tokens` 다. id 에 접두어를 실어 dev Redis 를
+    함께 쓰는 다른 프로젝트와 겹치지 않게 했지만, **`SCAN <prefix>*` 정리나 접두어 기반 ACL 에는 걸리지 않는다.**
+    키는 TTL(20초)로 스스로 사라진다.
+- **한도는 링크당 replenishRate 2 · burstCapacity 20 · requestedTokens 1** — 세 프로파일 같은 값이고 env 로 빼지
+  않았다. 사람이 링크를 열고 몇 번 새로고침하는 정도는 버스트 20 안에 들어가고, 지속 반복은 초당 2건으로 눌린다.
+  키 TTL 은 SCG 가 `2 × burst / rate` = 20초로 건다.
+- **거부는 429 + 공통 봉투 `GATEWAY_001`** (`api-design-guide.md` §2-2). SCG 기본 `RequestRateLimiter` 는 거부가 빈
+  본문이라 쓰지 않는다. `X-RateLimit-Remaining`·`X-RateLimit-Replenish-Rate`·`X-RateLimit-Burst-Capacity`·
+  `X-RateLimit-Requested-Tokens` 를 허용·거부 양쪽에 싣는다.
+- **Redis 장애 시 통과(fail-open)** — `RedisRateLimiter` 기본 동작 그대로다. 오류를 ERROR 로그
+  (`Error calling rate limiter lua`)로 남기고 허용하며 `X-RateLimit-Remaining: -1` 을 싣는다. 리밋이 잠시 빠지는 것이
+  공유 화면 전체가 Redis 하나에 묶여 막히는 것보다 낫다. 별도 fail-closed 옵션은 두지 않는다. 실제 리미터를 닫힌
+  포트에 붙여 `RateLimitFailOpenTest` 가 고정한다(연결 거부라 로컬 실측 약 0.2초에 통과).
+  - 필터도 같은 쪽이다. 리미터가 오류 신호를 내거나 동기 예외를 던지면(라우트 한도 미설정 등) 통과시키고 WARN 한 줄
+    (`routeId`·키 해시만, 토큰 원문 없음)을 남긴다. 리밋의 고장이 공유 화면 전체의 500 이 되지 않는다.
+- **로그와 알림** — 거부는 **DEBUG** 로만 남긴다. 거부가 쏟아지는 것이 이 기능이 상정한 상황이라 요청마다 WARN 이면
+  로그가 같이 폭주한다. 요청 단위 기록은 `LoggingGlobalApiGatewayFilter` 의 `[오류응답] 상태코드=429` 로 충분하다.
+  반대로 **Redis 장애 때는 라이브러리가 요청마다 ERROR + 스택트레이스를 남긴다** — 공유 트래픽만큼 로그가 쏟아진다.
+  그래서 알림은 로그 건수가 아니라 메트릭으로 건다: 거부율은
+  `spring_cloud_gateway_requests_seconds_count{routeId="plan-service-shared-plans",httpStatusCode="429"}`
+  (SCG 게이트웨이 메트릭, 기본 켜짐), Redis 장애는 Redis 자체 모니터링으로.
+- **배선 주의** — redis-core 의 연결 팩토리 **선언 반환형이 `RedisConnectionFactory`** 라 부트의 리액티브 Redis
+  자동구성이 꺼지고, 연달아 SCG `GatewayRedisAutoConfiguration`(`@ConditionalOnBean(ReactiveRedisTemplate)`)도 꺼져
+  `RedisRateLimiter` 가 생기지 않는다. 게이트웨이가 `ReactiveStringRedisTemplate` 을 직접 올린다
+  (`ApiGatewayRateLimitConfig`). core 의 반환형은 서블릿 서비스들의 자동구성까지 바꾸므로 건드리지 않았다.
+  `RateLimitWiringTest` 가 실제 컨텍스트로 빈·라우트별 한도를 고정한다. 함께 켜지는 SCG 의
+  `reactiveRedisRouteDefinitionTemplate(ReactiveRedisConnectionFactory)`(쓰지 않는 빈)는 core 연결 팩토리 싱글턴이
+  먼저 만들어져 있어야 주입이 풀린다 — 생성 순서에 기대고 있고, 깨지면 기동 실패라 같은 테스트의 컨텍스트 로딩이 잡는다.
+- **`tour-service` 서킷 인스턴스는 나누지 않았다.** 공개 경로와 인증 경로가 부르는 하류는 같은 tour-service 다.
+  공개 쪽 부하가 tour-service 를 실제로 느리게 만들면 인스턴스를 나눠도 인증 경로의 호출은 같이 느려진다 —
+  나눠서 막히는 것은 "공개 쪽 실패 집계가 인증 쪽 서킷을 여는" 경우뿐이다. 증폭의 원천은 리밋이 누른다.
+  **재검토 조건**: 리밋 적용 뒤에도 tour-service 서킷 OPEN 이 공유 링크 트래픽 증가와 함께 관찰될 때,
+  공개 경로가 tour-service 의 다른 API 를 더 부르게 될 때, 한도를 크게 올려야 할 때.
+
+### 남은 위험 (이 이슈로 닫히지 않는 것)
+
+게이트웨이 로그 마스킹은 **완결된 방어가 아니다.** 아래는 알고 남긴 것들이다.
+
+- **[보안 MEDIUM] 앞단 nginx access log 는 여전히 평문이다.** 가려지는 것은 게이트웨이 애플리케이션 로그뿐이다.
+  nginx 가 TLS 를 종료하고 `combined` 포맷의 `$request` 가 전체 경로를 남기므로 **로그 열람권만 있는 사람이
+  토큰을 그대로 얻을 수 있다.** 링크 수명 30일이 그 잔여 위험의 상한이다. nginx `log_format` 치환은 인프라
+  레포 몫이라 이 PR 밖이다.
+- **[보안 LOW] 비정규 표기는 정해진 문구 안에서만 가려진다** (#1281). 출력 변환기는 `HTTP <METHOD> "…"` 문구(부트 500,
+  `HttpWebHandlerAdapter` — DEBUG 의 요청 줄 포함, 체크포인트) 안이면 `shared-%70lans`·매트릭스 변수까지 라우트처럼 읽어
+  가리지만, 그 밖의 줄에서는 정규형 `/shared-plans/<토큰>` 만 가린다. 그래서 비정규 표기로 보낸 요청의 토큰은 문구 밖에서
+  경로를 원문으로 찍는 줄(예: SCG `RoutePredicateHandlerMapping` DEBUG 의 `Exchange: GET <URI>`, 경로를 메시지에 싣는 예외)에
+  남을 수 있다. 비정규 표기는 정상 경로가 만들지 않는다 — 공유 화면(Next 서버)과 브라우저는 정규형으로 보낸다. 그런 표기는
+  **이미 토큰을 가진 사람이 손으로 바꿔 보낸 요청**에서만 나오므로, 공유된 링크가 일상 트래픽으로 로그에 쌓이는 경로가 아니다.
+  운영 레벨(INFO)에서는 그 DEBUG 줄도 꺼져 있다. 저장소의 게이트웨이 설정(`application*.yml`, `observability-common.yml`)에
+  이 로거를 DEBUG 로 올린 프로파일은 없다(설정 서버는 세 프로파일 모두 꺼져 있다 — 환경변수 `LOGGING_LEVEL_*` 주입은 저장소
+  밖이라 확인하지 못했다). **wiretap 은 정규형 토큰도 남긴다** — `spring.cloud.gateway.httpserver.wiretap`·`httpclient.wiretap`
+  을 켜고 `reactor.netty` 를 DEBUG 로 올리면 요청 바이트가 16바이트 행의 헥스 덤프로 찍혀 `shared-plans` 와 토큰이 줄 사이로
+  갈라지므로 변환기가 알아보지 못한다. 켜는 동안의 로그는 공유 토큰을 담는다(둘 다 기본 꺼짐, 저장소 설정에도 없다).
+- **[보안 LOW] 콘솔 appender 밖은 가려지지 않는다.** 출력 변환기는 `logback-spring.xml` 의 `CONSOLE` 하나에만 걸려 있다.
+  로그는 콘솔로만 수집되고 저장소 어디에도 파일 로그 설정이 없다. 그래서 파일 appender 는 두지 않았다. 이 파일이 있으면
+  `logging.file.name`·`logging.pattern.console`·`logging.structured.format.console` 은 게이트웨이에서 먹지 않는다 — 파일 로그나
+  다른 출력 형식이 필요하면 그 appender 도 `%maskShareToken(...)` 으로 감싼 뒤에 켠다.
+- **[보안 LOW] 오류 응답 본문의 `path` 는 원문 경로다.** 부트 기본 오류 응답(`DefaultErrorAttributes`)을 그대로 쓰기 때문이다.
+  요청한 쪽(공유 화면은 Next 서버)에 돌아가는 값이라 게이트웨이 로그는 아니지만, 그 본문을 로그로 남기는 쪽이 있으면 거기서 남는다.
+- **[보안 LOW] 링크 단위 리밋이라 링크 하나를 겨냥한 소진은 막지 못한다** (#1244 로 증폭은 눌렀다 — 위 절).
+  링크를 아는 봇이 버킷을 비우면 그 링크는 초당 2건만 열리고, 같은 링크를 연 정상 사용자도 `GATEWAY_001` 429 를
+  받는다. 피해는 그 링크 하나에 갇히고(다른 링크·로그인 경로는 무관) 주인이 링크를 회전(DELETE 후 POST)하면 새 버킷이다.
+  봇이 아니어도 같다 — 단톡방처럼 여럿이 같은 링크를 한꺼번에 열면 상한은 동시 20명 + 초당 2명이다(화면 한 번에
+  백엔드 1회 — 프론트 공유 페이지가 `cache()` 로 메타데이터와 본문 호출을 합친다). 이 상한이 실제로 문제가 되면 한도를
+  올린다. 짧은 TTL 응답 캐시는 폐기 즉시성을 해치므로 두지 않았다.
+- **[보안 LOW] 형식이 맞는 무작위 토큰 플러드는 리밋에 걸리지 않는다.** 형식 위반 요청은 malformed 버킷 하나로
+  모이지만, 43자 형식을 맞춘 무작위 토큰은 토큰마다 버킷이 따로라 매번 새 버킷이다. 그 요청은
+  `uk_plan_share_link_token` 단건 조회 뒤 `PLAN_023` 404 로 끝나 tour-service 로 증폭되지 않는다(싼 404). 출처 단위
+  제한은 앞단 nginx `limit_req` 몫이다(인프라 레포). Redis 에는 그런 토큰마다 키 2개가 20초 TTL 로 생겼다 사라진다.
+- **[운영 LOW] dev/prod Redis 의 `maxmemory-policy` 를 확인해야 한다.** `allkeys-*` 나 `volatile-lru` 면 리밋 키가
+  급증할 때 같은 Redis 의 다른 키(로그아웃 토큰 블랙리스트 등)가 밀려날 수 있다. 형식 위반 요청을 버킷 하나로 모아
+  키 폭증 경로를 줄였지만, 위 형식 맞춘 무작위 플러드는 여전히 키를 만든다. 인프라 레포에서 정책을 확인한다.
+- **검증 공백 — 실제 Redis 에서의 동작은 dev 배포 뒤에 실측한다.** 테스트는 Lua 스크립트를 실행하지 않는다(Redis 를
+  띄우지 않는다). 토큰 버킷 판정, TTL 20초, 키 모양(`request_rate_limiter.{plan-service-shared-plans.<prefix>:shared-plan:…}`)은
+  dev 에서 병렬 요청과 `redis-cli --scan` 으로 확인한다.
+- **[운영 — #1253 으로 닫힘] 운영 중 Redis 가 내려가거나 멈추면 공유 요청은 명령 타임아웃(1초) 뒤에 통과한다.**
+  이 항목은 처음에 "명령 타임아웃(60초)만큼 매달린 뒤 통과" 라고 적었는데 실제는 더 나빴다 — Lettuce 기본은
+  리액티브 명령에 타임아웃이 **아예 없어**(`TimeoutOptions` 꺼짐 — 60초는 동기 호출에만 걸린다), 재연결을 기다리며 쌓인
+  리밋 판정이 끝나지 않아 **fail-open 이 일어나지 않았다.** [#1253](https://github.com/8llow8llowMe/hondigagae/issues/1253)
+  으로 게이트웨이가 `infra.redis.command-timeout: 1s` 와 명령 타임아웃 감시를 켜, 쌓인 명령도 1초 뒤 실패하고
+  `RedisRateLimiter` 가 통과시킨다(`RedisCommandTimeoutBehaviorTest` 가 가짜 Redis 로, `RateLimitWiringTest` 가 실제 yml
+  바인딩으로 고정). 즉시 통과하는 것은 여전히 연결 거부뿐이다.
+- **[운영 LOW] 기동 시점부터 Redis 가 먹통(패킷 드롭)이면 첫 연결 시도가 줄을 선다.** `LettuceConnectionFactory` 는
+  동기·리액티브 공유 연결을 **팩토리 락 하나** 아래에서 처음 맺고, 한 번의 시도가 연결 타임아웃(2초) + 핸드셰이크
+  (명령 타임아웃 1초)까지 걸린다. 그동안 블랙리스트 확인과 리밋 판정이 그 락에서 차례로 기다린다. 이 락을 잡는 셋 —
+  블랙리스트 확인 · 리밋 판정(#1253) · 액추에이터 Redis 헬스(부트가 블로킹 지표를 그렇게 감싼다) — 이 모두
+  `boundedElastic` 에서 돌아 **이벤트 루프는 이 락을 기다리지 않는다.** 그래서 둘과 무관한 요청(토큰 없는 공개 API)은
+  멈추지 않지만, 공유 요청과 토큰을 실은 요청은 그만큼 늦고 `boundedElastic` 상한(코어 × 10)을 넘으면 큐에서 기다린다.
+  한 번 맺어진 연결은 Lettuce 가 같은 연결로 재연결하므로, 운영 중 장애는 이 경로가 아니라 위 명령 타임아웃 경로를 탄다.
+- **[DB LOW] 보존/정리 정책이 없다.** 행을 지우지 않으므로 만료·미폐기 행이 쌓인다. 현실 규모에서는 무시할
+  수준이지만(한 일정당 재발급 주기마다 1행) 정리 배치는 아직 없다. 정리 배치가 생기면 그때 `(expires_at)`
+  인덱스가 필요해진다 — **지금 미리 만들지 않는다.**
+- **[DB LOW] 만료가 항상 410 으로 보이지는 않는다.** 만료된 옛 토큰이라도 그 사이 주인이 새 링크를 발급했다가
+  폐기하면 410 이 아니라 404 가 된다 — 폐기를 만료보다 먼저 판정하기 때문이다.
+- **검증 공백**: `idx_plan_share_link_plan_id_revoked_at` 의 역방향 인덱스 스캔(filesort 없음)과 콜레이션 동작은
+  **MySQL 전용 의미론이라 H2 슬라이스로 증명되지 않는다.** dev 반영 뒤
+  `EXPLAIN SELECT * FROM plan_share_link WHERE plan_id=? AND revoked_at IS NULL ORDER BY id DESC LIMIT 1` 로
+  `Backward index scan` 과 `Using filesort` 부재를 확인할 것.
+
+## 동행 반려견 — 여러 마리 (`plan_pet`)
+
+AI 일정 생성(`POST /ai-plans`)은 `petIds` 로 여러 마리를 받는데 담기(`POST /plans`)가 `petId` 단일이면
+"두 마리 기준으로 짠 일정" 이 저장되는 순간 한 마리 일정이 된다. 그래서 담기 계약·저장 구조·판정을 함께 다견화했다.
+
+### 계약 — ai-service 와 같은 규칙
+
+- `PlanCreateRequest.petIds` — `@Size(max = 5)`, 원소 `@Positive`. **첫 번째가 대표 반려견**이다.
+- `petIds` 가 있으면 `petId` 는 무시한다. 둘 다 없으면 **대표 반려견**(auth-service `GET /internal/v1/pets/representative/condition`)을
+  쓰고, 그것도 없으면 `PLAN_010 PET_REQUIRED` 400 이다 — `plan.pet_id` 가 NOT NULL 이고 날씨 판정의 기준이라 반려견 없는 일정은 만들지 않는다.
+- 우선순위를 `AiPlanCreateRequest` 와 똑같이 둔 이유: 두 서비스가 다르게 굴면 프론트가 생성과 담기에서 반려견을 서로 다른 모양으로 실어야 한다.
+- 대표 반려견 조회는 **지정이 없을 때만** 부른다. 담기마다 auth-service 를 왕복하지 않는다.
+- 응답(`PlanSummaryItem`·`PlanDetailResponse`·내부 `PlanOutlineResponse`)은 `petId`(대표)를 그대로 두고 `petIds`(전체)를 덧붙였다.
+  기존 필드를 지우지 않았으므로 프론트는 자기 속도로 옮겨 탄다.
+
+### 저장 구조 — `plan.pet_id` 유지 + `plan_pet` 조인 테이블
+
+두 안 중 **대표 컬럼을 남기는 쪽**을 택했다.
+
+| 안 | 장점 | 문제 |
+| --- | --- | --- |
+| `plan.pet_id` 제거 + `plan_pet` 만 | 정규화가 깨끗하다 | NOT NULL 컬럼을 지우는 수동 SQL 이 dev/prod 모두 필요하고, 배포 순서를 맞춰야 하며, 응답 `petId` 가 사라져 프론트 동시 수정이 필요하다 |
+| **`plan.pet_id` 유지(대표) + `plan_pet`** | 옛 행을 옮기는 SQL 없이 배포된다. 응답 `petId` 가 남아 프론트가 깨지지 않는다 | 두 곳에 같은 사실이 있다 — 규칙(`pet_id` = `plan_pet` 첫 행)을 코드가 지켜야 한다 |
+
+- `plan_pet(id, plan_id, pet_id)` — `uk_plan_pet_plan_id_pet_id`, `idx_plan_pet_pet_id_plan_id`(반려견별 히스토리용). PK 는 Snowflake, 연관관계 어노테이션 없음(§9-1).
+- **옛 일정 읽기 규칙은 `Plan.resolvePetIds()` 한 곳에 있다.** `plan_pet` 에 행이 없으면 `[petId]` 로 읽는다. 상세·목록·날씨 판정이 전부 이 메서드를 거치므로 옛 일정을 서로 다르게 읽지 않는다.
+- 목록은 페이지의 `planId` 를 모아 **`in` 절 한 번**으로 `plan_pet` 을 읽는다 (§9-7).
+- **`PUT /plans/{planId}` 의 `petIds` 로 동행 반려견을 바꾼다.** 생성과 같은 규칙(최대 5마리, 첫 번째가 대표, 소유하지 않은 아이가 있으면 `PLAN_011`)을 쓰되 **폴백이 없다** — 생성은 빈 목록을 대표 반려견으로 대신하지만 수정에서 빈 목록은 "동행견을 모두 빼겠다" 는 뜻이라 되살리면 사용자가 지우려던 아이가 말없이 돌아온다. `PLAN_010` 으로 거절한다.
+  - 생략(`null`)은 **유지**다. 보내면 `plan.pet_id`(대표)와 `plan_pet`(전체)을 **함께** 맞춘다. 한쪽만 고치면 대표와 목록이 어긋난다.
+  - `plan_pet` 교체는 **벌크 DML 로 먼저 지운다.** 파생 delete 는 INSERT 가 먼저 나가 `uk_plan_pet_plan_id_pet_id` 위반으로 죽는다 — `plan_item` 일자 교체와 같은 함정이다.
+  - **완료(`COMPLETED`)된 일정의 동행견은 바꾸지 않는다 (`PLAN_019`).** 다녀온 기록의 판정 근거가 뒤늦게 흔들린다. 같은 요청으로 완료하면서 바꾸는 것은 막지 않는다 — 아직 기록이 확정되기 전이다.
+  - **이 API 는 판정을 다시 계산하거나 준비물을 지우지 않는다.** 날씨 브리핑·준비물은 다음 조회가 새 `petIds` 를 읽는다. 사용자가 손으로 고친 준비물을 동행견 교체가 말없이 날리지 않는다.
+  - 소유하지 않은 임시 동행견(친구 개)은 범위 밖이다. 지금은 내 프로필 아이만 담는다.
+
+### 반려견 지정 규칙은 ai-service 와 함께 고친다 (필수)
+
+`PlanCreateRequest.petIds` 와 `AiPlanCreateRequest.petIds` 는 **같은 규칙을 쓴다** — 최대 5마리,
+첫 번째가 대표, `petId` 는 `petIds` 가 있으면 무시, 둘 다 없으면 대표 반려견 폴백.
+`effectivePetIds()` 구현이 두 파일에 같은 모양으로 들어 있다.
+
+**한쪽만 고치면 프론트가 생성과 담기에서 반려견을 서로 다른 모양으로 실어야 한다.**
+실제로 그런 일이 있었다 — 원소 `@NotNull` 이 빠져 `[null]` 이 통과했고, plan-service 는
+저장에서 500, ai-service 는 조용히 폴백으로 갈렸다. 어느 쪽도 문서화된 정책이 아니었다.
+
+지정 규칙을 손댈 때는 **두 DTO 와 두 검증 테스트**
+(`PlanCreateRequestValidationTest`, `AiPlanCreateRequestValidationTest`)를 함께 본다.
+
+**마이그레이션**
+
+- local/dev(`ddl-auto: update`) — 기동 시 `plan_pet` 이 만들어진다. 옛 행은 그대로 두면 된다.
+- prod(`ddl-auto: none`) — 배포 전에 테이블을 만든다. 옛 행 이관 SQL 은 **필요 없다** (읽기 규칙이 대신한다). 원하면 아래로 채울 수 있지만 선택이다.
+
+```sql
+CREATE TABLE plan_pet (
+    id          BIGINT       NOT NULL COMMENT '일정 동행 반려견 아이디',
+    plan_id     BIGINT       NOT NULL COMMENT '여행 일정 아이디 (FK: plan.id)',
+    pet_id      BIGINT       NOT NULL COMMENT '반려견 아이디 (FK: pet.id)',
+    created_at  TIMESTAMP    NOT NULL COMMENT '생성 날짜',
+    updated_at  TIMESTAMP    NOT NULL COMMENT '수정 날짜',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_plan_pet_plan_id_pet_id (plan_id, pet_id),
+    KEY idx_plan_pet_pet_id_plan_id (pet_id, plan_id)
+) COMMENT = '여행 일정 동행 반려견';
+
+-- 선택: 옛 일정을 조인 테이블에도 남기고 싶을 때. 한 일정에 한 행이라 plan.id 를 PK 로 재사용해도 겹치지 않는다.
+INSERT INTO plan_pet (id, plan_id, pet_id, created_at, updated_at)
+SELECT p.id, p.id, p.pet_id, p.created_at, p.updated_at
+FROM plan p
+WHERE NOT EXISTS (SELECT 1 FROM plan_pet pp WHERE pp.plan_id = p.id);
+```
+
+### 완료 시점 반려견 특성 스냅샷 (`plan_pet_condition`)
+
+**진행 중인 일정은 auth-service 를 매번 다시 읽고, 완료된 일정은 완료 시점 스냅샷을 읽는다.**
+
+이 서비스는 반려견 특성의 사본을 두지 않는 것이 원칙이었다. 진행 중 판정이 낡은 값을 쓰지
+않게 하려는 규칙이고, 그건 지금도 맞다 — 체중·민감도를 고치면 다음 판정에 곧바로 반영되어야
+한다. **완료된 여행은 반대다.** 다녀온 뒤 프로필을 고쳤다고 "그때 몽실이 기준" 이 뒤늦게
+달라지면 그 기록은 거짓이 된다. 그래서 사본을 두는 자리를 **완료 시점 하나로 좁혔다.**
+
+- **찍는 시점은 `COMPLETED` 로 넘어가는 전이 한 번뿐이다.** 이미 완료된 일정에 다시
+  `COMPLETED` 를 보내는 것은 전이가 아니라 다시 찍지 않는다 — 그때 찍으면 다녀온 뒤 고친
+  프로필이 "그때 기준" 으로 둔갑한다 (`PlanCommandProcessor.completesNow`).
+- **되돌린 뒤 다시 완료하면 그 시점으로 다시 찍는다.** 되돌린 동안 동행견을 바꿀 수 있어서
+  (`petIds` 수정), 옛 스냅샷을 그대로 두면 이번 여행에 가지도 않은 아이의 특성이 기록으로
+  남는다. 교체는 `plan_pet` 과 같은 이유로 **벌크 DML 로 먼저 지운다.**
+- **보관 범위는 `PetConditionQueryResult` 와 같다** — 견종·크기·더위/추위/소음 민감·활동량.
+  이 서비스가 실제로 tour-service 판정에 넘기는 축뿐이다. 이름·생년월 원문은 애초에 내부
+  계약(`PetConditionResponse`)이 내보내지 않는다. `ageMonths`·체중·사회성은 이 서비스가 아직
+  받지도 읽지도 않아 넣지 않았다 — 읽지 않는 값을 "기록" 이라는 이유로 더 쌓지 않는다.
+  판정이 그 축을 쓰게 되면 포트를 넓히면서 같이 넣는다.
+- **스냅샷이 없는 완료 일정은 예전처럼 원천을 읽는다.** 이 기능 이전에 완료된 일정이다.
+  없는 기록을 지어내지 않는다.
+- 조회 경로는 하나다 — `PlanWeatherProcessor.loadConditions(memberId, plan, petIds)` 가 상태를
+  보고 고른다. 원천을 직접 읽는 `loadConditions(memberId, petIds)` 는 **스냅샷을 찍는 쪽**이
+  쓴다. 사본을 두 곳에서 만들면 "완료면 스냅샷" 규칙이 갈라진다.
+- 원격 조회라 Facade 가 **트랜잭션 밖에서** 특성을 먼저 읽고, 상태 변경과 스냅샷 저장은 한
+  트랜잭션에 묶는다 (`createPlan` 의 반려견 확인과 같은 순서).
+
+**마이그레이션**
+
+- local/dev(`ddl-auto: update`) — 기동 시 만들어진다.
+- prod(`ddl-auto: none`) — 배포 전에 테이블을 만든다. 옛 행 이관은 **없다** (읽기 폴백이 대신한다).
+
+```sql
+CREATE TABLE plan_pet_condition (
+    id              BIGINT      NOT NULL COMMENT '일정 반려견 특성 스냅샷 아이디',
+    plan_id         BIGINT      NOT NULL COMMENT '여행 일정 아이디 (FK: plan.id)',
+    pet_id          BIGINT      NOT NULL COMMENT '반려견 아이디 (FK: pet.id, 프로필 삭제 후에도 스냅샷 유지)',
+    breed           VARCHAR(50)  NULL COMMENT '완료 시점의 견종',
+    size_type       VARCHAR(20)  NULL COMMENT '완료 시점의 크기 구분',
+    heat_sensitive  BIT(1)      NOT NULL COMMENT '완료 시점의 더위 민감 여부',
+    cold_sensitive  BIT(1)      NOT NULL COMMENT '완료 시점의 추위 민감 여부',
+    noise_sensitive BIT(1)      NOT NULL COMMENT '완료 시점의 소음 민감 여부',
+    activity_level  VARCHAR(20)  NULL COMMENT '완료 시점의 활동량',
+    created_at      TIMESTAMP   NOT NULL COMMENT '생성 날짜',
+    updated_at      TIMESTAMP   NOT NULL COMMENT '수정 날짜',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_plan_pet_condition_plan_id_pet_id (plan_id, pet_id)
+) COMMENT = '일정 완료 시점의 동행 반려견 특성 스냅샷';
+```
+
+### 반려견이 삭제되면 — 동행 목록 정리 ([#720](https://github.com/8llow8llowMe/hondigagae/issues/720))
+
+반려견은 auth-service 에서 **소프트 삭제**(`Pet.delete()` → `deleted=true`)되고 일정은 plan-service DB 에 있다.
+스키마가 갈라져 있어 FK 로 강제할 수 없으므로 `plan_pet` 에 죽은 반려견 행이 그대로 남고, 일정 상세 `petIds` 가
+지워진 아이를 계속 내려보냈다.
+
+**`plan_pet` 과 `plan_pet_condition` 은 같은 규칙으로 다루지 않는다.** 정리 대상은 `plan_pet` 뿐이고
+`plan_pet_condition` 은 **건드리지 않는다** — 그 테이블은 "프로필이 삭제된 뒤에도 그때 그 아이가 어땠는지" 를
+남기는 것이 존재 이유라(컬럼 주석에 명시), 같이 지우면 다녀온 기록의 판정 근거가 사라진다.
+
+**규칙 셋 (R1/R2/R3)**
+
+| | 규칙 | 왜 |
+| --- | --- | --- |
+| R1 | 정리 대상은 `status IN (DRAFT, CONFIRMED)` 이고 `deleted = false` 인 일정뿐이다. **완료 일정은 불가침** | 완료된 일정의 동행견은 사용자도 바꿀 수 없다 (`PLAN_019`). 배치가 그 선을 넘으면 손으로는 못 바꾸는 기록을 배치가 말없이 바꾸게 된다 |
+| R2 | 행을 지운 뒤 남은 `plan_pet` 중 **id 가 가장 작은**(= 먼저 저장된) 아이를 `plan.pet_id` 로 올린다 | `plan_pet` 에 순서 컬럼이 없고 Snowflake PK 오름차순이 곧 저장 순서다. auth 의 대표 반려견 승계(`PetCommandProcessor.delete`)와 같은 모양이다. 불변식은 "`plan.pet_id` = `plan_pet` 첫 행" 이고, **행 삭제와 `pet_id` 갱신은 같은 트랜잭션**이다 |
+| R3 | 정리하면 남는 행이 0개가 될 일정이면 **그 아이를 그대로 둔다** (자리 표시자) | `plan.pet_id` 는 NOT NULL 이고 "일정에 최소 한 마리" 는 생성·수정이 `PLAN_010` 으로 지키는 불변식이다. 배치가 뒤에서 깨면 안 된다. 조인 테이블 행이 없는 옛 일정도 같은 이유로 그대로 둔다 |
+
+불변식이 이미 깨진 일정(조인 테이블에 행은 있는데 `plan.pet_id` 가 그 안에 없음)을 만나면 첫 행으로 복구하고
+**warn 로그**를 남긴다 — 복구는 코드가 하지만 어떻게 깨졌는지는 코드가 설명하지 못한다.
+
+**진입점은 둘이고 같은 `reconcileMember` 를 쓴다 — 삭제 트리거(즉시) + 새벽 배치(안전망) ([#972](https://github.com/8llow8llowMe/hondigagae/issues/972))**
+
+| 진입점 | 언제 | 실패하면 |
+| --- | --- | --- |
+| 삭제 트리거 `POST /internal/v1/plans/companions/reconcile?memberId=` | auth-service 가 반려견 소프트 삭제를 **커밋한 직후** 동기로 부른다 | auth 는 warn 로그만 남기고 삭제는 성공한다(200). 그 몫은 배치가 잇는다 |
+| `PlanCompanionReconcileScheduler` | 매일 04:10 | 회원 단위로 건너뛰고, 연속 5회면 회차 중단 (아래) |
+
+- **트리거는 "이 petId 를 떼라" 가 아니라 "이 회원을 지금 대사하라" 다.** 바디가 없고, plan 은 배치와 똑같이
+  auth 에 살아 있는 아이를 되묻고(`GET /internal/v1/pets/conditions`) 없는 아이만 뗀다. 그래서 호출자 버그나 임의의
+  memberId 로 두드려도 살아 있는 반려견이 일정에서 빠지지 않는다 — 결과는 새벽 배치가 그 회원을 돌린 것과 같다.
+- **트리거 파사드(`PlanInternalFacade.reconcileCompanions`)에는 `@Transactional` 이 없다.** 안에 auth 원격 조회가 있어
+  커넥션을 잡은 채 기다리게 되고, 트랜잭션은 배치와 같이 `PlanPetDetachProcessor` 가 일정 단위로 연다
+  (`PlanInternalFacadeTransactionTest` 가 고정). auth 조회 실패(`PLAN_900` 503)는 삼키지 않고 올린다 — 응답을 못 받은
+  것을 "전부 삭제됨" 으로 읽으면 안 되고, 호출한 auth 는 실패로 기록한 뒤 배치에 넘긴다.
+- **트리거·배치·사용자 수정이 같은 일정을 동시에 만나도 안전하다.** 아래 "일정 행 비관 잠금" 이 셋을 직렬화한다.
+  연속 삭제(한 회원이 두 마리를 연달아 지움)면 트리거가 같은 회원에 두 번 들어오는데 역시 같은 잠금으로 직렬화된다.
+- 응답은 `{ detached, representativeChanged, placeholderKept }` 다. auth 는 이 값으로 아무것도 결정하지 않고
+  로그에만 남긴다 — 배치 로그와 같은 눈금으로 "트리거가 실제로 무엇을 뗐는가" 를 읽기 위해서다.
+
+**#720 의 "auth → plan 푸시는 의도적으로 뺐다" 를 되돌렸다 (#972).** #720 은 auth 에 첫 아웃바운드 의존이 생기고
+auth ↔ plan 순환이 만들어진다는 이유로, 정리는 하루 늦어도 된다며 plan 이 물어보는 한 방향만 두었다. 그런데
+사용자 쪽에서 보면 "반려견을 지웠는데 일정 상세에 그 아이가 그대로 보인다" 는 **하루 동안의 버그**였다. 대가로 받아들인 것:
+
+- auth 에 첫 아웃바운드 의존(Feign, 서킷 `plan-service`)이 생겼고 호출이 **user → auth → plan → auth** 로 중첩된다.
+  plan 이 느리면 삭제 응답이 최대 connect 2s + read 5s 늦어진다. 두 단계 read 타임아웃이 같아(5s) auth 가 포화되면
+  plan 의 역호출이 auth 스레드를 하나 더 붙잡는다. p99 가 문제가 되면 auth 쪽을 전용 executor 의 `@Async` 로
+  옮긴다 — 이 스레드 자기 의존도 그때 함께 없어진다(후속 후보).
+- 이 서비스의 **첫 변경형 내부 API** 인데 앱 레벨 내부 인증이 없다. `/internal/v1` 을 막는 전제는 둘이다 —
+  **① 게이트웨이에 라우트가 없다**(local·dev·prod 확인) **② 서비스 포트가 외부에서 닿지 않는다.** compose 는
+  `ports: "${PLAN_SERVICE_PORT_DEV}:…"` 로 호스트 모든 인터페이스에 게시하므로 ② 는 호스트 방화벽이 지킨다 —
+  2026-09-29 공인 주소에서 7000 · 7080~7085 · 7761 이 전부 닫혀 있음을 확인했다(같은 주소의 3306 은 열려 있다).
+  **LAN 안에서는 닿는다.** nginx 의 auth 직결 `location` 범위는 저장소에 설정이 없어 확인하지 못했다.
+- 트리거 의미라 두드려도 **정합성은** 배치와 같다 — auth 응답을 못 받으면 예외로 멈추고 살아 있는 아이는 떼지 않는다.
+  다만 **호출 빈도와 부하는 배치와 다르다.** 호출마다 auth `GET /internal/v1/pets/conditions` 가 1회 나가고,
+  R3 자리표시자로 남은 죽은 petId 는 `collectReferencedPetIds` 에 계속 잡혀 호출마다 그 일정 행을 다시 비관 잠금한다 —
+  반복 호출로 그 회원의 일정 수정과 부딪치게 할 수 있다. 공유 시크릿 헤더는 내부 엔드포인트 전체를 횡단하는 변경이라
+  별도 이슈로 두되, ② 가 깨지는 날(포트 게시 확대·nginx location 확장) 우선순위가 올라간다.
+
+**새벽 배치**
+
+`PlanCompanionReconcileScheduler`(`plan/adapter/in/scheduler/`)가 새벽에 돈다.
+cron 은 `plan-companion-reconcile.cron`(기본 `0 10 4 * * *`, 환경변수 `PLAN_COMPANION_RECONCILE_CRON`)이고
+`global/config/SchedulingConfig` 가 `@EnableScheduling` 을 켠다 — auth-service 의 같은 파일과 같은 자리다.
+트리거가 생긴 뒤에도 배치를 남기는 이유는 둘이다 — 트리거가 실패한 삭제(plan 다운·서킷 오픈·타임아웃·배포 순서가
+어긋나 경로가 없는 404)와 트리거 도입 전에 이미 남아 있던 행.
+
+- 처리 순서: 미완료·미삭제 일정을 가진 회원을 커서 페이지로 훑고 → 회원별로 그 일정들의 distinct `petIds` 를 모아
+  `PetConditionQueryPort.findOwnedPetIds(memberId, petIds)` 한 번으로 생존 여부를 묻고 → 빠진 아이마다
+  `PlanPetDetachProcessor.detachPet`. 회원마다 원격 호출 한 번인 것은 auth 의 내부 API 가 `memberId` 단위
+  계약이라 줄일 수 없다 (§9-7 의 "원천 단위가 원래 단건" 에 해당).
+- **트랜잭션은 일정 단위다.** 회차나 반려견 단위로 묶으면 일정 하나가 실패할 때 이미 정리한 일정까지 롤백된다.
+  루프와 같은 클래스에 있으면 `@Transactional` 이 자기 호출이라 프록시를 타지 않으므로 `TransactionTemplate` 을 쓴다.
+- **기존 잔여 행은 이 배치의 첫 회차가 정리한다.** 별도 마이그레이션·`ApplicationRunner`·운영 DML 이 없다.
+
+**동시 실행 안전의 근거는 "멱등" 이 아니라 일정 행 비관 잠금이다**
+
+분산 락이 없으므로 여러 인스턴스가 같은 시각에 돈다. 그런데 **멱등은 근거가 되지 않는다** — 죽은 아이가 둘(A·B)
+실린 일정을 두 실행이 동시에 잡으면 양쪽 모두 `plan_pet = [A, B]` 를 보고 각자 다른 행을 지운다. **서로 다른 행이라
+행 잠금으로 직렬화되지 않는다.** 결과는 0행이고, 그러면 다음 회차가 그 일정을 "조인 테이블이 생기기 전의 옛 일정"
+으로 오인해 **영구히 방치**한다. R3 가 깨지는데 스스로 복구도 못 한다.
+
+그래서 정리 트랜잭션은 일정 행을 **비관 잠금으로 다시 읽는다**(`PlanRepository.findActiveByIdForUpdate`). 같은
+일정을 처리하는 실행끼리 직렬화되어 뒤에 온 쪽이 `[B]` 를 보고 R3 로 남긴다. 잠금 구간에 원격 호출은 없다 —
+auth-service 조회는 이 트랜잭션 바깥에서 이미 끝나 있다. 사용자 조회 경로(`findByIdAndDeletedFalse`)는 잠금 없이
+그대로 둔다.
+
+`plan_pet` 재조회도 **잠금 조회**다(`findByPlanIdOrderByIdAscForUpdate`). 일정 행만 잠가도 직렬화는 되지만, 그
+직렬화는 "locking read 는 read view 를 만들지 않아 뒤따르는 일반 `SELECT` 가 그제서야 read view 를 만들고, 그래서
+앞 트랜잭션의 커밋을 본다" 는 **REPEATABLE READ 의 타이밍 전제**에 걸린다. 누가 트랜잭션 맨 앞에 일반 조회 한 줄만
+넣어도 read view 가 먼저 열려 옛 스냅샷을 읽고 0행 레이스가 조용히 부활한다. 둘 다 잠그면 그 전제가 사라진다.
+
+> **잠금 순서는 `plan` → `plan_pet` 이고, 두 경로 모두 그렇다.** 대사 배치
+> (`PlanPetDetachProcessor.detachFromPlan`)와 사용자 동행견 교체(`PlanCommandProcessor.updatePlan`)가 같은 두
+> 테이블을 건드린다. **순서가 갈리면 데드락이고, 피해자가 되는 쪽은 사용자다**(500). `updatePlan` 의 `save` 는
+> merge 라 UPDATE 를 flush 까지 미루고 `plan_pet` 벌크 DML 은 쿼리 스페이스가 겹치지 않아 auto-flush 도 유발하지
+> 않는다 — 저장만으로는 잠기지 않는다. 그래서 `petIds` 분기 **맨 앞에서 `findActiveByIdForUpdate` 를 명시적으로
+> 부른다**(반환값은 쓰지 않는다). 한쪽 순서를 바꿀 때는 반드시 다른 쪽도 같이 본다.
+
+**다중 인스턴스 — 왕복이 인스턴스 수만큼 곱해진다 ([#770](https://github.com/8llow8llowMe/hondigagae/issues/770))**
+
+분산 락이 없어 모든 인스턴스가 04:10 에 같은 회원 집합을 훑는다. 정확성은 위 잠금이 지키므로 **이것은 비용
+문제다.** 결론부터 — **지금은 분산 락을 넣지 않는다.** 아래에 근거와, 넣어야 할 때를 알아보는 기준을 남긴다.
+
+_회차 비용 (인스턴스 1대 기준)_
+
+| 값 | 크기 | 회차 로그 필드 |
+| --- | --- | --- |
+| auth-service 원격 왕복 | 회원 1명당 정확히 1회 = **M** | `remoteCalls` |
+| DB 쿼리 | 회원당 2회(일정 + `plan_pet`) + 페이지 조회 `ceil(M/200)` | `members` / `pages` |
+| 회차 소요 | M × 왕복 지연 (회원을 직렬로 돈다) | `elapsedMs` |
+
+**M 은 "반려견이 삭제된 회원" 이 아니라 `DRAFT`·`CONFIRMED` 일정을 가진 회원 전부다.** 정리할 것이 하나도 없는
+날에도 M 번 부른다 — 그것이 이 배치의 실제 비용이고, **분산 락으로는 줄지 않는 부분**이다.
+
+인스턴스 N 대면 왕복은 N×M 이다. 다만 부하의 **모양**을 정확히 봐야 한다. 각 인스턴스는 회원을 하나씩 직렬로
+돌므로 **auth 가 동시에 받는 요청은 최대 N 건**이다 — 스레드풀·커넥션풀에는 영향이 없다. 늘어나는 것은 총 요청
+수와 초당 요청 수(≈ N ÷ 왕복지연)이지 동시성 스파이크가 아니다. "새벽에 auth 로 몰린다" 는 총량으로는 맞고
+순간 부하로는 틀리다. 이 구분이 아래 기준을 `remoteCalls` 와 `elapsedMs` 로 잡는 이유다.
+
+_지금 넣지 않는 이유_
+
+1. **인스턴스가 1대다.** dev/prod 모두 compose 로 서비스당 컨테이너 하나이고(`replicas` 를 쓰지 않는다), 게다가
+   plan-service 는 `SNOWFLAKE_WORKER_ID` 를 인스턴스마다 다르게 줘야 해서 **두 번째 인스턴스는 compose 를 손대는
+   의식적인 변경**이다. 우연히 늘어날 수 없다 — 그래서 아래 기준을 그 변경의 체크포인트로 건다.
+2. **락은 곱하기만 지운다.** N×M 을 M 으로 되돌릴 뿐, 정리할 것이 없는 날에도 나가는 M 번은 그대로다.
+3. 이 저장소에 분산 락 선례가 없어 **의존과 테이블이 새로 생긴다.** 얻는 것이 "언젠가의 N배" 뿐이면 아직 이르다.
+
+_넣어야 할 때 — 하나라도 걸리면 다시 판단한다_
+
+| # | 기준 | 어디서 보나 | 왜 이 값인가 |
+| --- | --- | --- | --- |
+| T0 | plan-service 인스턴스를 **2대 이상**으로 올리려 한다 | compose·배포 변경 리뷰 | 1대에서는 락이 하는 일이 없다. 2대가 되는 그 순간이 판단 시점이다 |
+| T1 | 회차 `remoteCalls` ≥ **10,000** | 회차 완료 로그 | 1대에서도 왕복이 만 건이면 곱하기 이전에 **M 자체가 문제**다. 이때는 락이 아니라 대상 좁히기로 간다(아래) |
+| T2 | 회차 `elapsedMs` ≥ **1,200,000**(20분) | 회차 완료 로그 | 04:10 에 시작해 20분을 넘기면 auth 의 04:30 프로필 이미지 청소와 겹친다. 그쪽은 참조 키 전수 조회라 겹치면 서로를 느리게 한다 |
+| T3 | 04:10–04:30 구간에 auth 의 지연·에러율이 오르거나, 회차 `failures` 가 0 이 아니다 | Grafana(`observability-guide.md`) · 회차 로그 | 임계가 아니라 실제 아픔이다. 즉시 판단 대상이다 |
+
+**알람은 없다.** 이 수치는 사람이 회차 로그에서 읽어야 한다. 그래서 T1·T2 를 지표 알람이 아니라 **T0(인스턴스를
+늘리는 변경)에 묶어 둔다** — 아무도 보지 않는 임계값보다, 반드시 리뷰를 거치는 변경에 붙은 확인이 실제로 작동한다.
+
+_걸렸을 때 — 락보다 대상 좁히기가 먼저다_
+
+| 안 | 효과 | 비용 |
+| --- | --- | --- |
+| **A. 대상 좁히기** — auth 에 "최근 N일 안에 반려견이 삭제된 회원" 내부 조회를 두고 그 회원만 대사한다 | 왕복이 **M → 그날 삭제가 일어난 회원 수**. 보통 한 자릿수다. N 대여도 N × 한 자릿수라 **락이 필요 없어진다** | auth 에 내부 엔드포인트 1개 + plan 에 포트/어댑터. **스키마 변경은 없다** — `Pet.delete()` 가 `deleted` 만 켜고 복원 경로가 없어서, 소프트 삭제된 행의 `updated_at` 이 곧 삭제 시각이다 (`deleted = true AND updated_at >= :since`) |
+| **B. ShedLock** | 왕복 N×M → M. **M 은 그대로다** | 새 의존 + 락 테이블. 인스턴스 1대에서는 이득이 0 |
+
+**A 가 B 를 포함한다.** A 를 하면 남는 왕복이 한 줌이라 곱해져도 의미가 없고, B 를 해도 M 은 남는다. 그래서
+T1(=M 이 큼)에는 A 로 가고, **B 는 A 보다 먼저 스케일아웃이 와 버렸을 때의 임시방편**으로만 쓴다.
+
+A 로 갈 때 함께 정해야 하는 것 둘 — 둘 다 "전수 훑기를 버리면 잃는 것" 이다.
+
+- **되돌아보는 창(window).** 지금은 매일 전수를 훑으므로 배치가 며칠 죽어 있어도 스스로 복구된다. 델타로 바꾸면
+  그 성질이 사라진다. 창을 견딜 수 있는 최장 중단보다 넉넉히 잡거나(예: 30일), **전수 훑기를 주 1회로 남겨**
+  안전망을 유지한다.
+- **원천에서 행 자체가 사라진 반려견**(탈퇴 30일 뒤 파기, 아래 "잔여 행 탐지" 2번 쿼리)은 "최근 삭제" 목록에
+  잡히지 않는다. 지금도 그 경우 실질 피해는 R3 가 막지만, 델타로만 가면 **영영 안 잡힌다.** 위의 주 1회 전수
+  훑기를 남기면 이것도 같이 해결된다.
+
+_락 저장소를 고른다면 Redis 가 아니라 DB 다_
+
+- plan-service 는 **지금 `redis-core` 의존이 없다.** 스케줄러 락 하나 때문에 Redis 를 넣으면 Redis 가 흔들릴 때
+  Redis 를 쓰지도 않던 서비스가 같이 흔들린다. **청소 배치가 사용자 경로의 가용성을 끌어내리는 것은 뒤바뀐 거래다.**
+- 락의 경쟁 범위는 **같은 서비스의 인스턴스끼리**다. 서비스마다 스키마가 따로 있으므로 스키마당 락 테이블 하나가
+  정확히 그 범위이고, 서비스를 가로지르는 키 네임스페이스를 설계할 일이 없다.
+- dev Redis 는 BossPickSeoul 과 같은 standalone 노드를 쓴다(`deploy-guide.md`). 프로젝트가 다른 두 배치가 같은
+  키를 잡는 사고는 DB 테이블에는 없는 위험이다.
+- 이 저장소에도 Redis 락 선례는 있다 — tour-service 의 `ForecastRefreshLockPort`(`SET NX PX`). 다만 그쪽은 이미
+  `redis-core` 를 쓰는 서비스이고 **놓쳐도 되는 절약 락**(못 잡으면 그냥 원천을 부른다)이라 성격이 다르다.
+
+_락을 넣더라도 비관 잠금은 그대로 둔다_
+
+분산 락은 **배치끼리**만 직렬화한다. 위에서 다룬 0행 레이스의 나머지 절반 — 배치와 **사용자**의 `updatePlan` 이
+같은 일정을 동시에 건드리는 경우 — 는 어떤 스케줄러 락으로도 닫히지 않는다. `findActiveByIdForUpdate` 와
+`findByPlanIdOrderByIdAscForUpdate` 는 분산 락이 들어와도 남는다.
+
+_auth-service 의 스케줄러 3종도 같은 문제인가 (넣는다면 공용으로 넣기 위해 함께 본다)_
+
+| 스케줄러 | 다중 인스턴스에서 | 락이 필요한가 |
+| --- | --- | --- |
+| `WithdrawnMemberPurgeScheduler` (05:00) | 원격 호출이 없다. 두 인스턴스가 같은 페이지를 잡으면 뒤에 온 쪽이 행 잠금에서 기다렸다가 0행을 지운다 — **일이 두 배가 되는 것이 아니라 한쪽이 기다렸다 헛돈다** | 아니다. 다만 `purgeBatch` 는 실제 삭제 행 수가 아니라 **조회한 아이디 개수**를 돌려주므로 동시 실행에서는 회차 로그의 `deleted` 가 부풀려 찍힌다. 락을 넣을 이유는 아니고, 그 로그를 믿기 전에 알아 둘 점이다 |
+| `MemberProfileImageCleanupScheduler` (04:30) · `PetProfileImageCleanupScheduler` (04:40) | 인스턴스마다 **MinIO 목록 조회 + 참조 키 전수 조회**를 한 벌씩 한다. 삭제는 멱등이라 안전하지만(각 클래스 주석) 스캔은 그대로 N 배다 | 아직 아니다. 다만 비용이 회원 수가 아니라 **객체 수**에 붙으므로 넷 중 먼저 커지는 쪽이다. 공용 락을 넣는 날이 오면 첫 대상은 이 둘이다 |
+
+즉 **넷 다 지금은 필요 없고, 필요해지는 순서도 서로 다르다.** 그래서 지금 공용 락 모듈을 먼저 만들지 않는다 —
+만들 시점에 대상이 하나뿐이면 그것은 공용이 아니라 그냥 그 서비스의 코드다.
+
+**대표 승계는 `pet_id` 한 컬럼 DML 이다**
+
+`save` 는 merge 라 모든 updatable 컬럼에 정적 UPDATE 를 낸다(`PlanEntity` 에 `@DynamicUpdate`·`@Version` 이 없다).
+배치가 들고 있는 스냅샷이 조금이라도 낡으면 사용자의 제목·기간 수정을 되돌린다. `promoteRepresentative(planId,
+petId, expectedPetId)` 는 **다른 컬럼을 건드릴 방법 자체가 없어** 그 유실 경로를 구조적으로 없앤다.
+`expectedPetId` 불일치로 0건이 돌아오면 덮어쓰지 않고 warn 만 남긴다 — 그 순간의 사용자 수정이 옳고, 불변식은
+다음 회차가 복구한다. 벌크 DML 이라 `updated_at` 은 갱신되지 않는다(의도한 것이다 — 청소를 "사용자가 일정을
+수정했다" 로 보이게 하지 않는다).
+
+**연속 실패 5회면 회차를 멈춘다 — 빈 목록 200 은 정상 답이다**
+
+정리가 하루 늦는 것은 손해가 아니지만 잘못 떼어낸 동행견은 되돌릴 수 없다. 그래서 **응답을 못 받은 경우**는 멈춘다.
+다만 **회원 하나의 실패로 멈추면 안 된다** — 커서가 매 회차 0부터 시작하므로, 특정 회원에서 결정적으로 실패하면
+매일 같은 자리에서 멈춰 **그 뒤 회원은 영원히 정리되지 않는다**. `InternalResponseSupport` 가 4xx 를 포함한 모든
+`FeignException` 을 503 으로 바꾸기 때문에, 회원 하나의 데이터 문제가 "원천 장애" 처럼 보이기도 쉽다.
+
+- 회원 단위 실패(`PlanException` 이든 `DataAccessException` 이든)는 **warn + skip 하고 계속**한다.
+- **연속** 실패가 5회면 회차를 중단하고 마지막 실패 `memberId` 를 warn 에 남긴다. auth-service 전면 장애는 첫 다섯
+  회원이 연속으로 실패하므로 사실상 즉시 중단된다 — 조기 중단이 필요한 상황은 그대로 잡힌다.
+- 성공이 한 번 끼면 연속 수는 초기화된다. 드문 실패가 하루치로 쌓여 회차를 멈추지 않는다.
+- 반대로 **빈 목록 200 은 그대로 믿는다.** auth 의 조회는 요청 `petIds` 와의 교집합을 내므로 "요청한 아이가 전부
+  삭제됨" 과 "회원이 사라짐" 이 똑같이 빈 목록이다. 그런데 전자가 바로 정리 대상이므로, 여기서 회원을 건너뛰면
+  죽은 아이 둘이 실린 일정이 영구히 남아 #720 증상이 그대로 유지된다. 후자(탈퇴 30일 뒤 파기된 회원의 고아 일정)가
+  정리되는 것은 R3 가 마지막 한 마리를 지키므로 실질 피해가 없다.
+- **회차 요약 로그는 `finally` 에 있다.** 페이지 조회가 던지는 `DataAccessException` 처럼 잡지 않는 예외로 빠져나갈
+  때 요약이 통째로 사라지면, 하필 이상이 생긴 날의 수치를 못 보게 된다.
+- 회차 로그에 남기는 값: `elapsedMs` / `pages` / `members` / `failures` / `remoteCalls` / `aborted` / `detached` /
+  `representativeChanged` / `placeholderKept` / `legacyPlansSkipped`. `placeholderKept`(R3 발동)와
+  `legacyPlansSkipped`(조인 테이블 행이 없어 지울 것 자체가 없던 옛 일정)를 **따로 센다** — 합치면 R3 가 몇 번
+  발동했는지 로그에서 읽을 수 없다. 정리할 것이 없는 회차에도 한 줄은 남긴다. 회원당 원격 왕복 한 번이라는 구조가
+  유지되는지는 "아무 일도 없었던 날" 의 수치가 있어야 보인다.
+
+**API·DB 계약은 그대로다.** `plan.pet_id` 는 여전히 NOT NULL 이고, `petIds: []` 는 허용하지 않으며,
+`PLAN_010` / `PLAN_011` / `PLAN_019` 의 의미도 바뀌지 않는다. 이 작업은 **잔여 행 정리**뿐이다.
+
+**삭제 확인창 집계 — `GET /api/v1/plans/companions/{petId}` (#972)**
+
+반려견 삭제 확인창이 삭제 요청 **전에** 읽는다. memberId 는 JWT 에서 오고, 타인·없는 petId 는 `member_id = 나`
+조건에 걸려 404 가 아니라 **세 값이 모두 0** 이다(존재 여부를 따로 알려 주지 않는다).
+
+| 필드 | 뜻 | 정리 규칙과의 대응 |
+| --- | --- | --- |
+| `editablePlanCount` | 초안·확정·미삭제 일정 중 이 아이가 동행(대표 컬럼 OR `plan_pet`)인 일정 수 | R1 의 대상 |
+| `soleCompanionPlanCount` | 그중 동행 목록(`Plan.resolvePetIds`)이 이 아이 한 마리뿐인 일정 수. 조인 테이블 행이 없는 옛 일정의 대표도 든다 | R3 로 남는 일정 |
+| `completedPlanCount` | 완료 일정 중 이 아이가 동행인 일정 수 | R1 의 불가침 — 기록으로 남는다 |
+
+- 동행 판정 술어는 정리 쿼리(`findCompanionEditablePlansWithPet`)와 같고 `status in` 만 뺐다(`PlanRepository.findPlansWithPet`).
+  상태 분리는 `PlanStatus.isCompanionEditable()` 하나로 한다. 확인창이 말한 수와 실제 정리 결과가 갈라지지 않게 하려는 것이다.
+- 조회는 일정 목록 1회 + 편집 가능 일정의 `plan_pet` `in` 절 1회다 (§9-7, `PlanCompanionSummaryTest` 가 고정).
+- 게이트웨이는 기존 `/api/v1/plans/**` 라우트로 닿는다. 리터럴 `companions` 가 `/{planId}` 보다 구체적이라 Spring 매핑이 겹치지 않는다.
+
+**R3 로 남은 일정의 FE 표시 규칙.** 단독 동행 일정은 삭제 뒤에도 `petIds` 에 **죽은 petId 가 그대로** 남는다(의도).
+화면은 `petIds ∩ 내 반려견 목록` 이 비면 "동행 반려견 없음" 으로 보여 준다 — 서버가 그 id 를 걸러 내려보내지 않는다.
+
+**후속 후보 (이번에 하지 않은 것)** — R3 자리 표시자 대신 `plan.pet_id` nullable 화, 대표 반려견으로 자동 대체,
+트리거의 `@Async` 전환, 내부 API 공유 시크릿 인증.
+
+**잔여 행 탐지 (읽기 전용)**
+
+dev 는 auth / plan 스키마가 같은 MySQL 인스턴스에 있어 크로스 스키마 SELECT 로 배포 전후 건수를 비교할 수 있다
+(local 은 `hondigagae` 한 스키마를 함께 쓰므로 `<auth_schema>.` 접두어를 지우면 된다).
+**SELECT 만 쓴다 — 운영 DB 에 DML 을 돌리지 않는다.** 정리는 배치가 하고, 여기서 보는 것은 "줄어들고 있는가" 뿐이다.
+
+```sql
+-- 1) 삭제(soft delete)된 반려견을 아직 참조하는 plan_pet 행 — 정리 대상 일정만
+SELECT pp.plan_id, pp.pet_id, p.status
+FROM plan_pet pp
+         JOIN plan p ON p.id = pp.plan_id
+         JOIN <auth_schema>.pet pet ON pet.id = pp.pet_id
+WHERE p.deleted = FALSE
+  AND p.status IN ('DRAFT', 'CONFIRMED')
+  AND pet.deleted = TRUE;
+
+-- 2) 원천에서 행 자체가 사라진 반려견(탈퇴 회원 30일 파기 등)을 참조하는 행
+--    1) 과 같이 정리 대상이다. 일정마다 마지막 한 마리는 R3 로 남으므로 0 으로 수렴하지는 않는다
+SELECT pp.plan_id, pp.pet_id
+FROM plan_pet pp
+         JOIN plan p ON p.id = pp.plan_id
+WHERE p.deleted = FALSE
+  AND p.status IN ('DRAFT', 'CONFIRMED')
+  AND NOT EXISTS (SELECT 1 FROM <auth_schema>.pet pet WHERE pet.id = pp.pet_id);
+
+-- 3) 불변식 점검: plan.pet_id 가 plan_pet 첫 행과 다른 일정 (0건이어야 한다)
+SELECT p.id,
+       p.pet_id,
+       (SELECT first_pet.pet_id FROM plan_pet first_pet WHERE first_pet.plan_id = p.id ORDER BY first_pet.id LIMIT 1) AS expected_pet_id
+FROM plan p
+WHERE p.deleted = FALSE
+  AND EXISTS (SELECT 1 FROM plan_pet pp WHERE pp.plan_id = p.id)
+  AND p.pet_id <> (SELECT first_pet.pet_id FROM plan_pet first_pet WHERE first_pet.plan_id = p.id ORDER BY first_pet.id LIMIT 1);
+```
+
+### 반려견별 히스토리 (`GET /plans?petId=`)
+
+**한 마리라도 동행이면 히트**다. `plan.pet_id = :petId OR plan.id IN (select plan_id from plan_pet where pet_id = :petId)` —
+조인 테이블만 보면 옛 일정이, 대표 컬럼만 보면 두 번째 이후 반려견이 히스토리에서 빠진다. 정적 JPQL 이라 H2 슬라이스 테스트(`PlanRepositoryTest`)로 고정했다.
+
+### 판정 축 — 아이별로 따로 판정하고, 점수가 가장 낮은 아이가 기준
+
+여러 마리를 어떻게 합칠지는 두 갈래였다.
+
+| 안 | 호출 | 문제 |
+| --- | --- | --- |
+| 조건을 보수적으로 합쳐 한 번 판정 (더위·추위·소음 민감 OR, 크기 최대) | 일수 × 1 | **존재하지 않는 가상의 개** 기준이 된다. 가장 큰 아이가 더위에 가장 약한 아이라는 보장이 없고, 견종(단두종) 축은 합칠 방법이 없다 |
+| **아이별로 따로 판정 → 점수가 가장 낮은 아이를 그날의 기준** | 일수 × 서로 다른 조건 수(≤5) | 호출이 늘지만 "몽실이 기준" 이라고 말할 수 있다. 실제 아이 기준이라 근거가 정직하다 |
+
+- 조건이 같은 아이들은 **한 번만 묻는다** — 특성 조회에 실패해 전부 일반 조건이 됐을 때 마리 수만큼 같은 질문을 반복하지 않는다.
+- 응답은 일자마다 `basisPetId`(기준 아이)와 `petSuitabilities[]`(아이별 점수·등급)를 내린다. `score`·`reasons`·`indoorAlternatives` 는 기준 아이 것이다 — 날씨는 아이마다 같고, 근거를 마리 수만큼 반복하면 응답이 읽기 어려워진다.
+- 점수를 못 낸 날은 첫 아이(대표)를 기준으로 두어 날씨·이유는 보여 준다. 모든 조회가 실패하면 `unavailableReasonCode = LOOKUP_FAILED` 이고 아이별 목록은 빈 배열이다 (사유 구분은 아래 "일자 판정 불가 사유").
+- 반려견 특성은 auth-service 벌크 내부 API(`GET /internal/v1/pets/conditions?memberId=&petIds=`) 한 번으로 받는다. 빠진 아이(소유 아님·조회 실패)는 일반 조건으로 그 아이 몫의 판정에 남는다.
+- 후기 데이터는 반려견 성향 분석(ai-service)의 입력이 되므로, 방문 장소·활동 유형·만족도가 구조화되어 저장되어야 한다.
+
+## 일정 날씨 브리핑 (`GET /api/v1/plans/{planId}/weather`)
+
+- 적합도를 **다시 계산하지 않는다.** 판정 규칙의 소유자는 tour-service 고, 같은 규칙을
+  두 곳에서 구현하면 일정 화면과 장소 화면이 같은 날 같은 곳을 다르게 말하게 된다.
+- 반려견 특성은 auth-service 내부 벌크 API(`GET /internal/v1/pets/conditions`)에서 받아
+  tour-service 에 파라미터로 넘긴다. 사본을 두면 사용자가 프로필을 고쳐도 옛 값으로 판정한다.
+- **여러 마리면 아이별로 따로 판정하고 점수가 가장 낮은 아이가 그날의 기준이다** — 위 "동행 반려견" 절의 판정 축 참고.
+- **그날 장소 전체를 판정하고, 가장 힘든 곳이 그날을 정한다** (#1045). 그날 장소성 항목(`isPlaceTarget` · `targetId != null`)
+  마다 아이별로 묻고, **(장소, 반려견) 중 점수가 가장 낮은 조합**이 그날의 판정이다 — 기준 반려견과 같은 원칙으로,
+  한 곳이라도 힘든 날이면 그날은 힘든 날이다. `score` · `suitabilityLevel` · `reasons` · `indoorAlternatives` 는 그 조합의 것이고,
+  `representativePlaceId/Title` 은 **판정을 가른 장소**, `representativePlanItemId` 는 그 장소의 일정 항목(같은 장소가 둘이면 앞선 쪽)이다.
+  아이별 요약(`petSuitabilities`)은 아이마다 그날 가장 힘든 장소의 점수다. 동점이면 순서가 앞선 장소 · 앞선 아이다.
+  > **왜 바꿨나.** 예전에는 그날 첫 장소 한 곳만 물었다. 날씨만 보면 하루 안의 장소는 대개 같은 격자라 충분했지만, 적합도 근거의
+  > 대부분은 장소의 사정(크기 제한 · 동반 요금 · 혼잡)이다 — 첫 장소의 근거가 "N일차" 아래 그날 전체의 판정으로 읽혔고, 둘째 장소가
+  > 대형견 입장 불가여도 드러나지 않았다.
+- 일부 장소만 조회에 실패하면 남은 장소로 판정하고, **전부 실패할 때만** `LOOKUP_FAILED` 다 (반려견 축과 같은 규칙). 판정을 못 낸 날
+  (지난 날짜 · 예보 범위 밖 · 조회 실패)은 `representativePlace*` 에 순서가 가장 앞선 장소를 싣는다.
+- **호출 수**: 일수 × 그날 장소 수 × 서로 다른 조건 수(최대 5). 같은 장소를 두 번 담으면 한 번만 묻고, 하루 **최대 8곳**
+  (`MAX_PLACES_PER_DAY`, 순서대로)만 판정한다. 날짜로 답이 정해지는 날은 묻지 않으므로 실제로 부르는 날은 오늘부터 11일 이내뿐이다.
+  호출은 순차다 — 병렬 조회는 지연이 문제로 드러나면 따로 연다.
+- 일자별로 불가 사유를 따로 둔다. 어떤 날은 예보가 닿고 어떤 날은 닿지 않는 것이
+  **정상**이라(예보는 약 11일), 전체를 성공/실패로 나누면 그 차이를 표현할 수 없다.
+- 날씨 때문에 항목을 바꾸는 것은 이 API 가 아니라 일자별 항목 교체 API 로 명시적으로 한다
+  (`api-design-guide.md` §8 의 부수효과 분리 원칙).
+- Feign 조회 실패는 예외로 올리지 않고 빈 값으로 바꾼다. 날씨는 부가 정보이고,
+  tour-service 가 흔들렸다고 사용자가 자기 일정을 못 보게 되면 안 된다.
+- 항목 단위 판정이 필요해지는 순간은 **산책 위험도**다. 그것은 시각에 따라 갈리므로 같은
+  방식으로 접을 수 없어 별도 조회로 뺐다 — 아래 "항목 단위 산책 위험도" 절.
+
+### 항목 단위 산책 위험도 (`GET /plans/{planId}/walk-safety`)
+
+일자 날씨는 "둘째 날 괜찮아?" 에 답하고, 이 API 는 **"두 시에 그 해수욕장 걸어도 돼?"** 에
+답한다. 같은 해수욕장도 오후 2시와 저녁 7시가 다르므로 일자로 접을 수 없다.
+
+- **일정 상세에 얹지 않고 별도 경로로 뺐다.** 상세는 이미 장소 요약 때문에 원격 호출을 하나
+  들고 있고, 거기에 항목 수만큼의 위험도 조회를 더하면 "일정을 연다" 가 그 전부를 기다리는
+  일이 된다. 위험도는 화면이 필요할 때 따로 부른다.
+- **항목마다 엔드포인트를 두지 않은 이유**는 반대다 — 그러면 화면이 항목 수만큼 왕복한다.
+  일정 하나를 한 번에 받고, 서버가 접을 수 있는 호출을 접는다.
+- **판정 규칙을 복사하지 않는다.** 노면온도 추정·체감온도 산식·등급 임계는 tour-service 가
+  갖고, 여기서는 `GET /places/{placeId}/walk-safety` 를 **항목의 시각으로** 부를 뿐이다.
+  규칙을 옮기면 장소 화면과 일정 화면이 같은 시각 같은 곳을 다르게 말하게 된다.
+- **기준 반려견은 그날 날씨 판정의 `basisPetId` 와 같다.** 여기서 따로 고르면 한 화면이
+  "몽실이 기준" 이라고 말하는 옆에서 다른 화면이 보리 기준을 말한다. **그날 적합도 조회가
+  실패한 경우에만** 대표(첫 번째) 반려견으로 대신한다 — 여기까지 온 항목은 장소를 가진
+  항목이라 "그날 장소가 없어 기준을 못 냈다" 는 경우는 도달하지 않는다.
+- **그 기준은 하루치씩(`PlanWeatherProcessor.briefDay`) 구하고, 판정할 항목이 실제로 나온
+  날에만 구한다.** 브리핑 전체(`brief`)를 부르면 특성·항목 조회가 한 번 더 일어나고, 시각이
+  하나도 없어 위험도 호출이 0건인 일정에서도 `일수 × 조건 수` 만큼 적합도 원격 호출이 나간다.
+- **같은 (장소, 시각, 기준 반려견) 은 한 번만 묻는다.** 같은 장소에 시각이 같은 항목이 둘이면
+  답도 같다. **날이 다르면 접지 않는다** — 날짜는 판정의 입력이다(노면온도 추정이 태양 고도를
+  쓰고 예보 자체도 날짜별이다).
+- 응답은 항목 줄에 붙일 만큼만 든다 — 등급·노면온도·체감온도·기온·안전 시간대. 근거 목록·
+  시간대별 판정·특보 상세는 넣지 않는다. 항목마다 실어 나르면 응답이 항목 수만큼 부푼다.
+  필요하면 화면이 장소 위험도 API 를 직접 부른다.
+- 게이트웨이는 손대지 않았다 — `/api/v1/plans/**` 가 이미 덮는다.
+
+**항목 판정 불가 사유** (`PlanItemWalkSafetyUnavailableReason`) 는 일자 날씨와 **같은 축**이고,
+코드와 문장을 짝으로 내린다. 가르는 **순서에 이유가 있다.**
+
+| 순서 | 코드 | 왜 이 자리인가 |
+|------|------|----------------|
+| 1 | `PAST_DATE` | 무엇을 고쳐도 풀리지 않는다. 뒤로 미루면 지난 날짜에 "시각을 넣어 보세요" 라는 지켜지지 않을 안내가 나간다 |
+| 2 | `NOT_PLACE_TARGET` | 사용자가 일정에서 고칠 수 있다. `WALK` 의 `targetId` 는 `walk_course.id` 라 장소로 조회하면 남의 아이디다 |
+| 3 | `NO_START_TIME` | 사용자가 일정에서 고칠 수 있다. **정오를 넣어 판정하지 않는다** — 없는 시각을 지어내면 사용자가 정하지 않은 시간의 답이 된다 |
+| 4 | `BEYOND_FORECAST_RANGE` | 기다리면 풀린다. 사용자가 먼저 고칠 것이 있으면 그것을 먼저 말한다 |
+| 5 | `NO_FORECAST_AT_TIME` | **물어본 뒤에야 안다.** 지평 안인데 그 시각 예보를 쓸 수 없었던 경우다 |
+| 6 | `LOOKUP_FAILED` | plan→tour 호출 자체가 실패했다 |
+
+앞의 넷은 **묻기 전에** 갈리고, 뒤의 둘은 물어본 뒤에 갈린다.
+
+> **`LOOKUP_FAILED` 만 장애라고 단정하지 않는다.** tour-service 는 기상 원천 장애
+> (`WEATHER_UNAVAILABLE`)를 **빈 예보 목록으로 접어 200 을 돌려준다**
+> (`WalkSafetyProcessor.loadForecasts`). 그러면 등급이 `UNKNOWN` 으로 와서 이 경계에서는
+> "그 시각 예보가 정말 없는 것" 과 구분할 수 없고, 둘 다 `NO_FORECAST_AT_TIME` 으로 접힌다.
+> 그래서 이 사유의 문장은 **원인을 단정하지 않고** "쓸 수 없었다" 까지만 말한다 — 장애 중인
+> 사용자에게 "예보는 시각마다 갈린다" 고 하면 영구 사실처럼 읽힌다.
+> 가르려면 tour 응답에 coverage 를 실어 `UNAVAILABLE` 을 장애로 접어야 한다(후속 과제).
+
+**`NO_FORECAST_AT_TIME` 을 `BEYOND_FORECAST_RANGE` 로 합치지 않는다** (이슈 [#717](https://github.com/8llow8llowMe/hondigagae/issues/717)).
+같은 "예보가 없다" 지만 갈리는 시점과 단위가 다르다.
+
+| | `BEYOND_FORECAST_RANGE` | `NO_FORECAST_AT_TIME` |
+|---|---|---|
+| 무엇의 함수인가 | **날짜만** (`byDate`) | 날짜 + **시각** |
+| 언제 갈리는가 | 원격 호출 **전** | 물어보고 답을 받은 **뒤** |
+| 단위 | 그날 모든 항목이 같다 → 화면이 **일자 단위로 접어** 낸다 | **항목마다 갈린다.** 같은 날 새벽 항목은 답을 받고 낮 항목은 못 받는다 |
+| `walkSafetyLevel` | `null` | **`UNKNOWN` 이 남는다** |
+
+- 예보는 시간 단위라 지평 안 날짜여도 그 시각만 비는 일이 있다. 특히 `오늘+4` 는 실측에서
+  자정 한 시각만 오는 날이라(`weather-insight-integration.md` §5-1) 낮 항목이 이 사유로 떨어진다.
+  그래도 날짜로 미리 자르지 않는다 — **날짜만으로 답이 정해지지 않기 때문이다.**
+- 합치면 이미 물어보고 답을 받은 줄에까지 "기다리면 풀립니다" 가 나가고, 화면이 일자 단위로
+  접어 낸 자리에 항목마다 다른 사실이 섞인다.
+- **이 사유만 `walkSafetyLevel` 이 `UNKNOWN` 으로 남는다** — 나머지 다섯은 `null` 이다.
+  tour-service 의 `UNKNOWN` 은 부재가 아니라 **실제 답**이라 버릴 이유가 없고, Swagger 소비자와
+  후속 화면이 쓸 수 있다.
+  - **화면이 깨지는 것을 막으려고 남긴 것은 아니다.** FE 의 `itemWalkSafetyView`
+    (`frontend/src/lib/plan/walk-safety.ts`)는 `unavailableReasonCode` 가 있으면 그 자리에서
+    사유 문장으로 빠져나가므로, 등급을 `null` 로 내렸어도 화면은 같은 `sentence` 갈래로 떨어져
+    깨지지 않았다. 대신 **그 줄에 뜨는 문장이 등급 설명에서 사유 문장으로 바뀐다** — 이 응답에서
+    이 줄만은 순수 추가가 아니라 **표시 문장 교체**다.
+  - 그래서 `Processor.toInfo` 는 `PlanItemWalkSafetyInfo.unavailable(...)` 팩토리를 **쓰지 않고**
+    사유만 얹는다. 그 팩토리는 `placeTitle`·`basisPetId`·`targetDateTime` 을 버리는데, 이 줄은
+    tour-service 에 실제로 물어봤고 장소명도 기준 반려견도 알고 있다. 나머지 다섯은 묻지 못한
+    줄이라 버리는 것이 맞다.
+
+**시각별 예보 지평은 일자 예보와 다르다 — `[오늘, 오늘+4]` 로 5일이다.** 일자 날씨의 11일과
+헷갈리기 가장 쉬운 지점이다. 산책 위험도는 노면온도를 `기온 + 일사(날짜·시각·위도)` 로
+추정하므로 **시각별 데이터가 있는 단기예보만** 쓴다 — 중기예보(오늘+4\~오늘+10)에는 오전/오후뿐이라
+오후 두 시 아스팔트를 계산할 수 없다 (`weather-insight-integration.md` §2-1 · §6-2). 그래서
+tour-service 는 시각별 예보 목록이 덮는 날짜 밖이면 `OUT_OF_RANGE` → 등급 `UNKNOWN` 을 낸다.
+
+- 상수는 `PlanItemWalkSafetyUnavailableReason.HOURLY_FORECAST_HORIZON_DAYS = 4` 한 곳이고,
+  단기예보 실측 커버리지(`오늘 ~ 오늘+4`)에서 나온 값이다. **원천 커버리지가 바뀌면 그 상수와
+  이 문단이 같이 움직인다.**
+- 일자 지평(10)을 여기에 그대로 쓰면 **조용히 틀린다.** `오늘+5`\~`오늘+10` 항목이 컷에 걸리지
+  않아 전부 tour-service 로 나가고, 돌아오는 것은 등급 `UNKNOWN` 에 온도가 전부 null 인 200 이다.
+  `NO_FORECAST_AT_TIME` 이 생긴 뒤로는 사유 없는 빈 배지까지 가지는 않지만(#717 이전에는 그랬다),
+  **일주일 뒤 여행의 모든 항목이 쓸모없는 원격 호출을 한 번씩 하고** 기다리면 풀릴 날짜에
+  "이 시각의 예보가 없다" 는 항목별 사유를 받는다. 날짜로 이미 알 수 있는 것을 항목 수만큼
+  물어본 셈이다.
+- 같은 일정에서 `/weather` 에는 판정이 있는데 `/walk-safety` 는 비어 있는 날이 **정상**이다.
+  Swagger 설명에도 그렇게 적어 둔다 — 화면이 이것을 장애로 읽지 않게 해야 한다.
+
+**판정을 못 낸 줄도 `placeId` 는 그대로 내린다** (`NOT_PLACE_TARGET` 만 예외). 지난 날짜라
+예보가 없는 것과 장소를 모르는 것은 다른 사실이고, 무엇보다 `LOOKUP_FAILED` 줄에서 화면이
+장소 위험도 API 를 직접 불러 다시 시도하려면 그 값이 있어야 한다 — 비우면 "필요하면 직접
+부르세요" 라는 안내가 정작 가장 필요한 줄에서 지켜지지 않는다. `NOT_PLACE_TARGET` 만 비우는
+이유는 `WALK` 의 `targetId` 가 `walk_course.id` 라, 장소로 내보내면 화면이 남의 아이디를 열기
+때문이다. 반대로 `placeTitle` 은 **못 낸 줄에서 항상 비운다** — 그것은 tour-service 가 확인해 준
+이름이고, 일정에 적힌 이름은 `title` 로 이미 내려간다.
+
+**`petConditionApplied` 는 일정 단위가 아니라 항목마다 내린다** (#717). 그 판정에 기준
+반려견(`basisPetId`)의 특성이 반영됐는지를 말한다.
+
+- **기준 반려견이 날짜별로 갈린다.** `basisPetOn` 이 그날 날씨 판정에서 기준을 구하므로 날이
+  다르면 기준 아이가 다르고, tour-service 에 넘기는 조건도 달라져 값이 실제로 갈릴 수 있다.
+  최상위에 하나만 두면 날이 다른 항목에서 틀린다. 같은 DTO 가 이미 `basisPetId` 를 항목마다
+  들고 있어 바로 옆자리다.
+- **판정을 못 낸 줄은 `null` 이다.** 그 다섯(+`NO_FORECAST_AT_TIME` 은 물어봤으므로 값이 있다)은
+  tour-service 에 묻지 않았으므로 **값 자체가 없다.** `false` 는 "물어봤고 반려견 특성 없이 일반
+  조건으로 판정했다" 는 뜻이라, 묻지 않은 줄에 `false` 를 쓰면 하지 않은 판정을 했다고 말하게
+  된다. `Info` 와 응답 DTO 모두 **Wrapper `Boolean`** 이고, `unavailable(...)` 팩토리는 이 칸을
+  설정하지 않는다.
+
+**`walkSafetyLevel.scoreDescription` 은 이제 채워진다** (#717). 전에 `null` 이었던 것은 쓸 일이
+없어서가 아니라 **plan-service 의 Feign DTO 가 그 칸을 받지 않아** `@JsonIgnoreProperties(ignoreUnknown
+= true)` 가 조용히 버리고 있었기 때문이다. 원천(`WalkSafetyLevel`)은 모든 등급이 실제 문장을 갖고
+tour-service 가 네 칸을 전부 채워 보낸다. **같은 서비스의 적합도 경로(`PlaceSuitabilityClientResponse`)
+에는 이미 있던 칸이라, 설계가 아니라 빠뜨린 자국이었다.** Feign DTO → `QueryResult`
+(`levelScoreDescription`) → `Info` → Presenter 까지 한 칸씩 이어 붙였고, 새 원격 호출도 판정
+변경도 없다.
+
+**카카오 특보 알림은 이 절의 범위 밖이다.** 화면이 물을 때 답하는 것과 서버가 먼저 밀어 주는
+것은 다른 기능이라 별도 이슈로 뗀다.
+
+### 일자 판정 불가 사유 (이슈 [#492](https://github.com/8llow8llowMe/hondigagae/issues/492))
+
+**"못 냈다" 에는 성질이 다른 넷이 섞여 있고, 뭉뚱그리면 사용자에게 하는 말이 틀린다.** 지난
+날짜에 "잠시 후 다시 시도해 주세요" 가 나가면 화면은 그 문장을 그대로 보여 주고 사용자는
+영원히 바뀌지 않을 것을 새로고침한다. 여행 중 일정에서는 지난 일차마다 그 문장이 뜨는
+흔한 경로다. 일시적 장애와 구분되지 않으니 실제 예보 API 장애도 알아채기 어렵다.
+
+정본은 `PlanDayWeatherUnavailableReason` 이고, 문장도 그 enum 이 갖는다 — Processor 에 문자열
+상수를 두면 같은 사실을 말하는 문구가 갈린다.
+
+| 코드 | 뜻 | 재시도 | 판정 시점 |
+| --- | --- | --- | --- |
+| `PAST_DATE` | 이미 지난 날짜 | **권하지 않는다** — 예보는 소급되지 않는다 | 날짜만으로 (호출 전) |
+| `NO_PLACE_ITEM` | 그날 일정에 장소 항목이 없다 | 해당 없음 — 장소를 담으면 풀린다 | 일정 항목으로 (호출 전) |
+| `BEYOND_FORECAST_RANGE` | 예보가 아직 닿지 않는 미래 | 해당 없음 — 기다리면 풀린다 | 날짜만으로 (호출 전) |
+| `LOOKUP_FAILED` | 조회 자체가 실패 | **권한다** — 넷 중 이것만 장애다 | 조회 결과로 |
+
+- **예보가 닿는 범위는 `[오늘, 오늘+10]` — 11일이다.** 기상청 단기예보(오늘\~오늘+4)와
+  중기예보(오늘+4\~오늘+10)를 이어 만든 값이라 임의의 숫자가 아니다
+  (`weather-insight-integration.md` §2). 상수는 `PlanDayWeatherUnavailableReason.FORECAST_HORIZON_DAYS`
+  한 곳이고, 원천 커버리지가 바뀌면 그 상수와 이 표가 같이 움직인다.
+- **날짜만으로 답이 정해지는 둘은 원격 호출 전에 가른다.** 지난 날짜·예보 범위 밖은 물어도
+  결과가 정해져 있다. 3박 4일 중 사흘이 지난 일정이면 나가는 호출이 하루치로 준다.
+- **사유 코드를 응답에 함께 내린다** — `unavailableReasonCode`(코드)와 `unavailableReason`(문장)이
+  짝이다. 문장만 내리면 프론트가 사유별로 다르게 그리려고 문장을 파싱하게 되고, 코드만 내리면
+  같은 사실을 서버와 화면이 각자의 문구로 말한다 (FE [#497](https://github.com/8llow8llowMe/hondigagae/issues/497)).
+  기존 `unavailableReason` 필드는 타입도 문구도 그대로 두고 코드를 **더한다** — 배포된 화면이
+  이미 그 문장을 그리고 있어 타입을 바꾸면 그 화면이 깨진다.
+- **"오늘" 은 `Clock` 빈에서 얻는다** (`PlanServiceBeansConfig`, `Asia/Seoul` 고정). `-Duser.timezone`
+  은 배포 환경변수(`TIME_ZONE`)라 그 값 하나로 자정 경계가 다른 나라 기준이 될 수 있고, 그러면
+  일자 판정이 "지난 날짜" 를 하루 어긋나게 말한다. 여행 브리핑의 `today` 도 같은 시계를 쓴다 —
+  갈리면 한 응답 안의 두 값이 자정 경계에서 어긋난다. 시스템 시각을 직접 읽으면 이 분기는
+  실행 날짜에 따라 결과가 달라져 테스트로 고정되지 않는다.
+- tour-service 의 `ForecastCoverage`(AVAILABLE / DAY_ENDED / OUT_OF_RANGE / UNAVAILABLE)와
+  같은 구분을 일정 쪽 말로 옮긴 것이다. 그쪽은 예보 목록을 손에 들고 판정하고, 이쪽은
+  물어보기 전에 날짜로 판정한다.
+
+## 여행 브리핑 (`GET /api/v1/plans/{planId}/briefing?date=`)
+
+출발 전날·당일에 **하루치**를 한 번에 주는 조합 API 다 — 그날 일정 요약(항목 수·방문 체크 수·첫/마지막 항목·대표 장소),
+날씨·적합도(위 날씨 브리핑의 하루치), 발효 중인 기상특보, 산책 골든타임. FE 가 화면 하나로 "내일 여행 준비" 를 보여 주기 위한
+것이라 **결정적 조합만 하고 LLM 을 부르지 않는다.** 준비물은 ai-service 의 준비물 API 가 따로 있어 넣지 않는다.
+
+- **재계산하지 않는다.** 날씨는 `PlanWeatherProcessor.briefDay` 를 그대로 부른다(복사가 아니라 하루치 메서드를 공개했다) —
+  판정 장소 선정·아이별 판정·기준 반려견 선택이 같은 경로를 타야 일정 화면과 브리핑 화면이 같은 날을 같게 말한다.
+  특보·골든타임은 tour-service 가 낸 값을 옮기기만 한다. 경보 판정(`recommendationSuppressed`)도 tour 가 준 값이다 —
+  `level == WARNING` 을 이쪽에서 다시 세우면 규칙이 두 서비스로 갈라진다 (#357).
+- **특보·골든타임은 요청 날짜가 오늘일 때만 붙인다** (`today`). 골든타임은 tour 의 `GET /api/v1/insights/walk-times` 가
+  "오늘 남은 시간" 전용이라 내일 이후를 물을 수단이 없고, 특보는 tour 의 적합도 판정과 같은 규칙
+  (`targetDate == today` 일 때만)을 따른다 — 내일 날짜에 오늘 특보를 붙이면 "내일 태풍" 이라는 없는 예보가 화면에 선다.
+  오늘이 아니면 두 필드는 null 이고 각 `*UnavailableReasonCode`(사유 코드)·`*UnavailableReason`(그 사유의 문장)에
+  이유가 **짝으로** 담긴다.
+- **사유는 문장이 아니라 enum 이 소유한다 (#716).** `PlanBriefingWarningUnavailableReason`(`NOT_TODAY`/`LOOKUP_FAILED`) 과
+  `PlanBriefingWalkTimesUnavailableReason`(`NOT_TODAY`/`NO_PLACE_ITEM`/`NO_PLACE_POINT`/`LOOKUP_FAILED`) 둘이고,
+  사유 집합이 달라 합치지 않는다(`PlanDayWeatherUnavailableReason` 과 `PlanItemWalkSafetyUnavailableReason` 을 따로 둔 것과 같다).
+  **정상적으로 낼 수 없는 날과 일시 장애가 갈려야 화면이 재시도 버튼을 붙일 수 있다** — 두 집합 모두 `LOOKUP_FAILED` 만 장애다.
+  문장만 내리면 프론트가 사유별로 다르게 그리려고 문장을 파싱하게 된다 (#497).
+- **특보 "확인 못 함" 과 "없음" 을 나눈다 (필수).** 이 브리핑의 가장 나쁜 실패는 특보가 떠 있는데 화면이 조용한 것이다.
+  그래서 `WeatherWarningQueryPort` 만 조회 실패를 `PlanException` 으로 올리고, Processor 가 잡아
+  `weatherWarningUnavailableReason` 에 `LOOKUP_FAILED` 를 담는다. `weatherWarning` 과 이유가 **둘 다 null 일 때만**
+  "발효 중인 특보 없음" 이다. 골든타임·날씨는 부가 정보라 기존처럼 빈 값으로 접는다.
+  - 한계: tour-service 자체가 KMA 특보 조회 실패를 "없음" 으로 접는다(`WeatherWarningProcessor`). 이 경계에서 가를 수 있는 것은
+    plan→tour 호출의 실패까지다.
+- 특보는 걸음 좌표와 무관하게 오늘이면 확인한다 — 그래서 walk-times 응답에 실린 특보를 재활용하지 않고 tour 내부 API
+  `GET /internal/v1/weather/warnings`(가장 무거운 한 건) 를 따로 부른다. 장소 항목이 없는 날에도 특보는 나가야 한다.
+- 골든타임은 그날 **첫 장소**(`pickRepresentative`) 좌표로 묻는다. **일자 적합도를 가른 장소(`weather.representativePlaceId`)와 다를 수 있다** —
+  적합도는 그날 장소 전체 중 가장 힘든 곳으로 내고(#1045), 골든타임은 한 지점의 곡선이라 성격이 다르다. `schedule.representativePlace*` 도 이 좌표 기준 장소다.
+  반려견 조건은 **기준 아이**(`basisPetId` —
+  날씨 판정이 고른 점수 최저 아이, 없으면 대표) 것을 넘긴다. 좌표는 tour 내부 후보 API 한 번으로 받는다. 붙이지 못한 이유는
+  셋으로 가른다 — 장소 항목 없음 / 좌표 없음(delisted·원천 좌표 없음) / 조회 실패.
+- **시간대별 곡선(`hourly`)은 싣지 않는다.** 브리핑은 요약이고 곡선을 실으면 응답이 몇 배로 커진다. 응답에 판정 좌표를 함께 내리니
+  곡선이 필요한 화면은 그 좌표로 tour 의 walk-times 를 직접 부른다.
+  - 좌표는 `schedule.representativeLat`/`representativeLng` 에 싣는다 — **`walkTimes` 가 null 인 날에도 나와야** 골든타임을
+    못 붙인 날의 화면도 지도와 곡선을 부를 수 있다. `walkTimes` 안의 `lat`/`lng` 는 같은 값이고, FE 가 이미 읽고 있어 남겨 둔다.
+    좌표를 모르는 날은 `null` 이다(`0.0` 으로 접으면 적도상의 한 점이 된다).
+- **`schedule.firstItem`/`lastItem` 의 `itemType` 은 `{code,name,description}` metadata 다 (#716).** 일정 상세
+  (`PlanItemDetailItem.itemType`)와 같은 모양이다 — 같은 값을 두 API 가 다른 모양으로 내리면 프론트가 한국어 매핑 테이블을
+  따로 만들게 되는데 그것은 금지다 (coding-conventions §11).
+  - **기존 enum 문자열(`"PLACE"`)과 호환되지 않는 파괴적 변경이다.** 브리핑 v1 은 이 값을 렌더하지 않아 화면 회귀는 없지만
+    FE 타입·목 데이터가 옛 계약을 명시해 두고 있다(`frontend/src/types/plan.ts`, `frontend/src/lib/api/mock/plan-data.ts`,
+    `frontend/src/features/plan/plan-briefing-section.tsx`). FE 전환은 #751.
+- 날짜가 일정 기간 밖이면 `PLAN_002`, `date` 누락은 `PLAN_125`, `yyyy-MM-dd` 형식 오류는 `PLAN_124`.
+  `date` 는 필수다 — "출발 전날" 인지 "당일" 인지는 FE 가 안다.
+- 원격 호출 수(하루치라 상한이 낮다): auth 특성 1 + tour 적합도(서로 다른 조건 수, 최대 5) + tour 장소 요약 1 + tour 특보 1 +
+  tour 골든타임 1. 오늘이 아니면 뒤의 둘은 나가지 않는다. Facade 에 트랜잭션을 걸지 않는 이유는 날씨 브리핑과 같다.
+
+## 여행 동행 기능
+
+- `PUT /api/v1/plans/{planId}/items/{planItemId}/visited` — 항목 방문 체크. 일차 항목을
+  교체(delete+insert)하면 새 항목이라 그 날의 체크는 초기화된다.
+- `PUT /api/v1/plans/{planId}/items/{planItemId}/start-time` — 항목 하나의 시작 시각만 고친다 (#1030).
+  `{"startTime":"10:30:00"}`, 비우려면 `{"startTime":null}` 이나 `{}` (바디 자체는 필수라 없으면 400). **행을 제자리에서 고치므로 `planItemId` 와
+  `visited` 가 남는다** — 시각 하나 때문에 일괄 교체를 부르면 그날의 체크가 모두 풀리던 우회가 필요 없다.
+  - `PATCH /items/{planItemId}` 가 아니라 필드별 하위 리소스 `PUT` 이다. 같은 결의 `…/visited` ·
+    준비물 `…/checked` 와 맞추고, PATCH 의 "필드 없음" 과 "null 로 비움" 을 가르는 규칙을 만들지 않으려는 것이다.
+    메모도 단건으로 고칠 일이 생기면 `…/memo` 로 따로 둔다.
+  - 순서(`sequence`)와 시각이 어긋나도 막지 않는다 — 일괄 교체도 요구하지 않는다.
+  - 내 일정이 아니면 `PLAN_001`, 이 일정의 항목이 아니면(다른 일정의 항목 포함) `PLAN_005`.
+- `GET /api/v1/plans/{planId}/emergency` — 일자별 방문 장소마다 가까운 동물병원·동물약국
+  (반경 10km, 최대 3곳). 같은 장소는 한 번만 검색하고, 좌표가 없는 장소는 건너뛴다 — 원천에서
+  사라진(delisted) 장소는 요약 자체가 오지 않고, 남아 있어도 원천이 좌표를 주지 않은 장소가 있다.
+  시설 검색 실패는 삼키지 않는다 — 시설 없는 브리핑은 안전하다는 착각만 준다.
+- `GET /api/v1/plans?petId=` — 반려견별 여행 히스토리. 여러 마리 일정은 그중 한 마리로 들어 있어도 히트다.
+  or-null 조건 대신 메서드를 나눠 조회한다.
+
+## 여행 준비물 (`plan_packing_item`)
+
+`GET|PUT|POST /api/v1/plans/{planId}/packing-items`,
+`PUT .../{packingItemId}/checked`, `DELETE .../{packingItemId}` (이슈 #398).
+세부는 [`docs/features/398-plan-packing-items.md`](../features/398-plan-packing-items.md).
+
+- **저장은 plan-service 가 한다.** ai-service 는 준비물을 생성만 하고 저장하지 않는다 — JPA 가
+  없는 서비스에 저장소를 붙이면 "제안만 한다" 는 성격이 바뀌고, 생성은 됐는데 저장이 실패한 상태를
+  ai-service 가 떠안게 된다. FE 가 생성과 저장을 따로 부르면 실패 지점이 화면에서 구분된다.
+- `plan` 컨텍스트 안에 둔다. 준비물은 일정의 하위 리소스라 소유권 검사가 일정의 것과 같아야 하고,
+  새 컨텍스트로 빼면 `getOwnedPlan` 을 복제하게 된다 — `plan_item`·`plan_pet` 과 같은 부류다.
+  컨트롤러만 `PlanPackingWebController` 로 나눴다(`PlanWebController` 가 이미 10개다).
+- **`PUT` 은 `source = AI` 인 행만 교체한다.** 사용자가 직접 적어 둔 항목은 남는다. 기간 축소 때
+  범위 밖 항목을 자동 삭제하지 않고 `PLAN_008` 로 거부한 것과 같은 판단이다 — 사용자의 기록을
+  말없이 지우지 않는다.
+- **체크 상태는 이름으로 승계한다.** `plan_item` 의 `visited` 는 일차 교체 때 초기화되는데,
+  그쪽은 항목이 통째로 다른 것이 되므로 맞다. 준비물은 "리드줄" 이 다시 나오면 같은 리드줄이다 —
+  승계가 없으면 짐을 반쯤 싼 상태에서 다시 뽑기 한 번에 체크가 전부 날아간다.
+- 이름이 겹치면 사용자 것이 이기고, AI 목록 안의 중복은 첫 것만 남긴다(LLM 이 같은 것을 두 번 낸다).
+  유니크 인덱스 `uk_plan_packing_item_plan_id_name` 이 마지막 방어선이다.
+- **AI 항목 삭제는 벌크 DML 로 즉시 내보낸다.** `plan_item` 이 겪은 함정과 같다 — 파생 delete 는
+  `em.remove` 큐잉이라 flush 때 INSERT 가 먼저 나가고, 교체가 같은 `(planId, name)` 을 재사용하므로
+  유니크 인덱스 위반으로 죽는다.
+- `category` 는 enum 이 아니라 VARCHAR(30) 이다. 값의 원천이 LLM 이라 프롬프트를 고치면 늘어나고,
+  enum 이면 모델이 새 분류를 낸 날 저장이 통째로 실패한다.
+- Facade 에 트랜잭션을 그대로 건다 — 이 유스케이스에는 원격 호출이 하나도 없다. 일정 CRUD·브리핑이
+  트랜잭션을 좁힌 이유(tour·auth 왕복)가 여기에는 해당하지 않는다.
+- 상한은 일정당 50개(`PLAN_013`). 이름 중복은 409 `PLAN_012`, 남의 일정 항목은 404 `PLAN_014`.
+- 남은 것: 다견 준비물(ai-service 가 아직 대표 `petId` 만 읽는다), FE 연동(`useMutation` → `useQuery` + 저장).
+
+## 장소 즐겨찾기 (favorite 컨텍스트)
+
+- `GET|POST|DELETE /api/v1/favorites/places[/{placeId}]` — 찜 목록/저장/해제. 저장·해제 모두
+  멱등이고 회원당 최대 100곳이다. 저장 시 tour-service 조회로 장소 존재를 검증한다.
+- 목록의 장소 요약(제목·주소·동반조건·대표 이미지)은 tour-service 내부 후보 API 로 붙인다.
+  조회 실패 시 placeId 만으로 응답한다 — tour 장애가 찜 목록 조회 실패로 번지지 않는다.
+- 목록 항목의 `savedAt` 은 즐겨찾기 행의 `createdAt`(저장 시각)이다. 장소 요약 조회 실패와 무관하게 늘 실리며,
+  목록은 즐겨찾기 아이디(Snowflake, 시간순) 내림차순 = 최근 저장순이다 (#1241).
+
+## 서비스 간 내부 API
+
+`GET /internal/v1/plans/{planId}/outline?memberId=` — ai-service 의 하루 재생성용 일정 개요.
+`GET /internal/v1/plans/ai-commits/{jobId}?memberId=` — ai-service 잡 조회(폴링·SSE)의 `committedPlanId` 용. 이 작업을 담은 일정 아이디 (#970).
+`GET /internal/v1/favorites/place-ids?memberId=` — ai-service 의 즐겨찾기 우선 반영용 아이디 목록.
+
+- `ai-commits` 는 **없어도 200** 이다 — `Response<{planId}>` 의 `planId` 가 담은 적 없음·삭제됨·남의 것일 때 전부 `null`.
+  outline 처럼 404 로 가르지 않는다. 잡 조회는 이 값 없이도 성립해야 하고, 가르면 남의 jobId 가 담겼는지를 알려 주게 된다.
+  담기 멱등과 **같은 조회**(`PlanQueryProcessor.findAiCommittedPlan`)를 쓴다.
+
+- 일차별 항목의 제목·유형·placeId 만 내보낸다. 메모·시간대 같은 개인 기록은 경계를 넘기지 않는다.
+- `petId`(대표)와 `petIds`(동행 전체)를 함께 내보낸다. ai-service 의 준비물 생성은 아직 `petId` 만 읽는다 — 다견 준비물은 ai 쪽 후속이다.
+- 내부 호출이라도 memberId 로 소유권을 다시 확인한다 — 남의 planId 로는 404.
+
+`POST /internal/v1/plans/companions/reconcile?memberId=` — auth-service 의 반려견 삭제 직후 동행 목록 대사 **트리거** (#972).
+
+- 바디 없음. "무엇을 떼라" 가 아니라 "이 회원을 지금 대사하라" 다 — 04:10 배치와 같은 `reconcileMember` 를 돈다.
+- 응답 `Response<{ detached, representativeChanged, placeholderKept }>` 200. auth 조회 실패면 `PLAN_900 INTERNAL_SERVICE_UNAVAILABLE` 503.
+- 이 서비스의 첫 **변경형** 내부 API 다. 앱 레벨 내부 인증은 없다 — 위 "반려견이 삭제되면" 절의 위험 참고.
+
+이 서비스가 **부르는** 내부 API (tour-service, 전부 벌크 1회 호출이다):
+
+- `GET /internal/v1/places/visible-ids?placeIds=` — 저장 시 장소 존재 검증.
+- `GET /internal/v1/places/candidates?placeIds=` — 일정 상세 항목의 장소 요약, 즐겨찾기 목록의 장소 요약,
+  응급 브리핑의 검색 중심점.
+- `GET /internal/v1/walk-courses/candidates?walkCourseIds=` — 일정 상세 `WALK` 항목의 산책 코스 요약 (#619).
+  저장 시 코스 존재 검증도 이 API 를 쓴다 (#715) — 목록에 없는 아이디가 결과에서 빠지는 동작이 곧 존재 확인이다.
+  **tour 장애 시 요약만 비우고 항목은 남긴다** — 장소 요약과 같은 판단이고, 두 요약은 서로 독립이다.

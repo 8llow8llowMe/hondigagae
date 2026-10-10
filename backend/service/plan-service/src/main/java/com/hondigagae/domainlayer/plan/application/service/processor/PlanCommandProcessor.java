@@ -1,0 +1,585 @@
+package com.hondigagae.domainlayer.plan.application.service.processor;
+
+import com.hondigagae.domainlayer.plan.application.command.PlanCopyCommand;
+import com.hondigagae.domainlayer.plan.application.command.PlanCreateCommand;
+import com.hondigagae.domainlayer.plan.application.command.PlanItemCommand;
+import com.hondigagae.domainlayer.plan.application.command.PlanUpdateCommand;
+import com.hondigagae.domainlayer.plan.application.exception.PlanErrorCode;
+import com.hondigagae.domainlayer.plan.application.exception.PlanException;
+import com.hondigagae.domainlayer.plan.application.port.out.PetConditionQueryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlaceVerifyQueryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanPetConditionRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanPetRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanWalkCourseQueryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQueryResult;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlanWalkCourseSummaryQueryResult;
+import com.hondigagae.shared.travel.plan.PlanItemType;
+import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
+import com.hondigagae.domainlayer.plan.domain.model.Plan;
+import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
+import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
+import com.hondigagae.domainlayer.plan.domain.model.PlanPetCondition;
+import com.hondigagae.persistence.util.SnowflakeIdGenerator;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+
+@Component
+@RequiredArgsConstructor
+public class PlanCommandProcessor {
+
+    /** 여행 기간 상한(일). 개인 여행 기준으로 충분하고, 일자 배열과 브리핑 루프의 상한이 된다. */
+    private static final int MAX_TRIP_DAYS = 30;
+
+    /** 복제 시 제목을 생략하면 원본 뒤에 붙인다. */
+    private static final String COPY_TITLE_SUFFIX = " (복사)";
+
+    private final PlanRepositoryPort planRepositoryPort;
+    private final PlanItemRepositoryPort planItemRepositoryPort;
+    private final PlanPetRepositoryPort planPetRepositoryPort;
+    private final PlanPetConditionRepositoryPort planPetConditionRepositoryPort;
+    private final PlaceVerifyQueryPort placeVerifyQueryPort;
+    private final PlanWalkCourseQueryPort planWalkCourseQueryPort;
+    private final PetConditionQueryPort petConditionQueryPort;
+    private final SnowflakeIdGenerator snowflakeIdGenerator;
+    /** 여행 전 상태 가드의 "오늘". 시스템 시각을 직접 읽으면 판정이 테스트에서 날짜에 따라 흔들린다. */
+    private final Clock clock;
+
+    /**
+     * DB 쓰기 구간만 트랜잭션으로 묶는다. 반려견 확인({@link #resolvePetIds})과 타깃 검증
+     * ({@link #verifyItemTargets})은 원격 호출이라 Facade 가 <b>이 메서드에 들어오기 전에</b>
+     * 수행한다 — 트랜잭션 안에서 원격 응답을 기다리면 DB 커넥션을 잡은 채 대기하게 된다
+     * (architecture-guide §3 의 문서화된 예외).
+     */
+    @Transactional
+    public Plan createPlan(long memberId, PlanCreateCommand command, List<Long> petIds) {
+        validateDateRange(command.startDate(), command.endDate());
+
+        Plan plan = Plan.builder()
+            .id(snowflakeIdGenerator.generateId())
+            .memberId(memberId)
+            // 대표 반려견 = 첫 번째. 목록 전체는 plan_pet 에 따로 둔다.
+            .petId(petIds.get(0))
+            .areaCode(command.areaCode())
+            .sigunguCode(command.sigunguCode())
+            .title(command.title())
+            .startDate(command.startDate())
+            .endDate(command.endDate())
+            .budget(command.budget())
+            .status(PlanStatus.DRAFT)
+            .deleted(false)
+            // AI 초안 담기 멱등 키 (#970). 같은 (memberId, sourceAiJobId) 가 이미 있으면 유니크 위반으로
+            // 커밋이 실패하고, Facade 가 그것을 받아 먼저 담긴 일정을 돌려준다 — 여기서 잡지 않는다
+            // (트랜잭션이 rollback-only 가 된 뒤라 이 메서드 안에서는 재조회 결과를 돌려줄 수 없다).
+            .sourceAiJobId(command.sourceAiJobId())
+            .build();
+
+        Plan saved = planRepositoryPort.save(plan);
+        planPetRepositoryPort.saveAll(toPets(saved.id(), petIds));
+
+        // 항목 수 상한(#1243)은 요청 @Size(PLAN_136)가 막는다 — 새 일정은 빈 채로 시작하므로 요청의 항목 수가 곧 일정의 항목 수다.
+        if (!CollectionUtils.isEmpty(command.items())) {
+            validateItemDays(saved, command.items());
+            validateSequenceUniqueness(command.items());
+            planItemRepositoryPort.saveAll(toItems(saved.id(), command.items()));
+        }
+        return saved;
+    }
+
+    /**
+     * 지난 일정을 새 {@code DRAFT} 로 복제한다. 준비물·후기·방문 체크는 가져오지 않는다.
+     *
+     * <p>타깃 검증({@link #verifyItemTargets})은 부르지 않는다 — 복제는 이미 저장된 항목을
+     * 옮기는 것이고, delisted 장소는 상세 규칙대로 항목은 남기고 요약만 비운다. 생성 경로처럼
+     * 검증하면 delisted 참조가 있는 일정을 복제할 수 없게 된다.
+     *
+     * <p><b>산책 코스도 같다</b> (#715). 저장 시 코스 존재 검증이 생겼지만 복제에는 걸지 않는다 —
+     * 검증 없이 저장됐거나 원천에서 사라진 코스를 참조하는 옛 일정을 복제할 수 없게 되고, 그것은
+     * 사용자가 고칠 수 없는 과거 자료 때문에 새 일정을 못 만드는 일이다.
+     *
+     * <p><b>항목 수 상한({@link Plan#MAX_ITEMS}, #1243)도 보지 않는다.</b> 원본 항목을 그대로 옮기므로 사본은
+     * 원본 수를 넘지 않는다 — 상한 전에 이미 넘은 원본의 사본도 받고, 그 사본을 늘리는 편집은 하루 교체가 막는다.
+     *
+     * <p>동행 반려견 필터({@link #resolveCopyPetIds})는 원격 호출이라 Facade 가 트랜잭션 밖에서 부른다.
+     */
+    @Transactional
+    public Plan copyPlan(Plan source, PlanCopyCommand command, List<Long> petIds, List<PlanItem> sourceItems) {
+        // 기간 자체가 잘못된 경우(역전·상한 초과)를 먼저 거른다 — PLAN_003 · PLAN_009 다.
+        // 일수 비교를 앞에 두면 "3일이어야 합니다" 를 받은 사용자가 그대로 맞춰도 다시
+        // 거절당한다. 프론트가 클라이언트에서 역전·30일 상한을 먼저 막는 것도 이 순서다.
+        validateDateRange(command.startDate(), command.endDate());
+        int newTotalDays = (int) java.time.temporal.ChronoUnit.DAYS.between(command.startDate(), command.endDate()) + 1;
+        if (newTotalDays != source.totalDays()) {
+            // 원본 일수를 문구에 담는다 — 며칠로 맞춰야 하는지 없으면 사용자가 행동할 수 없다
+            throw new PlanException(PlanErrorCode.PLAN_COPY_PERIOD_MISMATCH, source.totalDays());
+        }
+
+        Plan plan = Plan.builder()
+            .id(snowflakeIdGenerator.generateId())
+            .memberId(source.memberId())
+            .petId(petIds.get(0))
+            .areaCode(source.areaCode())
+            .sigunguCode(source.sigunguCode())
+            .title(resolveCopyTitle(command.title(), source.title()))
+            .startDate(command.startDate())
+            .endDate(command.endDate())
+            .budget(source.budget())
+            .status(PlanStatus.DRAFT)
+            .deleted(false)
+            // 출처(sourceAiJobId)는 복사하지 않는다 (#970). 복제본은 AI 작업을 담은 결과가 아니고,
+            // 복사하면 원본과 같은 멱등 키가 되어 유니크 위반으로 복제 자체가 실패한다.
+            .build();
+
+        Plan saved = planRepositoryPort.save(plan);
+        planPetRepositoryPort.saveAll(toPets(saved.id(), petIds));
+
+        if (!CollectionUtils.isEmpty(sourceItems)) {
+            List<PlanItemCommand> itemCommands = sourceItems.stream()
+                .map(item -> PlanItemCommand.builder()
+                    .day(item.day())
+                    .sequence(item.sequence())
+                    .itemType(item.itemType())
+                    .targetId(item.targetId())
+                    .title(item.title())
+                    .memo(item.memo())
+                    .startTime(item.startTime())
+                    .build())
+                .toList();
+            validateSequenceUniqueness(itemCommands);
+            planItemRepositoryPort.saveAll(toItems(saved.id(), itemCommands));
+        }
+        return saved;
+    }
+
+    /**
+     * 복제 시 원본 동행 반려견을 따르되, 삭제됐거나 소유가 아닌 아이는 빼고 남은 아이가 없으면
+     * {@link PlanErrorCode#PET_REQUIRED} 이다 — 대표 반려견 폴백은 쓰지 않는다. 원본에 실려
+     * 있던 동행 구성을 최대한 유지하되, 더 이상 내 반려견이 아닌 아이는 실어 올 수 없기 때문이다.
+     */
+    public List<Long> resolveCopyPetIds(long memberId, List<Long> sourcePetIds) {
+        if (CollectionUtils.isEmpty(sourcePetIds)) {
+            throw new PlanException(PlanErrorCode.PET_REQUIRED);
+        }
+        Set<Long> ownedPetIds = petConditionQueryPort.findOwnedPetIds(memberId, sourcePetIds);
+        List<Long> filtered = sourcePetIds.stream()
+            .filter(ownedPetIds::contains)
+            .toList();
+        if (filtered.isEmpty()) {
+            throw new PlanException(PlanErrorCode.PET_REQUIRED);
+        }
+        return filtered;
+    }
+
+    /**
+     * 요청이 반려견을 지정하지 않았으면 <b>대표 반려견</b>으로 대신한다 — ai-service 의 생성과 같은
+     * 규칙이다. 한 마리만 키우는 사용자가 담기마다 petId 를 고르게 하지 않기 위한 기본값이고,
+     * 그것도 없으면 일정을 만들 수 없다 — petId 는 NOT NULL 이고 날씨 판정의 기준이기 때문이다.
+     *
+     * <p>지정된 petIds 는 <b>소유·존재를 auth-service 로 검증한다.</b> 검증 없이 저장하면 남의
+     * petId·없는 petId 가 그대로 plan.pet_id / plan_pet 에 남고, 이후 날씨 브리핑이 특성을 못 받아
+     * 그 일정만 영구히 일반 조건으로 조용히 강등된다. 원격 호출이므로 트랜잭션 밖(Facade)에서 부른다.
+     */
+    public List<Long> resolvePetIds(long memberId, List<Long> requested) {
+        if (!CollectionUtils.isEmpty(requested)) {
+            Set<Long> ownedPetIds = petConditionQueryPort.findOwnedPetIds(memberId, requested);
+            if (!ownedPetIds.containsAll(requested)) {
+                throw new PlanException(PlanErrorCode.NOT_FOUND_PET);
+            }
+            return requested;
+        }
+        return petConditionQueryPort.findRepresentativePetId(memberId)
+            .map(List::of)
+            .orElseThrow(() -> new PlanException(PlanErrorCode.PET_REQUIRED));
+    }
+
+    /**
+     * 수정 경로의 동행견 확인. 소유 검증은 생성과 같은 규칙을 그대로 쓰되 <b>폴백이 없다</b>.
+     *
+     * <p>생성은 빈 목록을 대표 반려견으로 대신하지만, 수정에서 빈 목록은 "동행견을 모두 빼겠다"
+     * 는 뜻이다. 여기서 대표 반려견으로 되살리면 사용자가 지우려던 아이가 말없이 돌아온다.
+     * 일정에는 최소 한 마리가 있어야 하므로 {@code PLAN_010} 으로 거절한다.
+     */
+    public List<Long> resolvePetIdsForUpdate(long memberId, List<Long> requested) {
+        if (CollectionUtils.isEmpty(requested)) {
+            throw new PlanException(PlanErrorCode.PET_REQUIRED);
+        }
+        return resolvePetIds(memberId, requested);
+    }
+
+    /**
+     * @param petIds {@code null} 이면 동행견을 건드리지 않는다. 목록이 오면 {@code plan.pet_id}(대표)와
+     *               {@code plan_pet}(전체)을 <b>함께</b> 맞춘다 — 한쪽만 고치면 대표와 목록이 어긋난다.
+     *               소유 검증은 원격 호출이라 Facade 가 트랜잭션 밖에서 미리 끝낸다
+     *               ({@link #resolvePetIdsForUpdate}).
+     *               <p>날씨 판정·준비물은 여기서 다시 계산하지 않는다. 다음 조회가 새 {@code petIds} 를
+     *               읽어 판정하고, 이미 만든 준비물은 지우지 않는다 — 사용자가 손으로 고친 준비물을
+     *               동행견 교체가 말없이 날리는 일은 없어야 한다.
+     * @param petConditionsAtCompletion 일정이 <b>이번 요청으로</b> {@code COMPLETED} 가 될 때만 채워
+     *               들어오는, 그 시점의 동행 반려견 특성이다. 그 외에는 {@code null} 이고 스냅샷을
+     *               건드리지 않는다. 원격 조회라 Facade 가 트랜잭션 밖에서 미리 끝낸다.
+     *               <p>이미 완료된 일정을 다시 완료하는 요청은 상태가 바뀌지 않으므로 다시 찍지 않는다.
+     *               되돌린 뒤 다시 완료하면 <b>그 시점으로 다시 찍는다</b> — 되돌린 동안 동행견을 바꿀 수
+     *               있어서(#621), 옛 스냅샷을 그대로 두면 이번 여행에 가지도 않은 아이의 특성이 기록으로 남는다.
+     */
+    @Transactional
+    public Plan updatePlan(Plan plan, PlanUpdateCommand command, List<Long> petIds,
+        Map<Long, PetConditionQueryResult> petConditionsAtCompletion) {
+        LocalDate startDate = command.startDate() != null ? command.startDate() : plan.startDate();
+        LocalDate endDate = command.endDate() != null ? command.endDate() : plan.endDate();
+        validateDateRange(startDate, endDate);
+
+        // 이미 완료된 일정은 다녀온 기록이다 — 동행견을 바꾸면 그때의 판정 근거가 뒤늦게 흔들린다.
+        // 같은 요청으로 완료하면서 바꾸는 것은 막지 않는다. 아직 기록이 확정되기 전이다.
+        if (petIds != null && plan.status() == PlanStatus.COMPLETED) {
+            throw new PlanException(PlanErrorCode.PLAN_COMPLETED_PET_LOCKED);
+        }
+
+        Plan updated = plan.toBuilder()
+            .title(command.title() != null ? command.title() : plan.title())
+            // 대표 반려견 = 첫 번째. 생성과 같은 규칙이다.
+            .petId(petIds != null ? petIds.get(0) : plan.petId())
+            .startDate(startDate)
+            .endDate(endDate)
+            .budget(command.budget() != null ? command.budget() : plan.budget())
+            .status(command.status() != null ? command.status() : plan.status())
+            .build();
+        validateStartedBeforeCompletion(plan, updated, command);
+
+        // 기간을 줄이면 범위 밖 일차의 항목이 고아가 된다 — 조용히 남기면 상세와 날씨 브리핑이 어긋나므로
+        // 사용자가 항목을 먼저 정리하도록 거부한다. 자동 삭제는 사용자의 기록을 말없이 지우는 일이라 하지 않는다.
+        if (updated.totalDays() < plan.totalDays()) {
+            boolean hasOrphanItems = planItemRepositoryPort.findByPlanId(plan.id()).stream()
+                .anyMatch(item -> item.day() > updated.totalDays());
+            if (hasOrphanItems) {
+                throw new PlanException(PlanErrorCode.PLAN_PERIOD_SHRINK_CONFLICT);
+            }
+        }
+
+        Plan saved = planRepositoryPort.save(updated);
+
+        if (petIds != null) {
+            // plan 행을 먼저 잠근다. 같은 두 테이블(plan, plan_pet)을 동행견 대사 배치도 건드리는데
+            // 그쪽은 plan → plan_pet 순으로 잠근다. 여기서 plan_pet 을 먼저 만지면 순서가 역전되어
+            // 새벽 배치와 서로를 기다리다 데드락이 나고, 피해자가 되는 쪽은 사용자다(500).
+            // save 만으로는 잠기지 않는다 — merge 는 UPDATE 를 flush 까지 미루고, plan_pet 벌크 DML 은
+            // 쿼리 스페이스가 겹치지 않아 auto-flush 를 유발하지도 않는다. 그래서 명시적으로 잠근다.
+            // (반환값은 쓰지 않는다. 대상 일정은 바로 위에서 이미 확인했다)
+            planRepositoryPort.findActiveByIdForUpdate(saved.id());
+            // 삭제가 먼저다. 큐잉되면 같은 (planId, petId) 가 옛 행과 겹쳐 유니크 인덱스 위반으로 죽는다.
+            planPetRepositoryPort.deleteByPlanId(saved.id());
+            planPetRepositoryPort.saveAll(toPets(saved.id(), petIds));
+        }
+        if (petConditionsAtCompletion != null) {
+            // 같은 이유로 삭제가 먼저다 — 다시 완료하는 경로가 같은 (planId, petId) 를 재사용한다.
+            planPetConditionRepositoryPort.deleteByPlanId(saved.id());
+            planPetConditionRepositoryPort.saveAll(toPetConditions(saved.id(), petConditionsAtCompletion));
+        }
+        return saved;
+    }
+
+    /**
+     * 이번 요청으로 일정이 완료되는가. 이미 완료된 일정에 다시 {@code COMPLETED} 를 보내는 것은
+     * 전이가 아니다 — 그때 다시 찍으면 다녀온 뒤 고친 프로필이 "그때 기준" 으로 둔갑한다.
+     */
+    public static boolean completesNow(Plan plan, PlanUpdateCommand command) {
+        return command.status() == PlanStatus.COMPLETED && plan.status() != PlanStatus.COMPLETED;
+    }
+
+    /**
+     * 여행 전 상태 가드 (#971). 서비스 기준 오늘이 시작일보다 앞이면 완료 상태가 될 수 없다 —
+     * 떠나지 않은 여행을 다녀온 기록으로 남기지 않는다. 판정은 {@link Plan#hasStarted} 하나로 한다.
+     *
+     * <ul>
+     *   <li>이번 요청으로 완료하는데 (수정 결과 기준) 시작 전이면 막는다
+     *   <li>이미 완료된 일정의 <b>시작일을 옮겨</b> 시작 전이 되는 것도 막는다 — 완료 뒤 날짜를 미래로
+     *       밀면 같은 결과("안 간 여행의 완료")에 우회로로 닿는다
+     *   <li>시작일을 건드리지 않는 수정(제목 등)은 막지 않는다. 가드 이전에 만들어진, 시작 전인데 완료된
+     *       일정이 남아 있어도 그 일정의 제목 수정까지 깨지면 안 된다
+     *   <li>이미 완료된 일정에 {@code COMPLETED} 를 다시 보내는 것은 전이가 아니라({@link #completesNow})
+     *       첫 번째 조건에 걸리지 않는다
+     * </ul>
+     */
+    private void validateStartedBeforeCompletion(Plan plan, Plan updated, PlanUpdateCommand command) {
+        LocalDate today = LocalDate.now(clock);
+        if (updated.hasStarted(today)) {
+            return;
+        }
+        boolean movesCompletedPlanStart = plan.status() == PlanStatus.COMPLETED
+            && updated.status() == PlanStatus.COMPLETED
+            && !updated.startDate().equals(plan.startDate());
+        if (completesNow(plan, command) || movesCompletedPlanStart) {
+            throw new PlanException(PlanErrorCode.PLAN_NOT_STARTED_COMPLETE);
+        }
+    }
+
+    private List<PlanPetCondition> toPetConditions(long planId, Map<Long, PetConditionQueryResult> conditions) {
+        return conditions.entrySet().stream()
+            .map(entry -> PlanPetCondition.of(
+                snowflakeIdGenerator.generateId(), planId, entry.getKey(), entry.getValue()))
+            .toList();
+    }
+
+    @Transactional
+    public void softDeletePlan(Plan plan) {
+        planRepositoryPort.save(plan.markDeleted());
+    }
+
+    /**
+     * 특정 일차의 항목을 일괄 교체한다. (삭제 후 재삽입)
+     *
+     * <p>타깃 검증({@link #verifyItemTargets})은 원격 호출이라 Facade 가 트랜잭션 밖에서 먼저 한다.
+     *
+     * <p>일정 전체 항목 상한({@link Plan#MAX_ITEMS}, #1243)은 삭제 · 저장 <b>앞</b>에서 본다
+     * ({@link #validateItemLimit}). 하루 교체는 다른 날 항목에 더해지는 경로라 요청 {@code @Size} 만으로는
+     * 막히지 않는다.
+     */
+    @Transactional
+    public void replaceDayItems(Plan plan, int day, List<PlanItemCommand> commands) {
+        if (!plan.containsDay(day)) {
+            throw new PlanException(PlanErrorCode.PLAN_DAY_OUT_OF_RANGE);
+        }
+        List<PlanItemCommand> dayItems = commands.stream()
+            .map(command -> PlanItemCommand.builder()
+                .day(day)
+                .sequence(command.sequence())
+                .itemType(command.itemType())
+                .targetId(command.targetId())
+                .title(command.title())
+                .memo(command.memo())
+                .startTime(command.startTime())
+                .build())
+            .toList();
+
+        validateSequenceUniqueness(dayItems);
+        // 같은 일정의 다른 날을 동시에 교체하면 둘 다 "다른 날 + 새 목록" 을 옛 값으로 세어 상한을 넘긴다 — 요청 하나가
+        // 최대 100개를 더하므로 동시 3건이면 240(IN 절이 깨지는 선)도 넘는다. 일정 행을 먼저 잠가 교체를 일정 단위로
+        // 줄 세운다. 세는 조회보다 앞이어야 한다 — 이 트랜잭션의 첫 일관 읽기가 스냅숏을 잡으므로 잠금이 먼저여야
+        // 뒤 요청이 앞 요청의 커밋을 본다. 순서는 plan → plan_item 이라 기존 plan → plan_pet 잠금과 엇갈리지 않는다.
+        // (반환값은 쓰지 않는다. 대상 일정은 Facade 가 이미 확인했다)
+        planRepositoryPort.findActiveByIdForUpdate(plan.id());
+        validateItemLimit(plan, day, dayItems.size());
+        planItemRepositoryPort.deleteByPlanIdAndDay(plan.id(), day);
+        planItemRepositoryPort.saveAll(toItems(plan.id(), dayItems));
+    }
+
+    /**
+     * 하루 교체 뒤 일정 전체 항목 수가 상한을 넘는지 본다 (#1243). 교체될 그날의 옛 항목은 통째로 바뀌는 자리라
+     * 빼고 세고, 새 목록을 더한 것이 교체 뒤 수다 — 다른 날 60 + 새 목록 41 은 요청 하나로 보면 상한 안이지만
+     * 일정은 101 이 된다. 판정은 {@link Plan#acceptsItemCount} 하나다(상한 전에 이미 넘은 일정은 늘지 않으면 받는다).
+     *
+     * <p>세는 데 {@code findByPlanId} <b>한 번</b>을 쓴다 — 준비물 상한({@code PLAN_013})과 같은 관례다. count 전용
+     * 질의를 따로 두지 않는 것은, 교체될 그날 수와 전체 수가 둘 다 필요해 count 하나로는 모자라고, 행 수가 상한
+     * 언저리라 읽는 비용이 작으며, 이 교체의 응답(상세)도 곧바로 같은 일정의 항목 전체를 다시 읽기 때문이다.
+     *
+     * <p>호출하는 쪽({@link #replaceDayItems})이 일정 행을 먼저 잠근다 — 같은 일정의 다른 날을 동시에 교체해도
+     * 둘이 옛 값을 함께 세어 상한을 넘기지 않는다.
+     */
+    private void validateItemLimit(Plan plan, int day, int newDayItemCount) {
+        List<PlanItem> existing = planItemRepositoryPort.findByPlanId(plan.id());
+        int replacedCount = (int) existing.stream().filter(item -> item.day() == day).count();
+        int nextCount = existing.size() - replacedCount + newDayItemCount;
+        if (!Plan.acceptsItemCount(existing.size(), nextCount)) {
+            throw new PlanException(PlanErrorCode.PLAN_ITEM_LIMIT_EXCEEDED);
+        }
+    }
+
+    private void validateDateRange(LocalDate startDate, LocalDate endDate) {
+        if (startDate.isAfter(endDate)) {
+            throw new PlanException(PlanErrorCode.PLAN_DATE_RANGE_INVALID);
+        }
+        // 상한 없는 기간은 일자 배열·브리핑 루프를 무한정 키운다. 과거 날짜는 기록용으로 허용한다.
+        if (java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) + 1 > MAX_TRIP_DAYS) {
+            throw new PlanException(PlanErrorCode.PLAN_PERIOD_TOO_LONG);
+        }
+    }
+
+    private void validateItemDays(Plan plan, List<PlanItemCommand> commands) {
+        // day 는 일자별 교체 경로에서 생략 가능하도록 Integer 다. 생성 경로에서는 여기서 필수를 강제한다.
+        if (commands.stream().anyMatch(command -> command.day() == null)) {
+            throw new PlanException(PlanErrorCode.ITEM_DAY_REQUIRED);
+        }
+        boolean outOfRange = commands.stream().anyMatch(command -> !plan.containsDay(command.day()));
+        if (outOfRange) {
+            throw new PlanException(PlanErrorCode.PLAN_DAY_OUT_OF_RANGE);
+        }
+    }
+
+    /**
+     * (day, sequence) 중복을 저장 전에 거른다. DB 유니크 인덱스(uk_plan_item_plan_id_day_sequence)가
+     * 마지막 방어선이지만, 그대로 두면 위반이 500 으로 나간다 — 사용자 입력 문제는 400 으로 알려 준다.
+     */
+    private void validateSequenceUniqueness(List<PlanItemCommand> commands) {
+        long distinctCount = commands.stream()
+            .map(command -> command.day() + ":" + command.sequence())
+            .distinct()
+            .count();
+        if (distinctCount != commands.size()) {
+            throw new PlanException(PlanErrorCode.ITEM_SEQUENCE_DUPLICATED);
+        }
+    }
+
+    /**
+     * 항목이 가리키는 <b>타깃의 존재</b>를 저장 전에 확인한다. 유형마다 아이디 공간이 달라
+     * 장소와 산책 코스를 따로 묻되, <b>종류마다 원격 호출은 한 번</b>이다.
+     *
+     * <p>입구를 하나로 둔다 — 두 검증을 따로 공개하면 새 저장 경로가 한쪽만 부르고도 통과한다.
+     * {@code WALK} 가 장소 검증 판정에서 빠져 {@code targetId} 가 검증 없이 저장되던 것이
+     * 정확히 그 모양이었다 (#715).
+     *
+     * <p>원격 호출이므로 트랜잭션 밖(Facade)에서 부른다.
+     */
+    public void verifyItemTargets(List<PlanItemCommand> commands) {
+        if (CollectionUtils.isEmpty(commands)) {
+            return;
+        }
+        verifyPlaceTargets(commands);
+        verifyWalkCourseTargets(commands);
+    }
+
+    /**
+     * 장소를 참조하는 항목들을 <b>한 번의 원격 호출</b>로 검증한다.
+     *
+     * <p>항목마다 따로 부르면 일정 하루(항목 8개 안팎) 저장에 HTTP 왕복이 8번 생긴다.
+     * delisted 장소는 tour-service 가 목록에서 빼고 돌려주므로, 원천에서 사라진 장소를
+     * 새 항목이 참조하는 것도 여기서 함께 막힌다.
+     *
+     * <p>{@code targetId} 가 null 인 항목은 묻지 않는다 — 대상 없이 제목만 있는 줄은 담을 수 있다.
+     */
+    private void verifyPlaceTargets(List<PlanItemCommand> commands) {
+        Set<Long> targetIds = commands.stream()
+            .filter(command -> command.itemType().isPlaceTarget() && command.targetId() != null)
+            .map(PlanItemCommand::targetId)
+            .collect(Collectors.toSet());
+        if (targetIds.isEmpty()) {
+            return;
+        }
+
+        Set<Long> visibleIds = placeVerifyQueryPort.findVisiblePlaceIds(targetIds);
+        if (!visibleIds.containsAll(targetIds)) {
+            throw new PlanException(PlanErrorCode.NOT_FOUND_PLAN_PLACE);
+        }
+    }
+
+    /**
+     * {@code WALK} 항목의 {@code targetId} 를 <b>한 번의 원격 호출</b>로 검증한다 (#715).
+     *
+     * <p><b>{@code isPlaceTarget()} 을 넓혀 장소 검증에 태우지 않는다.</b> 그 판정의 뜻은
+     * "{@code targetId} 가 {@code place.id} 인가" 이고, 응급 브리핑({@code PlanEmergencyProcessor})과
+     * 상세 요약({@code PlanQueryProcessor.placeTargetIdOf})이 같은 판정으로 조회 대상을 고른다 —
+     * 넓히면 그 두 경로가 {@code walk_course.id} 를 장소 아이디 공간에서 찾는다. 이름이 흐려지는
+     * 문제가 아니라 동작이 깨진다.
+     *
+     * <p>존재 확인에 <b>요약 조회를 그대로 쓴다.</b> {@link PlanWalkCourseQueryPort#findSummaries}
+     * 가 목록에 없는 아이디를 결과에서 빼므로 아이디 집합 비교로 충분하다. 전용 엔드포인트를 새로
+     * 열면 검증에 필요 없는 본문은 덜어내지만 tour-service 의 내부 API 가 하나 늘고 두 경로가
+     * 같은 표를 각자 묻게 된다 — 한 번 저장에 담기는 코스는 몇 개 수준이고, 같은 API 를 일정
+     * 상세가 이미 매 조회 부른다.
+     *
+     * <p>{@code targetId} 가 null 인 항목은 장소 경로와 같이 묻지 않는다.
+     */
+    private void verifyWalkCourseTargets(List<PlanItemCommand> commands) {
+        List<Long> walkCourseIds = commands.stream()
+            .filter(command -> command.itemType() == PlanItemType.WALK && command.targetId() != null)
+            .map(PlanItemCommand::targetId)
+            .distinct()
+            .toList();
+        if (walkCourseIds.isEmpty()) {
+            return;
+        }
+
+        Set<Long> foundIds = planWalkCourseQueryPort.findSummaries(walkCourseIds).stream()
+            .map(PlanWalkCourseSummaryQueryResult::walkCourseId)
+            .collect(Collectors.toSet());
+        if (!foundIds.containsAll(walkCourseIds)) {
+            throw new PlanException(PlanErrorCode.NOT_FOUND_PLAN_WALK_COURSE);
+        }
+    }
+
+    /**
+     * 방문 체크. 소유권은 일정 기준으로 보고, 항목이 그 일정의 것인지 다시 확인한다 —
+     * planItemId 만 믿으면 남의 일정 항목을 내 planId 로 체크할 수 있다.
+     *
+     * <p>여행 시작일 전(서비스 기준 오늘)에는 다녀옴으로 <b>표시</b>할 수 없다 — {@code PLAN_027} (#983).
+     * 판정은 {@link Plan#hasStarted} 하나로 한다(당일 포함, 일정 상태는 보지 않는다). <b>해제는 언제나 받는다</b> —
+     * 가드 이전에 찍힌 표시나 일정을 미래로 옮긴 뒤 남은 표시를 사용자가 풀 수 있어야 한다.
+     * 소유 확인이 가드보다 먼저다 — 남의 항목에는 날짜와 무관하게 {@code PLAN_005} 로 답한다.
+     */
+    @Transactional
+    public PlanItem markItemVisited(Plan plan, long planItemId, boolean visited) {
+        PlanItem item = getItemOf(plan, planItemId);
+        if (visited && !plan.hasStarted(LocalDate.now(clock))) {
+            throw new PlanException(PlanErrorCode.PLAN_NOT_STARTED_VISIT);
+        }
+        return planItemRepositoryPort.save(item.withVisited(visited));
+    }
+
+    /**
+     * 항목 하나의 시작 시각만 바꾼다 (#1030).
+     *
+     * <p>일자 일괄 교체({@link #replaceDayItems})는 삭제 후 재삽입이라 그날의 방문 체크가 모두 풀리고
+     * {@code planItemId} 가 새로 발급된다. 시각 하나 고치자고 그 값을 잃을 이유가 없어 행을 제자리에서 고친다 —
+     * 아이디 · 방문 체크 · 순서가 그대로 남는다.
+     *
+     * <p>순서({@code sequence})와 시각이 어긋나도 막지 않는다. 일괄 교체도 둘을 맞추라고 요구하지 않는다.
+     *
+     * @param startTime null 이면 시각을 비운다
+     */
+    @Transactional
+    public PlanItem changeItemStartTime(Plan plan, long planItemId, LocalTime startTime) {
+        PlanItem item = getItemOf(plan, planItemId);
+        return planItemRepositoryPort.save(item.withStartTime(startTime));
+    }
+
+    /** 이 일정의 항목. 없거나 다른 일정의 항목이면 같은 404 다 — 남의 항목이 있다는 사실도 알리지 않는다. */
+    private PlanItem getItemOf(Plan plan, long planItemId) {
+        return planItemRepositoryPort.findById(planItemId)
+            .filter(found -> found.planId() == plan.id())
+            .orElseThrow(() -> new PlanException(PlanErrorCode.NOT_FOUND_PLAN_ITEM));
+    }
+
+    private String resolveCopyTitle(String requestedTitle, String sourceTitle) {
+        if (requestedTitle != null && !requestedTitle.isBlank()) {
+            return requestedTitle;
+        }
+        if (sourceTitle.length() + COPY_TITLE_SUFFIX.length() <= 60) {
+            return sourceTitle + COPY_TITLE_SUFFIX;
+        }
+        return sourceTitle.substring(0, 60 - COPY_TITLE_SUFFIX.length()) + COPY_TITLE_SUFFIX;
+    }
+
+    private List<PlanPet> toPets(long planId, List<Long> petIds) {
+        return petIds.stream()
+            .map(petId -> PlanPet.builder()
+                .id(snowflakeIdGenerator.generateId())
+                .planId(planId)
+                .petId(petId)
+                .build())
+            .toList();
+    }
+
+    private List<PlanItem> toItems(long planId, List<PlanItemCommand> commands) {
+        return commands.stream()
+            .map(command -> PlanItem.builder()
+                .id(snowflakeIdGenerator.generateId())
+                .planId(planId)
+                .day(command.day())
+                .sequence(command.sequence())
+                .itemType(command.itemType())
+                .targetId(command.targetId())
+                .title(command.title())
+                .memo(command.memo())
+                .startTime(command.startTime())
+                .build())
+            .toList();
+    }
+}

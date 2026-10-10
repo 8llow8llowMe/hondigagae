@@ -1,0 +1,76 @@
+# 컨텍스트 로딩 테스트 전용 프로파일 (plan-service 의 같은 파일과 같은 목적).
+# 목적은 "빈 정의가 서로 충돌하지 않고 컨텍스트가 뜨는가" 하나다. 외부 의존은 전부 끊는다.
+#   - DB: H2 인메모리 (testRuntimeOnly). ddl-auto:create-drop 으로 엔티티 매핑까지 검증한다.
+#   - Eureka / Config Server: 비활성. 등록·조회를 시도하면 CI 에서 네트워크로 죽는다.
+#   - Redis / MinIO / SMTP: 연결은 첫 사용 시점에 일어나므로 주소만 채운다. 버킷 초기화는 실패를 로그로 삼킨다.
+#   - Feign 클라이언트(plan-service)는 프록시만 만들어지고 호출하지 않으므로 대상 서비스가 없어도 된다.
+# 값은 전부 테스트 전용 가짜값이다 — 비밀이 아니다.
+server:
+  port: 0
+
+spring:
+  cloud:
+    config:
+      enabled: false
+    discovery:
+      enabled: false
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:auth-context;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+  mail:
+    host: localhost
+    port: 2525
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+snowflake:
+  datacenter-id: 1
+  worker-id: 1
+
+infra:
+  redis:
+    mode: standalone
+    host: localhost
+    port: 6379
+    password:
+    key-prefix: hondigagae:context-test
+  storage:
+    endpoint: http://localhost:9000
+    public-url: http://localhost:9000
+    bucket: hondigagae-context-test
+    access-key: context-test-access-key
+    secret-key: context-test-secret-key
+    max-file-bytes: 5242880
+
+jwt:
+  access-key: context-test-only-jwt-access-key-0123456789abcdef0123456789abcdef0123456789abcdef
+  refresh-key: context-test-only-jwt-refresh-key-fedcba9876543210fedcba9876543210fedcba9876543210
+  access-expiration: PT1H
+  refresh-expiration: P14D
+  blacklist-fail-open: false
+
+oauth:
+  kakao:
+    client-id:
+    client-secret:
+    redirect-uri: http://localhost:3000/oauth/kakao/callback
+    scope:
+      - profile_nickname
+  naver:
+    client-id:
+    client-secret:
+    redirect-uri: http://localhost:3000/oauth/naver/callback
+
+member:
+  withdrawn-email:
+    pepper: context-test-only-pepper-not-a-secret
