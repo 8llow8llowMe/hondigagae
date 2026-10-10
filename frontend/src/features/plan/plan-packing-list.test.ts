@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import {
+  claimReentry,
   PACKING_PREVIEW_MAX_ITEMS,
   PackingListPanel,
   type PackingListPanelProps,
@@ -512,5 +513,29 @@ describe('PackingListPanel — 요약 모드 (#732)', () => {
     expect(markup).toContain(`준비물 ${PACKING_PREVIEW_MAX_ITEMS}`)
     expect(markup).toContain(messages.plan.packingAddAction)
     expect(markup).not.toContain(messages.plan.packingExpandAction)
+  })
+})
+
+describe('claimReentry — 생성 따닥 (#1338)', () => {
+  it('진행 중이면 두 번째 호출이 자리를 얻지 못한다', () => {
+    const flag = { current: false }
+    let calls = 0
+    const start = () => {
+      if (claimReentry(flag)) calls += 1
+    }
+
+    start()
+    start()
+
+    expect(calls).toBe(1)
+  })
+
+  it('해제하면 다시 시작할 수 있다 — 실패 뒤 `다시 시도` 가 막히지 않는다', () => {
+    const flag = { current: false }
+
+    expect(claimReentry(flag)).toBe(true)
+    flag.current = false
+
+    expect(claimReentry(flag)).toBe(true)
   })
 })
