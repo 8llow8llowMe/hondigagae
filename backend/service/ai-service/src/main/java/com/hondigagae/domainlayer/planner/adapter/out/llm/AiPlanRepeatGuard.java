@@ -139,8 +139,11 @@ final class AiPlanRepeatGuard {
         return best;
     }
 
-    /** 식사 자리는 음식점으로, 장소 자리는 숙박도 음식점도 아닌 후보로. */
-    private static boolean sameKind(AiPlanDraftItem item, PlaceCandidate candidate) {
+    /**
+     * 식사 자리는 음식점으로, 장소 자리는 숙박도 음식점도 아닌 후보로. 권역 이탈 교체({@link AiPlanRouteGuard}, #1334)도
+     * 같은 기준을 쓴다 — 두 가드의 "같은 종류" 가 갈리면 한쪽은 점심 자리에 오름을 넣는다.
+     */
+    static boolean sameKind(AiPlanDraftItem item, PlaceCandidate candidate) {
         String type = candidate.contentTypeName();
         boolean restaurant = AiPlanDraftFactGuard.RESTAURANT_CONTENT_TYPE.equals(type);
         boolean lodging = AiPlanDraftFactGuard.LODGING_CONTENT_TYPE.equals(type);
