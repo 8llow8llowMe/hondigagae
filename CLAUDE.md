@@ -58,6 +58,7 @@
 - **develop 동기화는 `merge` 가 아니라 `rebase`.** 머지 커밋이 섞이면 선형 히스토리가 깨진다.
 - **`develop` 에 직접 커밋하지 않는다.** 셀프 머지는 허용하되 PR 은 생략하지 않는다.
 - 머지는 **`Rebase and merge`** 만 쓴다. PR 본문의 `Issue Number` 를 반드시 채운다.
+  **예외: 릴리스(develop → main)는 `Create a merge commit`** — 배포 라벨 해석 때문이다 (`docs/git-workflow.md` §7 릴리스).
 - PR 은 **30파일 이내**를 목표로 하고, 넘으면 이유를 본문에 적는다.
 - **작업 트리를 다른 세션·사람과 동시에 쓴다.** `git add -A` / `git add .` / `git stash` 를
   쓰지 않는다 — 경로를 하나씩 적어 스테이징한다 (`docs/git-workflow.md` §4-1).

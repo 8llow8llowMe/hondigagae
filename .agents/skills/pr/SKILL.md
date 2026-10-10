@@ -15,6 +15,7 @@ description: "혼디가개(hondigagae) GitHub Pull Request 본문을 한국어 �
 - **`Issue Number: #N` 을 반드시 채운다.** 비워 두지 않는다.
 - **PR 생성 시 assignee 와 라벨을 함께 지정한다.** 나중에 붙이려고 미루지 않는다 (`git-workflow.md` §6).
 - 머지는 **`Rebase and merge`** 만 쓴다 (`gh pr merge <번호> --rebase --delete-branch`).
+  예외: 릴리스(develop → main)는 `gh pr merge <번호> --merge` — `--delete-branch` 를 붙이지 않는다 (`docs/git-workflow.md` §7 릴리스).
 - **30파일 / 1,000줄을 넘으면** 쪼갤 수 있는지 검토하고, 넘겨야 하면 **이유를 본문에 적는다.**
 - CI 통과가 머지 조건이다.
 
