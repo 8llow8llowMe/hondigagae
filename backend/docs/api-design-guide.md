@@ -120,6 +120,18 @@
   "resultMessage":"요청이 너무 많습니다. 잠시 후 다시 시도해주세요.","fieldErrors":null},"dataBody":null}
 ```
 
+### 2-3. 서비스가 내는 429 는 `Retry-After` 를 싣는다 (이슈 [#1293](https://github.com/8llow8llowMe/hondigagae/issues/1293))
+
+서비스의 쿨다운 · 잠금 · 상한 429 는 **본문 봉투 · 코드 · 상태를 그대로 두고** 표준 `Retry-After` 헤더(남은 초,
+정수)를 함께 싣는다. 클라이언트가 "언제 다시 해도 되는가"를 문구 파싱 없이 알게 하려는 것이다.
+
+- 값은 그 제한을 거는 저장소 키의 **남은 TTL** 이다. 읽지 못하면(키 없음 · 만료 없음 · 장애) 설정값으로 대체하고,
+  **읽기 실패로 429 를 5xx 로 바꾸지 않는다.**
+- 초 변환은 **올림 · 최소 1** 이다. `0` 은 "지금 다시 보내라"로 읽혀 곧바로 다시 429 를 부른다.
+- 예외에 대기 시간을 싣고 `{Domain}ExceptionHandler` 가 헤더를 단다 — 예외로 끝나는 응답이라 `ResponseEntity`
+  쪽에서는 달 수 없다. 본보기: auth-service `AuthException.withRetryAfter` (`services/auth-service.md`).
+- 계정 열거 방지가 걸린 제한이면 남은 시간도 가입 여부와 무관한 키에서 나와야 한다.
+
 ## 3. Controller 스타일
 
 - 다른 레이어를 직접 호출하지 않고 `WebUseCase`만 호출한다.

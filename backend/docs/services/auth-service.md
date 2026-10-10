@@ -61,6 +61,8 @@
 - `GET /api/v1/auth/{provider}/login?code=&state=` — 소셜 로그인. `oauthState` 쿠키가 쿼리 state 와 일치해야 한다 (없거나 다르면 `AUTH_010`)
 - `POST /api/v1/auth/email/send-code`, `POST /api/v1/auth/email/verify-code`
 - `POST /api/v1/auth/password/reset/send-code`, `POST /api/v1/auth/password/reset` — 비밀번호 재설정
+  - 두 send-code 는 `Response<AuthVerificationCodeSendResponse>` — `{codeExpiresInSeconds: 300, resendAvailableInSeconds: 60}`.
+    값은 가입 여부와 무관하다 (아래 "발송 응답의 시간 정보와 429 의 Retry-After")
 - `GET /api/v1/auth/sessions` — 로그인 기기 목록 (최근 갱신순, current 는 refresh 쿠키로 판별)
 - `DELETE /api/v1/auth/sessions/{sessionId}` — 특정 기기 로그아웃 (멱등)
 - `POST /api/v1/auth/token/reissue`, `POST /api/v1/auth/logout` (현재 기기만)
@@ -180,6 +182,50 @@
 - 클라이언트 IP 는 `ClientIpResolver`(X-Forwarded-For → X-Real-IP → remoteAddr)로 얻고
   Redis 고정 윈도우 카운터(장애 시 fail-open — 상한은 남용 방어지 정합성 장치가 아니다)로 센다.
 
+## 발송 응답의 시간 정보와 429 의 Retry-After (#1293)
+
+### send-code 응답
+
+두 send-code(`/email/send-code` · `/password/reset/send-code`)는 성공 시 `dataBody` 에 시간 정보를 싣는다.
+
+| 필드 | 값 | 출처 |
+| --- | --- | --- |
+| `codeExpiresInSeconds` | 300 | `CODE_TTL` (5분) |
+| `resendAvailableInSeconds` | 60 | `RESEND_COOLDOWN` (60초) — 방금 쿨다운을 잡았으므로 전체 값이다 |
+
+**가입 여부와 무관한 고정값이다.** 기가입 · 탈퇴 이메일(회원가입), 미가입 · 소셜 전용 · 탈퇴 계정(재설정)처럼
+실제로 코드가 발급되지 않고 안내 메일만 나간 분기도 같은 값을 돌려준다. 값이 분기마다 다르면 그 차이가 계정
+열거 벡터가 된다. 그래서 두 Processor 는 분기마다 값을 만들지 않고 상수 `SEND_INFO` 하나만 돌려준다 —
+`EmailVerificationProcessorTest` · `PasswordResetProcessorTest` 가 분기별 반환값이 같은지 잠근다.
+
+흐름은 계층 규칙 그대로다: Processor → `VerificationCodeSendInfo`(`Duration` 둘) → `AuthPresenter` 가 초로 바꿔
+`AuthVerificationCodeSendResponse` 를 만든다.
+
+### 429 의 `Retry-After`
+
+429 세 가지에 표준 `Retry-After` 헤더(초, 정수)를 싣는다. 본문 봉투 · 코드 · 상태는 바뀌지 않는다.
+
+| 코드 | 값 | 읽지 못했을 때 대체값 |
+| --- | --- | --- |
+| `AUTH_003` 재발송 쿨다운 | 쿨다운 키의 남은 TTL (`emailVerificationCooldown` / `passwordResetCooldown`) | 60초 (`RESEND_COOLDOWN`) |
+| `AUTH_016` IP 발송 상한 | IP 카운터 키(`emailSendIp`)의 남은 TTL = 고정 윈도우 잔여 | `auth.email-send.ip-window` (기본 1시간) |
+| `AUTH_015` 로그인 잠금 | 이미 잠긴 경우 잠금 키(`loginLock`)의 남은 TTL. 이번 실패로 **방금 잠근** 경우는 TTL 을 다시 읽지 않고 잠금 시간 전체 | `auth.login.lock-duration` (기본 10분) |
+
+- **전달 경로** — Processor 가 `AuthException.withRetryAfter(errorCode, Duration)` 으로 대기 시간을 싣고,
+  `AuthExceptionHandler` 가 있을 때만 헤더를 단다. 생성자가 아니라 팩토리인 것은 `(errorCode, Object... args)`
+  와 시그니처가 겹쳐 `Duration` 이 메시지 인자로 오인되는 일을 막기 위해서다.
+- **남은 TTL 읽기** — 세 store port 의 `find*Remaining` 이 `Optional<Duration>` 을 돌려준다(어댑터 공통
+  구현 `RedisKeyTtlReader`). PTTL(밀리초)로 읽고 `-2`(키 없음) · `-1`(만료 없음) · `null` · `0` · Redis 장애는
+  전부 비운다 — **예외를 던지지 않는다.** 이미 결정된 429 에 헤더를 채우는 보조 정보라, 장애가 새면 429 가
+  500 으로 바뀐다. 비면 Processor 가 위 표의 대체값을 쓴다.
+- **초 변환은 올림 · 최소 1** (`AuthExceptionHandler.toRetryAfterSeconds`). 버림하면 남은 0.4초가 `0` 이 되어
+  "지금 다시 보내라"로 읽히고, 그 요청은 아직 살아 있는 키에 걸려 다시 429 가 된다.
+- **계정 열거** — 세 키 모두 가입 여부를 보기 전에 잡히는 키(IP · 정규화 이메일)라 남은 시간도 가입 여부와
+  무관하다. 로그인 잠금은 미존재 이메일도 같은 임계값에서 같은 키로 잠긴다 — `GeneralLoginProcessorTest` 가
+  미존재 · 기가입 이메일의 잠금 응답(코드 · 메시지 · 대기 시간)이 같은지 잠근다.
+- 게이트웨이 레이트 리밋(`GATEWAY_001`)은 이 범위 밖이다 — 그쪽은 `X-RateLimit-*` 헤더를 쓴다
+  (`api-design-guide.md` §2).
+
 ## 메일 템플릿 (#1062)
 
 인증 메일 7종의 본문은 Java 문자열이 아니라 Thymeleaf HTML 템플릿이다. 발송은 여전히
@@ -287,7 +333,8 @@
   **5회 오입력 시 코드 무효화 + `AUTH_017`**(브루트포스 방어).
 - 저장소는 회원가입 인증과 **키 분리**(`PasswordResetStorePort` / `RedisPasswordResetStoreAdapter`) —
   공유하면 재설정 코드로 회원가입이 통과하거나 그 반대가 된다. 코드 TTL 5분 / 쿨다운 60초는
-  회원가입 인증과 동일하고, 코드 생성기는 공용(`VerificationCodeGenerator`).
+  회원가입 인증과 동일하고, 코드 생성기는 공용(`VerificationCodeGenerator`). 이 두 값은 발송 응답
+  (`codeExpiresInSeconds` · `resendAvailableInSeconds`)으로도 내려가며 세 분기 모두 같다 (#1293).
 - 새 비밀번호 검증 코드 대역: `AUTH_106~108` (member 비밀번호 정책과 동일 규칙).
 
 ## 계정 연결/전환 (일반 ↔ 소셜) — 프론트 연동은 `docs/auth-account-frontend-guide.md`
