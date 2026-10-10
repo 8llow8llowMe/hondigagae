@@ -6,14 +6,23 @@ import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthSessionsR
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.item.AuthSessionItem;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthGeneralLoginResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuthorizeResponse;
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthVerificationCodeSendResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueResponse;
 import com.hondigagae.domainlayer.auth.application.info.JwtTokenIssueInfo;
 import com.hondigagae.domainlayer.auth.application.info.JwtTokenReissueInfo;
 import com.hondigagae.domainlayer.auth.application.info.OAuthAuthorizationInfo;
+import com.hondigagae.domainlayer.auth.application.info.VerificationCodeSendInfo;
 import org.springframework.stereotype.Component;
 
 @Component
 public class AuthPresenter {
+
+    public AuthVerificationCodeSendResponse toVerificationCodeSendResponse(VerificationCodeSendInfo info) {
+        return AuthVerificationCodeSendResponse.builder()
+            .codeExpiresInSeconds(info.codeExpiresIn().toSeconds())
+            .resendAvailableInSeconds(info.resendAvailableIn().toSeconds())
+            .build();
+    }
 
     public AuthSessionsResponse toSessionsResponse(List<AuthSessionInfo> sessions) {
         List<AuthSessionItem> items = sessions.stream()

@@ -36,4 +36,13 @@ public interface EmailVerificationStorePort {
      * 저장소 장애 시 0 을 반환한다 (fail-open — 상한은 보조 방어라 발송 자체를 막지 않는다).
      */
     long increaseIpSendCount(String clientIp, Duration window);
+
+    /**
+     * 재발송 쿨다운의 남은 시간 ({@code Retry-After} 용, #1293). 키가 없거나 만료가 없거나 저장소를 읽지 못하면
+     * 비어 있다 — 호출부가 설정값으로 대체한다. 이 조회는 응답 헤더를 채우는 보조 정보라 예외를 던지지 않는다.
+     */
+    Optional<Duration> findCooldownRemaining(String email);
+
+    /** IP 발송 상한 윈도우의 남은 시간. 비어 있을 때의 의미는 {@link #findCooldownRemaining(String)} 과 같다. */
+    Optional<Duration> findIpSendWindowRemaining(String clientIp);
 }

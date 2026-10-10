@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthGeneralLoginResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuthorizeResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthSessionsResponse;
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthVerificationCodeSendResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.provider.OAuthStateCookieProvider;
 import com.hondigagae.domainlayer.auth.adapter.in.web.provider.RefreshCookieProvider;
@@ -193,12 +194,12 @@ class OAuthStateCookieFlowTest {
         }
 
         @Override
-        public void sendEmailVerificationCode(String email, String clientIp) {
+        public AuthVerificationCodeSendResponse sendEmailVerificationCode(String email, String clientIp) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void sendPasswordResetCode(String email, String clientIp) {
+        public AuthVerificationCodeSendResponse sendPasswordResetCode(String email, String clientIp) {
             throw new UnsupportedOperationException();
         }
 
