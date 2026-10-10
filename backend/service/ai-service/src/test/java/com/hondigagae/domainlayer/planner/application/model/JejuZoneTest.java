@@ -76,6 +76,14 @@ class JejuZoneTest {
     }
 
     @Test
+    @DisplayName("권역마다 대표점이 제 권역 안에 있다 — 거리순 후보 조회의 기준점이다 (#1312)")
+    void anchorsLieInTheirOwnZone() {
+        for (JejuZone zone : JejuZone.values()) {
+            assertThat(JejuZone.of(zone.getAnchorLat(), zone.getAnchorLng())).as("%s 대표점", zone).isEqualTo(zone);
+        }
+    }
+
+    @Test
     @DisplayName("이웃한 날의 권역은 언제나 맞닿는다 — 한라산을 넘는 북부-남부가 없다")
     void consecutiveDaysAreAdjacent() {
         List<JejuZone> order = JejuZone.aroundTheIsland(13);

@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuer
 import com.hondigagae.domainlayer.planner.application.model.AiPlanJobMode;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanStepOutcome;
 import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
+import com.hondigagae.domainlayer.planner.application.model.JejuZone;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
@@ -37,6 +38,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,9 +59,13 @@ public class AiPlanWorker {
     /**
      * 권역마다 고르려고 한 번에 가져올 수 (#1236 · #1245). tour-service 목록 API 의 한 페이지 상한이다 — dev 의 제주
      * 동반 가능 숙박 56곳 · 음식점 126곳 모두 첫 페이지에 6권역이 다 잡힌다(음식점 남동부만 1곳). 요청 조건(실내 ·
-     * 카페) 후보도 이만큼 가져와 권역을 돌아가며 {@link #REQUEST_SLOT} 곳을 고른다.
+     * 카페) 후보도 이만큼 가져와 권역을 돌아가며 {@link #REQUEST_SLOT} 곳을 고른다. 권역 대표점 기준 거리순 조회(#1312)도
+     * 한 페이지를 가져와 그 권역에 든 것만 쓴다.
      */
     private static final int ZONE_FETCH_SIZE = 50;
+
+    /** 제주의 관광 지역코드. 권역({@link JejuZone})은 제주에만 있다 (#1312). */
+    private static final String JEJU_AREA_CODE = "39";
 
     private final AiPlanJobStorePort aiPlanJobStorePort;
     private final AiPlanJobEventPort aiPlanJobEventPort;
@@ -294,8 +300,9 @@ public class AiPlanWorker {
         String sigunguCode = emptyToNull(params.get("sigunguCode"));
         List<Long> pinnedPlaceIds = parseIdList(params.get("pinnedPlaceIds"));
         List<Long> favoritePlaceIds = loadFavoritePlaceIds(params.get("preferFavorites"), memberId);
-        List<PlaceCandidate> placeCandidates =
-            loadCandidates(areaCode, sigunguCode, pinnedPlaceIds, favoritePlaceIds, params.get("requestNote"));
+        boolean zoneBalanced = isZoneBalanced(areaCode, sigunguCode, regenerateDay);
+        List<PlaceCandidate> placeCandidates = loadCandidates(
+            areaCode, sigunguCode, zoneBalanced, pinnedPlaceIds, favoritePlaceIds, params.get("requestNote"));
 
         onStep.accept(AiPlanJobStep.WEATHER);
         List<DayWeatherOutlook> weatherOutlook =
@@ -430,16 +437,35 @@ public class AiPlanWorker {
      * 항상 부른다 — 후보가 비면 어댑터가 {@code NO_PLACE_CANDIDATES} 로 실패시킨다.
      */
     private List<PlaceCandidate> loadCandidates(
-        String areaCode, String sigunguCode, List<Long> pinnedPlaceIds, List<Long> favoritePlaceIds,
-        String requestNote
+        String areaCode, String sigunguCode, boolean zoneBalanced, List<Long> pinnedPlaceIds,
+        List<Long> favoritePlaceIds, String requestNote
+    ) {
+        List<PlaceCandidate> pool =
+            assembleCandidates(areaCode, sigunguCode, zoneBalanced, pinnedPlaceIds, favoritePlaceIds, requestNote);
+        log.info("AI plan candidate pool size={} zoneBalanced={} areaCode={} sigunguCode={} zones={}",
+            pool.size(), zoneBalanced, areaCode, sigunguCode, CandidateZonePolicy.describe(pool));
+        return pool;
+    }
+
+    private List<PlaceCandidate> assembleCandidates(
+        String areaCode, String sigunguCode, boolean zoneBalanced, List<Long> pinnedPlaceIds,
+        List<Long> favoritePlaceIds, String requestNote
     ) {
         List<PlaceCandidate> searched = placeCandidateQueryPort
             .findPetFriendlyCandidates(areaCode, sigunguCode, aiLlmProperties.placeCandidateSize()).stream()
             .map(this::toCandidate)
             .toList();
         searched = reserveRequested(areaCode, sigunguCode, searched, requestNote);
-        searched = spreadByZone(Kind.LODGING, areaCode, sigunguCode, searched);
-        searched = spreadByZone(Kind.RESTAURANT, areaCode, sigunguCode, searched);
+        ZoneAnchoredCandidates anchored = zoneBalanced && !searched.isEmpty()
+            ? loadZoneAnchored(areaCode)
+            : ZoneAnchoredCandidates.NONE;
+        int visitFloor = 0;
+        if (zoneBalanced) {
+            searched = CandidateZonePolicy.ensureVisits(anchored.visits(), searched, aiLlmProperties.placeCandidateSize());
+            visitFloor = CandidateZonePolicy.VISITS_PER_ZONE;
+        }
+        searched = spreadByZone(Kind.LODGING, areaCode, sigunguCode, searched, anchored.lodgings(), visitFloor);
+        searched = spreadByZone(Kind.RESTAURANT, areaCode, sigunguCode, searched, anchored.restaurants(), visitFloor);
         if (sigunguCode != null && searched.isEmpty()) {
             // 지역 전체로 넓히지 않는다. 사용자가 "제주시만" 이라고 한 요청에 서귀포 장소를
             // 섞으면 조건을 무시한 일정이 되고, 그 사실이 응답에 드러나지도 않는다.
@@ -502,30 +528,103 @@ public class AiPlanWorker {
      *
      * <p><b>못 가져와도 생성은 계속한다</b> — 동선을 낫게 할 뿐, 없다고 일정이 틀리지는 않는다. 종류마다 따로 부르므로
      * 한쪽이 실패해도 다른 쪽은 싣는다. 장소가 하나도 없으면 싣지 않는다(후보 없음 실패는 어댑터가 낸다).
+     *
+     * <p><b>제주 전체 요청이면 권역 대표점에서 가까운 순으로 찾은 것({@code anchored})을 먼저 쓴다 (#1312).</b> id 순
+     * 첫 페이지는 dev 에서 음식점 남동부 1곳뿐이었다. id 순 결과는 그 뒤에 두어, 어느 권역의 거리순 조회가 실패했을 때만
+     * 그 권역 몫을 채운다.
+     *
+     * @param anchored   권역 대표점 기준 거리순으로 찾은 그 종류(권역이 맞는 것만). 시군구 지정 요청이면 비어 있다
+     * @param visitFloor 꼬리를 덜어 낼 때 지킬 권역당 방문 장소 수. 시군구 지정 요청이면 0
      */
     private List<PlaceCandidate> spreadByZone(
-        Kind kind, String areaCode, String sigunguCode, List<PlaceCandidate> searched
+        Kind kind, String areaCode, String sigunguCode, List<PlaceCandidate> searched,
+        List<PlaceCandidate> anchored, int visitFloor
     ) {
         if (searched.isEmpty()) {
             return searched;
         }
-        List<PlaceCandidate> found;
+        List<PlaceCandidate> found = new ArrayList<>(anchored);
         try {
             List<PlaceCandidateQueryResult> results = kind == Kind.LODGING
                 ? placeCandidateQueryPort.findLodgingCandidates(areaCode, sigunguCode, ZONE_FETCH_SIZE)
                 : placeCandidateQueryPort.findRestaurantCandidates(areaCode, sigunguCode, ZONE_FETCH_SIZE);
-            found = results.stream().map(this::toCandidate).toList();
+            results.stream().map(this::toCandidate).forEach(found::add);
         } catch (AiPlanException exception) {
             log.warn("Zone candidates lookup failed, continuing without them. kind={} errorCode={}",
                 kind, exception.getErrorCode().getCode());
-            return searched;
+            if (found.isEmpty()) {
+                return searched;
+            }
         }
         List<PlaceCandidate> spread =
-            CandidateZonePolicy.spread(kind, found, searched, aiLlmProperties.placeCandidateSize());
+            CandidateZonePolicy.spread(kind, found, searched, aiLlmProperties.placeCandidateSize(), visitFloor);
         log.info("AI plan candidates spread by zone kind={} fetched={} before={} after={} areaCode={} sigunguCode={}",
             kind, found.size(), searched.stream().filter(kind::matches).count(),
             spread.stream().filter(kind::matches).count(), areaCode, sigunguCode);
         return spread;
+    }
+
+    /**
+     * 후보 풀을 권역 균형으로 만드는 요청인가 (#1312) — 시군구를 지정하지 않은 제주 전체의 전체 생성뿐이다.
+     *
+     * <ul>
+     *   <li>시군구를 지정하면 돌 섬이 없고, 권역 몫을 채우면 지정 밖 장소가 섞인다</li>
+     *   <li>제주 밖은 {@link JejuZone} 이 없다</li>
+     *   <li>하루 재생성은 기존 일정이 앞뒤 날을 정하고 권역 순서 제안도 싣지 않는다 — 동작을 바꾸지 않는다</li>
+     * </ul>
+     */
+    private static boolean isZoneBalanced(String areaCode, String sigunguCode, Integer regenerateDay) {
+        return JEJU_AREA_CODE.equals(areaCode) && sigunguCode == null && regenerateDay == null;
+    }
+
+    /**
+     * 6권역 대표점({@link JejuZone#getAnchorLat()})마다 가까운 순으로 방문 장소 · 숙박 · 음식점을 찾는다 (#1312). 찾은 것 중
+     * <b>실제 권역이 그 권역인 것만</b> 그 권역 몫으로 둔다 — 대표점 근처라도 경계 너머 장소는 옆 권역의 것이다.
+     *
+     * <p>tour-service 를 권역 6 × 종류 3 = 18번 부른다. 원천 단위가 "한 점에서 가까운 순" 이라 묶을 수 없고(대표점마다
+     * 정렬 기준이 다르다), 생성 한 번에 한 번만 돈다 — LLM 호출이 수십 초라 순차 호출 수백 ms 는 문제가 아니다.
+     * <b>실패한 조회는 빈 목록으로 이어 간다</b> — 그 권역 · 종류만 몫이 덜 찬다.
+     */
+    private ZoneAnchoredCandidates loadZoneAnchored(String areaCode) {
+        List<PlaceCandidate> visits = new ArrayList<>();
+        List<PlaceCandidate> lodgings = new ArrayList<>();
+        List<PlaceCandidate> restaurants = new ArrayList<>();
+        for (JejuZone zone : JejuZone.values()) {
+            double lat = zone.getAnchorLat();
+            double lng = zone.getAnchorLng();
+            anchoredLookup(zone, "VISIT", () -> placeCandidateQueryPort.findNearbyCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE))
+                .stream().filter(CandidateZonePolicy::isVisit).forEach(visits::add);
+            anchoredLookup(zone, "LODGING",
+                () -> placeCandidateQueryPort.findNearbyLodgingCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE))
+                .stream().filter(Kind.LODGING::matches).forEach(lodgings::add);
+            anchoredLookup(zone, "RESTAURANT",
+                () -> placeCandidateQueryPort.findNearbyRestaurantCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE))
+                .stream().filter(Kind.RESTAURANT::matches).forEach(restaurants::add);
+        }
+        return new ZoneAnchoredCandidates(List.copyOf(visits), List.copyOf(lodgings), List.copyOf(restaurants));
+    }
+
+    /** 한 권역 · 한 종류의 거리순 조회. 권역이 맞는 것만 남기고, 실패하면 빈 목록이다. */
+    private List<PlaceCandidate> anchoredLookup(
+        JejuZone zone, String kind, Supplier<List<PlaceCandidateQueryResult>> lookup
+    ) {
+        try {
+            return lookup.get().stream()
+                .map(this::toCandidate)
+                .filter(candidate -> JejuZone.of(candidate.lat(), candidate.lng()) == zone)
+                .toList();
+        } catch (AiPlanException exception) {
+            log.warn("Zone anchored candidates lookup failed, continuing without them. zone={} kind={} errorCode={}",
+                zone, kind, exception.getErrorCode().getCode());
+            return List.of();
+        }
+    }
+
+    /** 권역 대표점 기준 거리순으로 찾은 종류별 후보 (#1312). 권역 선언 순서로, 권역 안에서는 가까운 순이다. */
+    private record ZoneAnchoredCandidates(
+        List<PlaceCandidate> visits, List<PlaceCandidate> lodgings, List<PlaceCandidate> restaurants
+    ) {
+        private static final ZoneAnchoredCandidates NONE = new ZoneAnchoredCandidates(List.of(), List.of(), List.of());
     }
 
     /**
