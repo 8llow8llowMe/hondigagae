@@ -45,7 +45,7 @@
 | 메서드 | 경로 | 비고 |
 | --- | --- | --- |
 | GET | `/api/v1/places` | 지역·타입·동반조건·실내·크기·원본분류·반려견 크기/체중·**키워드** 필터. 키워드는 최대 5단어를 이름·주소에 단어별 AND 적용, 커서 기반. 선택 `lat`·`lng` 를 함께 주면 (반올림 m, placeId) 거리순 + `distanceMeters` — 하나만 오면 `PLACE_109`, 커서 복원 실패는 `PLACE_110` (#1202) |
-| GET | `/api/v1/places/nearby` | 좌표 반경 검색 (식당·카페 포함). **keyword** 는 목록과 같은 최대 5단어 이름·주소 AND 검색 |
+| GET | `/api/v1/places/nearby` | 좌표 반경 검색 (식당·카페 포함). **keyword** 는 목록과 같은 최대 5단어 이름·주소 AND 검색. 선택 `sigunguCode` 는 목록과 같은 시군구 필터 (#1316) |
 | GET | `/api/v1/places/{placeId}` | intro·petInfo·images 결합 상세. `indoor`·`sourceCategory`·`sourceName` 포함(목록과 같은 매핑), `contentId` 는 원천이 TourAPI 가 아니면 **null** |
 | GET | `/api/v1/emergencies/facilities` | 동물병원·동물약국 반경 검색, `openNowOnly` 지금 영업 중 필터 |
 | GET | `/api/v1/emergencies/facilities/{facilityId}` | 긴급 시설 상세. delisted 시설은 404 |
