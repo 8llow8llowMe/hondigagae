@@ -70,8 +70,12 @@ public final class CandidateZonePolicy {
      * 제주 전체 일정에서 권역마다 둘 방문 장소(숙박 · 음식점이 아닌 곳)의 하한 (#1312).
      *
      * <p>하루 2~3곳을 고르므로 권역의 날 하루를 그 권역 안에서 채울 수 있는 최소다. 3이면 상한 50 안에서 권역 몫이
-     * 방문 18 + 숙박 12 + 음식점 12 = 42곳이고, 남는 8칸이 요청 조건 후보 몫({@code REQUEST_SLOT}=8)과 같다 — 꼬리를 덜어
-     * 낼 때 맨 앞의 요청 조건 후보까지 깎이지 않는다. 4로 올리면 그 8칸이 2칸이 되어 요청 조건 후보가 깎일 수 있다.
+     * 방문 18 + 숙박 12 + 음식점 12 = 42곳이고, 남는 8칸이 요청 조건 후보 몫({@code REQUEST_SLOT}=8)과 같다. 4로 올리면 그
+     * 8칸이 2칸이 된다.
+     *
+     * <p><b>요청 조건 후보가 깎이지 않는 것은 조건부다</b> — 상한이 50이고, 일반 검색에 섞여 온 숙박 · 음식점이 권역 몫을
+     * 넘지 않을 때다. 숙박 · 음식점은 덜어 내지 않으므로, 일반 검색에 그것이 권역 몫보다 많이 들어 있거나 상한을 50 아래로
+     * 두면 칸이 모자란다. 그때는 새로 실을 것을 줄이되 권역을 돌아가며 줄여({@link #acrossZones}) 한 권역만 비지 않게 한다.
      */
     public static final int VISITS_PER_ZONE = 3;
 
@@ -189,9 +193,11 @@ public final class CandidateZonePolicy {
                 overflow--;
             }
         }
-        // 덜어 낼 꼬리가 없으면(권역 몫으로만 찼다) 새로 실을 것을 줄인다 — 상한을 넘기지 않는다
+        // 덜어 낼 꼬리가 없으면(권역 몫으로만 찼다) 새로 실을 것을 줄인다 — 상한을 넘기지 않는다.
+        // 권역 균형 풀(visitFloor > 0)의 added 는 권역 선언 순서라 앞에서 자르면 남동부(마지막)부터 빈다 — 권역을 돌아가며
+        // 줄인다 (#1312). 하한이 없는 요청(시군구 지정 등)은 전처럼 앞에서 자른다
         int room = Math.max(0, added.size() - Math.max(0, overflow));
-        kept.addAll(added.subList(0, room));
+        kept.addAll(room < added.size() && visitFloor > 0 ? acrossZones(added, room) : added.subList(0, room));
         return List.copyOf(kept);
     }
 

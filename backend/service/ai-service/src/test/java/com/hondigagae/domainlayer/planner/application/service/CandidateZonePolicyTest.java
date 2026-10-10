@@ -224,6 +224,20 @@ class CandidateZonePolicyTest {
         }
 
         @Test
+        @DisplayName("칸이 모자라 새로 실을 것을 줄여야 하면 권역을 돌아가며 줄인다 — 선언 순서 끝의 남동부만 비지 않는다")
+        void trimsAddedAcrossZonesWhenRoomIsShort() {
+            // 숙박은 덜어 내지 않으므로 상한 4에 남는 칸은 2뿐이다
+            List<PlaceCandidate> base = List.of(JUNGMUN_STAY, SEOGWIPO_PENSION);
+            List<PlaceCandidate> found = List.of(
+                spot(801L, 33.4300, 126.3000), spot(802L, 33.4310, 126.3000), spot(803L, 33.4320, 126.3000),
+                pyoseonBeach, noksanro, namwonTrail);
+
+            List<PlaceCandidate> pool = CandidateZonePolicy.ensureVisits(found, base, 4);
+
+            assertThat(pool).extracting(PlaceCandidate::placeId).containsExactly(201L, 101L, 801L, 901L);
+        }
+
+        @Test
         @DisplayName("풀의 권역 × 종류별 개수를 한 줄로 적는다")
         void describesZonesAndKinds() {
             String line = CandidateZonePolicy.describe(

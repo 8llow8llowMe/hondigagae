@@ -2,6 +2,7 @@ package com.hondigagae.global.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.hondigagae.domainlayer.planner.application.service.worker.AiPlanWorker;
 import com.hondigagae.global.properties.AiLlmProperties;
 import com.hondigagae.global.properties.AiPlanJobProperties;
 import java.util.ArrayList;
@@ -34,13 +35,15 @@ class AiPlanTaskExecutorTest {
     private static final long INTERNAL_QUERY_TIMEOUT_SECONDS = 5L;
 
     /**
-     * {@code AiPlanWorker#toQuery} 가 최악에 부르는 내부 조회 횟수 — 반려견 특성, 일정 개요,
-     * 즐겨찾기, 후보 검색, 필수 포함 장소, 즐겨찾기 후보, 날씨 전망.
+     * {@code AiPlanWorker#toQuery} 가 최악에 부르는 내부 조회 횟수(권역 거리순 조회 제외) — 반려견 특성, 일정 개요,
+     * 즐겨찾기, 후보 검색, 요청 조건 검색(#1170), 숙박 검색(#1236), 음식점 검색(#1245), 필수 포함 장소, 즐겨찾기 후보,
+     * 날씨 전망. 권역 거리순 조회(#1312)는 예산으로 묶여 {@link #zoneAnchoredWorstSeconds()} 로 따로 센다.
      *
      * <p>여기만 손으로 센 항이라 조회를 늘리면 함께 늘려야 한다. 처음에는 통째로 "약 15초" 로
-     * 적었는데, 실제 최악은 35초라 산술의 여유를 20초 부풀려 보고하고 있었다.
+     * 적었는데, 실제 최악은 35초라 산술의 여유를 20초 부풀려 보고하고 있었다. #1170 · #1236 · #1245 가 조회를
+     * 셋 늘리고도 이 값을 7로 둔 채였던 것을 #1312 검토에서 잡았다.
      */
-    private static final long INTERNAL_QUERY_COUNT = 7L;
+    private static final long INTERNAL_QUERY_COUNT = 10L;
 
     @Test
     @DisplayName("실효 동시성이 1이다 — Ollama 가 한 번에 하나만 추론하므로 늘려도 처리량이 늘지 않는다")
@@ -95,7 +98,16 @@ class AiPlanTaskExecutorTest {
         AiLlmProperties llm = defaultLlmProperties();
         return llm.queueWaitMs() / 1_000L
             + llm.timeoutMs() / 1_000L
-            + INTERNAL_QUERY_TIMEOUT_SECONDS * INTERNAL_QUERY_COUNT;
+            + INTERNAL_QUERY_TIMEOUT_SECONDS * INTERNAL_QUERY_COUNT
+            + zoneAnchoredWorstSeconds();
+    }
+
+    /**
+     * 권역 거리순 조회(#1312) 전체의 최악값(초). 18번이지만 첫 실패에서 멈추고 예산을 넘으면 더 부르지 않는다. 예산은 호출을
+     * 시작하기 전에만 보므로 최악은 예산 + 진행 중이던 호출 하나의 read timeout 이다(3 + 5 = 8초).
+     */
+    private static long zoneAnchoredWorstSeconds() {
+        return AiPlanWorker.ZONE_ANCHORED_BUDGET.toSeconds() + INTERNAL_QUERY_TIMEOUT_SECONDS;
     }
 
     private ThreadPoolTaskExecutor taskExecutor() {

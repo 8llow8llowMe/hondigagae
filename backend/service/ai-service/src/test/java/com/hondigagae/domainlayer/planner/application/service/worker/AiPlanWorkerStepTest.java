@@ -14,6 +14,8 @@ import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuer
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
+import com.hondigagae.domainlayer.planner.application.service.CandidateZonePolicy;
+import com.hondigagae.domainlayer.planner.application.service.CandidateZonePolicy.Kind;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobEventPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobMetricsPort;
@@ -33,6 +35,7 @@ import com.hondigagae.global.properties.AiLlmProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -350,22 +353,104 @@ class AiPlanWorkerStepTest {
     }
 
     @Test
-    @DisplayName("거리순 방문 조회가 실패해도 생성은 계속하고, 숙박 · 음식점 거리순 결과는 싣는다")
-    void continuesWhenAnchoredLookupFails() {
+    @DisplayName("제주가 아닌 지역은 거리순 조회를 하지 않는다 — 권역이 없다")
+    void skipsAnchoredLookupsOutsideJeju() {
+        AiPlanJob seoul = pendingJob(null);
+        seoul.requestParams().put("areaCode", "1");
+        RecordingCandidates candidates = southEastReady();
+
+        worker(new FakeJobStore(seoul), new FakeJobEvents(), new RecordingLlm(), candidates).runJob(JOB_ID);
+
+        assertThat(candidates.nearbyLookups).isZero();
+    }
+
+    @Test
+    @DisplayName("거리순 조회가 한 번 실패하면 남은 조회를 건너뛰고 id 순 결과로 이어 간다 — 서킷에 실패를 더 쌓지 않는다")
+    void stopsAnchoredLookupsOnFirstFailure() {
         RecordingCandidates candidates = southEastReady();
         candidates.nearbyVisitFailure = new AiPlanException(AiPlanErrorCode.INTERNAL_SERVICE_UNAVAILABLE);
+        candidates.stays = List.of(located(931L, "숙박", 33.3050, 126.7700));
         FakeJobStore store = new FakeJobStore(pendingJob(null));
         RecordingLlm llm = new RecordingLlm();
 
         worker(store, new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
 
         assertThat(store.current().status()).isEqualTo(AiPlanJobStatus.COMPLETED);
+        assertThat(candidates.nearbyLookups).isEqualTo(1);
         assertThat(llm.lastQuery.safeCandidates()).hasSize(50).extracting(PlaceCandidate::placeId)
-            .contains(911L, 912L, 921L, 922L)
-            .doesNotContain(901L);
+            .contains(931L)
+            .doesNotContain(901L, 911L, 921L);
     }
 
-    /** 일반 후보는 북부 50곳(id 1~50, 남동부 0), 거리순 조회는 남동부 방문 4 · 숙박 3 · 음식점 3곳을 돌려준다. */
+    @Test
+    @DisplayName("거리순 조회의 누적 시간이 예산(3초)을 넘으면 남은 조회를 부르지 않는다")
+    void stopsAnchoredLookupsWhenBudgetIsSpent() {
+        RecordingCandidates candidates = southEastReady();
+        AiPlanWorker worker = worker(new FakeJobStore(pendingJob(null)), new FakeJobEvents(), new RecordingLlm(), candidates);
+        // 시계를 볼 때마다 1초씩 흐른다 — 시작 0초, 1 · 2초에 부르고 3초에 멈춘다
+        long[] ticks = {0};
+        worker.nanoClock = () -> Duration.ofSeconds(ticks[0]++).toNanos();
+
+        worker.runJob(JOB_ID);
+
+        assertThat(candidates.nearbyLookups).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("id 순 숙박과 거리순 숙박이 같은 곳이면 한 번만 싣는다")
+    void dedupesLodgingFoundByBothLookups() {
+        RecordingCandidates candidates = southEastReady();
+        candidates.stays = List.of(located(911L, "숙박", 33.3300, 126.8000));
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(new FakeJobStore(pendingJob(null)), new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        assertThat(llm.lastQuery.safeCandidates()).filteredOn(candidate -> candidate.placeId() == 911L).hasSize(1);
+        assertThat(llm.lastQuery.safeCandidates()).hasSize(50);
+    }
+
+    @Test
+    @DisplayName("6권역 모두 거리순 결과가 있고 카페 요청이 있으면 풀 50곳에 요청 후보 8곳을 지키고 권역마다 방문 3 · 숙박 2 · 음식점 2곳을 싣는다")
+    void balancesEveryZoneWithRequestedCafes() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("requestNote", "카페 가고 싶어요");
+        RecordingCandidates candidates = southEastReady();
+        List<PlaceCandidateQueryResult> requested = new ArrayList<>();
+        long id = 1_000L;
+        for (JejuZone zone : JejuZone.values()) {
+            double lat = zone.getAnchorLat();
+            double lng = zone.getAnchorLng();
+            requested.add(restaurant(id++, "요청 카페", lat + 0.001, lng + 0.001));
+            requested.add(restaurant(id++, "요청 카페", lat + 0.002, lng + 0.002));
+            candidates.nearbyVisits.put(zone, List.of(
+                located(id++, "관광지", lat, lng), located(id++, "관광지", lat + 0.003, lng),
+                located(id++, "관광지", lat, lng + 0.003), located(id++, "관광지", lat + 0.004, lng)));
+            candidates.nearbyLodgings.put(zone, List.of(
+                located(id++, "숙박", lat - 0.001, lng), located(id++, "숙박", lat - 0.002, lng),
+                located(id++, "숙박", lat - 0.003, lng)));
+            candidates.nearbyRestaurants.put(zone, List.of(
+                located(id++, "음식점", lat, lng - 0.001), located(id++, "음식점", lat, lng - 0.002),
+                located(id++, "음식점", lat, lng - 0.003)));
+        }
+        candidates.requested = requested;
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        List<PlaceCandidate> pool = llm.lastQuery.safeCandidates();
+        assertThat(pool).hasSize(50);
+        // 요청 카페는 권역을 돌아가며 8곳이 앞에 있다 — 꼬리 깎기에 깎이지 않는다
+        assertThat(pool.subList(0, 8)).allSatisfy(candidate -> assertThat(candidate.title()).isEqualTo("요청 카페"));
+        for (JejuZone zone : JejuZone.values()) {
+            List<PlaceCandidate> inZone = pool.stream()
+                .filter(candidate -> JejuZone.of(candidate.lat(), candidate.lng()) == zone).toList();
+            assertThat(inZone).as("%s 방문", zone).filteredOn(CandidateZonePolicy::isVisit).hasSizeGreaterThanOrEqualTo(3);
+            assertThat(inZone).as("%s 숙박", zone).filteredOn(Kind.LODGING::matches).hasSize(2);
+            assertThat(inZone).as("%s 음식점", zone).filteredOn(Kind.RESTAURANT::matches).hasSize(2);
+        }
+    }
+
+    /** 일반 후보는 북부 50곳(id 1~50, 남동부 0), 거리순 조회는 남동부에서만 방문 5 · 숙박 3 · 음식점 3곳을 돌려준다. */
     private static RecordingCandidates southEastReady() {
         RecordingCandidates candidates = new RecordingCandidates();
         List<PlaceCandidateQueryResult> general = new ArrayList<>();
@@ -374,17 +459,17 @@ class AiPlanWorkerStepTest {
                 .placeId(id).title("북부" + id).contentTypeName("관광지").lat(33.5).lng(126.5).build());
         }
         candidates.general = general;
-        candidates.nearbyVisits = List.of(
+        candidates.nearbyVisits.put(JejuZone.SOUTH_EAST, List.of(
             located(901L, "관광지", 33.3260, 126.8420), located(902L, "관광지", 33.3523, 126.7470),
             located(903L, "관광지", 33.2800, 126.7200), located(904L, "관광지", 33.3000, 126.7600),
             // 남동부 대표점에서 찾았어도 경계 너머(북동부)면 어느 권역 몫으로도 싣지 않는다
-            located(905L, "관광지", 33.4592, 126.8317));
-        candidates.nearbyLodgings = List.of(
+            located(905L, "관광지", 33.4592, 126.8317)));
+        candidates.nearbyLodgings.put(JejuZone.SOUTH_EAST, List.of(
             located(911L, "숙박", 33.3300, 126.8000), located(912L, "숙박", 33.3100, 126.7900),
-            located(913L, "숙박", 33.3200, 126.8100));
-        candidates.nearbyRestaurants = List.of(
+            located(913L, "숙박", 33.3200, 126.8100)));
+        candidates.nearbyRestaurants.put(JejuZone.SOUTH_EAST, List.of(
             located(921L, "음식점", 33.3250, 126.8300), located(922L, "음식점", 33.2900, 126.7300),
-            located(923L, "음식점", 33.3150, 126.8200));
+            located(923L, "음식점", 33.3150, 126.8200)));
         return candidates;
     }
 
@@ -679,10 +764,10 @@ class AiPlanWorkerStepTest {
         private int requestedSize;
         /** 일반 검색 결과 (#1312). null 이면 북부 후보 하나(100)다. */
         private List<PlaceCandidateQueryResult> general;
-        /** 남동부 대표점에서 부를 때만 돌려줄 거리순 결과 (#1312). 다른 대표점에서는 비어 있다. */
-        private List<PlaceCandidateQueryResult> nearbyVisits = List.of();
-        private List<PlaceCandidateQueryResult> nearbyLodgings = List.of();
-        private List<PlaceCandidateQueryResult> nearbyRestaurants = List.of();
+        /** 권역 대표점마다 돌려줄 거리순 결과 (#1312). 없는 권역은 비어 있다. */
+        private final Map<JejuZone, List<PlaceCandidateQueryResult>> nearbyVisits = new EnumMap<>(JejuZone.class);
+        private final Map<JejuZone, List<PlaceCandidateQueryResult>> nearbyLodgings = new EnumMap<>(JejuZone.class);
+        private final Map<JejuZone, List<PlaceCandidateQueryResult>> nearbyRestaurants = new EnumMap<>(JejuZone.class);
         private AiPlanException nearbyVisitFailure;
         private int nearbyLookups;
 
@@ -692,13 +777,13 @@ class AiPlanWorkerStepTest {
             if (nearbyVisitFailure != null) {
                 throw nearbyVisitFailure;
             }
-            return atSouthEast(lat, lng) ? nearbyVisits : List.of();
+            return nearbyVisits.getOrDefault(anchorZone(lat, lng), List.of());
         }
 
         @Override
         public List<PlaceCandidateQueryResult> findNearbyLodgingCandidates(String areaCode, double lat, double lng, int size) {
             nearbyLookups++;
-            return atSouthEast(lat, lng) ? nearbyLodgings : List.of();
+            return nearbyLodgings.getOrDefault(anchorZone(lat, lng), List.of());
         }
 
         @Override
@@ -706,11 +791,17 @@ class AiPlanWorkerStepTest {
             String areaCode, double lat, double lng, int size
         ) {
             nearbyLookups++;
-            return atSouthEast(lat, lng) ? nearbyRestaurants : List.of();
+            return nearbyRestaurants.getOrDefault(anchorZone(lat, lng), List.of());
         }
 
-        private static boolean atSouthEast(double lat, double lng) {
-            return lat == JejuZone.SOUTH_EAST.getAnchorLat() && lng == JejuZone.SOUTH_EAST.getAnchorLng();
+        /** 이 좌표를 대표점으로 가진 권역. 대표점이 아니면 null — 거리순 조회는 대표점으로만 부른다. */
+        private static JejuZone anchorZone(double lat, double lng) {
+            for (JejuZone zone : JejuZone.values()) {
+                if (zone.getAnchorLat() == lat && zone.getAnchorLng() == lng) {
+                    return zone;
+                }
+            }
+            return null;
         }
 
         @Override
