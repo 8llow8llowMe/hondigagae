@@ -24,6 +24,38 @@ develop / main 에 머지
 
 `develop → dev`, `main → prod` 다. 그 외 브랜치는 배포하지 않는다.
 
+### 멀티브랜치 잡 설정 — 브랜치 발견은 All branches
+
+잡 8개(백엔드 7 + 프론트 1)의 GitHub 소스 설정은 모두 같다.
+
+| 항목 | 값 |
+| --- | --- |
+| Discover branches | **All branches** |
+| Discover pull requests from origin | Merging the pull request with the current target branch revision |
+| Filter by name (with wildcards) | Include `main develop PR-*` · Exclude `feature/be/* feature/fe/*` |
+
+Jenkins 는 push 가 일어난 브랜치만 빌드한다. 그래서 잡이 도는 시점은 아래와 같다.
+
+| 시점 | 도는 잡 |
+| --- | --- |
+| 작업 브랜치 → develop PR 생성·갱신 | `PR-N` 만 (CI). 작업 브랜치는 이름 필터에서 빠진다 |
+| develop 에 머지 | `develop` (CI + dev 배포) |
+| 릴리스 PR(develop → main) 생성 | `PR-N` 만 (CI) |
+| 릴리스 PR 이 열린 동안 develop 에 머지 | `develop` (dev 배포) + `PR-N` (릴리스 내용이 바뀌었으므로 CI 재실행) |
+| 릴리스 PR 머지 | `main` (CI + prod 배포) |
+
+**Discover branches 를 "Exclude branches that are also filed as PRs" 로 되돌리지 않는다.**
+이 전략은 PR 의 head 브랜치를 브랜치 잡에서 뺀다. 작업 브랜치는 이미 이름 필터가 빼고 있으므로,
+이 전략이 실제로 빼는 브랜치는 **릴리스 PR 의 head 가 된 `develop` 하나뿐**이다.
+그러면 릴리스 PR 이 열려 있는 동안 `develop` 잡이 "이 프로젝트는 현재 비활성 상태입니다" 로
+꺼지고, 그 사이 develop 에 머지한 변경은 빌드 실패도 경고도 없이 dev 에 배포되지 않는다.
+인덱싱 로그에는 `Ignoring SCMHead{'develop'} because current strategy excludes branches
+that ARE also filed as a pull request` 가 남는다 (#1330).
+
+All branches 의 대가는 위 표의 넷째 줄, 릴리스 PR 이 열린 동안 빌드가 두 번 도는 것 하나다.
+설정을 바꾼 뒤에는 각 잡에서 **Scan Multibranch Pipeline Now** 를 한 번 돌려야 꺼졌던
+`develop` 잡이 다시 살아난다.
+
 ## 2. 배포는 PR 라벨로 지정한다 (fail-closed)
 
 모노레포라 push 한 번에 잡 8개(백엔드 7 + 프론트 1)가 전부 트리거된다.
@@ -293,6 +325,7 @@ docker exec hondigagae-batch-service-dev \
 | 증상 | 원인 |
 | --- | --- |
 | 잡이 '변경 없음 - 생략' 으로 끝남 | 이번 push 가 그 서비스와 무관. 정상 동작이다 |
+| `develop` 잡이 '이 프로젝트는 현재 비활성 상태입니다' | Discover branches 가 "Exclude branches that are also filed as PRs" 로 바뀌었고 릴리스 PR 이 열려 있다. All branches 로 되돌리고 Scan 한다 (§1, #1330) |
 | 잡이 '배포 대상 라벨 미지정' 으로 끝남 | PR 에 `backend-{svc}` 라벨을 안 붙였다 |
 | 빌드가 UNSTABLE, 배포 생략 | GitHub App credential 문제로 라벨 조회 실패 |
 | 빌드는 되는데 기동 실패 | Vault key 이름이 `.env.example` 과 다름 |
