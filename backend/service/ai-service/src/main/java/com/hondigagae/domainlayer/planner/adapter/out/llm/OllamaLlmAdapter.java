@@ -471,10 +471,12 @@ public class OllamaLlmAdapter implements AiLlmPort {
      *
      * <p>읽는 법:
      * <ul>
-     *   <li>{@code prefillEstMs} 가 크다 → 프롬프트가 길다. {@code ai-llm.place-candidate-size} 를 줄인다.
-     *       <b>{@code prefillMs}(Ollama 보고값)는 긴 입력에서 틀린다</b> (#1246) — 입력 675 · 2,917 토큰에 83 · 94ms,
-     *       5,600 토큰에도 64ms 로 길이와 무관했고, 빠진 시간이 전체에서 로드 · 디코드를 뺀 나머지로 남았다.
-     *       그래서 {@code prefillEstMs = totalMs - loadMs - decodeMs} 를 함께 남긴다</li>
+     *   <li>{@code unreportedMs} 가 크다 → Ollama 가 지표에 싣지 않은 구간이다. <b>입력 처리 추정이 아니다</b> (#1321).
+     *       요청이 {@code format:"json"} + {@code think:"low"} 라 Ollama 는 추론을 먼저 생성하고(첫 단계) 문법을 걸어
+     *       다시 생성하는데, 첫 단계 시간(추론 토큰 생성 + 캐시가 안 맞을 때의 입력 처리)은
+     *       {@code prompt_eval_duration} · {@code eval_duration} 어디에도 없다. 그래서
+     *       {@code unreportedMs = totalMs - loadMs - decodeMs} 는 추론 길이를 따라 흔들린다(700~1,800자에 시간도 같이).
+     *       {@code prefillMs}(보고값)도 이 구간을 포함하지 않으므로 입력 길이와 무관하게 작게 나온다 (#1246)</li>
      *   <li>{@code decodeMs} 가 크다 → 출력이 길거나 장비가 느리다. 프롬프트를 줄여도 거의 그대로다</li>
      *   <li>{@code loadMs} 가 0 이 아니다 → 모델이 내려갔다 다시 올라왔다. {@code ai-llm.keep-alive} 를 본다</li>
      *   <li>{@code elapsedMs} 와 {@code totalMs} 차이가 크다 → 대기·전송이 끼었다.
@@ -488,11 +490,11 @@ public class OllamaLlmAdapter implements AiLlmPort {
         Long totalMs = durationMillis(response, METADATA_TOTAL_DURATION);
         Long loadMs = durationMillis(response, METADATA_LOAD_DURATION);
         Long decodeMs = durationMillis(response, METADATA_EVAL_DURATION);
-        Long prefillEstMs = totalMs == null || loadMs == null || decodeMs == null ? null : totalMs - loadMs - decodeMs;
+        Long unreportedMs = totalMs == null || loadMs == null || decodeMs == null ? null : totalMs - loadMs - decodeMs;
         log.info("LLM timing operation={} model={} promptChars={} elapsedMs={} totalMs={} loadMs={}"
-                + " prefillMs={} prefillEstMs={} decodeMs={} outputTokens={}",
+                + " prefillMs={} unreportedMs={} decodeMs={} outputTokens={}",
             operation, aiLlmProperties.model(), promptChars(prompt), elapsedMs, totalMs, loadMs,
-            durationMillis(response, METADATA_PROMPT_EVAL_DURATION), prefillEstMs, decodeMs,
+            durationMillis(response, METADATA_PROMPT_EVAL_DURATION), unreportedMs, decodeMs,
             outputTokens(response));
     }
 
