@@ -349,11 +349,25 @@ public class OllamaLlmAdapter implements AiLlmPort {
         return false;
     }
 
+    /**
+     * 단위 없는 정수 문자열은 초 단위({@code s})를 붙여 보낸다 (#1321). Ollama 는 문자열 keep_alive 에서 단위가 없으면
+     * HTTP 400({@code time: missing unit in duration "-1"})으로 거부한다(dev 2026-10-10 실측). Spring AI 는 값을 문자열로
+     * 보내므로 {@code -1} 을 그대로 두면 모든 생성이 실패한다. 숫자 keep_alive 는 초 단위이고 음수는 상주라 뜻이 같다.
+     * 단위 있는 값({@code -1m} · {@code 24h} · {@code 30m})은 그대로 보낸다. 비면 기존 동작(값 그대로).
+     */
+    static String ollamaKeepAlive(String keepAlive) {
+        if (keepAlive == null) {
+            return null;
+        }
+        String trimmed = keepAlive.trim();
+        return trimmed.matches("-?\\d+") ? trimmed + "s" : trimmed;
+    }
+
     private OllamaChatOptions buildRequestOptions() {
         OllamaChatOptions.Builder builder = OllamaChatOptions.builder().format("json")
             // 요청마다 싣는다 — Ollama 의 keep_alive 는 요청 단위 값이라, 빠뜨린 요청 하나가 서버 기본(5분)으로
             // 되돌려 놓는다. 그러면 뜸한 dev 에서 첫 요청마다 모델 로드가 붙는다 (#1128).
-            .keepAlive(aiLlmProperties.keepAlive());
+            .keepAlive(ollamaKeepAlive(aiLlmProperties.keepAlive()));
         // gpt-oss 계열은 low/medium/high 추론 강도를 지원한다. 미지원 모델로 교체해도
         // 기동이 깨지지 않도록 알 수 없는 값은 모델 기본값에 맡긴다.
         String reasoningEffort = aiLlmProperties.reasoningEffort();
