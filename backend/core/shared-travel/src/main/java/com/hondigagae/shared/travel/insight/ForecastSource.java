@@ -17,8 +17,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum ForecastSource implements CodeNameDescribable {
 
-    SHORT_TERM("단기예보", "오늘부터 약 5일까지의 시간 단위 예보입니다. 가장 정확합니다."),
-    MID_TERM("중기예보", "약 5일 이후 예보입니다. 오전/오후 단위라 단기예보보다 대략적이고 습도와 바람 정보가 없습니다."),
+    SHORT_TERM("단기예보", "오늘부터 나흘 뒤 무렵까지의 시간 단위 예보입니다. 가장 정확합니다."),
+    MID_TERM("중기예보", "나흘 뒤 무렵부터 열흘 뒤까지의 예보입니다. 오전/오후 단위라 단기예보보다 대략적이고 습도와 바람 정보가 없습니다."),
     NONE("예보 없음", "예보가 닿지 않는 날짜라 날씨를 근거로 쓰지 못했습니다.");
 
     private final String displayName;

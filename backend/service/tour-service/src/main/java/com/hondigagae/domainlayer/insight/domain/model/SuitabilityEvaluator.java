@@ -87,7 +87,7 @@ public final class SuitabilityEvaluator {
     private static SuitabilityReason missingWeatherReason(ForecastCoverage coverage) {
         return switch (coverage == null ? ForecastCoverage.UNAVAILABLE : coverage) {
             case OUT_OF_RANGE -> SuitabilityReason.informational(SuitabilityReasonCode.FORECAST_OUT_OF_RANGE,
-                "예보는 약 11일까지만 제공되어 이 날짜의 날씨는 근거로 쓰지 못했습니다.");
+                "예보는 오늘부터 대략 열흘 뒤까지만 제공되어 이 날짜의 날씨는 근거로 쓰지 못했습니다.");
             case DAY_ENDED -> SuitabilityReason.informational(SuitabilityReasonCode.FORECAST_DAY_ENDED,
                 "이 날짜의 예보 시간대가 이미 지나 날씨를 근거로 쓰지 못했습니다.");
             default -> SuitabilityReason.informational(SuitabilityReasonCode.FORECAST_UNAVAILABLE,
