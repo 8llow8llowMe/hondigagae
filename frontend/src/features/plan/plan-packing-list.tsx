@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
@@ -73,6 +73,9 @@ export function PlanPackingList({
     queryClient.setQueryData(key, next)
   }
 
+  /** 생성 재진입 가드 — 아래 `startGenerate` 주석 */
+  const generatingRef = useRef(false)
+
   /*
     **생성과 저장이 한 mutation 이다.** 둘을 갈라 두면 생성은 됐는데 저장만 실패한 상태가
     화면에 남고, 그때 목록은 보이는데 새로고침하면 사라진다 — #586 이 없애려던 바로 그
@@ -87,7 +90,20 @@ export function PlanPackingList({
       return savePackingItems(planId, toPackingSavePayload(created.items))
     },
     onSuccess: apply,
+    onSettled: () => {
+      generatingRef.current = false
+    },
   })
+
+  /*
+    **따닥을 ref 가 먼저 막는다** (#1338 · `form-guide.md` §6). `isPending` 은 다음 렌더에야
+    서서 대기 화면(`Pending`)이 버튼을 걷어 내기 전에 두 번째 클릭이 들어온다 — 수십 초짜리
+    LLM 호출이 두 번 돈다. 해제는 성공·실패와 무관하게 `onSettled` 다.
+  */
+  function startGenerate() {
+    if (!claimReentry(generatingRef)) return
+    generate.mutate()
+  }
 
   const add = useMutation({
     mutationFn: (values: PackingAddValues) => addPackingItem(planId, toPackingAddPayload(values)),
@@ -133,7 +149,7 @@ export function PlanPackingList({
       onReload={() => void list.refetch()}
       generating={generate.isPending}
       generateFailed={generate.isError}
-      onGenerate={() => generate.mutate()}
+      onGenerate={startGenerate}
       onToggleChecked={(packingItemId, checked) => check.mutate({ packingItemId, checked })}
       onRemove={(packingItemId) => remove.mutate(packingItemId)}
       onAdd={(values) => add.mutate(values)}
@@ -728,4 +744,14 @@ function AddSection({
       </div>
     </div>
   )
+}
+
+/**
+ * 진행 중이 아니면 자리를 잡고 `true`, 이미 잡혀 있으면 `false` (#1338). 해제는 호출부가
+ * 요청이 끝났을 때 `current = false` 로 한다.
+ */
+export function claimReentry(flag: { current: boolean }): boolean {
+  if (flag.current) return false
+  flag.current = true
+  return true
 }
