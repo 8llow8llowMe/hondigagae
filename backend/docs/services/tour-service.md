@@ -101,7 +101,10 @@
   상세에는 `fitsActivityLevels`(이 코스를 걸을 만한 활동량의 `{code,name,description}` 목록)를 더한다.
   plan-service 의 `PlanItemWalkCourseItem.fitsActivityLevels` 와 같은 모양이라 화면이 렌더를 재사용한다.
   **목록 항목에는 싣지 않는다** — 목록은 이미 활동량으로 걸러 내려가므로 항목마다 반복하면 응답만 부푼다
-- `GET /api/v1/places/nearby?lat=&lng=&radius=&contentType=&petSizeType=&petWeightKg=&keyword=` — 좌표 반경 장소 검색. keyword 는 목록과 같은 단어별 이름·주소 AND 검색
+- `GET /api/v1/places/nearby?lat=&lng=&radius=&sigunguCode=&contentType=&petSizeType=&petWeightKg=&keyword=` — 좌표 반경 장소 검색. keyword 는 목록과 같은 단어별 이름·주소 AND 검색.
+  선택 `sigunguCode` 는 목록(`GET /places`)과 같은 의미·형식이다 — 지도의 "이 지역에서 재검색" 이 목록에서 주변 검색으로 바뀌어도
+  시군구 필터를 잃지 않게 한다. 생략하면 시군구를 가리지 않는 예전 동작 그대로다 (#1316)
+  빈 값(`sigunguCode=`)도 생략으로 본다 — 목록은 아직 빈 값을 `sigungu_code = ''` 로 걸어 0건이 된다(같은 정규화는 후속).
 - `GET /api/v1/emergencies/facilities?lat=&lng=&radius=&type=&open24Only=&openNowOnly=&size=` — 긴급 시설 반경 검색.
   `size` 상한은 **250** 이다 — 제주 전역 시설이 213곳이라 반경을 최대로 넓혀도 잘리지 않는다.
   화면이 유형·24시간을 클라이언트에서 좁히며 칩마다 개수를 보여주므로 한 번에 전량을 받아야 한다.
@@ -156,8 +159,8 @@
   이름 또는 주소 중 한 곳에 부분 일치해야 하고, 모든 단어를 만족한 장소만 찾는다. `%`·`_`·`\`는
   와일드카드가 아니라 리터럴이다. 공백/빈 값은 필터 없음이며 원문 길이 상한은 50자다. 검색 원천은
   DB `LIKE`이고, 같은 조건의 반복 조회만 Redis 에 5분 TTL 로 둔다. 검색 의미 변경 전 캐시와 섞이지
-  않도록 목록·주변 키 네임스페이스는 각각 `list:v3`, `nearby:v2`를 쓴다(목록은 #1202 에서 기준 좌표가 키에 들어가고
-  저장 봉투에 `distanceMeters` 가 더해져 v3 로 올렸다). Redis 장애는 캐시 미스로 취급한다. Elasticsearch
+  않도록 목록·주변 키 네임스페이스는 각각 `list:v3`, `nearby:v3`를 쓴다(목록은 #1202 에서 기준 좌표가 키에 들어가고
+  저장 봉투에 `distanceMeters` 가 더해져 v3 로, 주변은 #1316 에서 `sigunguCode` 가 키에 들어가 v3 로 올렸다). Redis 장애는 캐시 미스로 취급한다. Elasticsearch
   는 인프라 미구성이라 이 경로를 쓰지 않는다 (#421).
 - 날씨: 기상청 실시간 호출(`WeatherObservationPort`) + Redis **격자별** 캐시.
   TTL 은 고정값이 아니라 다음 발표 시각에 맞춘다 — 캐시는 성능 최적화가 아니라
@@ -230,7 +233,8 @@
 - **규모 한계**: 제주 2,300여 곳이라 페이지마다 후보 좌표 전량을 읽어 메모리에서 정렬한다(3컬럼이라 싸다). 전국으로 넓히면
   공간 인덱스나 DB 정렬로 옮길 지점이 `PlaceQueryProcessor#findPlacesByDistance` 와 `findCoordinatesByCriteria` 다.
 - **캐시**: 키워드 목록 캐시는 거리순도 같이 탄다. 키에 `lat`·`lng` 가 들어가고 봉투의 `PlaceSummaryInfo` 모양이 바뀌어
-  네임스페이스를 `list:v3` 로 올렸다. 주변 검색은 키 의미가 그대로이고 옛 항목이 `distanceMeters` 없이도 읽혀 `nearby:v2` 를 유지한다.
+  네임스페이스를 `list:v3` 로 올렸다. 주변 검색은 키 의미가 그대로이고 옛 항목이 `distanceMeters` 없이도 읽혀 그때는 `nearby:v2` 를 유지했다
+  (이후 #1316 에서 시군구 필터가 키에 들어가 `nearby:v3` 로 올렸다).
 - **하위 호환**: 좌표가 없으면 예전 `searchByCriteria` 경로 그대로다(거리 포트를 부르지 않는다 — `PlaceQueryProcessorDistanceSortTest`).
   응답에 `distanceMeters: null` 이 더해지는 것만 다르고, ai-service 의 `PlaceSliceClientResponse` 는 `@JsonIgnoreProperties(ignoreUnknown = true)`
   라 모르는 필드를 무시한다.
