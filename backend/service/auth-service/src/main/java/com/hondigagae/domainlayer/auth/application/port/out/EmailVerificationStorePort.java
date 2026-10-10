@@ -25,6 +25,12 @@ public interface EmailVerificationStorePort {
     boolean tryAcquireCooldown(String email, Duration ttl);
 
     /**
+     * 재발송 쿨다운의 남은 시간. 429 {@code Retry-After} 계산용이다 (#1293).
+     * 키가 없거나 TTL 이 없거나 저장소 장애면 빈 값 — 대체값은 호출부가 정한다.
+     */
+    Optional<Duration> findCooldownRemaining(String email);
+
+    /**
      * 코드 오입력 횟수를 1 올리고 누적값을 돌려준다. 카운터 수명은 코드 TTL 과 같다.
      */
     long increaseVerifyFailureCount(String email, Duration ttl);
@@ -36,4 +42,10 @@ public interface EmailVerificationStorePort {
      * 저장소 장애 시 0 을 반환한다 (fail-open — 상한은 보조 방어라 발송 자체를 막지 않는다).
      */
     long increaseIpSendCount(String clientIp, Duration window);
+
+    /**
+     * IP 발송 윈도우의 남은 시간. 429 {@code Retry-After} 계산용이다 (#1293).
+     * 키가 없거나 TTL 이 없거나 저장소 장애면 빈 값 — 대체값은 호출부가 정한다.
+     */
+    Optional<Duration> findIpSendWindowRemaining(String clientIp);
 }

@@ -2,8 +2,10 @@ package com.hondigagae.domainlayer.auth.application.service.processor;
 
 import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
 import com.hondigagae.domainlayer.auth.application.exception.AuthException;
+import com.hondigagae.domainlayer.auth.application.info.VerificationCodeSendInfo;
 import com.hondigagae.domainlayer.auth.application.port.out.EmailVerificationStorePort;
 import com.hondigagae.domainlayer.auth.application.port.out.MailSendPort;
+import com.hondigagae.domainlayer.auth.application.service.support.RetryAfterResolver;
 import com.hondigagae.domainlayer.auth.application.service.support.VerificationCodeGenerator;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
 import com.hondigagae.domainlayer.member.application.service.support.EmailNormalizer;
@@ -35,20 +37,28 @@ public class EmailVerificationProcessor {
      * 가입 여부와 무관하게 항상 동일하게 성공 응답한다(계정 열거 방지).
      * 기가입 이메일에는 인증코드 대신 "이미 가입된 계정" 안내 메일을 발송해
      * 메일박스 소유자만 상태를 알 수 있게 한다.
+     *
+     * <p>돌려주는 코드 TTL · 재발송 쿨다운(#1293)도 같은 이유로 <b>분기 전에 상수에서 한 번만 만들고</b>
+     * 모든 성공 경로에서 그 값을 그대로 돌려준다 — 코드를 실제로 저장했는지에 따라 값이 달라지면
+     * 응답이 가입 여부를 말해 버린다.
      */
-    public void sendCode(String rawEmail, String clientIp) {
+    public VerificationCodeSendInfo sendCode(String rawEmail, String clientIp) {
         String email = EmailNormalizer.normalize(rawEmail);
+        VerificationCodeSendInfo sendInfo = VerificationCodeSendInfo.of(CODE_TTL, RESEND_COOLDOWN);
 
         // 1. IP 발송 상한 — 이메일 쿨다운은 키가 이메일이라, 한 IP 가 서로 다른 이메일 다수로
         //    발송을 반복하는 남용을 막지 못한다. IP 차원의 고정 윈도우 상한을 먼저 검사한다.
         long ipSendCount = emailVerificationStorePort.increaseIpSendCount(clientIp, emailSendLimitProperties.ipWindow());
         if (ipSendCount > emailSendLimitProperties.ipMaxSendCount()) {
-            throw new AuthException(AuthErrorCode.EMAIL_SEND_IP_LIMITED);
+            long retryAfter = RetryAfterResolver.resolveSeconds(
+                emailVerificationStorePort.findIpSendWindowRemaining(clientIp), emailSendLimitProperties.ipWindow());
+            throw AuthException.withRetryAfter(AuthErrorCode.EMAIL_SEND_IP_LIMITED, retryAfter);
         }
 
         // 2. 재발송 쿨다운 (가입 여부 판별보다 먼저 적용해 프로빙에도 동일 비용을 부과한다)
         if (!emailVerificationStorePort.tryAcquireCooldown(email, RESEND_COOLDOWN)) {
-            throw new AuthException(AuthErrorCode.EMAIL_CODE_COOLDOWN);
+            long retryAfter = RetryAfterResolver.resolveSeconds(emailVerificationStorePort.findCooldownRemaining(email), RESEND_COOLDOWN);
+            throw AuthException.withRetryAfter(AuthErrorCode.EMAIL_CODE_COOLDOWN, retryAfter);
         }
 
         // 3. 기가입 이메일이면 안내 메일만 발송하고 동일하게 성공 처리
@@ -59,7 +69,7 @@ public class EmailVerificationProcessor {
         //    두 곳이 같은 사실을 다르게 보지 않게 한다.
         if (memberRepositoryPort.existsByEmailIn(List.of(email, withdrawnEmailHasher.hash(email)))) {
             mailSendPort.sendAlreadyRegisteredNotice(email);
-            return;
+            return sendInfo;
         }
 
         // 4. 인증코드 생성/저장 후 비동기 발송 (새 코드 발급 시 이전 실패 카운터도 함께 초기화)
@@ -67,6 +77,7 @@ public class EmailVerificationProcessor {
         emailVerificationStorePort.saveCode(email, code, CODE_TTL);
         emailVerificationStorePort.clearVerifyFailures(email);
         mailSendPort.sendVerificationCode(email, code);
+        return sendInfo;
     }
 
     public void verifyCode(String rawEmail, String code) {

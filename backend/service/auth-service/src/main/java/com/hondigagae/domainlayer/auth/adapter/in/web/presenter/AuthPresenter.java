@@ -10,10 +10,20 @@ import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueR
 import com.hondigagae.domainlayer.auth.application.info.JwtTokenIssueInfo;
 import com.hondigagae.domainlayer.auth.application.info.JwtTokenReissueInfo;
 import com.hondigagae.domainlayer.auth.application.info.OAuthAuthorizationInfo;
+import com.hondigagae.domainlayer.auth.application.info.VerificationCodeSendInfo;
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthCodeSendResponse;
 import org.springframework.stereotype.Component;
 
 @Component
 public class AuthPresenter {
+
+    /** 회원가입 인증 · 비밀번호 재설정 발송 공용. 초 단위로 내린다 (#1293). */
+    public AuthCodeSendResponse toCodeSendResponse(VerificationCodeSendInfo info) {
+        return AuthCodeSendResponse.builder()
+            .codeExpiresInSeconds(info.codeTtl().toSeconds())
+            .resendAvailableInSeconds(info.resendCooldown().toSeconds())
+            .build();
+    }
 
     public AuthSessionsResponse toSessionsResponse(List<AuthSessionInfo> sessions) {
         List<AuthSessionItem> items = sessions.stream()

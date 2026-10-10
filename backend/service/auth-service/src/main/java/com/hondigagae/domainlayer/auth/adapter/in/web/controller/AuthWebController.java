@@ -22,8 +22,13 @@ import com.hondigagae.domainlayer.auth.application.model.OAuthSignupConsent;
 import com.hondigagae.domainlayer.auth.application.port.in.AuthWebUseCase;
 import com.hondigagae.domainlayer.member.domain.enums.OAuthProvider;
 import com.hondigagae.security.common.dto.MemberLoginActive;
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthCodeSendResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -49,6 +54,12 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "인증/인가", description = "로그인, 로그아웃, 토큰 재발급 API를 제공합니다.")
 public class AuthWebController {
 
+    private static final String RETRY_AFTER_DESCRIPTION = "다시 요청할 수 있을 때까지 남은 시간(정수 초, 최소 1). "
+        + "제한 키의 남은 시간이며, 읽지 못하면 그 제한의 설정값(쿨다운 60초 · 잠금 기간 · IP 윈도우)입니다";
+    private static final String CODE_SENT_DESCRIPTION = "발송 요청 처리 완료. 가입 여부와 무관하게 같은 응답 · 같은 값입니다";
+    private static final String RATE_LIMITED_DESCRIPTION_SEND_CODE = "AUTH_003 — 같은 이메일 재발송 쿨다운(60초) 중 / "
+        + "AUTH_016 — 이 IP 의 발송 상한 초과";
+
     private final AuthWebUseCase authWebUseCase;
     private final RefreshCookieProvider refreshCookieProvider;
     private final OAuthStateCookieProvider oAuthStateCookieProvider;
@@ -60,8 +71,14 @@ public class AuthWebController {
             + "구분됩니다. 실패가 누적되면 해당 이메일이 일정 시간 잠깁니다(AUTH_015, 429).\n\n"
             + "인증 불필요. **필수: 요청 바디의 email, password.** "
             + "응답 바디의 accessToken 을 이후 요청의 `Authorization: Bearer` 헤더에 넣고, refresh 토큰은 HttpOnly 쿠키로 자동 저장됩니다.\n\n"
+            + "잠금 응답(AUTH_015, 429)에는 잠금이 풀릴 때까지 남은 시간이 `Retry-After` 헤더(정수 초)로 실립니다.\n\n"
             + "호출 예: `POST /api/v1/auth/login` `{\"email\":\"user@example.com\",\"password\":\"P@ssw0rd!\"}`"
     )
+    // 429 를 선언하면 springdoc 이 반환 타입에서 추론하던 200 을 빼먹는다 — 200 도 함께 선언해 반환 타입 스키마를 쓰게 한다.
+    @ApiResponse(responseCode = "200", description = "로그인 성공", useReturnTypeSchema = true)
+    @ApiResponse(responseCode = "429", description = "AUTH_015 — 로그인 실패 누적으로 이 이메일이 잠겼습니다",
+        headers = @Header(name = HttpHeaders.RETRY_AFTER, description = RETRY_AFTER_DESCRIPTION, schema = @Schema(implementation = Integer.class, example = "540")),
+        content = @Content(schema = @Schema(implementation = Response.class)))
     @PostMapping("/login")
     public ResponseEntity<Response<AuthGeneralLoginResponse>> loginWithCredentials(@Valid @RequestBody AuthGeneralLoginRequest request) {
         AuthCookieResult<AuthGeneralLoginResponse> result = authWebUseCase.generalLogin(AuthGeneralLoginCommand.from(request));
@@ -188,15 +205,22 @@ public class AuthWebController {
     @Operation(summary = "이메일 인증코드 발송",
         description = "회원가입용 이메일 인증코드를 발송합니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 시간당 발송 상한(AUTH_016)이 적용되며, "
             + "가입 여부와 무관하게 항상 성공으로 응답합니다(기가입 이메일에는 안내 메일 발송).\n\n"
+            + "응답 dataBody 의 `codeExpiresInSeconds`(코드 유효 시간) · `resendAvailableInSeconds`(재발송 대기 시간)로 "
+            + "만료 · 재발송 타이머를 그립니다. **가입 여부와 무관하게 항상 같은 값**이라 실제 발송 여부를 뜻하지 않습니다.\n\n"
+            + "429(AUTH_003 · AUTH_016)에는 `Retry-After` 헤더(정수 초)가 실립니다.\n\n"
             + "인증 불필요. **필수: 요청 바디의 email.**\n\n"
             + "호출 예: `POST /api/v1/auth/email/send-code` `{\"email\":\"user@example.com\"}`")
+    @ApiResponse(responseCode = "200", description = CODE_SENT_DESCRIPTION, useReturnTypeSchema = true)
+    @ApiResponse(responseCode = "429", description = RATE_LIMITED_DESCRIPTION_SEND_CODE,
+        headers = @Header(name = HttpHeaders.RETRY_AFTER, description = RETRY_AFTER_DESCRIPTION, schema = @Schema(implementation = Integer.class, example = "42")),
+        content = @Content(schema = @Schema(implementation = Response.class)))
     @PostMapping("/email/send-code")
-    public ResponseEntity<Response<Void>> sendEmailVerificationCode(
+    public ResponseEntity<Response<AuthCodeSendResponse>> sendEmailVerificationCode(
         @Valid @RequestBody AuthEmailCodeSendRequest request,
         HttpServletRequest httpServletRequest
     ) {
-        authWebUseCase.sendEmailVerificationCode(request.email(), clientIpResolver.resolve(httpServletRequest));
-        return ResponseEntity.ok().body(Response.success());
+        AuthCodeSendResponse response = authWebUseCase.sendEmailVerificationCode(request.email(), clientIpResolver.resolve(httpServletRequest));
+        return ResponseEntity.ok().body(Response.success(response));
     }
 
     @Operation(summary = "이메일 인증코드 검증",
@@ -214,16 +238,25 @@ public class AuthWebController {
         계정 존재 여부와 무관하게 항상 성공으로 응답하며, 미가입 이메일과 소셜 전용 계정에는
         각각 안내 메일이 발송됩니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 발송 상한(AUTH_016)이 적용됩니다.
 
+        응답 dataBody 의 `codeExpiresInSeconds`(코드 유효 시간) · `resendAvailableInSeconds`(재발송 대기 시간)로
+        만료 · 재발송 타이머를 그립니다. **계정 존재 여부와 무관하게 항상 같은 값**이라 실제 발송 여부를 뜻하지 않습니다.
+
+        429(AUTH_003 · AUTH_016)에는 `Retry-After` 헤더(정수 초)가 실립니다.
+
         인증 불필요. **필수: 요청 바디의 email.**
 
         호출 예: `POST /api/v1/auth/password/reset/send-code` `{"email":"user@example.com"}`""")
+    @ApiResponse(responseCode = "200", description = CODE_SENT_DESCRIPTION, useReturnTypeSchema = true)
+    @ApiResponse(responseCode = "429", description = RATE_LIMITED_DESCRIPTION_SEND_CODE,
+        headers = @Header(name = HttpHeaders.RETRY_AFTER, description = RETRY_AFTER_DESCRIPTION, schema = @Schema(implementation = Integer.class, example = "42")),
+        content = @Content(schema = @Schema(implementation = Response.class)))
     @PostMapping("/password/reset/send-code")
-    public ResponseEntity<Response<Void>> sendPasswordResetCode(
+    public ResponseEntity<Response<AuthCodeSendResponse>> sendPasswordResetCode(
         @Valid @RequestBody AuthPasswordResetCodeSendRequest request,
         HttpServletRequest httpServletRequest
     ) {
-        authWebUseCase.sendPasswordResetCode(request.email(), clientIpResolver.resolve(httpServletRequest));
-        return ResponseEntity.ok().body(Response.success());
+        AuthCodeSendResponse response = authWebUseCase.sendPasswordResetCode(request.email(), clientIpResolver.resolve(httpServletRequest));
+        return ResponseEntity.ok().body(Response.success(response));
     }
 
     @Operation(summary = "비밀번호 재설정", description = """

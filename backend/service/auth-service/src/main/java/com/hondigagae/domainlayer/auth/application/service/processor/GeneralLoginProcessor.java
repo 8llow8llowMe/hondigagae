@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
 import com.hondigagae.domainlayer.auth.application.exception.AuthException;
 import com.hondigagae.domainlayer.auth.application.info.GeneralLoginInfo;
 import com.hondigagae.domainlayer.auth.application.port.out.LoginAttemptStorePort;
+import com.hondigagae.domainlayer.auth.application.service.support.RetryAfterResolver;
 import com.hondigagae.domainlayer.member.application.exception.MemberErrorCode;
 import com.hondigagae.domainlayer.member.application.exception.MemberException;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
@@ -49,8 +50,11 @@ public class GeneralLoginProcessor {
         String email = EmailNormalizer.normalize(command.email());
 
         // 1. 잠금 검사 — 회원 조회보다 먼저 수행해 잠긴 이메일에는 DB 조회/bcrypt 비용조차 주지 않는다.
+        //    Retry-After 는 잠금 키의 남은 TTL, 못 읽으면 잠금 기간 (#1293). 잠긴 이메일에만 한 번 더 왕복한다.
         if (loginAttemptStorePort.isLocked(email)) {
-            throw new AuthException(AuthErrorCode.LOGIN_ATTEMPT_LOCKED);
+            long retryAfter = RetryAfterResolver.resolveSeconds(
+                loginAttemptStorePort.findLockRemaining(email), loginAttemptProperties.lockDuration());
+            throw AuthException.withRetryAfter(AuthErrorCode.LOGIN_ATTEMPT_LOCKED, retryAfter);
         }
 
         // 2. 회원 조회 (미존재도 LOGIN_FAILED로 응답해 계정 존재 여부를 노출하지 않는다)
@@ -83,7 +87,9 @@ public class GeneralLoginProcessor {
         long failureCount = loginAttemptStorePort.increaseFailureCount(email, loginAttemptProperties.lockDuration());
         if (failureCount >= loginAttemptProperties.maxFailureCount()) {
             loginAttemptStorePort.lock(email, loginAttemptProperties.lockDuration());
-            return new AuthException(AuthErrorCode.LOGIN_ATTEMPT_LOCKED);
+            // 방금 건 잠금이라 남은 TTL 이 곧 잠금 기간이다 — 다시 읽으러 왕복하지 않는다 (#1293).
+            return AuthException.withRetryAfter(AuthErrorCode.LOGIN_ATTEMPT_LOCKED,
+                RetryAfterResolver.resolveSeconds(Optional.empty(), loginAttemptProperties.lockDuration()));
         }
         return new AuthException(AuthErrorCode.LOGIN_FAILED);
     }

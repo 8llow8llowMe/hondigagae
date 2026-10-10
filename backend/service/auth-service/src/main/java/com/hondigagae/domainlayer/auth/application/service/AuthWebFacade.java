@@ -1,5 +1,7 @@
 package com.hondigagae.domainlayer.auth.application.service;
 
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthCodeSendResponse;
+import com.hondigagae.domainlayer.auth.application.info.VerificationCodeSendInfo;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthSessionsResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthGeneralLoginResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuthorizeResponse;
@@ -85,9 +87,10 @@ public class AuthWebFacade implements AuthWebUseCase {
     }
 
     @Override
-    public void sendEmailVerificationCode(String email, String clientIp) {
+    public AuthCodeSendResponse sendEmailVerificationCode(String email, String clientIp) {
         // Redis/메일 중심 흐름이라 트랜잭션 경계를 두지 않는다 (DB 조회는 단건 findByEmail뿐).
-        emailVerificationProcessor.sendCode(email, clientIp);
+        VerificationCodeSendInfo sendInfo = emailVerificationProcessor.sendCode(email, clientIp);
+        return authPresenter.toCodeSendResponse(sendInfo);
     }
 
     @Override
@@ -96,9 +99,10 @@ public class AuthWebFacade implements AuthWebUseCase {
     }
 
     @Override
-    public void sendPasswordResetCode(String email, String clientIp) {
+    public AuthCodeSendResponse sendPasswordResetCode(String email, String clientIp) {
         // Redis/메일 중심 흐름이라 트랜잭션 경계를 두지 않는다 (DB 조회는 단건 findByEmail뿐).
-        passwordResetProcessor.sendResetCode(email, clientIp);
+        VerificationCodeSendInfo sendInfo = passwordResetProcessor.sendResetCode(email, clientIp);
+        return authPresenter.toCodeSendResponse(sendInfo);
     }
 
     @Override

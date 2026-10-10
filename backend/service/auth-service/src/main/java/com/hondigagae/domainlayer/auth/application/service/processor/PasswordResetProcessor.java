@@ -2,10 +2,12 @@ package com.hondigagae.domainlayer.auth.application.service.processor;
 
 import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
 import com.hondigagae.domainlayer.auth.application.exception.AuthException;
+import com.hondigagae.domainlayer.auth.application.info.VerificationCodeSendInfo;
 import com.hondigagae.domainlayer.auth.application.port.out.EmailVerificationStorePort;
 import com.hondigagae.domainlayer.auth.application.port.out.JwtTokenStorePort;
 import com.hondigagae.domainlayer.auth.application.port.out.MailSendPort;
 import com.hondigagae.domainlayer.auth.application.port.out.PasswordResetStorePort;
+import com.hondigagae.domainlayer.auth.application.service.support.RetryAfterResolver;
 import com.hondigagae.domainlayer.auth.application.service.support.VerificationCodeGenerator;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
 import com.hondigagae.domainlayer.member.application.service.support.EmailNormalizer;
@@ -44,29 +46,38 @@ public class PasswordResetProcessor {
     private final VerificationCodeGenerator verificationCodeGenerator;
     private final EmailSendLimitProperties emailSendLimitProperties;
 
-    public void sendResetCode(String rawEmail, String clientIp) {
+    /**
+     * 돌려주는 코드 TTL · 재발송 쿨다운(#1293)은 <b>분기 전에 상수에서 한 번만 만들고</b> 모든 성공
+     * 경로에서 그대로 돌려준다 — 미가입 · 탈퇴 · 소셜 전용처럼 코드를 저장하지 않는 경로도 같은 값이어야
+     * 응답으로 계정 상태를 구분할 수 없다.
+     */
+    public VerificationCodeSendInfo sendResetCode(String rawEmail, String clientIp) {
         String email = EmailNormalizer.normalize(rawEmail);
+        VerificationCodeSendInfo sendInfo = VerificationCodeSendInfo.of(CODE_TTL, RESEND_COOLDOWN);
 
         // 1. IP 발송 상한 → 이메일 쿨다운 (회원가입 발송과 동일한 순서/방어)
         long ipSendCount = emailVerificationStorePort.increaseIpSendCount(clientIp, emailSendLimitProperties.ipWindow());
         if (ipSendCount > emailSendLimitProperties.ipMaxSendCount()) {
-            throw new AuthException(AuthErrorCode.EMAIL_SEND_IP_LIMITED);
+            long retryAfter = RetryAfterResolver.resolveSeconds(
+                emailVerificationStorePort.findIpSendWindowRemaining(clientIp), emailSendLimitProperties.ipWindow());
+            throw AuthException.withRetryAfter(AuthErrorCode.EMAIL_SEND_IP_LIMITED, retryAfter);
         }
         if (!passwordResetStorePort.tryAcquireCooldown(email, RESEND_COOLDOWN)) {
-            throw new AuthException(AuthErrorCode.EMAIL_CODE_COOLDOWN);
+            long retryAfter = RetryAfterResolver.resolveSeconds(passwordResetStorePort.findCooldownRemaining(email), RESEND_COOLDOWN);
+            throw AuthException.withRetryAfter(AuthErrorCode.EMAIL_CODE_COOLDOWN, retryAfter);
         }
 
         // 2. 계정 상태별 분기 — 응답은 전부 동일하고 메일 내용만 다르다
         Optional<Member> memberHolder = memberRepositoryPort.findByEmail(email);
         if (memberHolder.isEmpty() || memberHolder.get().status() != MemberStatus.ACTIVE) {
             mailSendPort.sendPasswordResetNotRegisteredNotice(email);
-            return;
+            return sendInfo;
         }
         Member member = memberHolder.get();
         if (member.password() == null) {
             // 소셜 전용 계정 — 비밀번호가 없으므로 소셜 로그인 이용을 안내한다
             mailSendPort.sendPasswordResetSocialOnlyNotice(email, member.provider().getDescription());
-            return;
+            return sendInfo;
         }
 
         // 3. 재설정 코드 발급 (새 코드 발급 시 이전 실패 카운터도 함께 초기화)
@@ -74,6 +85,7 @@ public class PasswordResetProcessor {
         passwordResetStorePort.saveCode(email, code, CODE_TTL);
         passwordResetStorePort.clearVerifyFailures(email);
         mailSendPort.sendPasswordResetCode(email, code);
+        return sendInfo;
     }
 
     @Transactional

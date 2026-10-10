@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
 import com.hondigagae.domainlayer.auth.application.exception.AuthException;
+import com.hondigagae.domainlayer.auth.application.info.VerificationCodeSendInfo;
 import com.hondigagae.domainlayer.auth.application.port.out.EmailVerificationStorePort;
 import com.hondigagae.domainlayer.auth.application.port.out.MailSendPort;
 import com.hondigagae.domainlayer.auth.application.service.support.VerificationCodeGenerator;
@@ -125,6 +126,85 @@ class EmailVerificationProcessorTest {
         assertThat(mailSendPort.sentCodes).hasSize(1);
     }
 
+    /**
+     * 응답 값이 가입 여부를 말하면 안 된다 (#1293). 신규 · 기가입 · 탈퇴 이메일이 코드 저장 여부와 무관하게
+     * 같은 코드 TTL · 재발송 쿨다운을 받는다.
+     */
+    @Test
+    void sendCode_returnsSameTimingRegardlessOfRegistration() {
+        memberRepositoryPort.register("active@example.com");
+        memberRepositoryPort.register(withdrawnEmailHasher.hash(WITHDRAWN_EMAIL));
+
+        VerificationCodeSendInfo fresh = processor.sendCode("fresh@example.com", CLIENT_IP);
+        VerificationCodeSendInfo active = processor.sendCode("active@example.com", CLIENT_IP);
+        VerificationCodeSendInfo withdrawn = processor.sendCode(WITHDRAWN_EMAIL, CLIENT_IP);
+
+        assertThat(fresh.codeTtl()).isEqualTo(Duration.ofMinutes(5));
+        assertThat(fresh.resendCooldown()).isEqualTo(Duration.ofSeconds(60));
+        assertThat(active).isEqualTo(fresh);
+        assertThat(withdrawn).isEqualTo(fresh);
+        // 코드는 신규 이메일에만 저장됐다 — 값이 같은 것은 저장 여부와 무관하기 때문이다.
+        assertThat(mailSendPort.sentCodes).containsExactly("fresh@example.com");
+    }
+
+    @Test
+    void sendCode_withinEmailCooldown_carriesRemainingTtlAsRetryAfter() {
+        processor.sendCode("user@example.com", CLIENT_IP);
+        storePort.cooldownRemaining = Optional.of(Duration.ofMillis(42_300));
+
+        assertThatThrownBy(() -> processor.sendCode("user@example.com", CLIENT_IP))
+            .isInstanceOfSatisfying(AuthException.class, exception -> {
+                assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.EMAIL_CODE_COOLDOWN);
+                // 초 올림 — 42.3초 남았으면 43초 뒤에 재시도해야 같은 429 를 다시 받지 않는다.
+                assertThat(exception.getRetryAfterSeconds()).hasValue(43L);
+            });
+    }
+
+    @Test
+    void sendCode_withinEmailCooldown_fallsBackToCooldownWhenTtlUnreadable() {
+        processor.sendCode("user@example.com", CLIENT_IP);
+        storePort.cooldownRemaining = Optional.empty();
+
+        assertThatThrownBy(() -> processor.sendCode("user@example.com", CLIENT_IP))
+            .isInstanceOfSatisfying(AuthException.class,
+                exception -> assertThat(exception.getRetryAfterSeconds()).hasValue(60L));
+    }
+
+    @Test
+    void sendCode_withinEmailCooldown_retryAfterIsAtLeastOneSecond() {
+        processor.sendCode("user@example.com", CLIENT_IP);
+        storePort.cooldownRemaining = Optional.of(Duration.ofMillis(1));
+
+        assertThatThrownBy(() -> processor.sendCode("user@example.com", CLIENT_IP))
+            .isInstanceOfSatisfying(AuthException.class,
+                exception -> assertThat(exception.getRetryAfterSeconds()).hasValue(1L));
+    }
+
+    @Test
+    void sendCode_overIpLimit_carriesIpWindowRemainingAsRetryAfter() {
+        for (int i = 0; i < IP_MAX_SEND_COUNT; i++) {
+            processor.sendCode("user" + i + "@example.com", CLIENT_IP);
+        }
+        storePort.ipWindowRemaining = Optional.of(Duration.ofSeconds(1_234));
+
+        assertThatThrownBy(() -> processor.sendCode("another@example.com", CLIENT_IP))
+            .isInstanceOfSatisfying(AuthException.class, exception -> {
+                assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.EMAIL_SEND_IP_LIMITED);
+                assertThat(exception.getRetryAfterSeconds()).hasValue(1_234L);
+            });
+    }
+
+    @Test
+    void sendCode_overIpLimit_fallsBackToIpWindowWhenTtlUnreadable() {
+        for (int i = 0; i < IP_MAX_SEND_COUNT; i++) {
+            processor.sendCode("user" + i + "@example.com", CLIENT_IP);
+        }
+
+        assertThatThrownBy(() -> processor.sendCode("another@example.com", CLIENT_IP))
+            .isInstanceOfSatisfying(AuthException.class,
+                exception -> assertThat(exception.getRetryAfterSeconds()).hasValue(Duration.ofHours(1).toSeconds()));
+    }
+
     @Test
     void sendCode_withinEmailCooldown_rejects() {
         processor.sendCode("user@example.com", CLIENT_IP);
@@ -181,10 +261,23 @@ class EmailVerificationProcessorTest {
         private final Set<String> cooldowns = new HashSet<>();
         private final Map<String, Long> ipCounts = new HashMap<>();
         private boolean ipCounterBroken;
+        // 남은 TTL 조회 결과. 빈 값은 키 없음 · TTL 없음 · 저장소 장애를 한데 흉내 낸다 (어댑터가 그렇게 접는다).
+        private Optional<Duration> cooldownRemaining = Optional.empty();
+        private Optional<Duration> ipWindowRemaining = Optional.empty();
 
         @Override
         public void saveCode(String email, String code, Duration ttl) {
             codes.put(email, code);
+        }
+
+        @Override
+        public Optional<Duration> findCooldownRemaining(String email) {
+            return cooldownRemaining;
+        }
+
+        @Override
+        public Optional<Duration> findIpSendWindowRemaining(String clientIp) {
+            return ipWindowRemaining;
         }
 
         @Override

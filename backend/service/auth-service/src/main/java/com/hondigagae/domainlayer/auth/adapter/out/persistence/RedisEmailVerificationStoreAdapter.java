@@ -62,10 +62,21 @@ public class RedisEmailVerificationStoreAdapter implements EmailVerificationStor
             redisTemplate.opsForValue().setIfAbsent(buildCooldownKey(email), COOLDOWN_VALUE, ttl));
     }
 
+    /** 이 조회는 장애를 삼킨다 — 거부가 확정된 429 의 안내값이라 500 으로 바꾸지 않는다 ({@link RedisRemainingTtlReader}). */
+    @Override
+    public Optional<Duration> findCooldownRemaining(String email) {
+        return RedisRemainingTtlReader.read(redisTemplate, buildCooldownKey(email), "emailVerificationCooldown");
+    }
+
+    @Override
+    public Optional<Duration> findIpSendWindowRemaining(String clientIp) {
+        return RedisRemainingTtlReader.read(redisTemplate, buildIpSendKey(clientIp), "emailSendIp");
+    }
+
     @Override
     public long increaseIpSendCount(String clientIp, Duration window) {
         try {
-            String key = buildKey("emailSendIp", clientIp);
+            String key = buildIpSendKey(clientIp);
             Long count = redisTemplate.opsForValue().increment(key);
             // 첫 발송에서만 TTL 을 걸어 고정 윈도우를 만든다 (로그인 실패 카운터와 동일한 방식).
             ensureCounterTtl(key, count, window);
@@ -121,6 +132,10 @@ public class RedisEmailVerificationStoreAdapter implements EmailVerificationStor
 
     private String buildCooldownKey(String email) {
         return buildKey("emailVerificationCooldown", email);
+    }
+
+    private String buildIpSendKey(String clientIp) {
+        return buildKey("emailSendIp", clientIp);
     }
 
     private String buildKey(String type, String email) {

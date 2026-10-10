@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.auth.adapter.out.persistence;
 import com.hondigagae.domainlayer.auth.application.port.out.LoginAttemptStorePort;
 import com.hondigagae.redis.properties.RedisProperties;
 import java.time.Duration;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -73,6 +74,12 @@ public class RedisLoginAttemptStoreAdapter implements LoginAttemptStorePort {
         } catch (DataAccessException exception) {
             log.error("[RedisLoginAttemptStoreAdapter] 로그인 잠금 설정 실패: error={}", exception.getMessage());
         }
+    }
+
+    /** 장애 시 빈 값 — 다른 메서드와 같은 fail-open 이다. 대체값(잠금 기간)은 호출부가 정한다. */
+    @Override
+    public Optional<Duration> findLockRemaining(String email) {
+        return RedisRemainingTtlReader.read(redisTemplate, buildLockKey(email), "loginLock");
     }
 
     @Override

@@ -45,6 +45,12 @@ public class RedisPasswordResetStoreAdapter implements PasswordResetStorePort {
             redisTemplate.opsForValue().setIfAbsent(buildCooldownKey(email), COOLDOWN_VALUE, ttl));
     }
 
+    /** 이 조회는 장애를 삼킨다 — 거부가 확정된 429 의 안내값이라 500 으로 바꾸지 않는다 ({@link RedisRemainingTtlReader}). */
+    @Override
+    public Optional<Duration> findCooldownRemaining(String email) {
+        return RedisRemainingTtlReader.read(redisTemplate, buildCooldownKey(email), "passwordResetCooldown");
+    }
+
     @Override
     public long increaseVerifyFailureCount(String email, Duration ttl) {
         String key = buildFailKey(email);

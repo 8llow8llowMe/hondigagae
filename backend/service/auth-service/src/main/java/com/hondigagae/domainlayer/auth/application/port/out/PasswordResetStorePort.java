@@ -23,6 +23,12 @@ public interface PasswordResetStorePort {
      */
     boolean tryAcquireCooldown(String email, Duration ttl);
 
+    /**
+     * 재발송 쿨다운의 남은 시간. 429 {@code Retry-After} 계산용이다 (#1293).
+     * 키가 없거나 TTL 이 없거나 저장소 장애면 빈 값 — 대체값은 호출부가 정한다.
+     */
+    Optional<Duration> findCooldownRemaining(String email);
+
     /** 코드 검증 실패 횟수를 1 올리고 누적값을 돌려준다 (브루트포스 방어). */
     long increaseVerifyFailureCount(String email, Duration ttl);
 

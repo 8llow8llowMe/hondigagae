@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
 import com.hondigagae.domainlayer.auth.application.exception.AuthException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -24,11 +25,16 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @RestControllerAdvice(basePackages = "com.hondigagae.domainlayer.auth")
 public class AuthExceptionHandler {
 
+    /**
+     * 재시도 가능 시각이 실린 예외(429 쿨다운 · 잠금 · IP 상한)만 표준 {@code Retry-After}(정수 초) 헤더를 단다 (#1293).
+     * 본문 봉투 · 코드 · 상태는 헤더 유무와 무관하게 같다.
+     */
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<Response<Void>> handleAuthException(AuthException exception) {
-        return ResponseEntity
-            .status(exception.getErrorCode().getHttpStatus())
-            .body(Response.fail(exception.getErrorCode().getCode(), exception.getMessage()));
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(exception.getErrorCode().getHttpStatus());
+        exception.getRetryAfterSeconds()
+            .ifPresent(seconds -> builder.header(HttpHeaders.RETRY_AFTER, String.valueOf(seconds)));
+        return builder.body(Response.fail(exception.getErrorCode().getCode(), exception.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
