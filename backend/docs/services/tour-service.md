@@ -50,7 +50,11 @@
   + 적합도 판정(`score` · `suitabilityLevel` · `headline` · `reasons` · `weather` · `congestion` · `indoorAlternatives`)이고, 특보와 날씨 출처는
   목록 머리에 한 번. **점수는 적합도 한 곳 판정과 같은 `PlaceSuitabilityProcessor.score` 로 낸다** — 같은 조건이면 추천 카드와 상세 적합도가
   같은 값을 말한다. 점수를 못 낸 곳은 빼므로 `score` 는 비지 않고, 추천할 곳이 없으면 `items: []`(200). 리터럴 경로라 `/{placeId}` 로 잡히지
-  않는다(`PlaceRecommendationRouteTest`). 후보 · 정렬 · 다양성 · 캐시 규칙은 `weather-insight-integration.md` §6-5
+  않는다(`PlaceRecommendationRouteTest`). 후보 · 정렬 · 다양성 · 캐시 규칙은 `weather-insight-integration.md` §6-5.
+  **예열 스케줄(#1388)** — `PlaceRecommendationPrewarmScheduler` 가 단기예보 격자 캐시 만료(발표시각 H:40) 5분 뒤
+  (`0 45 2,5,8,11,14,17,20,23 * * *`, Asia/Seoul)에 기본 조건(오늘 · 반려견 조건 없음 · 3곳) 추천을 결과 캐시를 읽지 않고 계산해,
+  날씨 격자 캐시와 기본 결과 캐시를 미리 채운다. Redis 작업 잠금으로 회차당 한 인스턴스만 돌고, 실패는 WARN 으로 삼킨다.
+  `insight.recommendation.prewarm.enabled`(기본 true, local · dev false — 두 환경이 기상청 키 하나를 같이 써서 prod 에서만 돈다). 이 서비스의 유일한 `@Scheduled` 다(`SchedulingConfig`)
 - `GET /api/v1/places/{placeId}/walk-safety` — 산책 위험도 (추정 노면온도 + 기상청 여름철 체감온도 + 안전 시간대).
   체감온도는 기상청 산식으로 계산하며 폭염특보 기준(33/35℃)이 판정 임계다. NOAA 열지수는 참고로 병기하고,
   두 값 모두 계산 근거 문구(feelsLikeBasis/heatIndexBasis)를 함께 내린다
