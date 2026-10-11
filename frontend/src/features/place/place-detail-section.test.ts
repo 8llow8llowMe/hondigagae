@@ -546,15 +546,19 @@ describe('PlaceDetailSection — 외부 원문 처리', () => {
 
 describe('PlaceDetailSection — 모바일 하단 바의 바닥 오프셋', () => {
   /**
-   * 바는 `lg` 미만에서 보이지만 그것이 비켜야 할 **고정 탭바는 `md:hidden`** 이다.
-   * 두 breakpoint 를 같은 값으로 묶어 `bottom-16` 만 두었더니 768~1023 에서 바가
-   * 바닥에서 64px 떠 그 아래로 본문이 비쳤다(실측: 900×800).
+   * #1369 부터 이 화면에는 탭바가 없다 (`hidesTabBar`). 예전에는 바가 탭바 위(`bottom-16`)에 떠서
+   * 둘이 겹쳐 쌓여 화면의 17% 를 가렸다. 이제 모든 폭에서 바닥에 붙고 홈 인디케이터를 비킨다.
+   * 범위를 바의 여는 태그로 좁힌다 — 마크업 전체의 `bottom-16` 은 다른 요소에 속는다.
    */
-  it('탭바가 사라지는 md 부터는 바닥에 붙는다', () => {
+  it('바닥에 붙고 안전영역을 비킨다 — 탭바 높이만큼 뜨지 않는다', () => {
     const markup = render()
+    const at = markup.indexOf('sticky bottom-0')
+    const tag = markup.slice(markup.lastIndexOf('<', at), markup.indexOf('>', at) + 1)
 
-    expect(markup).toContain('bottom-16')
-    expect(markup).toContain('md:bottom-0')
+    expect(at).toBeGreaterThan(-1)
+    expect(tag).toContain('pb-safe')
+    expect(tag).toContain('lg:hidden')
+    expect(markup).not.toContain('bottom-16')
   })
 })
 
