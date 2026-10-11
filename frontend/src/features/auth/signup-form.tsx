@@ -20,6 +20,7 @@ import {
 import { SignupConsentSheet } from '@/features/auth/signup-consent-sheet'
 import { SignupConsentAction, SignupStepHeading } from '@/features/auth/signup-parts'
 import { CodeStep, EmailStep, ProfileStep } from '@/features/auth/signup-steps'
+import { useCodeTimers } from '@/features/auth/use-code-timers'
 import { login, sendEmailCode, signup, verifyEmailCode } from '@/lib/api/auth'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import { handOffLoginEmail } from '@/lib/auth/login-email-handoff'
@@ -33,9 +34,9 @@ import {
   toConsentErrors,
 } from '@/lib/auth/signup-consent'
 import { codeStepAfterResend, type ResendOutcome } from '@/lib/form/code-step-after-resend'
-import { remainingSeconds } from '@/lib/form/cooldown'
 import { apiErrorToFormErrors, type FormErrors, NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { formErrorsAfterEdit } from '@/lib/form/form-failure-display'
+import { appendRetryAfter, toErrorsWithRetryAfter } from '@/lib/form/retry-after'
 import { returnFocusTarget } from '@/lib/form/return-focus'
 import {
   focusResendResult,
@@ -46,9 +47,7 @@ import { useForm } from '@/lib/form/use-form'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { validate } from '@/lib/form/validate'
 import { messages } from '@/lib/messages'
-
-/** 백엔드 send-code 쿨다운 (AuthWebController 문서 실측) */
-const RESEND_COOLDOWN_SECONDS = 60
+import type { VerificationCodeSendResponse } from '@/types/auth'
 
 type Step = 'email' | 'code' | 'profile'
 
@@ -95,12 +94,18 @@ export function SignupForm({
 
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
-  // 쿨다운은 "남은 초"를 직접 감산하는 state 가 아니라 시작 시각을 들고, 렌더마다
-  // remainingSeconds(순수 함수) 로 다시 계산한다 — form-guide.md §2, 회원가입-세부명세.md D7.
-  const [cooldownStartedAt, setCooldownStartedAt] = useState<number | null>(null)
-  // remainingSeconds 는 Date.now() 를 다시 읽어야 값이 바뀐다. 이 값 자체는 쓰지 않고
-  // setInterval 이 1초마다 재렌더를 트리거하는 용도로만 갱신한다
-  const [, forceCooldownTick] = useState(0)
+  /*
+    재발송 쿨다운 · 코드 만료 (#1309). 길이는 FE 가 박지 않고 발송 응답(`resendAvailableInSeconds` ·
+    `codeExpiresInSeconds`)과 429 의 `Retry-After` 로 받는다. 마감 시각 기반이라 백그라운드 탭에서도
+    어긋나지 않는다 — form-guide.md §2, 회원가입-세부명세.md D7. 재설정 2단계와 같은 훅이다.
+  */
+  const {
+    cooldownSeconds,
+    expiresInSeconds,
+    start: startCodeTimers,
+    coolDown: coolDownResend,
+    reset: resetCodeTimers,
+  } = useCodeTimers()
   const [duplicateEmail, setDuplicateEmail] = useState<string | null>(null)
   const [isResending, setResending] = useState(false)
   const resendingRef = useRef(false)
@@ -142,24 +147,6 @@ export function SignupForm({
   // CodeStep 의 ErrorState 재시도가 코드 검증 재제출인지 재전송 재시도인지 구분한다
   const [codeAction, setCodeAction] = useState<'verify' | 'resend'>('verify')
 
-  useEffect(() => {
-    if (cooldownStartedAt === null) return
-    const interval = setInterval(() => {
-      const remaining = remainingSeconds(cooldownStartedAt, RESEND_COOLDOWN_SECONDS, Date.now())
-      if (remaining <= 0) {
-        setCooldownStartedAt(null)
-        return
-      }
-      forceCooldownTick((tick) => tick + 1)
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [cooldownStartedAt])
-
-  const cooldownSeconds =
-    cooldownStartedAt === null
-      ? 0
-      : remainingSeconds(cooldownStartedAt, RESEND_COOLDOWN_SECONDS, Date.now())
-
   // 단계 전환 시 새 단계의 첫 입력으로 포커스를 옮긴다 — 회원가입-세부명세.md D6.
   // "전환 시" 이지 "진입 시" 가 아니다: 첫 렌더에도 이 effect 가 돌면 /signup 진입
   // 즉시 이메일 입력으로 포커스가 가서 스크린리더가 제목·단계 표시를 건너뛴다
@@ -187,23 +174,26 @@ export function SignupForm({
     containerRef.current?.querySelector<HTMLElement>(`#${focusId}`)?.focus()
   }, [step])
 
-  const emailForm = useForm<EmailValues, void>({
+  const emailForm = useForm<EmailValues, VerificationCodeSendResponse>({
     schema: emailSchema,
     initialValues: { email: '' },
     onSubmit: async (values) => {
       // 이전 되돌림 안내가 새 제출 결과를 가리지 않게 먼저 지운다
       setStepBackMessage(null)
       try {
-        await sendEmailCode(values.email)
+        const sent = await sendEmailCode(values.email)
         setEmailErrorStatus(null)
+        return sent
       } catch (error) {
         setEmailErrorStatus(error instanceof ApiError ? error.status : NO_RESPONSE_STATUS)
         throw error
       }
     },
-    onSuccess: (_result, values) => {
+    // 429(`AUTH_003` · `AUTH_016`)에 남은 시간을 덧붙인다 (#1309) — 그 밖은 공용 매핑과 같다
+    toErrors: toErrorsWithRetryAfter,
+    onSuccess: (sent, values) => {
       setEmail(values.email)
-      setCooldownStartedAt(Date.now())
+      startCodeTimers(sent)
       setCodeErrorStatus(null)
       setStep('code')
     },
@@ -237,6 +227,8 @@ export function SignupForm({
         // AUTH_005(코드 만료): 1단계로 되돌린다 — 정본 D4. 빈 useEffect 로 감시하지
         // 않고 실패한 자리(.catch)에서 바로 처리한다.
         if (error.resultCode === 'AUTH_005') {
+          // 이 코드는 더 쓸 수 없다 — 시계를 걷는다. 3단계 진입 · 완료와 같은 판단이다 (#1309)
+          resetCodeTimers()
           setStep('email')
           setStepBackMessage(apiErrorToFormErrors(error, messages.form.submitFailed).form)
         }
@@ -247,6 +239,9 @@ export function SignupForm({
     onSuccess: () => {
       setDuplicateEmail(null)
       setProfileErrorStatus(null)
+      // 코드를 다 썼다 — 3단계에서 시계가 1초마다 폼 전체를 다시 그리지 않게 걷는다 (#1309).
+      // 코드를 더 쓸 수 없게 된 다른 갈래(AUTH_005 · MEMBER_006 으로 1단계 복귀)도 같이 걷는다
+      resetCodeTimers()
       setStep('profile')
     },
   })
@@ -324,6 +319,8 @@ export function SignupForm({
 
           // MEMBER_006(인증 미완료): 1단계로 되돌린다 — 정본 D4
           if (error.resultCode === 'MEMBER_006') {
+            // 1단계로 돌아간다 — 시계는 3단계 진입 때 이미 걷혔지만 같은 판단을 여기도 둔다 (#1309)
+            resetCodeTimers()
             setStep('email')
             setStepBackMessage(apiErrorToFormErrors(error, messages.form.submitFailed).form)
           }
@@ -386,9 +383,10 @@ export function SignupForm({
     setCodeAction('resend')
     let result: ResendResult = 'failed'
     void sendEmailCode(email)
-      .then(() => {
+      .then((sent) => {
         result = 'sent'
-        setCooldownStartedAt(Date.now())
+        // 새 코드다 — 만료도 새로 센다 (#1309)
+        startCodeTimers(sent)
         setCodeErrorStatus(null)
         /*
           직전 폼 전체 실패(#1102)와 코드 칸 오류 · 값(#1109)을 걷는다. 남기면 성공한 재전송 위에
@@ -402,13 +400,17 @@ export function SignupForm({
         if (error instanceof ApiError && error.kind === 'rate-limited') {
           // 쿨다운을 유지해 재전송 버튼을 계속 비활성 상태로 둔다(D4). ErrorState 가
           // 아니라 FormAlert 로만 보여준다 — codeForm 오류에 실어 CodeStep 이 그대로 렌더한다.
-          // 상태도 429 로 둔다 (#1102) — 직전 5xx 상태가 남아 있으면 이 알림이 일시 장애에 가린다
-          setCooldownStartedAt(Date.now())
+          // 상태도 429 로 둔다 (#1102) — 직전 5xx 상태가 남아 있으면 이 알림이 일시 장애에 가린다.
+          // 쿨다운 길이는 `Retry-After` 다 (#1309) — IP 상한(`AUTH_016`)이면 60초가 아니라 최대 약 1시간이다
+          coolDownResend(error.retryAfterSeconds)
           setCodeErrorStatus(error.status)
           // 코드 칸 오류 · 값은 남기고 429 문구를 얹는다 — 새 코드가 오지 않았다 (#1109)
           applyResendOutcome({
             result: 'failed',
-            failure: apiErrorToFormErrors(error, messages.form.submitFailed),
+            failure: appendRetryAfter(
+              apiErrorToFormErrors(error, messages.form.submitFailed),
+              error,
+            ),
           })
           return
         }
@@ -425,7 +427,7 @@ export function SignupForm({
         */
         setResendOutcome((previous) => ({ count: previous.count + 1, result }))
       })
-  }, [cooldownSeconds, email, applyResendOutcome])
+  }, [cooldownSeconds, email, applyResendOutcome, startCodeTimers, coolDownResend])
 
   /*
     **재전송 뒤 포커스** (#1102). 재전송 버튼은 요청 중 `loading`, 끝나면 성공이든 429 든 쿨다운으로
@@ -621,7 +623,7 @@ export function SignupForm({
     profileForm.reset()
     setConsentErrors(NO_FORM_ERRORS)
     setProfileErrorStatus(null)
-    setCooldownStartedAt(null)
+    resetCodeTimers()
     setCodeErrorStatus(null)
     setStep('email')
   }
@@ -670,6 +672,7 @@ export function SignupForm({
           errorStatus={codeErrorStatus}
           submitting={codeForm.isSubmitting}
           cooldownSeconds={cooldownSeconds}
+          expiresInSeconds={expiresInSeconds}
           resending={isResending}
           notice={messages.auth.codeSent}
           onValueChange={(key, value) => {

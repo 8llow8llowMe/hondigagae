@@ -8,10 +8,12 @@ import { FormFailure } from '@/components/form-failure'
 import { FormNotice } from '@/components/form-notice'
 import { Input } from '@/components/input'
 import { PasswordInput } from '@/components/password-input'
+import { CodeExpiryLine } from '@/features/auth/code-expiry-line'
 import type { CodeValues, EmailValues, SignupProfileValues } from '@/features/auth/schemas'
 import { SIGNUP_STEP_STATUS_ID, SignupEmailSummary } from '@/features/auth/signup-parts'
 import { VerificationCodeInput } from '@/features/auth/verification-code-input'
 import { handOffLoginEmail } from '@/lib/auth/login-email-handoff'
+import { cooldownAnnounceSeconds } from '@/lib/form/code-timers'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { type FailureAnnounce, submitFailureAnnounce } from '@/lib/form/submit-failure-focus'
 import { messages } from '@/lib/messages'
@@ -109,6 +111,11 @@ export type CodeStepProps = {
   errorStatus: number | null
   submitting: boolean
   cooldownSeconds: number
+  /**
+   * 코드 만료까지 남은 초 (#1309). 지났으면 0, 받은 코드가 없으면 null — 코드 칸 아래 줄이 셋을 가른다
+   * (`CodeExpiryLine`).
+   */
+  expiresInSeconds: number | null
   /** 재전송 요청이 인플라이트인가. 쿨다운과 별개로 이중 클릭을 막는다 (form-guide.md §6) */
   resending: boolean
   /** 1단계 성공 안내("메일로 인증코드를 보냈어요."). 없으면 렌더하지 않는다 */
@@ -127,6 +134,7 @@ export function CodeStep({
   errorStatus,
   submitting,
   cooldownSeconds,
+  expiresInSeconds,
   resending,
   notice,
   onValueChange,
@@ -140,8 +148,9 @@ export function CodeStep({
   // 리뷰 I1 재수정. login-form.tsx 의 LoginFormFields 와 같은 패턴.
   const isCoolingDown = cooldownSeconds > 0
   // 매 초 갱신되는 카운트다운을 그대로 aria-live 에 실으면 초마다 읽힌다.
-  // 화면에 보이는 초는 버튼 라벨(비-live)에 두고, 스크린리더 알림은 10초 단위로만 낸다 (D6)
-  const announceSeconds = isCoolingDown && cooldownSeconds % 10 === 0 ? cooldownSeconds : null
+  // 화면에 보이는 초는 버튼 라벨(비-live)에 두고, 스크린리더 알림은 드물게 낸다 (D6) — 1분 미만은
+  // 10초 단위, 이상은 분 경계다. 대기가 분으로 표기돼 10초마다 같은 말을 되풀이하지 않게 (#1309)
+  const announceSeconds = cooldownAnnounceSeconds(cooldownSeconds)
 
   return (
     <form
@@ -164,21 +173,25 @@ export function CodeStep({
         onRetry={onRetry}
       />
 
-      {/* 칸 하나뿐인 단계라 `*` 를 달지 않는다 (#1284) */}
-      <Field
-        id="code"
-        label={messages.auth.codeLabel}
-        error={errors.fields.code}
-        extraDescribedBy={SIGNUP_STEP_STATUS_ID}
-      >
-        {/* 입력 중에 대문자화 · 공백 제거 — 재설정 2단계와 같은 칸이다 (#1078) */}
-        <VerificationCodeInput
+      {/* 만료 줄은 칸에 붙는다 — 폼 간격(16)이 아니라 칸 안 간격(4)이다 (#1309) */}
+      <div className="flex flex-col gap-1">
+        {/* 칸 하나뿐인 단계라 `*` 를 달지 않는다 (#1284) */}
+        <Field
           id="code"
-          value={values.code}
-          onValueChange={(value) => onValueChange('code', value)}
-          invalid={errors.fields.code !== undefined}
-        />
-      </Field>
+          label={messages.auth.codeLabel}
+          error={errors.fields.code}
+          extraDescribedBy={SIGNUP_STEP_STATUS_ID}
+        >
+          {/* 입력 중에 대문자화 · 공백 제거 — 재설정 2단계와 같은 칸이다 (#1078) */}
+          <VerificationCodeInput
+            id="code"
+            value={values.code}
+            onValueChange={(value) => onValueChange('code', value)}
+            invalid={errors.fields.code !== undefined}
+          />
+        </Field>
+        <CodeExpiryLine expiresInSeconds={expiresInSeconds} />
+      </div>
 
       <div className="flex items-center justify-between gap-2">
         <Button

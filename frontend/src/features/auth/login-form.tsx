@@ -27,6 +27,7 @@ import {
 import type { FormErrors } from '@/lib/form/field-errors'
 import { focusFirstError, hasFieldErrors } from '@/lib/form/focus-first-error'
 import { formErrorsAfterEdit } from '@/lib/form/form-failure-display'
+import { toErrorsWithRetryAfter } from '@/lib/form/retry-after'
 import {
   type FailureAnnounce,
   focusSubmitFailure,
@@ -265,6 +266,12 @@ export function LoginForm({ returnTo, initialEmail, onSubmittingChange }: LoginF
         throw error
       }
     },
+    /*
+      잠금 429(`AUTH_015`, 기본 10분)에 남은 시간을 덧붙인다 (#1309) — 서버 문구("잠시 후 다시
+      시도해주세요")는 그대로 두고 `Retry-After` 로 "10분 뒤 다시 시도할 수 있어요." 를 보탠다.
+      그 밖의 실패는 공용 매핑과 같다.
+    */
+    toErrors: toErrorsWithRetryAfter,
     // 이동은 문서째 새로 받는다 — 라우터 캐시의 비로그인 응답을 버리려고다 (#1075, `enterSession`)
     onSuccess: () => enterSession({ queryClient, location: globalThis.location }, returnTo),
   })

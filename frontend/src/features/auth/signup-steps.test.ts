@@ -142,6 +142,7 @@ describe('CodeStep', () => {
         errorStatus: null,
         submitting: false,
         cooldownSeconds: 42,
+        expiresInSeconds: null,
         onValueChange: noop,
         onSubmit: noop,
         resending: false,
@@ -167,6 +168,7 @@ describe('CodeStep', () => {
         errorStatus: null,
         submitting: false,
         cooldownSeconds: 0,
+        expiresInSeconds: null,
         onValueChange: noop,
         onSubmit: noop,
         resending: false,
@@ -188,6 +190,7 @@ describe('CodeStep', () => {
         errorStatus: 400,
         submitting: false,
         cooldownSeconds: 0,
+        expiresInSeconds: null,
         onValueChange: noop,
         onSubmit: noop,
         resending: false,
@@ -210,6 +213,7 @@ describe('CodeStep', () => {
         errorStatus: 503,
         submitting: false,
         cooldownSeconds: 0,
+        expiresInSeconds: null,
         onValueChange: noop,
         onSubmit: noop,
         resending: false,
@@ -234,6 +238,7 @@ describe('CodeStep', () => {
         errorStatus: 503,
         submitting: false,
         cooldownSeconds: 0,
+        expiresInSeconds: null,
         onValueChange: noop,
         onSubmit: noop,
         resending: false,
@@ -257,6 +262,7 @@ describe('CodeStep', () => {
         errorStatus: 429,
         submitting: false,
         cooldownSeconds: 60,
+        expiresInSeconds: null,
         onValueChange: noop,
         onSubmit: noop,
         resending: false,
@@ -283,6 +289,7 @@ describe('CodeStep', () => {
         errorStatus: null,
         submitting: false,
         cooldownSeconds: 0,
+        expiresInSeconds: null,
         resending: true,
         onValueChange: noop,
         onSubmit: noop,
@@ -305,6 +312,7 @@ describe('CodeStep', () => {
         errorStatus: null,
         submitting: false,
         cooldownSeconds: 0,
+        expiresInSeconds: null,
         resending: false,
         notice: messages.auth.codeSent,
         onValueChange: noop,
@@ -328,6 +336,7 @@ describe('CodeStep', () => {
         errorStatus: null,
         submitting: false,
         cooldownSeconds: 0,
+        expiresInSeconds: null,
         resending: false,
         onValueChange: noop,
         onSubmit: noop,
@@ -353,6 +362,7 @@ describe('진행 중인 이메일 — 2·3단계가 라벨과 함께 보인다 (
         errorStatus: null,
         submitting: false,
         cooldownSeconds: 0,
+        expiresInSeconds: null,
         resending: false,
         onValueChange: noop,
         onSubmit: noop,
@@ -579,6 +589,7 @@ describe('세 단계 — 5xx 에는 일시 장애 하나만 선다 (#1079)', () 
             values: { code: '' },
             submitting: false,
             cooldownSeconds: 0,
+            expiresInSeconds: null,
             resending: false,
             onValueChange: noop,
             onSubmit: noop,
@@ -644,6 +655,7 @@ describe('가입 단계 — 필수 표시(*)를 그리지 않는다 (#1284)', ()
         email: 'a@b.c',
         values: { code: '' },
         cooldownSeconds: 0,
+        expiresInSeconds: null,
         resending: false,
         onResend: noop,
         onChangeEmail: noop,
@@ -716,6 +728,7 @@ describe('가입 단계 — 첫 칸이 단계 문구를 가리킨다 (#1295)', (
         email: 'a@b.c',
         values: { code: '' },
         cooldownSeconds: 0,
+        expiresInSeconds: null,
         resending: false,
         onResend: noop,
         onChangeEmail: noop,
@@ -739,5 +752,90 @@ describe('가입 단계 — 첫 칸이 단계 문구를 가리킨다 (#1295)', (
     expect(describedByOf(markup, 'password')).toEqual(['password-hint', SIGNUP_STEP_STATUS_ID])
     expect(describedByOf(markup, 'name')).not.toContain(SIGNUP_STEP_STATUS_ID)
     expect(describedByOf(markup, 'nickname')).not.toContain(SIGNUP_STEP_STATUS_ID)
+  })
+})
+
+/*
+  코드 칸 아래 만료 줄 (#1309). 단언을 **그 줄의 태그 안으로 좁힌다** — 마크업 전체에서 문구를 찾으면
+  다른 자리(버튼 · 알림)에 같은 말이 생겨도 초록이 된다.
+*/
+function signupCodeStep(expiresInSeconds: number | null, cooldownSeconds = 0): string {
+  return renderToStaticMarkup(
+    createElement(CodeStep, {
+      email: 'a@b.c',
+      values: { code: '' },
+      errors: NO_FORM_ERRORS,
+      errorStatus: null,
+      submitting: false,
+      cooldownSeconds,
+      expiresInSeconds,
+      resending: false,
+      onValueChange: noop,
+      onSubmit: noop,
+      onResend: noop,
+      onChangeEmail: noop,
+      onRetry: noop,
+    }),
+  )
+}
+
+/** 보이는 만료 줄 `<p data-code-expiry=…>` 의 상태와 글 */
+function expiryLine(markup: string): { state: string; text: string } | null {
+  const match = /<p data-code-expiry="([a-z]+)"[^>]*>([^<]*)<\/p>/.exec(markup)
+  return match ? { state: match[1] ?? '', text: match[2] ?? '' } : null
+}
+
+/** 만료 알림 live 영역의 글 */
+function expiryLive(markup: string): string | null {
+  return /<span data-code-expiry-live=""[^>]*>([^<]*)<\/span>/.exec(markup)?.[1] ?? null
+}
+
+describe('CodeStep — 코드 만료 줄 (#1309)', () => {
+  it('남은 시간이 있으면 "코드는 4분 59초 뒤 만료돼요" 를 보인다', () => {
+    expect(expiryLine(signupCodeStep(299))).toEqual({
+      state: 'counting',
+      text: '코드는 4분 59초 뒤 만료돼요',
+    })
+  })
+
+  it('만료되면 다시 보내기를 안내한다 — 제출은 막지 않는다', () => {
+    const markup = signupCodeStep(0)
+
+    expect(expiryLine(markup)).toEqual({ state: 'expired', text: messages.auth.codeExpired })
+    // 클래스에 `disabled:` 변형이 있어 속성(`disabled=""`)으로 본다
+    const submit = /<button type="submit"[^>]*>/.exec(markup)?.[0] ?? ''
+    expect(submit).not.toBe('')
+    expect(submit).not.toContain('disabled=""')
+  })
+
+  it('받은 코드가 없으면(null) 줄도 알림 영역도 그리지 않는다', () => {
+    const markup = signupCodeStep(null)
+
+    expect(expiryLine(markup)).toBeNull()
+    expect(expiryLive(markup)).toBeNull()
+  })
+
+  it('보이는 줄은 live 가 아니고, 알림은 분 경계와 만료 순간에만 낸다', () => {
+    expect(signupCodeStep(299)).not.toMatch(/<p data-code-expiry="[a-z]+"[^>]*aria-live/)
+    expect(expiryLive(signupCodeStep(299))).toBe('')
+    expect(expiryLive(signupCodeStep(240))).toBe(messages.auth.codeExpiresIn(240))
+    expect(expiryLive(signupCodeStep(0))).toBe(messages.auth.codeExpired)
+  })
+})
+
+describe('CodeStep — 긴 쿨다운 (#1309, AUTH_016)', () => {
+  it('1분 이상 남은 대기는 분으로 쓴다 — "3540초" 가 아니다', () => {
+    const markup = signupCodeStep(200, 3540)
+
+    expect(messages.auth.resendCooldown(3540)).toBe('다시 보내기 (59분 후 가능)')
+    expect(markup).toContain('다시 보내기 (59분 후 가능)')
+    expect(markup).not.toContain('3540')
+  })
+
+  it('1분 이상이면 쿨다운 알림을 분 경계에서만 낸다', () => {
+    expect(signupCodeStep(200, 3540)).toContain(
+      `<span aria-live="polite" class="sr-only">${messages.auth.resendCooldown(3540)}</span>`,
+    )
+    expect(signupCodeStep(200, 3530)).toContain('<span aria-live="polite" class="sr-only"></span>')
   })
 })

@@ -46,6 +46,7 @@ function codeStep(overrides: Partial<PasswordResetCodeStepProps> = {}) {
       errorStatus: null,
       submitting: false,
       cooldownSeconds: 0,
+      expiresInSeconds: null,
       resending: false,
       onValueChange: noop,
       onSubmit: noop,
@@ -316,5 +317,44 @@ describe('재설정 폼 — 필수 표시(*)를 그리지 않는다 (#1283)', ()
 
   it('2단계 코드 · 새 비밀번호', () => {
     expect(codeStep()).not.toMatch(REQUIRED_MARK)
+  })
+})
+
+/*
+  코드 칸 아래 만료 줄 (#1309) — 가입 2단계와 같은 컴포넌트(`CodeExpiryLine`)다. 단언은 그 줄의 태그
+  안으로 좁힌다.
+*/
+function expiryLine(markup: string): { state: string; text: string } | null {
+  const match = /<p data-code-expiry="([a-z]+)"[^>]*>([^<]*)<\/p>/.exec(markup)
+  return match ? { state: match[1] ?? '', text: match[2] ?? '' } : null
+}
+
+describe('PasswordResetCodeStep — 코드 만료 줄 (#1309)', () => {
+  it('남은 시간이 있으면 만료까지 남은 시간을 보인다', () => {
+    expect(expiryLine(codeStep({ expiresInSeconds: 300 }))).toEqual({
+      state: 'counting',
+      text: '코드는 5분 뒤 만료돼요',
+    })
+  })
+
+  it('만료되면 다시 보내기를 안내한다', () => {
+    expect(expiryLine(codeStep({ expiresInSeconds: 0 }))).toEqual({
+      state: 'expired',
+      text: messages.auth.codeExpired,
+    })
+  })
+
+  it('받은 코드가 없으면(null) 그리지 않는다', () => {
+    const markup = codeStep({ expiresInSeconds: null })
+
+    expect(expiryLine(markup)).toBeNull()
+    expect(markup).not.toContain('data-code-expiry-live')
+  })
+
+  it('만료 줄은 코드 칸 묶음 안, 새 비밀번호 칸보다 앞에 선다', () => {
+    const markup = codeStep({ expiresInSeconds: 120 })
+
+    expect(markup.indexOf('data-code-expiry=')).toBeGreaterThan(markup.indexOf('id="code"'))
+    expect(markup.indexOf('data-code-expiry=')).toBeLessThan(markup.indexOf('id="newPassword"'))
   })
 })

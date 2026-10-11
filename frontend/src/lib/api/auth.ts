@@ -1,6 +1,7 @@
 import { clientFetch, clientFetchVoid } from '@/lib/api/client'
 import { paths } from '@/lib/api/paths'
 import type { SignupConsent } from '@/lib/auth/signup-consent'
+import type { VerificationCodeSendResponse } from '@/types/auth'
 
 /**
  * 인증 API 호출부.
@@ -34,9 +35,16 @@ export function logout(): Promise<void> {
   return clientFetchVoid(paths.auth.logout, { method: 'POST' })
 }
 
-/** 가입 여부와 무관하게 항상 성공한다 — 계정 열거 방지 */
-export function sendEmailCode(email: string): Promise<void> {
-  return clientFetchVoid(paths.auth.emailSendCode, { method: 'POST', body: { email } })
+/**
+ * 가입 여부와 무관하게 항상 성공한다 — 계정 열거 방지.
+ *
+ * 응답은 코드 만료 · 재발송 대기 시간이다 (#1309) — 가입 여부와 무관하게 같은 값이다.
+ */
+export function sendEmailCode(email: string): Promise<VerificationCodeSendResponse> {
+  return clientFetch<VerificationCodeSendResponse>(paths.auth.emailSendCode, {
+    method: 'POST',
+    body: { email },
+  })
 }
 
 /** 성공하면 서버에 "이 이메일은 인증됨(30분)" 이 남는다. 토큰을 주지 않는다 */
@@ -58,10 +66,16 @@ export type PasswordResetRequest = { email: string; code: string; newPassword: s
  * 안내 메일이 나간다. 호출부가 성공/실패로 계정 존재를 판정하면 안 된다
  * (비밀번호찾기-세부명세.md D1).
  *
- * 실패는 429 둘뿐이다: `AUTH_003`(이메일당 60초) · `AUTH_016`(IP 시간당 상한).
+ * 실패는 429 둘뿐이다: `AUTH_003`(이메일당 60초) · `AUTH_016`(IP 시간당 상한). 둘 다 남은 초를
+ * `Retry-After` 로 준다 — `ApiError.retryAfterSeconds` (#1309).
+ *
+ * 응답은 가입 인증 발송과 같은 모양이다 — 코드 만료 · 재발송 대기 시간.
  */
-export function sendPasswordResetCode(email: string): Promise<void> {
-  return clientFetchVoid(paths.auth.passwordResetSendCode, { method: 'POST', body: { email } })
+export function sendPasswordResetCode(email: string): Promise<VerificationCodeSendResponse> {
+  return clientFetch<VerificationCodeSendResponse>(paths.auth.passwordResetSendCode, {
+    method: 'POST',
+    body: { email },
+  })
 }
 
 /**
