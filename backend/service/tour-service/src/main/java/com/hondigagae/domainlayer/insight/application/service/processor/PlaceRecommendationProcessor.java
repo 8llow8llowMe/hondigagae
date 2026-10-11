@@ -94,9 +94,13 @@ public class PlaceRecommendationProcessor {
         PlaceRecommendationCacheKey cacheKey = PlaceRecommendationCacheKey.builder()
             .targetDate(targetDate).today(today).warning(warning).petCondition(pet).limit(limit).build();
 
-        Optional<CachedPlaceRecommendationQueryResult> cached = placeRecommendationCachePort.find(cacheKey);
-        if (cached.isPresent()) {
-            return insightMapper.toRecommendationInfo(cached.get());
+        // 예열(refreshCache)은 캐시를 읽지 않는다. 직전에 넣은 결과가 아직 살아 있으면 적중으로 끝나 날씨 격자를 하나도
+        // 새로 받지 않기 때문이다. 쓰기 규칙(아래)은 사용자 요청과 같다 (#1388).
+        if (!query.refreshCache()) {
+            Optional<CachedPlaceRecommendationQueryResult> cached = placeRecommendationCachePort.find(cacheKey);
+            if (cached.isPresent()) {
+                return insightMapper.toRecommendationInfo(cached.get());
+            }
         }
 
         Computation computation = compute(targetDate, today, warning, pet, limit);

@@ -53,3 +53,11 @@ infra:
 snowflake:
   datacenter-id: ${SNOWFLAKE_DATACENTER_ID}
   worker-id: ${SNOWFLAKE_WORKER_ID}
+
+# 장소 추천 예열(#1388)은 dev 에서 끈다 — dev 와 prod 가 같은 기상청 serviceKey(한 쿼터)를 쓰므로,
+# dev 까지 돌면 예열만으로 하루 848건(424 × 2)을 확정으로 쓴다. dev 는 첫 호출 지연을 받아들인다.
+# 확인이 필요하면 INSIGHT_RECOMMENDATION_PREWARM_ENABLED=true 로 켠다.
+insight:
+  recommendation:
+    prewarm:
+      enabled: ${INSIGHT_RECOMMENDATION_PREWARM_ENABLED:false}

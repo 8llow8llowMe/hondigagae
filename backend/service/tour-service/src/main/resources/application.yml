@@ -110,3 +110,13 @@ insight:
     content-type-ids: ${INSIGHT_RECOMMENDATION_CONTENT_TYPE_IDS:12,14,28}
     # 특보는 키에 담겨(오늘만) 바뀌면 새로 계산하므로, 결과가 특보 조회 캐시 TTL 이상 낡지 않는다 — 적합도 한 곳 판정과 같은 한계다.
     cache-ttl-seconds: ${INSIGHT_RECOMMENDATION_CACHE_TTL_SECONDS:600}
+    # 예열 (#1388). 단기예보 격자 캐시가 낡은 직후 서버가 먼저 추천(오늘 · 반려견 조건 없음 · 기본 3곳)을 계산해 격자 캐시와
+    # 기본 조건 결과 캐시를 채운다. 그 회차 첫 홈 방문자가 기상청 왕복(키 53개, dev 실측 5.9초)을 떠안지 않게 한다.
+    # 트래픽이 없어도 회차마다 격자를 부르므로 하루 최대 424건(53 × 8)을 확정으로 쓴다 — §4-1 상한(752) 안이다.
+    # 그래서 prod 에서만 켠다(dev · local 은 프로필 yml 에서 끈다. weather-insight-integration.md §6-5).
+    prewarm:
+      enabled: ${INSIGHT_RECOMMENDATION_PREWARM_ENABLED:true}
+      # 격자 캐시 만료 = 발표 정각 + kma-api.publish-delay-minutes(10) + kma-api.cache-grace-minutes(30) = 발표시각 H:40.
+      # 그 5분 뒤인 H:45 에 돈다(Asia/Seoul). 위 두 값을 바꾸면 이것도 같이 옮긴다 — 만료 전에 돌면 캐시 적중만 하고 끝난다.
+      # 기본값끼리의 정합은 PlaceRecommendationPrewarmCronTest 가 지킨다.
+      cron: ${INSIGHT_RECOMMENDATION_PREWARM_CRON:0 45 2,5,8,11,14,17,20,23 * * *}

@@ -142,7 +142,7 @@ public class PlaceInsightWebController {
         @Parameter(description = "[선택, 기본 3] 추천 개수 (1~10). 후보가 모자라면 그보다 적게 옵니다", example = "3")
         @Min(value = 1, message = InsightValidationMessage.RECOMMENDATION_LIMIT_RANGE_INVALID)
         @Max(value = 10, message = InsightValidationMessage.RECOMMENDATION_LIMIT_RANGE_INVALID)
-        @RequestParam(defaultValue = "3") int limit
+        @RequestParam(defaultValue = "" + PlaceRecommendationQuery.DEFAULT_LIMIT) int limit
     ) {
         PlaceRecommendationQuery query = PlaceRecommendationQuery.builder()
             .targetDate(targetDate)

@@ -227,6 +227,24 @@ class PlaceRecommendationProcessorTest {
     }
 
     @Test
+    @DisplayName("예열(refreshCache)은 살아 있는 캐시를 읽지 않고 날씨까지 새로 계산해 같은 키에 다시 넣는다 (#1388)")
+    void refreshCacheBypassesReadButWrites() {
+        CachedPlaceRecommendationQueryResult cached = new CachedPlaceRecommendationQueryResult(today, null, List.of());
+        when(cachePort.find(any())).thenReturn(Optional.of(cached));
+        givenCandidates(candidate(1L, TOURIST_SPOT, 33.40d));
+        givenWeather(33.40d, mild(today));
+
+        PlaceRecommendationInfo info = processor.recommend(PlaceRecommendationQuery.prewarmToday());
+
+        assertThat(info.places()).hasSize(1);
+        verify(cachePort, never()).find(any());
+        verify(weatherForecastProcessor).dailyForecastsAt(anyDouble(), anyDouble(), any());
+        verify(cachePort).put(
+            argThat(key -> key.targetDate().equals(today) && key.today() && key.limit() == 3 && !key.petCondition().isSpecified()),
+            any(), eq(Duration.ofSeconds(600)));
+    }
+
+    @Test
     @DisplayName("계산한 결과는 설정 TTL 로 캐시에 넣는다")
     void cachesComputedResult() {
         givenCandidates(candidate(1L, TOURIST_SPOT, 33.40d));
