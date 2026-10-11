@@ -12,6 +12,7 @@ import { placeCardsEnd } from '@/lib/insight/place-cards'
 import { messages } from '@/lib/messages'
 import { suitability, suitabilityInsufficient } from '@/test/fixtures/insight'
 import { placeSummary } from '@/test/fixtures/place'
+import { readSourceWithoutComments } from '@/test/source'
 import type {
   CongestionItem,
   PlaceSuitabilityResponse,
@@ -132,6 +133,27 @@ describe('PlaceInsightCard — 사진', () => {
   /* `firstImage` 가 null 이면 카테고리 일러스트 — 장식이라 alt="" */
   it('사진이 없으면 카테고리 일러스트를 쓴다', () => {
     expect(card()).toMatch(/<img src="\/illustrations\/[^"]+" alt=""/)
+  })
+
+  /*
+    #1358 — 추천 카드 사진은 첫 화면 근처라 LCP 가 된다. 세 장 다 지연 로딩하지 않는다.
+    범위를 사진 `<img>` 여는 태그로 좁힌다 — 카드 전체에서 `loading` 을 찾으면 다른 이미지에 속는다.
+  */
+  it('사진을 지연 로딩하지 않는다 — preload 여부와 무관하다', () => {
+    const withPhoto = { ...placeSummary, firstImage: 'https://tong.visitkorea.or.kr/a.jpg' }
+    const photoTag = (markup: string) => /<img[^>]*a\.jpg[^>]*>/.exec(markup)?.[0] ?? ''
+
+    const plain = photoTag(card(suitability, withPhoto))
+    const eager = photoTag(
+      renderToStaticMarkup(
+        createElement(PlaceInsightCard, { data: suitability, place: withPhoto, preload: true }),
+      ),
+    )
+
+    expect(plain).not.toBe('')
+    expect(eager).not.toBe('')
+    expect(plain).not.toContain('loading="lazy"')
+    expect(eager).not.toContain('loading="lazy"')
   })
 
   it('일러스트도 없으면 이미지 없음 문구를 둔다', () => {
@@ -297,5 +319,19 @@ describe('PlaceInsightCardList — 틀', () => {
     expect(busy).toContain('aria-busy="true"')
     expect(busy).toContain('opacity-55')
     expect(markup).not.toContain('aria-busy')
+  })
+})
+
+/*
+  #1358 — 홈은 **첫 카드에만** `preload` 를 넘긴다. 셋 다 넘기면 캐러셀 둘째 · 셋째(화면 밖)까지
+  첫 화면 대역폭을 나눠 쓴다. `home-view.tsx` 는 훅을 써서 렌더할 수 없어 소스로 잠근다.
+*/
+describe('홈 → 첫 카드 preload (#1358)', () => {
+  const HOME = readSourceWithoutComments('src/features/home/home-view.tsx')
+
+  it('PlaceInsightCard 에 preload={index === 0} 을 넘긴다', () => {
+    const usage = /<PlaceInsightCard\b[\s\S]*?\/>/.exec(HOME)?.[0] ?? ''
+
+    expect(usage).toContain('preload={index === 0}')
   })
 })

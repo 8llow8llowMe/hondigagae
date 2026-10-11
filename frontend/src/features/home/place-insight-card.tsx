@@ -103,6 +103,7 @@ export function PlaceInsightCard({
   data,
   place,
   reason = null,
+  preload = false,
 }: {
   data: PlaceSuitabilityResponse
   /** 목록 응답의 장소. 사진·주소·실내 여부·동반 여부는 적합도 응답에 없다 */
@@ -112,6 +113,12 @@ export function PlaceInsightCard({
    * 다른 카드를 봐야 알 수 있고, 그것은 목록을 가진 쪽만 안다.
    */
   reason?: SuitabilityReasonItem | null
+  /**
+   * **사진을 미리 받는다** (`<link rel=preload>` + 높은 우선순위, #1358). 홈이 **첫 카드에만**
+   * 넘긴다 — 장소 상세 갤러리 · 코스 히어로와 같은 `preload` 관례다. 나머지 카드도 지연 로딩은
+   * 하지 않는다(아래 `Photo`). 미리 받기까지 셋 다 하면 첫 화면 대역폭을 셋이 나눠 쓴다.
+   */
+  preload?: boolean
 }) {
   const tone = suitabilityTone(data.suitabilityLevel.code)
   const crowded = crowdedLabel(data.congestion)
@@ -127,7 +134,7 @@ export function PlaceInsightCard({
         href={`/places/${data.placeId}`}
         className="focus-visible:ring-brand-500 flex h-full flex-col rounded-md focus-visible:ring-2 focus-visible:outline-none"
       >
-        <Photo place={place} allowance={allowance} />
+        <Photo place={place} allowance={allowance} preload={preload} />
 
         {/* `<a>` 는 flow content 를 담는다 — 판정 줄의 `div`(`MetricValue`)도 된다. 나머지는 `span` */}
         <span className="text-title-2 text-fg mt-3 line-clamp-2 font-semibold break-keep">
@@ -257,9 +264,11 @@ function Verdict({
 function Photo({
   place,
   allowance,
+  preload,
 }: {
   place: PlaceSummary | undefined
   allowance: string | null
+  preload: boolean
 }) {
   const url = imageSrc(place?.firstImage ?? null)
   const illustration = placeIllustration(place?.contentType.code ?? null)
@@ -274,6 +283,13 @@ function Photo({
           // 캐러셀은 뷰포트의 약 82%, 그리드는 우측 열의 1/3
           sizes="(min-width: 1024px) 320px, 82vw"
           className="object-cover"
+          /*
+            **지연 로딩하지 않는다** (#1358). 이 카드는 홈에만 서고 늘 첫 화면 근처다 — 1024 이상
+            3열 그리드는 세 장이 모두 첫 화면 안이고, 모바일 캐러셀도 둘째 장이 오른쪽에 걸쳐
+            보인다. `lazy` 로 두면 LCP 가 된 사진이 늦게 불린다(1024 실측: 둘째 장 사진이 LCP,
+            Next dev 경고). `preload` 는 `loading` 과 함께 줄 수 없어 갈라 넘긴다.
+          */
+          {...(preload ? { preload: true } : { loading: 'eager' as const })}
         />
       ) : illustration !== null ? (
         /* 사진이 없으면 카테고리 일러스트 — 장식이므로 alt="" (`lib/place/illustration.ts`) */
