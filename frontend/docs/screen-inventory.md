@@ -225,17 +225,39 @@
 
 ## 3-1. 장소 인사이트 (적합도 · 산책 위험도) — **구현 완료**
 
-| 화면           | 경로                            | API                                        | 상태                                 |
-| -------------- | ------------------------------- | ------------------------------------------ | ------------------------------------ |
-| 여행 적합도    | `/` 홈 · `/places/[placeId]` 내 | `GET /places/{placeId}/suitability`        | **구현** — 홈(#51) · 장소 상세(#64)  |
-| 산책 위험도    | `/` 홈 · `/places/[placeId]` 내 | `GET /places/{placeId}/walk-safety`        | **구현** — 홈(#51) · 장소 상세(#197) |
-| 산책 골든타임  | `/` 홈                          | `GET /insights/walk-times`                 | **구현** (#167)                      |
-| 권역 날씨 비교 | `/` 홈                          | `GET /insights/regional-weather`           | **구현** (#169)                      |
-| 기상특보 표시  | `/` 홈 · `/places/[placeId]` 내 | 적합도·산책 위험도 응답의 `weatherWarning` | **구현** (#165)                      |
-| 기간 혼잡도    | `/places/[placeId]` 내          | `GET /places/{placeId}/congestions`        | **구현** (#430)                      |
+| 화면           | 경로                            | API                                             | 상태                                                     |
+| -------------- | ------------------------------- | ----------------------------------------------- | -------------------------------------------------------- |
+| 여행 적합도    | `/places/[placeId]` 내          | `GET /places/{placeId}/suitability`             | **구현** — 장소 상세(#64). 홈(#51)은 #1380 에서 추천으로 |
+| 장소 추천      | `/` 홈                          | `GET /places/recommendations`                   | **구현** (#1380) — `오늘 갈 만한 곳`                     |
+| 산책 위험도    | `/` 홈 · `/places/[placeId]` 내 | `GET /places/{placeId}/walk-safety`             | **구현** — 홈(#51) · 장소 상세(#197)                     |
+| 산책 골든타임  | `/` 홈                          | `GET /insights/walk-times`                      | **구현** (#167)                                          |
+| 권역 날씨 비교 | `/` 홈                          | `GET /insights/regional-weather`                | **구현** (#169)                                          |
+| 기상특보 표시  | `/` 홈 · `/places/[placeId]` 내 | 적합도·산책 위험도·추천 응답의 `weatherWarning` | **구현** (#165)                                          |
+| 기간 혼잡도    | `/places/[placeId]` 내          | `GET /places/{placeId}/congestions`             | **구현** (#430)                                          |
 
 근거: tour-service `insight` 컨텍스트 / `PlaceInsightWebController` **실측**.
 이 서비스의 차별점이 담긴 응답이라 계약을 자세히 적어 둔다.
+
+**`GET /places/recommendations` — `PlaceRecommendationResponse`** (BE #1368 · FE #1380)
+
+근거: origin/develop 소스(`PlaceInsightWebController#getRecommendations` · `PlaceRecommendationItem`) ·
+`backend/docs/weather-insight-integration.md` §6-5 · dev 실호출(2026-10-11 — 200, **캐시 미스 콜드 18초**, 캐시 600초).
+
+| 필드                       | 타입                         | 화면 지침                                                                                                  |
+| -------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `targetDate`               | `LocalDate`                  | 판정 기준 일자. 홈은 `targetDate` 를 보내지 않는다 — 서버가 오늘로 잡는다                                  |
+| `weatherProviderName`      | `String`                     | 지역 공통 — 머리에 한 번                                                                                   |
+| `weatherWarning`           | `WeatherWarningItem \| null` | **오늘일 때만** 붙는다. 같은 단일 지점 특보라 홈은 최상단 띠(`pickWeatherWarning`)의 마지막 후보로만 쓴다  |
+| `items[]`                  | `PlaceRecommendationItem[]`  | **서버 순서 그대로** (점수 → `ALLOWED` → 덜 붐빔 → placeId, 유형 다양성). 없으면 `[]`(200)                 |
+| `items[].score`            | `Integer`                    | **null 이 아니다** — 점수를 못 낸 곳은 서버가 뺀다                                                         |
+| `items[].petAllowanceType` | metadata                     | `ALLOWED` · `PARTIALLY_ALLOWED` 만 — 동반 미확인은 후보에서 빠졌다                                         |
+| `items[].firstImage`       | `String`                     | 비지 않는다 (사진 있는 후보만)                                                                             |
+| 판정 조각                  | 적합도와 같은 Item           | `suitabilityLevel` · `headline` · `reasons` · `weather` · `congestion` · `indoorAlternatives` · `*Applied` |
+
+- 쿼리: 반려견 조건 7종은 **적합도와 같은 이름 · 같은 조립**(`toInsightQuery`), `limit` 1~10(기본 3, 밖이면
+  400 `INSIGHT_105`). 홈은 `limit=3` 을 늘 명시한다.
+- **서버 프리페치하지 않는다** — 콜드 18초가 첫 HTML 을 막는다(`architecture-guide.md` §9 홈 행).
+- 홈이 카드 모양으로 옮기는 규칙은 `lib/insight/recommendation.ts` 와 `features/home/홈-세부명세.md` D10.
 
 **`GET /places/{placeId}/congestions` — `PlaceCongestionResponse`** (BE PR #138 · #425)
 
