@@ -61,6 +61,10 @@ export function nearbyPlacesPath(
 
   // areaCode 는 보내지 않는다 — 반경이 이미 범위를 정한다. 둘을 함께 보내면
   // 지역 경계 밖으로 지도를 옮겼을 때 조용히 0건이 된다
+  //
+  // sigunguCode 는 보낸다 (#1320). 사용자가 고른 `지역` 이라 재검색 뒤에도 풀리면 안 된다 —
+  // 빠지면 필터 표시는 `서귀포시` 인데 결과는 반경 안 전부다. BE 는 #1316 부터 받는다
+  if (filters.sigunguCode !== null) params.set('sigunguCode', filters.sigunguCode)
   if (filters.contentType !== null) params.set('contentType', filters.contentType)
   if (filters.petAllowanceType !== null) params.set('petAllowanceType', filters.petAllowanceType)
   if (filters.indoor !== null) params.set('indoor', String(filters.indoor))
