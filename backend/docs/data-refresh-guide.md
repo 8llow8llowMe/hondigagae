@@ -592,10 +592,37 @@ UPDATE place survivor
 
 - **대상은 TourAPI 노출 행뿐이다** (`source='TOUR_API' AND merged_into_id IS NULL AND delisted_at IS NULL`).
   문화정보원 · 식약처 노출 행은 자기 적재가 두 칸을 소유한다 — 건드리지 않는다.
-- **근거 둘** — `place_pet_info`(`allowance_scope` FULL_AREA → ALLOWED, PARTIAL · OUTDOOR_ONLY → PARTIALLY_ALLOWED)와
-  이 행으로 **흡수된 행**(`merged_into_id = 이 행`, delisted 아닌 것)의 값. UNKNOWN 은 근거가 아니다.
+- **근거 셋** — `place_pet_info`(`allowance_scope` FULL_AREA → ALLOWED, PARTIAL · OUTDOOR_ONLY → PARTIALLY_ALLOWED),
+  이 행으로 **흡수된 행**(`merged_into_id = 이 행`, delisted 아닌 것)의 값, 그리고 하위 시설이면 **본 시설의 결과 중 제한**
+  (아래 "하위 시설", #1340). UNKNOWN 은 근거가 아니다.
 - **결과는 가장 제한적인 값** — NOT_ALLOWED > PARTIALLY_ALLOWED > ALLOWED, SMALL_ONLY > SMALL_MEDIUM > ALL.
   근거가 없으면 UNKNOWN. `place_pet_info` 가 없는 곳을 NOT_ALLOWED 로 만들지 않는다.
+- **하위 시설은 본 시설의 제한을 받는다** (#1340). 문화정보원 행은 TourAPI 행 **하나에만** 흡수되므로, 본 시설이 흡수 행으로
+  받은 "야외만" 이 같은 곳의 매장 행에는 닿지 않았다 — `생각하는 정원`(125445)은 PARTIALLY_ALLOWED 인데 28m 옆
+  `생각하는 정원[면세점(TAX REFUND SHOP)]`(4054291, 쇼핑)은 자기 근거 FULL_AREA 뿐이라 ALLOWED 로 보였다. 그래서 두 단계로 계산한다.
+  1. 모든 대상 행을 자기 근거(동반 정보 · 흡수 행)로 계산한다.
+  2. 하위 시설 행은 본 시설의 1단계 결과가 PARTIALLY_ALLOWED · NOT_ALLOWED 일 때 그것을 근거로 더해 동반 구분을 다시 고른다.
+     본 시설 후보가 여럿이면 모두 본다(가장 제한적인 값). 자기 근거가 없는 하위 시설도 받는다 — `생각하는정원(청원)`
+     (2907434, 58m)은 UNKNOWN → PARTIALLY_ALLOWED.
+  - **하위 시설 판정**(`PlaceIdentityPolicy.isSubFacilityOf`) — 본 시설 이름에는 `(` · `[` 가 없고 하위 시설 이름에는 있으며,
+    수식어를 걷은 정규화 이름(`PlaceNameMatcher.normalize`)이 같고, **100m**(`SUB_FACILITY_RADIUS_M`) 안이다. prod 실측 쌍 4개가
+    모두 0~58m 였다. 둘 다 수식어가 없으면 같은 이름의 두 행(병합이 볼 일)이고, 둘 다 있으면 형제 하위 시설이라 서로 물려주지 않는다.
+    좌표 없는 행은 판정하지 않는다. 대상은 위와 같은 TourAPI 노출 행끼리다.
+  - **방향은 본 시설 → 하위 시설 하나뿐**이고 **근거가 있는 구분은 좁히기만 한다.** 하위 시설이 더 제한적이어도 본 시설은 그대로다. 본 시설이
+    UNKNOWN 이면 영향이 없고, **본 시설의 ALLOWED 도 물려주지 않는다** — 근거 없는 실내 매장이 본 시설 덕에 "동반 가능" 으로
+    보이면 같은 오해가 반대 경로로 생긴다. 1단계 결과만 물려주므로 상속이 이어지지 않는다.
+  - **동반 구분만 물려준다.** 크기 제한(`allowed_pet_size`)과 `place_pet_info` 의 제한 문구는 하위 시설 자기 근거 그대로다 —
+    본 시설의 크기 제한이 매장에도 맞는다는 근거가 없다(범위 최소화).
+  - **한계.** 괄호가 시설이 아니라 지역 표기(`관덕정(제주)` 꼴)여도 100m 안에 같은 이름의 본 시설이 있으면 하위 시설로 본다 —
+    거리로만 거른다. 이름 정규화는 SQL 이 아니라 Java 가 한다(병합 판정과 같은 구현, MySQL 정규식과 동작이 다르다).
+  - **근거 없는 하위 시설은 `pet_available` 이 true 가 된다.** UNKNOWN → PARTIALLY_ALLOWED 라 아래 규칙대로 `pet_available` 도
+    false → true 다. 그래서 `실내 = true` 인 하위 시설이면 비 오는 날 실내 대안 · `PARTIALLY_ALLOWED` 필터에 새로 나올 수 있다.
+    본 시설이 "야외만" 이면 실내 매장은 실제로 동반이 안 되는 곳일 수 있으므로, 구분은 맞지만 실내 대안으로는 느슨하다.
+    prod 기준 해당 행은 `생각하는정원(청원)` 하나이고 `indoor` 가 비어 있어 실내 대안에는 나오지 않는다. 본 시설 제한 범위
+    (야외만 등)를 실내 대안 판정에 넣는 것은 이 절 범위 밖이다.
+  - **본 시설이 다른 이름의 행에 흡수되면** 그 제한은 하위 시설에 닿지 않는다 — 본 시설 후보는 살아 있는 행에서만 고른다.
+  - **상세의 원문은 구분과 다를 수 있다.** 장소 상세 `petInfo` 는 `place_pet_info` 원문을 그대로 내므로 면세점은 여전히 "전 구역" 으로
+    보이고, 동반 구분만 PARTIALLY_ALLOWED 가 된다. 본 시설 125445 가 이미 그런 모양(원문 FULL_AREA · 구분 PARTIALLY_ALLOWED)이다.
 - **`pet_available` 은 결과 동반 구분을 따른다** — ALLOWED · PARTIALLY_ALLOWED 면 true, NOT_ALLOWED · UNKNOWN 이면 false.
   TourAPI 적재가 이 칸을 INSERT 리터럴 false 로만 넣어서, 비 오는 날 실내 대안(`petAvailable = true`)이 동반이 확인된
   TourAPI 장소를 고르지 못하고 상세에 `petAvailable=false` 와 `ALLOWED` 가 함께 나가던 것을 맞춘다.
@@ -606,7 +633,23 @@ UPDATE place survivor
   `allowed_pet_size` 채우기(survivor 가 UNKNOWN 일 때만)는 재계산이 흡수 행을 근거로 쓰므로 걷었다.
 
 완료 로그(재계산 뒤 대상 전체의 분포와 이번에 바뀐 행 수):
-`pet allowance reflected. targets=…, changed=…, ALLOWED=…, PARTIALLY_ALLOWED=…, NOT_ALLOWED=…, UNKNOWN=…, sizeRestricted=…`.
+`pet allowance reflected. targets=…, changed=…, ALLOWED=…, PARTIALLY_ALLOWED=…, NOT_ALLOWED=…, UNKNOWN=…, sizeRestricted=…, inherited=…`.
+`inherited` 는 본 시설의 제한을 받아 자기 근거만의 값보다 좁아진 하위 시설 수다(#1340) — 매 실행 다시 판정하므로 두 번째 실행에서도
+같은 값이고, 그때 `changed` 는 0 이다. 그런 행마다 한 줄씩 `pet allowance inherited from parent facility. placeId=…, parentIds=[…],
+own=…, inherited=…` 도 남는다.
+
+**코드 수정이 dev/prod 값에 반영되는 시점** — 이 스텝이 다음에 돌 때다. dev 는 스케줄러가 켜져 있어 다음 월요일 03:00 KST
+`placeDataPipelineJob` 이 두 번(병합 뒤 · 반려동물 뒤) 돌린다. **prod 는 `BATCH_SCHEDULE_ENABLED` 기본 false 라(compose `:-false`) 켜 두지 않았다면 저절로 돌지 않는다.**
+기다리지 않으려면 `placeMergeJob` 을 손으로 돌린다 — 공공 API 를 부르지 않고(병합은 DB 만 본다, 이미 병합된 행은 후보에서 빠져 멱등)
+마지막 단계로 이 스텝을 돈다. `petTourImportJob` 도 같은 스텝을 돌지만 동반여행 API 를 330콜 부른다.
+
+```powershell
+java -jar $jar `
+  --spring.main.web-application-type=none `
+  --spring.batch.job.enabled=true `
+  --spring.batch.job.name=placeMergeJob `
+  areaCode=39 runAt=$runAt
+```
 
 2026-09-28 dev 모의(설계 명세 §1, 같은 규칙의 SQL)로는 ALLOWED 342 · PARTIALLY_ALLOWED 39 · NOT_ALLOWED 29 ·
 UNKNOWN 1,685 가 나와야 한다. 모의는 흡수 행의 `delisted_at` 을 거르지 않았으므로 실제 값이 조금 작을 수 있다.
@@ -645,6 +688,10 @@ SELECT pet_allowance_type, allowed_pet_size, pet_available, COUNT(*)
   FROM place
  WHERE source = 'TOUR_API' AND merged_into_id IS NULL AND delisted_at IS NULL
  GROUP BY pet_allowance_type, allowed_pet_size, pet_available ORDER BY 4 DESC;
+
+-- 하위 시설 상속 확인 (#1340) — 생각하는 정원 세 행이 모두 PARTIALLY_ALLOWED 여야 한다
+SELECT id, title, pet_allowance_type, allowed_pet_size, pet_available
+  FROM place WHERE id IN (125445, 4054291, 2907434);
 
 -- 근거가 있는데 UNKNOWN 으로 남은 행 — 0 이어야 한다 (재계산이 안 돌았거나 규칙이 어긋난 것이다)
 SELECT COUNT(*) unreflected
