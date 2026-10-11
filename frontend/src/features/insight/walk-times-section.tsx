@@ -7,7 +7,12 @@ import { METRIC_WORD_TONE } from '@/components/metric'
 import { Skeleton } from '@/components/skeleton'
 import { WalkTimesCurve } from '@/components/walk-times-curve'
 import type { GoldenWindowRun } from '@/lib/insight/golden-window'
-import { describeGoldenWindow, formatHourRuns, SAFE_CODE } from '@/lib/insight/golden-window'
+import {
+  describeGoldenWindow,
+  formatHourRuns,
+  lacksSafeHour,
+  SAFE_CODE,
+} from '@/lib/insight/golden-window'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -137,6 +142,16 @@ export function WalkTimesSection({
   const status = goldenWindowStatusOf(data)
   // 곡선이 비는 날(`hourly: []`)은 버튼도 세우지 않는다 — 열어도 아무것도 없는 버튼이다
   const curveToggle = collapseCurveOnMobile && data.hourly.length > 0
+  /*
+    **창 안에 안전 시각이 없는 날은 제목이 `나은 시간` 이다** (#1362). 그날 `좋은 시간` 아래에
+    `이 시간대는 내내 주의 등급이에요` 가 서면 제목과 문장이 반대 말을 한다. 창을 준 날(`AVAILABLE`)
+    만 본다 — 다른 갈래는 문장이 이미 "추천하지 않아요" 라고 답한다.
+  */
+  const heading =
+    status === 'AVAILABLE' &&
+    lacksSafeHour(describeGoldenWindow(data.hourly, data.goldenStart, data.goldenEnd))
+      ? messages.home.goldenHeadingRelative
+      : messages.home.goldenHeading
 
   return (
     /*
@@ -148,7 +163,7 @@ export function WalkTimesSection({
       **특보 배지가 여기 없다** (#349). 페이지 최상단 `WeatherWarningStrip` 하나가
       말한다 — 그래야 감싸던 flex 줄도 함께 사라진다.
     */
-    <section aria-label={messages.home.goldenHeading} className="border-border border-t">
+    <section aria-label={heading} className="border-border border-t">
       <div className="flex flex-col gap-3 px-4 py-4 md:px-5 md:py-5">
         {/*
           **카드가 아니라 카드 안의 블록이다** (#428). 판정과 같은 카드에 산다 — 갈라
@@ -183,7 +198,7 @@ export function WalkTimesSection({
           */
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
-              {messages.home.goldenHeading}
+              {heading}
             </h2>
             <button
               type="button"
@@ -202,7 +217,7 @@ export function WalkTimesSection({
           </div>
         ) : (
           <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
-            {messages.home.goldenHeading}
+            {heading}
           </h2>
         )}
 

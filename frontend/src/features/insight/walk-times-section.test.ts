@@ -1369,3 +1369,48 @@ describe('WalkTimesSection — 모바일 곡선 접기 (#1356)', () => {
     expect(render(GOOD_DAY)).not.toContain(messages.home.goldenCurveToggle)
   })
 })
+
+/*
+  #1362 — 창 안에 안전 시각이 없는 날 제목이 `좋은 시간` 이라고 말하지 않는다. dev 2026-10-11:
+  `오늘 산책하기 좋은 시간` / `12:00 – 23:00` / `이 시간대는 내내 주의 등급이에요`.
+*/
+describe('WalkTimesSection — 안전 시각이 없는 창의 제목 (#1362)', () => {
+  /** GOOD_DAY 의 시각을 전부 주의로 — 창은 서버가 준 그대로다 */
+  const ALL_CAUTION_DAY: WalkTimesResponse = {
+    ...GOOD_DAY,
+    hourly: GOOD_DAY.hourly.map((item) => ({
+      ...item,
+      walkSafetyLevel: { ...item.walkSafetyLevel, code: 'CAUTION', name: '주의' },
+    })),
+  }
+  const headingOf = (markup: string) => /<h2[^>]*>([^<]*)<\/h2>/.exec(markup)?.[1]
+
+  it('전부 주의인 창은 제목이 나은 시간이다 — 섹션 접근 이름도 같다', () => {
+    const markup = render(ALL_CAUTION_DAY)
+
+    expect(headingOf(markup)).toBe(messages.home.goldenHeadingRelative)
+    expect(markup).toContain(`aria-label="${messages.home.goldenHeadingRelative}"`)
+  })
+
+  it('안전 시각이 있는 날은 평소 제목이다', () => {
+    expect(headingOf(render(GOOD_DAY))).toBe(messages.home.goldenHeading)
+  })
+
+  /* 다른 갈래는 문장이 "추천하지 않아요" 라고 답한다 — 제목은 평소대로 질문을 건다 */
+  it('추천 보류 · 전부 위험인 날은 평소 제목이다', () => {
+    expect(headingOf(render(SUPPRESSED_DAY))).toBe(messages.home.goldenHeading)
+    expect(headingOf(render(ALL_RISKY_DAY))).toBe(messages.home.goldenHeading)
+  })
+
+  it('모바일 접힘 갈래(제목 줄 버튼)에서도 같은 제목이다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(WalkTimesSection, {
+        data: ALL_CAUTION_DAY,
+        basis: 'current',
+        collapseCurveOnMobile: true,
+      }),
+    )
+
+    expect(headingOf(markup)).toBe(messages.home.goldenHeadingRelative)
+  })
+})

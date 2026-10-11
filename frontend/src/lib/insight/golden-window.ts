@@ -220,3 +220,18 @@ export function formatHourRuns(runs: readonly (readonly [number, number])[]): st
 function hourOf(at: string): number {
   return Number.parseInt(at.slice(11, 13), 10)
 }
+
+/**
+ * 창 안에 **안전 시각이 하나도 없는가** (#1362) — 제목이 `좋은 시간` 이라고 말해도 되는지.
+ *
+ * 서버가 창을 줬어도 그 안이 전부 `주의` 인 날이 있다. 그날 `오늘 산책하기 좋은 시간` 아래에
+ * `이 시간대는 내내 주의 등급이에요` 가 서면 제목과 문장이 반대 말을 한다 — 골든타임-문구 D0 이
+ * 등급이 섞인 날에 대해 푼 모순의 남은 갈래다. 그날만 제목이 `나은 시간` 이 된다.
+ *
+ * **모르는 것을 나쁜 것으로 말하지 않는다.** 판단 근거 부족(`UNKNOWN`)만 있는 창은 `worst` 가
+ * `null` 이라 여기서 `false` 다 — 평소 제목 그대로다. 창 안 시각이 없을 때(응답 불일치)도 같다.
+ */
+export function lacksSafeHour({ runs, worst }: GoldenWindowDescription): boolean {
+  if (worst === null || worst.code === SAFE_CODE) return false
+  return !runs.some((run) => run.code === SAFE_CODE)
+}
