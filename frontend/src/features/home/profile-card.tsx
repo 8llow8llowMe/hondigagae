@@ -241,14 +241,21 @@ function RegisterPrompt() {
       )}
     >
       {/*
-        390 에서 제목·설명이 두 줄로 접히고 버튼은 세로 중앙이다 (D1). 한국어 실데이터가
+        버튼은 세로 중앙이다 (D1). 모바일은 제목 한 줄 + 버튼이다(#1360 — 아래 설명은 `md` 이상). 한국어 실데이터가
         길어도 `min-w-0` 이 버튼을 밀어내지 않는다.
       */}
       <p className="min-w-0 flex-1">
         <span className="text-body-1 text-fg block font-semibold">
           {messages.home.guestProfileTitle}
         </span>
-        <span className="text-body-2 text-fg-muted block">{messages.home.guestProfileDesc}</span>
+        {/*
+          **설명은 `md` 이상만이다** (#1360). 375 에서 설명이 두 줄로 접혀 이 줄이 101px 이 됐고, 그만큼
+          첫 장소 카드가 접힘선 밖으로 밀렸다. 제목(`우리 아이 기준으로 보려면`)과 버튼(`반려견 등록`)
+          만으로 이유와 할 일이 한 줄에 읽힌다 — 설명은 그 이유의 예시라 좁은 폭에서 먼저 뺀다.
+        */}
+        <span className="text-body-2 text-fg-muted hidden md:block">
+          {messages.home.guestProfileDesc}
+        </span>
       </p>
       {/*
         미로그인이면 `proxy.ts` 가 `/login?returnTo=%2Fpets%2Fnew` 로 보낸다 — 여기서

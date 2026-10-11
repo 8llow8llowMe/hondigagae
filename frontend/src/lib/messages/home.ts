@@ -77,6 +77,11 @@ export const homeMessages = {
    */
   goldenCurveToggle: '시간대별 기온 · 노면 보기',
   /**
+   * 위 버튼의 **보이는 글자** (#1360 — 버튼이 제목 줄 오른쪽으로 갔다). 접근 이름은 위의 긴 문장이고,
+   * 보이는 글자로 시작해야 한다(WCAG 2.5.3 label-in-name) — `walk-times-section.test.ts` 가 잠근다.
+   */
+  goldenCurveToggleShort: '시간대별',
+  /**
    * 무엇을 기준으로 잰 곡선인지 밝힌다 (#180).
    *
    * **위치를 못 얻었을 때 그 사실을 감추지 않는다.** 다만 거부·타임아웃·미지원을 구분해

@@ -82,6 +82,23 @@ describe('ProfileCard — 반려견이 0마리인 갈래', () => {
   })
 
   /*
+    #1360 — 375 에서 설명이 두 줄로 접혀 이 줄이 101px 이 됐고 첫 장소 카드를 접힘선 밖으로 밀었다.
+    모바일은 제목 + 버튼 한 줄. 범위를 설명을 감싼 여는 태그로 좁힌다.
+  */
+  it('설명은 md 이상에서만 보인다 — 제목은 모든 폭이다', () => {
+    const tagOf = (text: string) => {
+      const at = markup.indexOf(text)
+      return markup.slice(
+        markup.lastIndexOf('<span', at),
+        markup.indexOf('>', markup.lastIndexOf('<span', at)) + 1,
+      )
+    }
+
+    expect(tagOf(messages.home.guestProfileDesc)).toMatch(/class="[^"]*\bhidden md:block\b/)
+    expect(tagOf(messages.home.guestProfileTitle)).not.toContain('hidden')
+  })
+
+  /*
     **행 전체가 링크였다.** 제목·설명까지 `<a>` 안에 있으면 버튼과 같은 목적지가 포커스를
     두 번 받는다 (D4). 이제 링크는 버튼 하나다.
   */
