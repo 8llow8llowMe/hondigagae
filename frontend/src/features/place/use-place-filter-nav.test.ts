@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { placeFilterHref } from '@/features/place/use-place-filter-nav'
-import { DEFAULT_PLACE_FILTERS } from '@/lib/url/place-filters'
+import { DEFAULT_PLACE_FILTERS, PLACES_DEFAULT_FILTERS } from '@/lib/url/place-filters'
 import { PLACES_DEFAULT_VIEW, PLAN_ADD_DEFAULT_VIEW } from '@/lib/url/view-mode'
 import type { PlaceFilters } from '@/types/place'
 
@@ -11,7 +11,7 @@ import type { PlaceFilters } from '@/types/place'
  * `/places` 의 기본 보기는 지도라(`PLACES_DEFAULT_VIEW`) 목록은 `?view=list` 로만 존재한다.
  * 조건만 새로 직렬화하면 그 키가 통째로 사라져 페이지가 지도로 되돌아갔다.
  */
-const withRegion: PlaceFilters = { ...DEFAULT_PLACE_FILTERS, sigunguCode: '4' }
+const withRegion: PlaceFilters = { ...PLACES_DEFAULT_FILTERS, sigunguCode: '4' }
 
 describe('placeFilterHref', () => {
   it('목록 보기에서 필터를 바꿔도 view=list 가 남는다 — 이것이 사라지면 지도로 튄다', () => {
@@ -22,16 +22,41 @@ describe('placeFilterHref', () => {
   })
 
   it('목록 보기에서 필터를 전부 풀어도 view=list 가 남는다 — 초기화도 보기를 바꾸지 않는다', () => {
-    expect(placeFilterHref('/places', DEFAULT_PLACE_FILTERS, 'list')).toBe('/places?view=list')
+    expect(placeFilterHref('/places', PLACES_DEFAULT_FILTERS, 'list')).toBe('/places?view=list')
   })
 
   it('지도 보기는 기본값이라 view 를 URL 에 적지 않는다 — 빈 URL 이 곧 지도다', () => {
-    expect(placeFilterHref('/places', DEFAULT_PLACE_FILTERS, 'map')).toBe('/places')
+    expect(placeFilterHref('/places', PLACES_DEFAULT_FILTERS, 'map')).toBe('/places')
     expect(placeFilterHref('/places', withRegion, 'map')).not.toContain('view=')
   })
 
   it('지도 보기에서 필터를 바꿔도 조건은 그대로 실린다', () => {
     expect(placeFilterHref('/places', withRegion, 'map')).toContain('sigunguCode=4')
+  })
+})
+
+/**
+ * `/places` 의 기본 조건은 `동반 가능만`이다 (#1379). 생략할 기본값을 **경로가** 정한다 —
+ * 같은 훅을 쓰는 담기 화면은 공용 기본값(동반 축 미지정) 그대로다.
+ */
+describe('placeFilterHref — 화면별 기본 조건 (#1379)', () => {
+  const PLAN_ADD = '/plans/223456789012000001/days/1/add'
+
+  it('/places 에서 동반 가능만은 기본이라 주소에 적지 않는다', () => {
+    expect(placeFilterHref('/places', PLACES_DEFAULT_FILTERS, 'map')).toBe('/places')
+  })
+
+  it('/places 에서 동반 축을 끄면 ALL 로 적는다 — 빈 URL 은 동반 가능만이라 적을 자리가 따로 없다', () => {
+    expect(placeFilterHref('/places', DEFAULT_PLACE_FILTERS, 'map')).toBe(
+      '/places?petAllowanceType=ALL',
+    )
+  })
+
+  it('담기 화면은 공용 기본값 — 동반 축을 끈 상태가 빈 URL 이다', () => {
+    expect(placeFilterHref(PLAN_ADD, DEFAULT_PLACE_FILTERS, 'map')).toBe(PLAN_ADD)
+    expect(placeFilterHref(PLAN_ADD, PLACES_DEFAULT_FILTERS, 'map')).toBe(
+      `${PLAN_ADD}?petAllowanceType=ALLOWED`,
+    )
   })
 })
 
@@ -73,7 +98,7 @@ describe('placeFilterHref — 담기 화면 경로 (#1012)', () => {
  * 반려견을 바꿔 체구 필터를 맞출 때만 남긴다 (장소-반려견칩-세부명세 D1-2, #1301).
  */
 describe('placeFilterHref — 미리보기 (#1301)', () => {
-  const large: PlaceFilters = { ...DEFAULT_PLACE_FILTERS, petSizeType: 'LARGE' }
+  const large: PlaceFilters = { ...PLACES_DEFAULT_FILTERS, petSizeType: 'LARGE' }
 
   it('previewId 를 주지 않으면 place 를 싣지 않는다', () => {
     expect(placeFilterHref('/places', large, 'map')).toBe('/places?petSizeType=LARGE')

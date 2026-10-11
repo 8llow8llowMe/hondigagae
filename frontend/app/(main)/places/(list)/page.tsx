@@ -17,7 +17,11 @@ import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import { pageMetadata } from '@/lib/seo/page-metadata'
-import { parsePlaceFilters, toPlaceFilterQuery } from '@/lib/url/place-filters'
+import {
+  parsePlaceFilters,
+  PLACES_DEFAULT_FILTERS,
+  toPlaceFilterQuery,
+} from '@/lib/url/place-filters'
 import { PLACE_PREVIEW_KEY, readPlacePreviewParam } from '@/lib/url/place-preview'
 import { parseViewMode, PLACES_DEFAULT_VIEW, viewModeHref } from '@/lib/url/view-mode'
 import type { PlaceDetail } from '@/types/place'
@@ -36,7 +40,8 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 export default async function PlacesPage({ searchParams }: { searchParams: SearchParams }) {
   const resolved = await searchParams
-  const filters = parsePlaceFilters(resolved)
+  /* **이 화면의 기본 조건은 `동반 가능만`이다** (#1379) — 빈 URL 이 그 상태다. `ALL` 이 끈 상태 */
+  const filters = parsePlaceFilters(resolved, PLACES_DEFAULT_FILTERS)
   /*
     **공개 화면인데 로그인 여부가 필요하다** (#200). 필터의 반려견 크기 축이 내 반려견을
     기준으로 걸러서, 필터 컴포넌트가 보호 리소스(`GET /members/me/pets`)를 조회한다.
@@ -50,7 +55,7 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
     넘겨야 한다. 어긋나면 토글이 가리키는 보기와 페이지가 그리는 보기가 달라진다.
   */
   const view = parseViewMode(resolved, PLACES_DEFAULT_VIEW)
-  const filterQuery = toPlaceFilterQuery(filters)
+  const filterQuery = toPlaceFilterQuery(filters, PLACES_DEFAULT_FILTERS)
   const listHref = viewModeHref('/places', filterQuery, 'list', PLACES_DEFAULT_VIEW)
   const mapHref = viewModeHref('/places', filterQuery, 'map', PLACES_DEFAULT_VIEW)
 
