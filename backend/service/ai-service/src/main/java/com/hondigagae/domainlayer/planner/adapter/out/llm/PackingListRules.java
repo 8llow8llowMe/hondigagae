@@ -3,16 +3,20 @@ package com.hondigagae.domainlayer.planner.adapter.out.llm;
 import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
+import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.domain.model.PackingList.PackingItem;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +38,11 @@ import lombok.extern.slf4j.Slf4j;
  *       이유에 그 수치를 적는다. 모델이 조건 밖에서 적은 같은 종류는 버린다</li>
  *   <li><b>그 밖의 품목은 목록 안에서만 받는다.</b> 실제로 파는 반려견 여행 용품의 낱말 목록
  *       ({@link #EXTRAS})에 걸리지 않으면 버린다. 걸려도 이유의 날씨 문장이 예보와 어긋나면 그 문장을 걷고,
- *       걷은 뒤 남는 이유가 없으면 품목을 버린다. 처음부터 이유가 없던 품목은 남긴다 — 틀린 말을 한 것이 아니다</li>
+ *       걷은 뒤 남는 이유가 없으면 품목을 버린다</li>
+ *   <li><b>이유는 이 여행의 사실에서 그 물건이 하는 일로 이어져야 한다 (#1336).</b> 이유가 일정(일차 · 장소) ·
+ *       예보 수치 · 반려견 특성 중 아무것도 가리키지 않으면 버린다 — 이유가 없는 품목도 같다. 가리켜도 그 물건의
+ *       쓰임({@link #PURPOSES})과 이어지는 말이 없으면 버린다. prod 의 "2일차 중문색달해수욕장에서 그늘이 필요하므로
+ *       담요", "해수욕장에서 물에 젖을 수 있으니 이동장" 은 사실을 가리키지만 물건과 이어지지 않는다</li>
  * </ol>
  *
  * <p><b>순서는 이 여행에만 해당하는 것부터다</b> — 날씨 품목, 모델 품목, 기본 품목. 일정 상세의 요약 카드가
@@ -117,12 +125,100 @@ final class PackingListRules {
 
     private static final Pattern SENTENCE_BOUNDARY = Pattern.compile("(?<=[.!?])\\s+");
 
+    /* ---- 이유가 이 여행의 사실을 가리키는가 (#1336) ---- */
+
+    /** "2일차" · "1~3일차". 일차가 여행 기간 안이어야 사실이다 — 범위면 끝도 안이어야 한다. */
+    private static final Pattern DAY_MENTION = Pattern.compile("(\\d{1,2})\\s*(?:~\\s*(\\d{1,2})\\s*)?일차");
+
+    /**
+     * 예보 수치를 가리키는 말. 예보가 있을 때만 사실이다 — 없는데 적은 수치는 지어낸 것이다. {@code 예보} 한 낱말은
+     * 넣지 않는다 — "날씨 예보를 미리 확인해요" 는 아무 수치도 가리키지 않는다.
+     */
+    private static final Pattern WEATHER_MENTION =
+        Pattern.compile("강수\\s*확률|\\d+\\s*%|\\d+(?:\\.\\d+)?\\s*℃|기온|풍속|m/s");
+
+    /**
+     * 장소 이름의 최소 길이. 전체 이름에도 토막에도 같다 — "이동" 같은 짧은 제목이나 "카페" · "공원" 같은 두 글자
+     * 토막은 어느 이유에나 걸린다. 그래서 두 글자 장소("우도")는 이름으로 잡지 못한다.
+     */
+    private static final int PLACE_TOKEN_MIN_LENGTH = 3;
+
+    /** 장소 이름 토막이어도 장소를 가리키지 않는 말. 반려동물 동반 장소 이름에 흔하다. */
+    private static final Set<String> PLACE_TOKEN_STOPWORDS = Set.of(
+        "반려견", "애견", "강아지", "반려동물", "동반", "제주도", "제주시", "서귀포", "서귀포시", "해수욕장", "리조트",
+        "게스트하우스", "펜션", "호텔", "카페", "놀이터", "운동장");
+
+    /**
+     * 이유의 장소 종류 낱말 ↔ 일정 장소 이름의 낱말. "해변 일정 뒤 발을 닦아요" 는 장소 이름을 옮기지 않았어도
+     * 일정에 해수욕장이 있으면 그 일정을 가리킨다. 일정에 그런 장소가 없으면 지어낸 말이다 — 일차를 함께 적었어도
+     * 버린다("2일차 협재해수욕장에서…" 를 해변 없는 일정에 적은 경우).
+     */
+    private static final List<PlaceKind> PLACE_KINDS = List.of(
+        new PlaceKind(Pattern.compile("해변|바다|바닷가|해수욕|해안|모래사장"),
+            Pattern.compile("해수욕장|해변|해안|바다|포구|모래")),
+        new PlaceKind(Pattern.compile("숲|오름|휴양림|곶자왈|산책로|둘레길|등산"),
+            Pattern.compile("숲|오름|휴양림|곶자왈|산책로|둘레길|한라산")),
+        new PlaceKind(Pattern.compile("올레"), Pattern.compile("올레")),
+        new PlaceKind(Pattern.compile("카페"), Pattern.compile("카페")),
+        new PlaceKind(Pattern.compile("숙소|숙박|호텔|펜션|리조트"),
+            Pattern.compile("호텔|펜션|리조트|스테이|민박|게스트하우스|숙소")));
+
+    /**
+     * 품목 종류 → 그 물건이 하는 일과 이어지는 말. 이유에 이 말이 하나도 없으면 사실과 물건이 이어지지 않은 것이다.
+     * 종류 낱말 자체는 지우고 본다 — "이동장이 필요해요" 의 {@code 이동} 이 쓰임으로 읽히면 안 된다.
+     *
+     * <p><b>한 글자 낱말은 활용형으로 좁힌다.</b> {@code 쉬} 는 "젖기 쉬우니", {@code 잠} 은 "잠시", {@code 거리} 는
+     * "볼거리", {@code 침} 은 "아침", {@code 발} 은 "출발", {@code 코} 는 "코스", {@code 비} 는 "비행기" 에 걸려
+     * prod 와 같은 따로 노는 이유를 통과시켰다.
+     *
+     * <p>목록에 없는 종류(인식표 · 구급 · 장난감 …)는 쓰임을 보지 않는다. 쓰임이 넓어 낱말로 묶이지 않는다.
+     * 낱말이 모자라 좋은 이유가 버려지면(로그 {@code LLM packing item replaced or dropped}) 낱말을 더한다.
+     */
+    private static final List<Purpose> PURPOSES = List.of(
+        new Purpose(Pattern.compile("담요|방석|매트"), Pattern.compile(String.join("|",
+            "보온", "따뜻", "체온", "추위", "추운", "쌀쌀", "바람", "쉬게", "쉬어", "쉴", "쉼", "휴식", "잠자", "잠들",
+            "잠을", "낮잠", "눕", "깔", "바닥", "차량", "차 안", "차에서", "이동\\s*중", "낯선", "익숙", "냄새", "안정",
+            "편하", "편안"))),
+        new Purpose(Pattern.compile("이동장|켄넬|(펫|반려견|강아지)\\s*캐리어|이동\\s*가방|슬링백|개모차|유모차"),
+            Pattern.compile(String.join("|",
+                "이동", "차량", "차 안", "차에", "차로", "차를", "자동차", "렌터카", "드라이브", "버스", "비행기", "항공",
+                "기내", "여객선", "선박", "배편", "배를", "탑승", "대중교통", "실내", "카페", "식당", "숙소", "매장", "입장",
+                "안정", "쉬게", "쉬어", "쉴", "쉼", "휴식", "안아", "오래 걷", "많이 걷", "지치", "체력", "장거리",
+                "이동\\s*거리", "먼\\s*거리", "km", "킬로",
+                "관절", "낯선", "붐비", "혼잡", "사람이 많"))),
+        new Purpose(Pattern.compile("수건|타월"), Pattern.compile(String.join("|",
+            "물", "젖", "바다", "해변", "해수욕", "계곡", "폭포", "목욕", "(?<![가-힣])비\\s*(가|에|를|예보|소식)", "빗",
+            "씻", "닦", "모래", "땀", "(?<!출)발", "수영", "말리"))),
+        new Purpose(Pattern.compile("물티슈"), Pattern.compile(String.join("|",
+            "닦", "(?<!출)발", "입가", "입 주변", "침을", "침이", "오염", "더러", "모래", "흙", "위생", "식사", "간식",
+            "배변", "털", "눈곱", "눈물", "얼굴", "청결", "흘", "정리"))),
+        new Purpose(Pattern.compile("진드기|해충|벌레|기피제"), Pattern.compile(String.join("|",
+            "풀", "숲", "오름", "잔디", "들판", "초원", "공원", "올레", "곶자왈", "야외", "자연", "정원", "목장", "농장",
+            "트레킹", "탐방로", "둘레길", "산책로", "등산", "모기"))),
+        new Purpose(Pattern.compile("구명|라이프\\s*(재킷|자켓)"), Pattern.compile(String.join("|",
+            "바다", "해변", "해수욕", "물", "수영", "카약", "요트", "보트", "선박", "여객선", "배를", "계곡", "패들",
+            "서핑", "스노클"))),
+        new Purpose(Pattern.compile("발\\s*세정|발\\s*클리너|신발|발\\s*보호"), Pattern.compile(String.join("|",
+            "(?<!출)발", "모래", "해변", "흙", "바닥", "자갈", "현무암", "돌", "산책", "오름", "길", "뜨거운",
+            "아스팔트", "진흙"))),
+        new Purpose(Pattern.compile("선크림|자외선"), Pattern.compile(String.join("|",
+            "햇볕", "햇빛", "해변", "야외", "그늘", "피부", "코(?!스)", "털", "맑", "한낮"))),
+        new Purpose(Pattern.compile("멀미"), Pattern.compile(String.join("|",
+            "차량", "차 안", "차에", "차로", "자동차", "렌터카", "드라이브", "버스", "이동", "비행기", "여객선", "선박",
+            "배편", "배를", "장거리", "우도", "가파도", "마라도"))));
+
     private final PackingChecklistQuery query;
     private final LocalDate startDate;
+    /** 일정 장소 이름(공백을 뺀 전체)과 거기서 떼어 낸 토막. 이유가 장소를 가리키는지 볼 때 쓴다. */
+    private final Set<String> placeNames;
+    /** 반려견 특성을 가리키는 말. 특성이 있는 것만 담는다 — 더위 민감이 아닌 아이의 "더위" 는 사실이 아니다. */
+    private final List<Pattern> petFacts;
 
     PackingListRules(PackingChecklistQuery query) {
         this.query = query;
         this.startDate = parseOrNull(query.startDate());
+        this.placeNames = placeNames(query.planOutline());
+        this.petFacts = petFacts(query.safePetConditions());
     }
 
     List<PackingItem> apply(List<PackingItem> modelItems) {
@@ -170,21 +266,135 @@ final class PackingListRules {
         if (serverKind || !EXTRAS.matcher(name).find()) {
             return null;
         }
-        // 공백뿐인 이유는 없는 이유다. 화면에 빈 줄을 그리지 않게 null 로 모은다.
-        String reason = modelItem.reason() == null || modelItem.reason().isBlank() ? null : modelItem.reason();
-        if (reason != null) {
-            reason = keepSentences(reason, sentence ->
-                (!rainy && RAIN_CLAIM.matcher(sentence).find())
-                    || (!hot && HEAT_CLAIM.matcher(sentence).find())
-                    || (!cold && COLD_CLAIM.matcher(sentence).find()));
-            if (reason == null) {
-                return null;
-            }
+        // 공백뿐인 이유는 없는 이유다. 이유가 없으면 이 여행의 무엇 때문인지 말할 수 없어 버린다 (#1336).
+        if (modelItem.reason() == null || modelItem.reason().isBlank()) {
+            return null;
+        }
+        String reason = keepSentences(modelItem.reason(), sentence ->
+            (!rainy && RAIN_CLAIM.matcher(sentence).find())
+                || (!hot && HEAT_CLAIM.matcher(sentence).find())
+                || (!cold && COLD_CLAIM.matcher(sentence).find()));
+        if (reason == null || !pointsAtTripFact(reason) || !fitsPurpose(name, reason)) {
+            return null;
         }
         // 분류가 빠지는 일이 흔하다. 불변 Set 의 contains(null) 은 NPE 라 먼저 거른다.
         String category = modelItem.category() != null && CATEGORIES.contains(modelItem.category())
             ? modelItem.category() : CATEGORY_CARE;
         return item(category, name, reason);
+    }
+
+    /** 이유가 일정(일차 · 장소) · 예보 수치 · 반려견 특성 중 하나라도 가리키는가. */
+    private boolean pointsAtTripFact(String reason) {
+        if (mentionsAbsentPlaceKind(reason)) {
+            return false;
+        }
+        return mentionsTripDay(reason) || mentionsPlace(reason) || mentionsWeather(reason)
+            || petFacts.stream().anyMatch(fact -> fact.matcher(reason).find());
+    }
+
+    private boolean mentionsTripDay(String reason) {
+        int days = dayCount();
+        Matcher matcher = DAY_MENTION.matcher(reason);
+        while (matcher.find()) {
+            int first = Integer.parseInt(matcher.group(1));
+            int last = matcher.group(2) == null ? first : Integer.parseInt(matcher.group(2));
+            if (first >= 1 && last >= first && last <= days) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean mentionsPlace(String reason) {
+        String compact = reason.replaceAll("\\s+", "");
+        if (placeNames.stream().anyMatch(compact::contains)) {
+            return true;
+        }
+        return PLACE_KINDS.stream().anyMatch(kind -> kind.reasonWords().matcher(reason).find()
+            && placeNames.stream().anyMatch(place -> kind.placeWords().matcher(place).find()));
+    }
+
+    /**
+     * 일정에 없는 장소 종류를 말하는가. 일정 장소를 모르면(개요 없음) 판정하지 않는다 — 모르는 것을 거짓이라 하지 않는다.
+     */
+    private boolean mentionsAbsentPlaceKind(String reason) {
+        if (placeNames.isEmpty()) {
+            return false;
+        }
+        return PLACE_KINDS.stream().anyMatch(kind -> kind.reasonWords().matcher(reason).find()
+            && placeNames.stream().noneMatch(place -> kind.placeWords().matcher(place).find()));
+    }
+
+    private boolean mentionsWeather(String reason) {
+        return !query.safeWeatherOutlook().isEmpty() && WEATHER_MENTION.matcher(reason).find();
+    }
+
+    /** 쓰임을 정해 둔 종류라면, 종류 낱말을 지운 이유에 그 쓰임과 이어지는 말이 있어야 한다. */
+    private static boolean fitsPurpose(String name, String reason) {
+        return PURPOSES.stream()
+            .filter(purpose -> purpose.kind().matcher(name).find())
+            .findFirst()
+            .map(purpose -> purpose.use().matcher(purpose.kind().matcher(reason).replaceAll(" ")).find())
+            .orElse(true);
+    }
+
+    private static Set<String> placeNames(PlanOutline outline) {
+        if (outline == null) {
+            return Set.of();
+        }
+        Set<String> names = new HashSet<>();
+        // 장소에 이어진 항목과 산책 코스만 본다. 이동 · 메모 항목의 제목은 사용자가 쓴 아무 말("이동")일 수 있다.
+        outline.safeDays().stream()
+            .flatMap(day -> day.safeItems().stream())
+            .filter(item -> item.placeId() != null || PlanItemType.WALK.name().equals(item.itemType()))
+            .filter(item -> !PlanItemType.MOVE.name().equals(item.itemType()))
+            .map(PlanOutline.PlanOutlineItem::title)
+            .filter(title -> title != null && !title.isBlank())
+            .forEach(title -> {
+                names.add(title.replaceAll("\\s+", ""));
+                Arrays.stream(title.strip().split("\\s+")).forEach(names::add);
+            });
+        names.removeIf(name -> name.length() < PLACE_TOKEN_MIN_LENGTH || PLACE_TOKEN_STOPWORDS.contains(name));
+        return Set.copyOf(names);
+    }
+
+    private static List<Pattern> petFacts(List<PetCondition> pets) {
+        List<Pattern> facts = new ArrayList<>();
+        if (pets.size() > 1) {
+            facts.add(Pattern.compile("반려견\\s*\\d"));
+        }
+        for (PetCondition pet : pets) {
+            literal(pet.breed()).ifPresent(facts::add);
+            literal(pet.sizeName()).ifPresent(facts::add);
+            literal(pet.ageText()).ifPresent(facts::add);
+            if (pet.lifeStage() != null) {
+                literal(pet.lifeStage().getDisplayName()).ifPresent(facts::add);
+            }
+            if (pet.weightText() != null && !pet.weightText().isBlank()) {
+                facts.add(Pattern.compile("kg|체중|몸무게"));
+            }
+            if (pet.heatSensitive()) {
+                facts.add(Pattern.compile("더위|더운|열에"));
+            }
+            if (pet.coldSensitive()) {
+                facts.add(Pattern.compile("추위|추운"));
+            }
+            if (pet.noiseSensitive()) {
+                facts.add(Pattern.compile("소음|소리|시끄"));
+            }
+            if (pet.lowSociality()) {
+                facts.add(Pattern.compile("낯선|사회성|다른\\s*(개|강아지|반려견)|사람이\\s*많"));
+            }
+            if (pet.walkPreferred()) {
+                facts.add(Pattern.compile("산책을\\s*좋아"));
+            }
+        }
+        return List.copyOf(facts);
+    }
+
+    private static Optional<Pattern> literal(String text) {
+        return text == null || text.isBlank()
+            ? Optional.empty() : Optional.of(Pattern.compile(Pattern.quote(text.strip())));
     }
 
     private String foodReason() {
@@ -297,5 +507,11 @@ final class PackingListRules {
     }
 
     private record Kind(String name, Pattern pattern, String reason) {
+    }
+
+    private record PlaceKind(Pattern reasonWords, Pattern placeWords) {
+    }
+
+    private record Purpose(Pattern kind, Pattern use) {
     }
 }
