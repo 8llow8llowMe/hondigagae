@@ -1272,3 +1272,77 @@ describe('WalkTimesSection — 창 안 등급이 여럿일 때 (#671 A-2)', () =
     expect(markup).toContain('아주 위험 등급</span>이에요.')
   })
 })
+
+/*
+  #1356 — 홈만 모바일에서 곡선을 접는다. 시각 한 줄과 등급 문장이 "언제" 의 답이고 시간대별 표는
+  펼쳐 보는 근거다. 산책 코스 상세는 넘기지 않으므로 마크업이 그대로다.
+*/
+describe('WalkTimesSection — 모바일 곡선 접기 (#1356)', () => {
+  function renderCollapsed(data: WalkTimesResponse) {
+    return renderToStaticMarkup(
+      createElement(WalkTimesSection, {
+        data,
+        basis: 'current',
+        collapseCurveOnMobile: true,
+      }),
+    )
+  }
+
+  it('넘기면 펼침 버튼이 서고 닫힌 채로 시작한다', () => {
+    const markup = renderCollapsed(GOOD_DAY)
+
+    expect(markup).toContain(messages.home.goldenCurveToggle)
+    expect(markup).toContain('aria-expanded="false"')
+  })
+
+  it('곡선을 감싼 칸은 md 미만에서만 숨는다 — 버튼이 그 칸을 가리킨다', () => {
+    const markup = renderCollapsed(GOOD_DAY)
+    const controls = /aria-controls="([^"]+)"/.exec(markup)?.[1] ?? ''
+    const at = markup.indexOf(`id="${controls}"`)
+
+    expect(controls).not.toBe('')
+    expect(markup.slice(markup.lastIndexOf('<div', at), markup.indexOf('>', at))).toContain(
+      'hidden md:block',
+    )
+  })
+
+  it('펼침 버튼은 md 미만에만 선다', () => {
+    const markup = renderCollapsed(GOOD_DAY)
+    const button = markup.lastIndexOf('<button', markup.indexOf(messages.home.goldenCurveToggle))
+
+    expect(markup.slice(button, markup.indexOf('>', button))).toContain('md:hidden')
+  })
+
+  /** `id` 를 단 `<div>` 의 바깥 HTML — 여닫는 태그 수를 세어 짝이 맞는 닫는 태그까지 */
+  function divById(markup: string, id: string): string {
+    const start = markup.lastIndexOf('<div', markup.indexOf(`id="${id}"`))
+    let depth = 0
+    for (const match of markup.slice(start).matchAll(/<div\b|<\/div>/g)) {
+      depth += match[0] === '</div>' ? -1 : 1
+      if (depth === 0) return markup.slice(start, start + match.index + '</div>'.length)
+    }
+    throw new Error(`닫히지 않은 div: ${id}`)
+  }
+
+  /* 위 시각이 어디 기준인지는 표가 아니라 판정 한 줄에 딸린 말이다 */
+  it('기준 캡션은 접혀도 남는다 — 숨는 칸 밖이다', () => {
+    const markup = renderCollapsed(GOOD_DAY)
+    const controls = /aria-controls="([^"]+)"/.exec(markup)?.[1] ?? ''
+    const box = divById(markup, controls)
+
+    expect(markup).toContain(messages.home.goldenPavementNote)
+    expect(box).not.toContain(messages.home.goldenPavementNote)
+    // 칸 안에는 곡선이 있다 — 빈 칸을 잰 것이 아니다
+    expect(box).toContain('scroll-rail')
+  })
+
+  it('곡선이 비는 날은 버튼을 세우지 않는다 — 열어도 아무것도 없다', () => {
+    expect(renderCollapsed({ ...GOOD_DAY, hourly: [] })).not.toContain(
+      messages.home.goldenCurveToggle,
+    )
+  })
+
+  it('넘기지 않으면 버튼이 없다 — 산책 코스 상세 마크업은 그대로다', () => {
+    expect(render(GOOD_DAY)).not.toContain(messages.home.goldenCurveToggle)
+  })
+})

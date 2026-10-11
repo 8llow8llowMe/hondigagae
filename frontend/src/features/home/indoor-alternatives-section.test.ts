@@ -4,13 +4,17 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { IndoorAlternativesSection } from '@/features/home/indoor-alternatives-section'
+import type { IndoorAlternative } from '@/lib/insight/indoor'
 import { messages } from '@/lib/messages'
 import { suitabilityWithIndoor } from '@/test/fixtures/insight'
 import type { AlternativePlaceItem } from '@/types/insight'
 
-const ALTERNATIVE = suitabilityWithIndoor.indoorAlternatives[0] as AlternativePlaceItem
+const ALTERNATIVE: IndoorAlternative = {
+  ...(suitabilityWithIndoor.indoorAlternatives[0] as AlternativePlaceItem),
+  nearPlaceTitle: '협재해수욕장',
+}
 
-function render(alternatives: AlternativePlaceItem[]) {
+function render(alternatives: IndoorAlternative[]) {
   return renderToStaticMarkup(createElement(IndoorAlternativesSection, { alternatives }))
 }
 
@@ -35,7 +39,13 @@ describe('IndoorAlternativesSection', () => {
     const markup = render([ALTERNATIVE])
 
     expect(markup).toContain('직선 2.3km')
+    expect(markup).toContain(messages.home.indoorHeading)
     expect(markup).toContain(messages.home.indoorNote)
+  })
+
+  /* #1356 — 홈은 여러 장소의 대안을 접으므로 줄마다 어디서 잰 거리인지 적는다 */
+  it('줄마다 거리를 잰 기준 장소를 적는다', () => {
+    expect(render([ALTERNATIVE])).toContain('협재해수욕장에서 직선 2.3km')
   })
 
   /* 실내라도 들어갈 수 있는지가 첫 질문이다 — 동반 조건은 서버 `name` 그대로 */

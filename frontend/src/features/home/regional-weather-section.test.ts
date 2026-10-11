@@ -660,3 +660,79 @@ describe('RegionalWeatherSkeleton — 높이 (#963 → #1068)', () => {
     expect(markup).not.toContain('h-40')
   })
 })
+
+/*
+  #1356 — 전 권역 동점인 날 모바일에서 칸 레일을 접는다. 머리 문장이 이미 `어느 권역이든
+  좋아요` 라고 말하고 칸은 같은 숫자를 늘어놓을 뿐이다. 견줄 거리가 있는 날은 접지 않는다.
+*/
+describe('RegionalWeatherSection — 동점 날 모바일 접기 (#1356)', () => {
+  /** 칸 레일 컨테이너의 여는 태그 — `scroll-rail` 클래스로 집는다 */
+  function railTag(markup: string): string {
+    const at = markup.indexOf('scroll-rail ')
+    return markup.slice(markup.lastIndexOf('<div', at), markup.indexOf('>', at) + 1)
+  }
+
+  /** 펼침 버튼의 여는 태그 — 제목 줄 ⓘ 도 `aria-expanded` 를 내므로 범위를 좁힌다 */
+  function toggleTag(markup: string): string {
+    const at = markup.lastIndexOf('<button', markup.indexOf(messages.home.regionRailToggle))
+    return at < 0 ? '' : markup.slice(at, markup.indexOf('>', at) + 1)
+  }
+
+  it('전부 동점이면 펼침 버튼을 세우고 레일을 md 미만에서 숨긴다', () => {
+    const markup = render(TIED_DAY)
+
+    expect(toggleTag(markup)).toContain('aria-expanded="false"')
+    expect(railTag(markup)).toContain('hidden md:block')
+  })
+
+  /*
+    점수 있는 권역이 하나뿐이면 `findTiedTop().isAll` 이 참이지만 머리 문장은 `○○이 가장 나아요` 다.
+    칸은 나머지가 왜 비었는지(예보 없음)를 보여 주므로 접지 않는다.
+  */
+  it('점수 있는 권역이 하나뿐이면 접지 않는다', () => {
+    const [first] = GOOD_DAY.regions
+    const solo: RegionalWeatherResponse = {
+      ...GOOD_DAY,
+      recommendedRegion: first!.region,
+      regions: GOOD_DAY.regions.map((region, index) =>
+        index === 0 ? { ...region, weatherScore: 80 } : { ...region, weatherScore: null },
+      ),
+    }
+    const markup = render(solo)
+
+    expect(markup).toContain(messages.home.regionRecommended.replace('{name}', first!.region.name))
+    expect(markup).not.toContain(messages.home.regionRailToggle)
+  })
+
+  it('펼침 버튼이 레일을 가리킨다', () => {
+    const markup = render(TIED_DAY)
+    const controls = /aria-controls="([^"]+)"/.exec(markup)?.[1]
+
+    expect(controls).toBeDefined()
+    expect(railTag(markup)).toContain(`id="${controls}"`)
+  })
+
+  it('펼침 버튼은 md 미만에만 선다', () => {
+    const markup = render(TIED_DAY)
+    const button = markup.indexOf(messages.home.regionRailToggle)
+    const row = markup.lastIndexOf('<div', markup.lastIndexOf('<button', button))
+
+    expect(markup.slice(row, markup.indexOf('>', row))).toContain('md:hidden')
+  })
+
+  /* 권역은 서로 견주라고 있는 표다 (D1 · #530) — 차이가 있는 날 접으면 비교가 숨는다 */
+  it('단독 1위인 날은 접지 않는다', () => {
+    const markup = render(GOOD_DAY)
+
+    expect(markup).not.toContain(messages.home.regionRailToggle)
+    expect(railTag(markup)).not.toContain('hidden')
+  })
+
+  it('두 곳만 동점인 날도 접지 않는다', () => {
+    expect(render(TWO_TIED_DAY)).not.toContain(messages.home.regionRailToggle)
+  })
+
+  it('추천이 없는 날은 접지 않는다 — 칸이 이유를 보여 준다', () => {
+    expect(render(BAD_DAY)).not.toContain(messages.home.regionRailToggle)
+  })
+})

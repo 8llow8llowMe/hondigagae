@@ -28,9 +28,9 @@ const ALLOWED: Record<string, StateCharacterPose[]> = {
   'src/features/ai-plan/ai-plan-create-view.tsx': ['sitFront'],
   'src/features/plan/shared-plan-expired.tsx': ['sitLookup'],
   'src/features/plan/shared-plan-not-found.tsx': ['sitLookup'],
-  // B — 인증 폼 카드 옆 · 홈 올레 배너 · 저장한 곳 없음 · 세그먼트 404 · AI 취소
+  // B — 인증 폼 카드 옆 · 저장한 곳 없음 · 세그먼트 404 · AI 취소
+  // (홈 올레 배너의 `leash` 는 #1356 에서 배너가 바로가기 칸이 되며 걷혔다)
   'src/features/auth/auth-card-dog.tsx': ['sitFront'],
-  'src/features/home/home-view.tsx': ['leash'],
   'src/features/favorite/favorite-list-section.tsx': ['stand'],
   'app/(main)/places/[placeId]/not-found.tsx': ['sitLookup'],
   'app/(main)/plans/[planId]/not-found.tsx': ['sitLookup'],

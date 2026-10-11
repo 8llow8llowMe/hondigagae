@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { hospitalBannerDescription, pickNearestHospital } from '@/lib/emergency/nearest'
+import { hospitalShortcutCaption, pickNearestHospital } from '@/lib/emergency/nearest'
 import { messages } from '@/lib/messages'
 import type { NearbyFacilityItem, NearbyFacilityResult } from '@/types/emergency'
 
@@ -125,42 +125,53 @@ describe('pickNearestHospital', () => {
   })
 })
 
-describe('hospitalBannerDescription', () => {
+describe('hospitalShortcutCaption', () => {
   /*
-    좌표 미허용 · 조회 전 · 실패 · 반경 안에 병원 없음이 모두 이 갈래다. 배너는 어떤
-    상태에서도 사라지지 않으므로(`components/banner.tsx`) 문구가 반드시 있어야 한다.
+    좌표 미허용 · 조회 전 · 실패 · 반경 안에 병원 없음이 모두 이 갈래다. 칸은 어떤
+    상태에서도 사라지지 않으므로 문구가 반드시 있어야 한다.
   */
   it('찾지 못하면 지금까지의 고정 문구로 남는다', () => {
-    expect(hospitalBannerDescription(null)).toBe(messages.home.emergencyDesc)
+    expect(hospitalShortcutCaption(null)).toBe(messages.home.emergencyDesc)
   })
 
   it('24시간이면 그것을 먼저 말한다', () => {
-    const note = hospitalBannerDescription({
+    const note = hospitalShortcutCaption({
       facility: facility({ name: '제주24시동물병원', open24: true, distanceMeters: 480 }),
       kind: 'open24',
     })
 
-    expect(note).toBe('24시간 · 제주24시동물병원 480m')
+    expect(note).toBe('24시간 · 480m')
   })
 
   it('지금 진료중이면 그것을 말한다', () => {
-    const note = hospitalBannerDescription({
+    const note = hospitalShortcutCaption({
       facility: facility({ name: '한라동물병원', distanceMeters: 1250 }),
       kind: 'openNow',
     })
 
-    expect(note).toBe('지금 진료중 · 한라동물병원 1.3km')
+    expect(note).toBe('진료중 · 1.3km')
   })
 
   /* `openNow === null` 이 이 갈래다 — 열림/닫힘을 단정하지 않고 위치만 말한다 */
   it('영업 여부를 모르면 단정하지 않고 위치만 말한다', () => {
-    const note = hospitalBannerDescription({
+    const note = hospitalShortcutCaption({
       facility: facility({ name: '서귀포동물병원', openNow: null, distanceMeters: 3120 }),
       kind: 'nearest',
     })
 
-    expect(note).toBe('가장 가까운 곳 · 서귀포동물병원 3.1km')
+    expect(note).toBe('가까운 곳 3.1km')
     expect(note).not.toContain('진료중')
+  })
+
+  /* #1356 — 바로가기 칸 폭에 이름이 들어가지 않는다. 이름은 /emergency 가 말한다 */
+  it('시설 이름을 싣지 않는다', () => {
+    const notes = (['open24', 'openNow', 'nearest'] as const).map((kind) =>
+      hospitalShortcutCaption({ facility: facility({ name: '한라동물병원' }), kind }),
+    )
+
+    for (const note of notes) {
+      expect(note).not.toContain('한라동물병원')
+    }
   })
 
   /*
@@ -169,10 +180,10 @@ describe('hospitalBannerDescription', () => {
   */
   it('어느 갈래에서도 개수를 말하지 않는다', () => {
     const notes = (['open24', 'openNow', 'nearest'] as const).map((kind) =>
-      hospitalBannerDescription({ facility: facility(), kind }),
+      hospitalShortcutCaption({ facility: facility(), kind }),
     )
 
-    for (const note of [...notes, hospitalBannerDescription(null)]) {
+    for (const note of [...notes, hospitalShortcutCaption(null)]) {
       expect(note).not.toMatch(/\d+\s*곳/)
     }
   })
