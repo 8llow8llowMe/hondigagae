@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.placeimport.adapter.out.persistence;
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlacePetAllowanceCommandPort;
 import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlacePetAllowanceEvidenceQueryResult;
 import com.hondigagae.domainlayer.placeimport.domain.model.ReflectedPetAllowance;
+import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -35,9 +36,15 @@ public class JdbcPlacePetAllowanceAdapter implements PlacePetAllowanceCommandPor
      *
      * <p>delist 된 흡수 행은 근거에서 뺀다 — 원천이 더는 내지 않는 장소의 동반 여부다. 재등장하면 적재가
      * {@code delisted_at} 을 비우고 다음 실행에서 다시 근거가 된다.
+     *
+     * <p>{@code title} · {@code lat} · {@code lng} 는 하위 시설 판정용이다(#1340). 이름 정규화는 SQL 이 아니라 Java
+     * ({@code PlaceNameMatcher.normalize})가 한다 — 병합 판정과 같은 구현을 쓰려고.
      */
     private static final String SELECT_EVIDENCES_SQL = """
         SELECT p.id,
+               p.title,
+               p.lat,
+               p.lng,
                p.pet_allowance_type,
                p.allowed_pet_size,
                p.pet_available,
@@ -108,8 +115,7 @@ public class JdbcPlacePetAllowanceAdapter implements PlacePetAllowanceCommandPor
                 if (current != null) {
                     evidences.add(current.toQueryResult());
                 }
-                current = new PlaceRows(placeId, rs.getString("pet_allowance_type"), rs.getString("allowed_pet_size"),
-                    rs.getBoolean("pet_available"), rs.getString("pet_info_scope"), rs.getString("pet_info_size"));
+                current = new PlaceRows(rs);
             }
             current.addAbsorbed(rs.getString("absorbed_allowance"), rs.getString("absorbed_size"));
         }
@@ -123,6 +129,9 @@ public class JdbcPlacePetAllowanceAdapter implements PlacePetAllowanceCommandPor
     private static final class PlaceRows {
 
         private final long placeId;
+        private final String title;
+        private final Double lat;
+        private final Double lng;
         private final String currentAllowance;
         private final String currentSize;
         private final boolean currentPetAvailable;
@@ -131,15 +140,21 @@ public class JdbcPlacePetAllowanceAdapter implements PlacePetAllowanceCommandPor
         private final List<String> absorbedAllowances = new ArrayList<>();
         private final List<String> absorbedSizes = new ArrayList<>();
 
-        private PlaceRows(
-            long placeId, String currentAllowance, String currentSize, boolean currentPetAvailable, String petInfoScope, String petInfoSize
-        ) {
-            this.placeId = placeId;
-            this.currentAllowance = currentAllowance;
-            this.currentSize = currentSize;
-            this.currentPetAvailable = currentPetAvailable;
-            this.petInfoScope = petInfoScope;
-            this.petInfoSize = petInfoSize;
+        /** 대상 행의 칸은 첫 줄에서 읽는다 — 흡수 행마다 같은 값이 반복된다. */
+        private PlaceRows(ResultSet rs) throws SQLException {
+            this.placeId = rs.getLong("id");
+            this.title = rs.getString("title");
+            this.lat = toDouble(rs.getBigDecimal("lat"));
+            this.lng = toDouble(rs.getBigDecimal("lng"));
+            this.currentAllowance = rs.getString("pet_allowance_type");
+            this.currentSize = rs.getString("allowed_pet_size");
+            this.currentPetAvailable = rs.getBoolean("pet_available");
+            this.petInfoScope = rs.getString("pet_info_scope");
+            this.petInfoSize = rs.getString("pet_info_size");
+        }
+
+        private static Double toDouble(BigDecimal value) {
+            return value == null ? null : value.doubleValue();
         }
 
         /** 흡수 행이 없으면 LEFT JOIN 이 두 칸 모두 NULL 인 줄 하나를 준다 — 그 줄은 근거가 아니다. */
@@ -153,7 +168,7 @@ public class JdbcPlacePetAllowanceAdapter implements PlacePetAllowanceCommandPor
         }
 
         private PlacePetAllowanceEvidenceQueryResult toQueryResult() {
-            return new PlacePetAllowanceEvidenceQueryResult(placeId, currentAllowance, currentSize, currentPetAvailable,
+            return new PlacePetAllowanceEvidenceQueryResult(placeId, title, lat, lng, currentAllowance, currentSize, currentPetAvailable,
                 petInfoScope, petInfoSize, absorbedAllowances, absorbedSizes);
         }
     }

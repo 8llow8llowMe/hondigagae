@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.placeimport.application.model.PetAllowanceReflectOutcome;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PlacePetAllowanceReflectProcessor;
+import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +35,8 @@ class JdbcPlacePetAllowanceAdapterTest {
                 id BIGINT NOT NULL PRIMARY KEY,
                 source VARCHAR(20) NOT NULL,
                 title VARCHAR(200) NOT NULL,
+                lat DECIMAL(13, 10) NULL,
+                lng DECIMAL(13, 10) NULL,
                 pet_allowance_type VARCHAR(20) NOT NULL DEFAULT 'UNKNOWN',
                 allowed_pet_size VARCHAR(20) NOT NULL DEFAULT 'UNKNOWN',
                 pet_available BOOLEAN NOT NULL DEFAULT FALSE,
@@ -142,6 +145,48 @@ class JdbcPlacePetAllowanceAdapterTest {
         assertThat(valuesOf(2L)).isEqualTo("UNKNOWN/UNKNOWN");
         assertThat(petAvailableOf(1L)).isFalse();
         assertThat(reverted.changed()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("하위 시설은 본 시설의 제한을 받는다 — 생각하는 정원 세 행 재현, 다시 돌리면 0행 (#1340)")
+    void subFacilityInheritsParentRestrictionOnDb() {
+        // 본 시설: 자기 동반 정보 전구역 + 흡수된 문화정보원 행 "야외만"(PARTIALLY_ALLOWED)
+        locatedTourApi(125445L, "생각하는 정원", "33.3195000", "126.2390000");
+        petInfo(125445L, "FULL_AREA", "ALL");
+        absorbed(900L, 125445L, "PARTIALLY_ALLOWED", "UNKNOWN");
+        // 면세점(28m) — 자기 근거는 전구역뿐
+        locatedTourApi(4054291L, "생각하는 정원[면세점(TAX REFUND SHOP)]", "33.3197500", "126.2390000");
+        petInfo(4054291L, "FULL_AREA", "ALL");
+        // 청원(58m) — 근거 없음
+        locatedTourApi(2907434L, "생각하는정원(청원)", "33.3200200", "126.2390000");
+        // 같은 이름 · 수식어지만 좌표가 없는 행 — 판정하지 않는다
+        locatedTourApi(2907435L, "생각하는정원(주차장)", null, null);
+        petInfo(2907435L, "FULL_AREA", "ALL");
+
+        PetAllowanceReflectOutcome outcome = processor.reflectPetAllowances();
+
+        assertThat(valuesOf(125445L)).isEqualTo("PARTIALLY_ALLOWED/ALL");
+        assertThat(valuesOf(4054291L)).isEqualTo("PARTIALLY_ALLOWED/ALL");
+        assertThat(valuesOf(2907434L)).isEqualTo("PARTIALLY_ALLOWED/UNKNOWN");
+        assertThat(petAvailableOf(2907434L)).isTrue();
+        assertThat(valuesOf(2907435L)).isEqualTo("ALLOWED/ALL");
+        assertThat(outcome.inherited()).isEqualTo(2);
+        assertThat(outcome.changed()).isEqualTo(4);
+
+        assertThat(processor.reflectPetAllowances().changed()).isZero();
+
+        // 본 시설의 제한 근거가 사라지면 하위 시설도 자기 근거로 돌아간다 — 본 시설의 ALLOWED 는 물려주지 않는다
+        jdbcTemplate.update("UPDATE place SET delisted_at = NOW() WHERE id = 900");
+        PetAllowanceReflectOutcome reverted = processor.reflectPetAllowances();
+        assertThat(valuesOf(125445L)).isEqualTo("ALLOWED/ALL");
+        assertThat(valuesOf(4054291L)).isEqualTo("ALLOWED/ALL");
+        assertThat(valuesOf(2907434L)).isEqualTo("UNKNOWN/UNKNOWN");
+        assertThat(reverted.inherited()).isZero();
+    }
+
+    private void locatedTourApi(long id, String title, String lat, String lng) {
+        jdbcTemplate.update("INSERT INTO place (id, source, title, lat, lng) VALUES (?, 'TOUR_API', ?, ?, ?)",
+            id, title, lat == null ? null : new BigDecimal(lat), lng == null ? null : new BigDecimal(lng));
     }
 
     private void tourApi(long id) {
