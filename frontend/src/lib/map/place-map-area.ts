@@ -1,5 +1,6 @@
 import { type LatLng, toLatLng } from '@/lib/geo/coord'
-import { isWithinBounds, type MapBounds } from '@/lib/map/viewport'
+import { isInJeju } from '@/lib/geo/jeju-bounds'
+import { isWithinBounds, type MapBounds, pointsCamera, type SpanBox } from '@/lib/map/viewport'
 
 /**
  * `/places` 지도 보기가 쥐는 **두 영역** — 이슈 #1143.
@@ -93,7 +94,7 @@ export function focusedPlaceMapArea(focus: LatLng): PlaceMapArea {
 }
 
 /**
- * 기준점 지도의 카메라가 어디까지 왔나 (#1177).
+ * 기준점 지도의 카메라가 어디까지 왔나 (#1177). `/places` 첫 결과 맞춤(#1379)도 같은 카메라라 같이 쓴다.
  *
  * - `pending` — 지도는 떴지만 카메라를 아직 놓지 않았다. 이때의 `idle` 은 **제주 기본 시야**다
  * - `applied` — 카메라를 놓았다(`MapCanvas` 의 `onCameraApplied`). 다음 `idle` 이 그 결과다
@@ -157,4 +158,28 @@ export function placesInArea<T extends { lat: number | null; lng: number | null 
     const coord = toLatLng(place)
     return coord === null || isWithinBounds(searched, coord)
   })
+}
+
+/**
+ * 첫 결과 하나만 있을 때도 담는 폭(m) — 카드를 눌러 확대하는 단계(`SELECTED_PLACE_MAP_LEVEL`, 폭 약
+ * 5km)와 같은 폭이다. 한 곳만 있어도 "어디쯤인지" 는 동네 단위로 보여야 한다.
+ */
+export const PLACE_MAP_RESULTS_MIN_SPAN_METERS = 5_000
+
+/**
+ * `/places` 첫 결과를 **모두 담는 카메라** (#1379).
+ *
+ * 제주 기본 시야(레벨 9)는 375 폭에서 동서 약 24km 라, dev 기본 목록 20곳 중 핀 둘만 보였다. 첫 장의
+ * 좌표를 감싸는 사각형으로 연다 — 계산은 동선 카드와 같은 `pointsCamera` 다. 좌표가 없는 곳은
+ * 지도가 판단할 수 없어 뺀다(목록에는 남는다). **제주 밖 좌표도 뺀다** — 하나만 섞여도 사각형이 육지까지
+ * 벌어져 섬이 점이 된다. 담을 곳이 없으면 null — 제주 기본 시야 그대로다.
+ */
+export function placeResultsCamera(
+  places: readonly { lat: number | null; lng: number | null }[],
+): { anchor: LatLng; spanMeters: SpanBox } | null {
+  const points = places
+    .map((place) => toLatLng(place))
+    .filter((point): point is LatLng => point !== null && isInJeju(point))
+
+  return pointsCamera(points, PLACE_MAP_RESULTS_MIN_SPAN_METERS)
 }

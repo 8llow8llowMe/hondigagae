@@ -9,6 +9,8 @@ import {
   framingAfterIdle,
   INITIAL_PLACE_MAP_AREA,
   PLACE_MAP_FOCUS_RADIUS_METERS,
+  PLACE_MAP_RESULTS_MIN_SPAN_METERS,
+  placeResultsCamera,
   placesInArea,
 } from '@/lib/map/place-map-area'
 import { boundsCenter, boundsRadiusMeters, type MapBounds } from '@/lib/map/viewport'
@@ -155,5 +157,44 @@ describe('areaAfterFramedIdle', () => {
     expect(next.origin).toEqual(MOVED)
     // 목록 영역을 옮기면 주변 조회 키가 바뀌어 한 번 더 조회한다
     expect(next.searched).toBe(start.searched)
+  })
+})
+
+/* #1379 — `/places` 첫 화면을 첫 장의 좌표에 맞춘다 */
+describe('placeResultsCamera', () => {
+  it('좌표가 있는 곳만 감싼다 — 좌표 없는 곳은 지도가 판단할 수 없다', () => {
+    const camera = placeResultsCamera([
+      { lat: 33.2, lng: 126.2 },
+      { lat: null, lng: null },
+      { lat: 33.5, lng: 126.9 },
+    ])
+
+    expect(camera?.anchor.lat).toBeCloseTo(33.35, 10)
+    expect(camera?.anchor.lng).toBeCloseTo(126.55, 10)
+  })
+
+  it('한 곳이면 동네 폭으로 연다 — 카드를 눌러 확대하는 폭과 같다', () => {
+    const camera = placeResultsCamera([{ lat: 33.4, lng: 126.5 }])
+
+    expect(camera?.spanMeters).toEqual({
+      widthMeters: PLACE_MAP_RESULTS_MIN_SPAN_METERS,
+      heightMeters: PLACE_MAP_RESULTS_MIN_SPAN_METERS,
+    })
+  })
+
+  /* 하나만 섞여도 사각형이 육지까지 벌어져 섬이 점이 된다 (#1379 검토) */
+  it('제주 밖 좌표는 담지 않는다', () => {
+    const camera = placeResultsCamera([
+      { lat: 33.2, lng: 126.2 },
+      { lat: 37.56, lng: 126.97 },
+      { lat: 33.5, lng: 126.9 },
+    ])
+
+    expect(camera?.anchor.lat).toBeCloseTo(33.35, 10)
+  })
+
+  it('담을 곳이 없으면 null — 제주 기본 시야 그대로다', () => {
+    expect(placeResultsCamera([])).toBeNull()
+    expect(placeResultsCamera([{ lat: null, lng: 126.5 }])).toBeNull()
   })
 })

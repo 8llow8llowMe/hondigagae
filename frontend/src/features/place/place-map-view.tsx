@@ -63,6 +63,7 @@ import {
   INITIAL_PLACE_MAP_AREA,
   PLACE_MAP_FOCUS_RADIUS_METERS,
   type PlaceMapArea,
+  placeResultsCamera,
   placesInArea,
 } from '@/lib/map/place-map-area'
 import { shouldOfferResearch } from '@/lib/map/research-offer'
@@ -72,6 +73,7 @@ import {
   boundsRadiusMeters,
   isSameViewport,
   type MapBounds,
+  type MapInsets,
 } from '@/lib/map/viewport'
 import { visibleCountLabel } from '@/lib/map/visible-count'
 import { messages } from '@/lib/messages'
@@ -126,6 +128,7 @@ export function PlaceMapView({
   preview = false,
   facilityLayer = false,
   island = false,
+  fitResults = false,
 }: {
   filters: PlaceFilters
   /** 미로그인이면 반려견 목록을 조회하지 않는다 — 필터의 크기 축이 빠진다 (#200) */
@@ -245,6 +248,19 @@ export function PlaceMapView({
    * 로고 알약과 자리가 겹쳐 따로 설계한다(명세 D7-3). `fill` 과 함께 켜지 않는다.
    */
   island?: boolean | undefined
+  /**
+   * **첫 화면을 첫 결과에 맞춘다** (#1379, 장소 공통명세 D8-8). `/places` 만 켠다.
+   *
+   * 제주 기본 시야는 375 폭에서 동서 약 24km 라 첫 장 20곳 중 핀 둘만 보였다. 켜면 마운트 때 목록
+   * 캐시(서버가 프리페치한 첫 장)의 좌표를 감싸는 사각형으로 카메라를 한 번 옮긴다 — 시트 · 조작 줄 ·
+   * 도킹 스택이 가린 몫을 빼고 남은 칸에 맞춘다(`fitInsets`). 그 뒤의 `idle` 처리는 기준점 지도와 같다
+   * (`framingAfterIdle` — 조작 0회에서 재검색 버튼이 뜨지 않는다).
+   *
+   * **마운트 때 한 번뿐이다.** 필터를 바꿔도 다시 맞추지 않는다 — 사용자가 맞춰 둔 시야를 결과가 바뀔
+   * 때마다 빼앗지 않는다. 기준점(`initialFocus`)이나 고른 장소(`?place=`)로 열리면 그쪽이 시야를 정하므로
+   * 맞추지 않고, 첫 장이 없으면(프리페치 실패) 제주 기본 시야 그대로다.
+   */
+  fitResults?: boolean | undefined
 }) {
   /*
     **`undefined` 만이 아니라 `null`·`false` 도 "머리 없음" 이다** (#1012 검토). 호출부가
@@ -298,13 +314,6 @@ export function PlaceMapView({
   */
   /* 기준점이 있으면 재검색을 누른 상태로 시작한다 (#1177) — 들어오자마자 주변 조회가 나간다 */
   const [researched, setResearched] = useState(focus !== null)
-  /*
-    **기준점 지도의 카메라가 어디까지 왔나** (#1177, `framingAfterIdle`). `null` 이면 기준점이
-    없는 지도라 `/places` 의 `areaAfterIdle` 그대로다.
-
-    ref 인 이유: 화면에 그리는 값이 아니라 다음 `idle` 을 어떻게 받을지만 정한다.
-  */
-  const framingRef = useRef<FocusFraming | null>(focus === null ? null : 'pending')
   const { selectedId, select: setSelectedId } = usePlacePreview(preview)
   const [sheetStop, setSheetStop] = useState<SheetStop>('mid')
   const [panelOpen, setPanelOpen] = useState(true)
@@ -478,6 +487,41 @@ export function PlaceMapView({
     return null
   }, [controlsInset])
 
+  /** 모바일 목록 시트 · 데스크톱 도킹 스택 — 첫 결과를 맞출 때 가린 몫을 잰다 (`fitInsets`) */
+  const sheetRef = useRef<HTMLElement>(null)
+  const stackRef = useRef<HTMLDivElement>(null)
+  /*
+    **첫 결과를 맞출 때 지도를 가리는 몫** (#1379). 카메라가 놓이는 순간 부른다(`MapCanvas` 의
+    `camera.insets`) — 시트와 스택은 폭마다 서고 말고가 갈려 값으로 넘기면 늘 한 박자 늦다.
+
+    - 위: 지도 위 조작 줄 바닥(`controlsInset` — 시트 상한 · 고른 핀 보정과 같은 값). 뷰포트 위에서 잰
+      값이라 루트 윗변을 뺀다
+    - 아래: 모바일 목록 시트 윗변. 데스크톱은 시트가 `lg:hidden` 이라 크기가 0 이다
+    - 왼쪽: 데스크톱 도킹 스택 오른쪽 끝. 모바일은 `hidden` 이라 0, 접혀 있으면(`-translate-x-full`)
+      오른쪽 끝이 루트 왼쪽 밖이라 0 이다 — 그래서 `panelOpen` 을 따로 읽지 않는다
+
+    **참조가 바뀌지 않는다** — ref 만 읽는다. 바뀌면 그것을 담은 카메라도 새 객체가 되어 다시 맞춘다.
+  */
+  const fitInsets = useCallback((): MapInsets | null => {
+    const rootElement = rootRef.current
+    if (rootElement === null) return null
+    const root = rootElement.getBoundingClientRect()
+
+    const inset =
+      typeof controlsInset === 'number'
+        ? controlsInset
+        : Number.parseFloat(getComputedStyle(rootElement).getPropertyValue('--map-island-inset'))
+    const sheet = sheetRef.current?.getBoundingClientRect()
+    const stack = stackRef.current?.getBoundingClientRect()
+
+    return {
+      top: Number.isFinite(inset) ? Math.max(0, inset - root.top) : 0,
+      right: 0,
+      bottom: sheet !== undefined && sheet.height > 0 ? Math.max(0, root.bottom - sheet.top) : 0,
+      left: stack !== undefined && stack.width > 0 ? Math.max(0, stack.right - root.left) : 0,
+    }
+  }, [controlsInset])
+
   /*
     **닫으면 포커스를 고른 행으로 돌려준다** (WCAG 2.4.3). ✕ 가 언마운트되면 포커스가 `body` 로
     떨어지고, 1024~1279 · 모바일은 행이 다시 보이게 된 참이다. 포커스가 다른 곳에 살아 있으면
@@ -536,6 +580,47 @@ export function PlaceMapView({
     () => (listQuery.data === undefined ? [] : mergeSlices(listQuery.data.pages)),
     [listQuery.data],
   )
+
+  /*
+    **첫 결과에 맞추는 카메라** (#1379, `fitResults`). 마운트 때 한 번 얼린다 — `focus` 와 같은 이유로
+    상태의 초깃값이다. 그 뒤 필터 · 페이지가 바뀌어도 옮기지 않는다.
+
+    **첫 장만 담는다** (`pages[0]`). 목록 보기에서 무한 스크롤로 여러 장을 받은 뒤 지도로 오면 같은 쿼리
+    캐시라 전부 들어 있는데, 그것까지 담으면 섬 전체로 벌어진다 — 맞추는 것은 "처음 보이는 결과" 다.
+  */
+  const [fitCamera] = useState(() => {
+    if (!fitResults || focus !== null || selectedId !== null) return null
+    const framed = placeResultsCamera(listQuery.data?.pages[0]?.contents ?? [])
+    return framed === null ? null : { ...framed, insets: fitInsets }
+  })
+  /*
+    **SDK 가 뜨기 전에 장소를 고르면 맞추기를 거둔다** (#1379 검토). 마운트 판정(`selectedId`)만으로는
+    시트에 먼저 선 행을 SDK 로드 중에 누른 경우를 못 막는다 — 지도가 뜨는 렌더에서 선택 확대가 먼저 돌고
+    카메라가 그것을 덮어 고른 핀이 가운데 오지 않았다. 카메라를 아직 놓지 않았을 때(`pending`)만 거둔다.
+  */
+  const [fitDropped, setFitDropped] = useState(false)
+  /*
+    **기준점 · 첫 결과 지도의 카메라가 어디까지 왔나** (#1177, `framingAfterIdle`). `null` 이면 카메라를
+    놓지 않는 지도라 `/places` 의 `areaAfterIdle` 그대로다. 첫 결과 맞춤(#1379)도 같은 함정이 있다 —
+    제주 기본 시야의 첫 `idle` 을 권유 기준으로 삼으면 카메라가 옮기자마자 재검색 버튼이 뜬다.
+
+    ref 인 이유: 화면에 그리는 값이 아니라 다음 `idle` 을 어떻게 받을지만 정한다.
+  */
+  const framingRef = useRef<FocusFraming | null>(
+    focus !== null || fitCamera !== null ? 'pending' : null,
+  )
+  /*
+    거둘 때 framing 을 **`applied` 로** 내린다 — `null` 이면 이미 지나간 첫 `idle` 을 다시 받을 수 없어 권유
+    기준이 영영 비고, `pending` 이면 모든 `idle` 을 버린다. `applied` 면 다음 `idle`(SDK 첫 시야)이 기준이
+    된다 — 맞추기가 없던 때(`areaAfterIdle` 의 첫 `idle`)와 같은 결과다.
+  */
+  useEffect(() => {
+    if (fitCamera === null || fitDropped || selectedId === null) return
+    if (framingRef.current !== 'pending') return
+
+    framingRef.current = 'applied'
+    setFitDropped(true)
+  }, [fitCamera, fitDropped, selectedId])
 
   const searchCenter = searchedBounds === null ? null : boundsCenter(searchedBounds)
   const searchRadius = searchedBounds === null ? 0 : boundsRadiusMeters(searchedBounds)
@@ -691,7 +776,7 @@ export function PlaceMapView({
 
   const handleBounds = useCallback((next: MapBounds, userMoved: boolean) => {
     /*
-      **기준점 지도는 따로 받는다** (#1177, `framingAfterIdle`). 첫 `idle` 은 카메라가 옮기기
+      **카메라를 놓는 지도는 따로 받는다** — 기준점(#1177) · 첫 결과 맞춤(#1379), `framingAfterIdle`. 첫 `idle` 은 카메라가 옮기기
       전의 제주 기본 시야라, 아래 갈래로 받으면 권유 기준이 그것으로 덮여 카메라가 옮기자마자
       재검색 버튼이 뜬다. 카메라를 놓은 뒤 첫 `idle` 을 권유 기준으로 삼는다.
     */
@@ -848,7 +933,7 @@ export function PlaceMapView({
         onSelect={selectOnMap}
         onBoundsChange={handleBounds}
         onCameraApplied={handleCameraApplied}
-        camera={focusCamera}
+        camera={focusCamera ?? (fitDropped ? null : fitCamera)}
         center={center}
         /* 카드를 누르면 그 핀으로 옮기고 동네가 보이는 단계까지 확대한다 */
         selectedLevel={SELECTED_PLACE_MAP_LEVEL}
@@ -1099,6 +1184,7 @@ export function PlaceMapView({
         )}
       >
         <div
+          ref={stackRef}
           id={stackId}
           inert={!panelOpen}
           // 그림자는 스택에 하나 — 접혀 있으면 x=0 에 회색 띠로 비친다 (#1123)
@@ -1263,6 +1349,7 @@ export function PlaceMapView({
 
       {/* ── 모바일: 하단 시트 3단 ────────────────────────────────────────── */}
       <MapSheet
+        ref={sheetRef}
         label="장소 목록"
         /*
           미리보기가 열리면 **같은 자리를 내준다** (#1227). 언마운트하지 않는다 — 닫으면 보던
