@@ -1,5 +1,8 @@
 import { messages } from '@/lib/messages'
+import { insertedStartTime } from '@/lib/plan/default-start-time'
 import { isPlaceTarget } from '@/lib/plan/detail'
+import { formatStartTime } from '@/lib/plan/start-time'
+import { withObjectParticle } from '@/lib/text/korean'
 import type { PlanDayItemsReplacePayload, PlanItemDetail, PlanItemPayload } from '@/types/plan'
 
 /**
@@ -178,6 +181,36 @@ export function itemInsertIndex(items: PlanItemDetail[]): number {
   return index
 }
 
+/**
+ * 담기가 새 항목에 채울 시각 (서버 형식 `HH:mm:ss`). 못 채우면 `undefined`.
+ *
+ * **비우면 그 항목의 산책 위험도가 `NO_START_TIME` 으로 꺼진다** (#1383 · 일정상세-세부명세
+ * D24). 끼울 자리(`itemInsertIndex`) **앞** 항목들의 시각만 본다. 담기 토스트가 같은 값을
+ * 말하도록 본문 조립과 따로 꺼내 둔다.
+ */
+export function insertedItemStartTime(items: PlanItemDetail[]): string | undefined {
+  return insertedStartTime(items.slice(0, itemInsertIndex(items)).map((item) => item.startTime))
+}
+
+/**
+ * 장소 담기 성공 토스트. 시각을 채웠으면 **그 시각과 "바꿀 수 있어요" 를 함께 말한다** —
+ * 추천값이라는 사실을 알릴 곳이 여기뿐이다 (D24-2). `use-plan-add-place` · 장소 담기 시트가
+ * 같이 쓴다.
+ */
+export function addPlaceToastMessage(
+  title: string,
+  day: number,
+  startTime: string | undefined,
+): string {
+  const time = formatStartTime(startTime ?? null)
+  const template = time === null ? messages.plan.addPlaceToast : messages.plan.addPlaceTimedToast
+
+  return template
+    .replace('{title}', withObjectParticle(title))
+    .replace('{day}', String(day))
+    .replace('{time}', time ?? '')
+}
+
 /** 기존 항목을 되싣고 `itemInsertIndex` 자리에 하나를 끼운 본문. `sequence` 는 0부터 다시 매긴다 */
 function insertItemPayload(
   items: PlanItemDetail[],
@@ -188,9 +221,14 @@ function insertItemPayload(
   const existing = items.map((item, index) =>
     toPayloadItem(item, day, index < at ? index : index + 1),
   )
+  const startTime = insertedItemStartTime(items)
 
   return {
-    items: [...existing.slice(0, at), { day, sequence: at, ...added }, ...existing.slice(at)],
+    items: [
+      ...existing.slice(0, at),
+      { day, sequence: at, ...added, ...(startTime === undefined ? {} : { startTime }) },
+      ...existing.slice(at),
+    ],
   }
 }
 

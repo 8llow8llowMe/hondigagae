@@ -29,11 +29,16 @@ import { useToday } from '@/lib/date/use-today'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
 import { addPlanDays } from '@/lib/plan/date'
-import { appendPlaceItemPayload, placeIdsOf } from '@/lib/plan/day-items'
+import {
+  addPlaceToastMessage,
+  appendPlaceItemPayload,
+  insertedItemStartTime,
+  placeIdsOf,
+} from '@/lib/plan/day-items'
 import { groupItemsByDay } from '@/lib/plan/detail'
 import { toPlanCreatePayload } from '@/lib/plan/form'
 import { toPlanDaySaveError } from '@/lib/plan/save-error'
-import { withObjectParticle, withTopicParticle } from '@/lib/text/korean'
+import { withTopicParticle } from '@/lib/text/korean'
 import { EMPTY_PLAN_FORM_VALUES, type PlanDetail, type PlanFormValues } from '@/types/plan'
 
 /**
@@ -369,9 +374,7 @@ function useAddPlaceToPlan({
           void queryClient.invalidateQueries({ queryKey: planKeys.list() })
 
           showToast({
-            message: messages.plan.addPlaceToast
-              .replace('{title}', withObjectParticle(place.title))
-              .replace('{day}', String(day)),
+            message: addPlaceToastMessage(place.title, day, insertedItemStartTime(dayItems)),
             action: {
               label: messages.plan.addToPlanToastAction,
               onAction: () => router.push(`/plans/${planId}`),

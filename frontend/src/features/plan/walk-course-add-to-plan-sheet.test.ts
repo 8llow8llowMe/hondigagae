@@ -54,6 +54,18 @@ describe('walkCourseAddToastMessage — 조사가 코스 이름표 받침을 따
     expect(message).toContain('몽실이와 제주 2박 3일')
     expect(message).toContain('3일차')
   })
+
+  it('담기가 시각을 채웠으면 그 시각과 바꿀 수 있다는 것을 말한다 (#1383 · D24-2)', () => {
+    expect(walkCourseAddToastMessage('1코스', '몽과 제주', 2, '15:00:00')).toBe(
+      '1코스를 몽과 제주 2일차 15:00에 담았어요. 시각은 일정에서 바꿀 수 있어요.',
+    )
+  })
+
+  it('시각을 못 채웠으면 예전 문장 그대로다', () => {
+    expect(walkCourseAddToastMessage('1코스', '몽과 제주', 2)).toBe(
+      '1코스를 몽과 제주 2일차에 담았어요.',
+    )
+  })
 })
 
 describe('toWalkCourseDayOptions — 일자 옵션 (D3-2)', () => {
