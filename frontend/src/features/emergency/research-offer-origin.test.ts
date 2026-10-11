@@ -74,9 +74,9 @@ describe('재검색 판정은 카메라가 놓은 중심과 비교한다 (#578)'
     있고, 둘이 있어야 `framedCamera` 가 위도 폭을 환산할 수 있다.
 
     **보고하는 값은 `setCenter` 에 넣은 값 그 자체여야 한다** (#873). `keepLevel` 갈래가
-    생기면서 실제로 놓는 위도가 `next.lat` 이 아니라 **지금 단계로 다시 환산한 `lat`**
-    이 됐다 — 둘 중 하나만 바뀌면 바깥이 "우리가 놓은 자리" 를 잘못 알고, 조작 0회에서
-    재검색 버튼이 뜨는 #578 이 그대로 재발한다. 그래서 같은 식별자를 쓰는지 잰다.
+    생기면서 실제로 놓는 위도가 지금 단계로 다시 환산한 값이 됐다 — 둘 중 하나만 바뀌면 바깥이
+    "우리가 놓은 자리" 를 잘못 알고, 조작 0회에서 재검색 버튼이 뜨는 #578 이 그대로 재발한다.
+    #1379 부터 그 환산도 `framedCamera` 안(`level`)이라 `next` 하나가 놓는 값이다. 같은 식별자를 쓰는지 잰다.
   */
   it('MapCanvas 는 카메라를 적용한 자리를 그대로 알린다', () => {
     const effect = mapCanvas.slice(
@@ -84,8 +84,8 @@ describe('재검색 판정은 카메라가 놓은 중심과 비교한다 (#578)'
       mapCanvas.indexOf('}, [camera, status])'),
     )
 
-    expect(effect).toMatch(/map\.setCenter\(new maps\.LatLng\(lat, next\.lng\)\)/)
-    expect(effect).toMatch(/cameraAppliedRef\.current\?\.\(\{ lat, lng: next\.lng \}\)/)
+    expect(effect).toMatch(/map\.setCenter\(new maps\.LatLng\(next\.lat, next\.lng\)\)/)
+    expect(effect).toMatch(/cameraAppliedRef\.current\?\.\(\{ lat: next\.lat, lng: next\.lng \}\)/)
   })
 
   /*
