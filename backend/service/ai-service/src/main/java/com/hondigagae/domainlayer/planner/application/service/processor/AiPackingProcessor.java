@@ -13,6 +13,10 @@ import com.hondigagae.domainlayer.planner.application.port.out.PlanOutlineQueryP
 import com.hondigagae.domainlayer.planner.application.port.out.WeatherOutlookQueryPort;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -25,6 +29,15 @@ import org.springframework.stereotype.Component;
  *
  * <p>근거 셋의 강도가 다르다: 기존 일정 개요는 <b>필수</b>(무엇을 하러 가는지 모르면 준비물이
  * 성립하지 않는다), 반려견 특성·날씨 전망은 <b>관용</b>(빠지면 그만큼 일반적인 목록이 된다).
+ *
+ * <p><b>같은 (회원, 일정)의 생성이 진행 중이면 새로 부르지 않고 그 결과를 함께 받는다 (#1337).</b>
+ * 버튼 더블클릭이 dev 에서 LLM 을 두 번 불렀다 — 두 번째 요청이 게이트에서 24초 기다린 뒤 같은 일을
+ * 다시 했고, 그동안 AI 일정 생성 잡까지 줄을 섰다. 오류 코드로 거절하지 않고 합치는 이유는 둘이다:
+ * 두 요청이 바라는 답이 같고(같은 일정의 제안이며 저장하지 않는다), 거절하면 늦게 온 쪽 화면이
+ * 멀쩡히 진행 중인 생성을 두고 실패를 띄운다. 실패도 함께 받고, 끝나면 슬롯을 비워 다음 요청은 새로 부른다.
+ *
+ * <p><b>전제: ai-service 인스턴스가 하나다</b> — {@code LlmCallGate} 와 같은 전제다. 인스턴스를 늘리면
+ * 인스턴스마다 한 번씩 부를 수 있고, 그때는 게이트와 함께 프로세스 밖(Redis)으로 옮긴다.
  */
 @Slf4j
 @Component
@@ -36,7 +49,50 @@ public class AiPackingProcessor {
     private final WeatherOutlookQueryPort weatherOutlookQueryPort;
     private final AiLlmPort aiLlmPort;
 
+    private final ConcurrentMap<InFlightKey, CompletableFuture<PackingListInfo>> inFlight = new ConcurrentHashMap<>();
+
     public PackingListInfo generatePackingList(long memberId, long planId) {
+        InFlightKey key = new InFlightKey(memberId, planId);
+        CompletableFuture<PackingListInfo> mine = new CompletableFuture<>();
+        CompletableFuture<PackingListInfo> running = inFlight.putIfAbsent(key, mine);
+        if (running != null) {
+            log.info("Packing list joined in-flight generation memberId={} planId={}", memberId, planId);
+            return awaitShared(running);
+        }
+        // 슬롯을 결과 확정보다 먼저 비운다. 거꾸로면 그 틈에 온 요청이 끝난 future 를 받아,
+        // 실패 직후의 재시도가 새로 부르지 않고 같은 오류만 돌려받는다.
+        PackingListInfo info;
+        try {
+            info = generate(memberId, planId);
+        } catch (Throwable failure) {
+            inFlight.remove(key, mine);
+            mine.completeExceptionally(failure);
+            throw failure;
+        }
+        inFlight.remove(key, mine);
+        mine.complete(info);
+        return info;
+    }
+
+    /**
+     * 먼저 온 요청의 결과를 기다린다. 기한을 따로 두지 않는다 — 먼저 온 요청이 게이트 대기 · 모델
+     * 타임아웃에 이미 묶여 있어 그보다 오래 걸리지 않는다. 실패는 먼저 온 요청과 같은 예외로 받는다.
+     */
+    private PackingListInfo awaitShared(CompletableFuture<PackingListInfo> running) {
+        try {
+            return running.join();
+        } catch (CompletionException exception) {
+            if (exception.getCause() instanceof RuntimeException cause) {
+                throw cause;
+            }
+            if (exception.getCause() instanceof Error cause) {
+                throw cause;
+            }
+            throw exception;
+        }
+    }
+
+    private PackingListInfo generate(long memberId, long planId) {
         PlanOutline outline = planOutlineQueryPort.findOutline(memberId, planId)
             .orElseThrow(() -> new AiPlanException(AiPlanErrorCode.PLAN_OUTLINE_UNAVAILABLE));
 
@@ -95,5 +151,9 @@ public class AiPackingProcessor {
         return weatherOutlookQueryPort.findDailyOutlook(outline.areaCode()).stream()
             .filter(outlook -> !outlook.date().isBefore(startDate) && !outlook.date().isAfter(endDate))
             .toList();
+    }
+
+    private record InFlightKey(long memberId, long planId) {
+
     }
 }
