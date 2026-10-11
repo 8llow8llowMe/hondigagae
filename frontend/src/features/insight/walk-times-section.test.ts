@@ -1342,6 +1342,29 @@ describe('WalkTimesSection — 모바일 곡선 접기 (#1356)', () => {
     )
   })
 
+  /*
+    #1360 — 버튼이 곡선 위 한 줄에서 제목 줄 오른쪽으로 갔다. 독립된 줄(44 + 간격 12)이 비로그인 첫
+    화면에서 첫 장소 카드를 접힘선 밖으로 밀었다.
+  */
+  it('펼침 버튼은 제목 줄에 선다 — 제목 바로 뒤 형제다', () => {
+    const markup = renderCollapsed(GOOD_DAY)
+    const headingEnd = markup.indexOf('</h2>') + '</h2>'.length
+
+    expect(markup.slice(headingEnd).trimStart().startsWith('<button')).toBe(true)
+  })
+
+  /* 보이는 글자는 짧고 접근 이름은 길다 — 접근 이름이 보이는 글자로 시작해야 한다 (WCAG 2.5.3) */
+  it('접근 이름이 보이는 글자로 시작한다', () => {
+    const markup = renderCollapsed(GOOD_DAY)
+    const button = markup.slice(markup.indexOf('<button'), markup.indexOf('</button>'))
+
+    expect(button).toContain(`aria-label="${messages.home.goldenCurveToggle}"`)
+    expect(button).toContain(messages.home.goldenCurveToggleShort)
+    expect(messages.home.goldenCurveToggle.startsWith(messages.home.goldenCurveToggleShort)).toBe(
+      true,
+    )
+  })
+
   it('넘기지 않으면 버튼이 없다 — 산책 코스 상세 마크업은 그대로다', () => {
     expect(render(GOOD_DAY)).not.toContain(messages.home.goldenCurveToggle)
   })
