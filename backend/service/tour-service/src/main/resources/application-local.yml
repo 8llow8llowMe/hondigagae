@@ -48,6 +48,13 @@ infra:
     password:
     key-prefix: ${REDIS_KEY_PREFIX:hondigagae:local}
 
+# 장소 추천 예열(#1388)은 로컬에서 끈다 — 하루 8번 기상청 쿼터를 개발자 노트북이 태우지 않게 한다.
+# 확인이 필요하면 INSIGHT_RECOMMENDATION_PREWARM_ENABLED=true 로 켠다.
+insight:
+  recommendation:
+    prewarm:
+      enabled: ${INSIGHT_RECOMMENDATION_PREWARM_ENABLED:false}
+
 eureka:
   client:
     serviceUrl:
