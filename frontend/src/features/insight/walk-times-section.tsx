@@ -135,6 +135,8 @@ export function WalkTimesSection({
   if (data === null) return loading ? <WalkTimesSkeleton /> : null
 
   const status = goldenWindowStatusOf(data)
+  // 곡선이 비는 날(`hourly: []`)은 버튼도 세우지 않는다 — 열어도 아무것도 없는 버튼이다
+  const curveToggle = collapseCurveOnMobile && data.hourly.length > 0
 
   return (
     /*
@@ -169,9 +171,40 @@ export function WalkTimesSection({
           그리는 일은 `WalkTimesCurve` 에 돌려준다: `rail` 을 넘기지 않으면 자기 `.scroll-rail`
           안에 오버레이로 그린다. 여기서 레일을 들고 있을 이유가 사라졌다.
         */}
-        <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
-          {messages.home.goldenHeading}
-        </h2>
+        {curveToggle ? (
+          /*
+            **펼침 버튼은 제목 줄 오른쪽이다** (#1360). 곡선 바로 위 한 줄(누르는 자리 44 + 간격 12)이
+            비로그인 첫 화면에서 첫 장소 카드를 접힘선 밖으로 밀었다. 버튼은 `-my-2` 로 줄 높이를
+            제목에 맞추고 누르는 자리 44 는 그대로 둔다(위아래 간격 안으로 겹친다).
+
+            #730 은 곡선 화살표를 제목 줄로 올렸다가 "카드 전체를 접는 버튼처럼 읽힌다" 로 되돌렸다.
+            그것은 **글자 없는 화살표**였다 — 여기는 `시간대별` 이라는 대상이 글자로 서 있어 무엇을
+            여는지 읽힌다. 접근 이름은 `시간대별 기온 · 노면 보기` 로, 보이는 글자로 시작한다(WCAG 2.5.3).
+          */
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
+              {messages.home.goldenHeading}
+            </h2>
+            <button
+              type="button"
+              aria-expanded={curveOpen}
+              aria-controls={curveId}
+              aria-label={messages.home.goldenCurveToggle}
+              onClick={() => setCurveOpen((prev) => !prev)}
+              className="text-body-2 text-link focus-visible:ring-brand-500 -my-2 inline-flex min-h-11 shrink-0 items-center gap-1 font-semibold focus-visible:ring-2 focus-visible:outline-none md:hidden"
+            >
+              {messages.home.goldenCurveToggleShort}
+              <ChevronDownIcon
+                size={20}
+                className={cn('shrink-0 transition-transform', curveOpen && 'rotate-180')}
+              />
+            </button>
+          </div>
+        ) : (
+          <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
+            {messages.home.goldenHeading}
+          </h2>
+        )}
 
         {/*
           **서버가 고른 상태를 그대로 따른다** (#270). 예전에는 `hasGolden` → `hasForecast`
@@ -193,33 +226,17 @@ export function WalkTimesSection({
           글자도 바뀌지 않는다 (이 파일의 기존 테스트가 그 합격 기준이다).
         */}
         {/*
-          **펼침 버튼은 곡선 바로 위다** — 펼치면 표가 버튼 아래로 열린다. 기준 캡션은 접혀도
-          남는다: 위 시각이 어디 기준인지(`제주시 기준`)는 표가 아니라 판정 한 줄에 딸린 말이다.
-          **곡선이 비는 날(`hourly: []`)은 버튼도 세우지 않는다** — 열어도 아무것도 없는 버튼이다.
+          접힌 곡선 — 버튼은 위 제목 줄에 있다. 기준 캡션은 접혀도 남는다: 위 시각이 어디 기준인지
+          (`제주시 기준`)는 표가 아니라 판정 한 줄에 딸린 말이다.
         */}
-        {collapseCurveOnMobile && data.hourly.length > 0 ? (
-          <>
-            <button
-              type="button"
-              aria-expanded={curveOpen}
-              aria-controls={curveId}
-              onClick={() => setCurveOpen((prev) => !prev)}
-              className="text-body-2 text-link focus-visible:ring-brand-500 inline-flex min-h-11 items-center gap-1 self-start font-semibold focus-visible:ring-2 focus-visible:outline-none md:hidden"
-            >
-              {messages.home.goldenCurveToggle}
-              <ChevronDownIcon
-                size={20}
-                className={cn('shrink-0 transition-transform', curveOpen && 'rotate-180')}
-              />
-            </button>
-            <div id={curveId} className={cn(!curveOpen && 'hidden md:block')}>
-              <WalkTimesCurve
-                hourly={data.hourly}
-                goldenStart={data.goldenStart}
-                goldenEnd={data.goldenEnd}
-              />
-            </div>
-          </>
+        {curveToggle ? (
+          <div id={curveId} className={cn(!curveOpen && 'hidden md:block')}>
+            <WalkTimesCurve
+              hourly={data.hourly}
+              goldenStart={data.goldenStart}
+              goldenEnd={data.goldenEnd}
+            />
+          </div>
         ) : (
           <WalkTimesCurve
             hourly={data.hourly}
