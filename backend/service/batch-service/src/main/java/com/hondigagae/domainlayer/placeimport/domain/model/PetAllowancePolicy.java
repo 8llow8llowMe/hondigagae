@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.placeimport.domain.model;
 
 import com.hondigagae.shared.travel.place.AllowedPetSize;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -15,6 +16,8 @@ import java.util.List;
  * <p><b>UNKNOWN 은 근거가 아니다.</b> 모든 근거가 UNKNOWN 이거나 근거가 없으면 결과가 UNKNOWN 이다. 특히
  * {@code place_pet_info} 가 없다는 것을 NOT_ALLOWED 로 읽지 않는다 — 동반여행 목록에 없다는 것은 "모른다" 이지
  * "안 된다" 가 아니다.
+ *
+ * <p>하위 시설(본 시설 이름 + 괄호 수식어, 100m 안)은 본 시설 결과 중 제한만 근거로 더 받는다 — {@link #withParentRestriction} (#1340).
  *
  * <p>설계: {@code docs/superpowers/specs/2026-09-28-pet-allowance-reflect-design.md} §2.
  */
@@ -57,6 +60,32 @@ public final class PetAllowancePolicy {
             }
         }
         return PetAllowanceType.UNKNOWN;
+    }
+
+    /**
+     * 하위 시설의 동반 구분에 본 시설의 제한을 얹는다 (#1340). 본 시설 판정은 {@code PlaceIdentityPolicy.isSubFacilityOf}.
+     *
+     * <p>본 시설 결과 중 <b>제한(PARTIALLY_ALLOWED · NOT_ALLOWED)만</b> 근거로 더하고 가장 제한적인 값을 고른다. 본 시설이
+     * "야외만" 인데 그 안 매장이 자기 근거("전 구역")로 ALLOWED 로 보이던 것({@code 생각하는 정원[면세점]})을 막는다.
+     * 자기 근거가 없는 하위 시설도 본 시설 제한을 받는다({@code 생각하는정원(청원)} → PARTIALLY_ALLOWED).
+     *
+     * <p><b>본 시설의 ALLOWED 는 물려주지 않는다.</b> 근거 없는 실내 매장이 본 시설 덕에 "동반 가능" 으로 보이면 이 이슈와 같은
+     * 오해가 반대 경로로 생긴다. UNKNOWN 은 원래 근거가 아니다. 그래서 상속은 근거 있는 구분을 좁히기만 한다.
+     * 자기 근거가 없는(UNKNOWN) 하위 시설은 본 시설 제한으로 PARTIALLY_ALLOWED 가 되어 {@code pet_available} 이 true 가 된다
+     * (data-refresh-guide.md §10).
+     *
+     * @param own     하위 시설 자기 근거(동반 정보 · 흡수 행)로 낸 결과
+     * @param parents 본 시설 후보들의 자기 근거 결과. 후보가 여럿이면 모두 본다
+     */
+    public static PetAllowanceType withParentRestriction(PetAllowanceType own, Collection<PetAllowanceType> parents) {
+        List<PetAllowanceType> evidences = new ArrayList<>();
+        evidences.add(own);
+        parents.stream().filter(PetAllowancePolicy::isRestriction).forEach(evidences::add);
+        return mostRestrictiveAllowance(evidences);
+    }
+
+    private static boolean isRestriction(PetAllowanceType allowance) {
+        return allowance == PetAllowanceType.PARTIALLY_ALLOWED || allowance == PetAllowanceType.NOT_ALLOWED;
     }
 
     /**

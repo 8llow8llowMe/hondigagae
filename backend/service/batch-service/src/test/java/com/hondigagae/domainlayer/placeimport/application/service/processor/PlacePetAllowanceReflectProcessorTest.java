@@ -23,6 +23,10 @@ import org.mockito.ArgumentCaptor;
  */
 class PlacePetAllowanceReflectProcessorTest {
 
+    /** 생각하는 정원(125445) 근처. 위도 0.00025° ≈ 28m, 0.00052° ≈ 58m (prod 실측 거리). */
+    private static final double PARENT_LAT = 33.3195;
+    private static final double PARENT_LNG = 126.2390;
+
     private final PlacePetAllowanceCommandPort port = mock(PlacePetAllowanceCommandPort.class);
     private final PlacePetAllowanceReflectProcessor processor = new PlacePetAllowanceReflectProcessor(port);
 
@@ -81,12 +85,110 @@ class PlacePetAllowanceReflectProcessorTest {
         assertThat(outcome.targets()).isEqualTo(2);
     }
 
+    @Test
+    @DisplayName("하위 시설은 본 시설의 결과까지 근거로 삼는다 — 생각하는 정원 면세점 · 청원 (#1340)")
+    void subFacilityInheritsParentRestriction() {
+        when(port.findTourApiEvidences()).thenReturn(List.of(
+            // 본 시설: 자기 동반 정보 전구역 + 흡수된 문화정보원 행 "야외만" → 일부. 크기는 소형만
+            located(125445L, "생각하는 정원", PARENT_LAT, PARENT_LNG, "UNKNOWN", "UNKNOWN", false,
+                "FULL_AREA", "ALL", List.of("PARTIALLY_ALLOWED"), List.of("SMALL_ONLY")),
+            // 면세점(28m): 자기 근거는 전구역뿐 → 본 시설 따라 일부. 크기 제한은 상속하지 않는다
+            located(4054291L, "생각하는 정원[면세점(TAX REFUND SHOP)]", PARENT_LAT + 0.00025, PARENT_LNG, "UNKNOWN", "UNKNOWN", false,
+                "FULL_AREA", "ALL", List.of(), List.of()),
+            // 청원(58m): 근거 없음 → 본 시설 따라 일부
+            located(2907434L, "생각하는정원(청원)", PARENT_LAT + 0.00052, PARENT_LNG, "UNKNOWN", "UNKNOWN", false,
+                null, null, List.of(), List.of())));
+        when(port.updatePetAllowances(anyList())).thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+
+        PetAllowanceReflectOutcome outcome = processor.reflectPetAllowances();
+
+        ArgumentCaptor<List<ReflectedPetAllowance>> written = listCaptor();
+        verify(port).updatePetAllowances(written.capture());
+        assertThat(written.getValue()).containsExactly(
+            new ReflectedPetAllowance(125445L, PetAllowanceType.PARTIALLY_ALLOWED, AllowedPetSize.SMALL_ONLY),
+            new ReflectedPetAllowance(4054291L, PetAllowanceType.PARTIALLY_ALLOWED, AllowedPetSize.ALL),
+            new ReflectedPetAllowance(2907434L, PetAllowanceType.PARTIALLY_ALLOWED, AllowedPetSize.UNKNOWN));
+        assertThat(written.getValue()).extracting(ReflectedPetAllowance::petAvailable).containsOnly(true);
+        assertThat(outcome.countOf(PetAllowanceType.PARTIALLY_ALLOWED)).isEqualTo(3);
+        assertThat(outcome.inherited()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("상속은 본 시설 → 하위 시설 한 방향이다 — 하위가 더 제한적이어도 본 시설은 그대로, 본 시설이 UNKNOWN 이면 하위도 그대로 (#1340)")
+    void inheritsOnlyFromParentToChild() {
+        when(port.findTourApiEvidences()).thenReturn(List.of(
+            // 역방향: 하위가 동반 불가여도 본 시설은 자기 근거대로 가능
+            located(10L, "용머리해안", PARENT_LAT, PARENT_LNG, "UNKNOWN", "UNKNOWN", false, "FULL_AREA", "ALL", List.of(), List.of()),
+            located(11L, "용머리해안(매표소)", PARENT_LAT + 0.0002, PARENT_LNG, "UNKNOWN", "UNKNOWN", false, null, null, List.of("NOT_ALLOWED"), List.of()),
+            // 본 시설 UNKNOWN — 하위 결과에 영향이 없다
+            located(20L, "산방산", 33.24, 126.31, "UNKNOWN", "UNKNOWN", false, null, null, List.of(), List.of()),
+            located(21L, "산방산(카페)", 33.2401, 126.31, "UNKNOWN", "UNKNOWN", false, "FULL_AREA", "ALL", List.of(), List.of()),
+            // 반경 밖(약 550m) — 괄호가 지역 표기인 다른 곳일 수 있어 상속하지 않는다
+            located(30L, "성산일출봉", 33.46, 126.94, "UNKNOWN", "UNKNOWN", false, "PARTIAL", "ALL", List.of(), List.of()),
+            located(31L, "성산일출봉(제주)", 33.465, 126.94, "UNKNOWN", "UNKNOWN", false, "FULL_AREA", "ALL", List.of(), List.of()),
+            // 좌표 없는 하위 행은 판정하지 않는다
+            located(40L, "비자림", 33.49, 126.81, "UNKNOWN", "UNKNOWN", false, "PARTIAL", "ALL", List.of(), List.of()),
+            located(41L, "비자림(매점)", null, null, "UNKNOWN", "UNKNOWN", false, "FULL_AREA", "ALL", List.of(), List.of()),
+            // 본 시설 후보가 둘이면 더 제한적인 쪽
+            located(50L, "한림공원", 33.39, 126.24, "UNKNOWN", "UNKNOWN", false, "PARTIAL", "ALL", List.of(), List.of()),
+            located(51L, "한림공원", 33.3901, 126.24, "UNKNOWN", "UNKNOWN", false, null, null, List.of("NOT_ALLOWED"), List.of()),
+            located(52L, "한림공원(매표소)", 33.3902, 126.24, "UNKNOWN", "UNKNOWN", false, "FULL_AREA", "ALL", List.of(), List.of()),
+            // 본 시설 ALLOWED 는 물려주지 않는다 — 근거 없는 실내 매장이 "동반 가능" 으로 보이면 #1340 과 같은 오해다
+            located(60L, "섭지코지", 33.42, 126.93, "UNKNOWN", "UNKNOWN", false, "FULL_AREA", "ALL", List.of(), List.of()),
+            located(61L, "섭지코지(카페)", 33.4201, 126.93, "UNKNOWN", "UNKNOWN", false, null, null, List.of(), List.of())));
+        when(port.updatePetAllowances(anyList())).thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+
+        PetAllowanceReflectOutcome outcome = processor.reflectPetAllowances();
+
+        ArgumentCaptor<List<ReflectedPetAllowance>> written = listCaptor();
+        verify(port).updatePetAllowances(written.capture());
+        assertThat(written.getValue()).containsExactly(
+            new ReflectedPetAllowance(10L, PetAllowanceType.ALLOWED, AllowedPetSize.ALL),
+            new ReflectedPetAllowance(11L, PetAllowanceType.NOT_ALLOWED, AllowedPetSize.UNKNOWN),
+            new ReflectedPetAllowance(21L, PetAllowanceType.ALLOWED, AllowedPetSize.ALL),
+            new ReflectedPetAllowance(30L, PetAllowanceType.PARTIALLY_ALLOWED, AllowedPetSize.ALL),
+            new ReflectedPetAllowance(31L, PetAllowanceType.ALLOWED, AllowedPetSize.ALL),
+            new ReflectedPetAllowance(40L, PetAllowanceType.PARTIALLY_ALLOWED, AllowedPetSize.ALL),
+            new ReflectedPetAllowance(41L, PetAllowanceType.ALLOWED, AllowedPetSize.ALL),
+            new ReflectedPetAllowance(50L, PetAllowanceType.PARTIALLY_ALLOWED, AllowedPetSize.ALL),
+            new ReflectedPetAllowance(51L, PetAllowanceType.NOT_ALLOWED, AllowedPetSize.UNKNOWN),
+            new ReflectedPetAllowance(52L, PetAllowanceType.NOT_ALLOWED, AllowedPetSize.ALL),
+            new ReflectedPetAllowance(60L, PetAllowanceType.ALLOWED, AllowedPetSize.ALL));
+        assertThat(outcome.countOf(PetAllowanceType.UNKNOWN)).isEqualTo(2);   // 20 · 61
+        assertThat(outcome.inherited()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("상속까지 반영된 상태면 다시 돌려도 쓰지 않는다 (#1340)")
+    void writesNothingWhenInheritanceAlreadyReflected() {
+        when(port.findTourApiEvidences()).thenReturn(List.of(
+            located(125445L, "생각하는 정원", PARENT_LAT, PARENT_LNG, "PARTIALLY_ALLOWED", "ALL", true,
+                "FULL_AREA", "ALL", List.of("PARTIALLY_ALLOWED"), List.of()),
+            located(4054291L, "생각하는 정원[면세점(TAX REFUND SHOP)]", PARENT_LAT + 0.00025, PARENT_LNG, "PARTIALLY_ALLOWED", "ALL", true,
+                "FULL_AREA", "ALL", List.of(), List.of())));
+
+        PetAllowanceReflectOutcome outcome = processor.reflectPetAllowances();
+
+        verify(port, never()).updatePetAllowances(anyList());
+        assertThat(outcome.changed()).isZero();
+        // 상속은 매 실행 다시 판정하므로 쓰지 않아도 센다 — 지금 몇 곳이 본 시설 값을 받고 있는지다
+        assertThat(outcome.inherited()).isEqualTo(1);
+    }
+
     private static PlacePetAllowanceEvidenceQueryResult evidence(
         long placeId, String currentAllowance, String currentSize, boolean currentPetAvailable, String petInfoScope, String petInfoSize,
         List<String> absorbedAllowances, List<String> absorbedSizes
     ) {
-        return new PlacePetAllowanceEvidenceQueryResult(placeId, currentAllowance, currentSize, currentPetAvailable, petInfoScope, petInfoSize,
+        return located(placeId, "place-" + placeId, null, null, currentAllowance, currentSize, currentPetAvailable, petInfoScope, petInfoSize,
             absorbedAllowances, absorbedSizes);
+    }
+
+    private static PlacePetAllowanceEvidenceQueryResult located(
+        long placeId, String title, Double lat, Double lng, String currentAllowance, String currentSize, boolean currentPetAvailable,
+        String petInfoScope, String petInfoSize, List<String> absorbedAllowances, List<String> absorbedSizes
+    ) {
+        return new PlacePetAllowanceEvidenceQueryResult(placeId, title, lat, lng, currentAllowance, currentSize, currentPetAvailable,
+            petInfoScope, petInfoSize, absorbedAllowances, absorbedSizes);
     }
 
     private static ArgumentCaptor<List<ReflectedPetAllowance>> listCaptor() {

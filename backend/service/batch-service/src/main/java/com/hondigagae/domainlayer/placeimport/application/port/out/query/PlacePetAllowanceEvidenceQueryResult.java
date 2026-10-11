@@ -6,7 +6,12 @@ import java.util.List;
  * TourAPI 노출 장소 한 곳의 동반 가능 여부 근거 (#886). 값은 컬럼 문자열 그대로다 — 해석은
  * {@code PetAllowancePolicy} 가 한다.
  *
+ * <p>이름 · 좌표는 하위 시설 판정(#1340, {@code PlaceIdentityPolicy.isSubFacilityOf})에 쓴다 — 본 시설의 제한을 하위 시설에 물려준다.
+ *
  * @param placeId            대상 place.id (TourAPI · 노출 · 병합되지 않은 행)
+ * @param title              place.title
+ * @param lat                place.lat. 좌표가 없으면 null — 하위 시설 판정에서 빠진다
+ * @param lng                place.lng. 좌표가 없으면 null
  * @param currentAllowance   지금 place.pet_allowance_type
  * @param currentSize        지금 place.allowed_pet_size
  * @param currentPetAvailable 지금 place.pet_available
@@ -17,6 +22,9 @@ import java.util.List;
  */
 public record PlacePetAllowanceEvidenceQueryResult(
     long placeId,
+    String title,
+    Double lat,
+    Double lng,
     String currentAllowance,
     String currentSize,
     boolean currentPetAvailable,
@@ -29,5 +37,9 @@ public record PlacePetAllowanceEvidenceQueryResult(
     public PlacePetAllowanceEvidenceQueryResult {
         absorbedAllowances = absorbedAllowances == null ? List.of() : List.copyOf(absorbedAllowances);
         absorbedSizes = absorbedSizes == null ? List.of() : List.copyOf(absorbedSizes);
+    }
+
+    public boolean hasCoordinates() {
+        return lat != null && lng != null;
     }
 }

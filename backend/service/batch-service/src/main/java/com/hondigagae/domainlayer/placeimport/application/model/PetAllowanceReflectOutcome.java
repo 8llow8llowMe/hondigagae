@@ -12,8 +12,12 @@ import java.util.Map;
  * @param changed        값이 바뀌어 실제로 갱신한 행 수. 입력이 같으면 두 번째 실행부터 0 이다
  * @param distribution   재계산 뒤 대상 전체의 동반 구분 분포. 네 값 모두 키가 있다(0 포함)
  * @param sizeRestricted 재계산 뒤 크기 제한(SMALL_ONLY · SMALL_MEDIUM)이 걸린 대상 수
+ * @param inherited      본 시설의 제한을 물려받아 자기 근거만으로 낸 값보다 좁아진 하위 시설 수 (#1340). 쓰기 여부와 무관하게
+ *                       이번 실행에서 상속이 적용된 행 전부를 센다 — 두 번째 실행에서도 같은 값이다
  */
-public record PetAllowanceReflectOutcome(int targets, int changed, Map<PetAllowanceType, Integer> distribution, int sizeRestricted) {
+public record PetAllowanceReflectOutcome(
+    int targets, int changed, Map<PetAllowanceType, Integer> distribution, int sizeRestricted, int inherited
+) {
 
     public PetAllowanceReflectOutcome {
         Map<PetAllowanceType, Integer> filled = new EnumMap<>(PetAllowanceType.class);
