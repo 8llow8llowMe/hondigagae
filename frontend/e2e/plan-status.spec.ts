@@ -369,13 +369,25 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
       await expect(target).toBeVisible()
     }
 
-    const y = async (target: typeof day) => {
-      const rect = await target.boundingBox()
-      if (rect === null) throw new Error('레이아웃을 재지 못했다')
-      return rect.y
+    /*
+      **셋을 한 번에 잰다** (#1369 에서 드러났다). 따로 `boundingBox()` 를 세 번 부르면 그 사이에
+      일자 판정 응답이 도착해 일자 카드가 대기 골격에서 실화면으로 바뀐다 — 문서가 약 460px
+      줄어드는 순간이다. 그러면 준비물은 대기 중 좌표(1655)로, 배너는 도착 뒤 좌표(1369)로 잡혀
+      DOM 순서와 반대인 값이 나왔다(develop 에서도 30회 중 3회). 한 `evaluate` 안에서 재면 같은
+      프레임의 스냅숏이라 어느 상태에서 재든 순서가 DOM 그대로다.
+    */
+    const handles = await Promise.all(
+      [day, packing, banner].map((target) => target.elementHandle()),
+    )
+    const [dayY, packingY, bannerY] = await page.evaluate(
+      (elements) => elements.map((element) => element?.getBoundingClientRect().top ?? Number.NaN),
+      handles,
+    )
+    if ([dayY, packingY, bannerY].some((value) => value === undefined || Number.isNaN(value))) {
+      throw new Error('레이아웃을 재지 못했다')
     }
 
-    return { day: await y(day), packing: await y(packing), banner: await y(banner) }
+    return { day: dayY as number, packing: packingY as number, banner: bannerY as number }
   }
 
   /**
