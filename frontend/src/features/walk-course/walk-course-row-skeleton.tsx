@@ -26,7 +26,7 @@ export function WalkCourseRowSkeleton() {
           오는데, 높이가 박혀 있으면 `aspect-16/10` 이 계산할 여지가 없어 사진 자리가
           16px 짜리 띠가 된다. 같은 그룹의 값이라 `h-auto` 가 `h-4` 를 밀어낸다.
         */}
-        <Skeleton className="aspect-16/10 h-auto w-full rounded-none" />
+        <Skeleton className="aspect-2/1 h-auto w-full rounded-none md:aspect-16/10" />
 
         <div className="px-4 pt-3 pb-4">
           {/* 제목 줄 — 번호 + 구간명이 한 줄이라 뼈대도 한 줄이다 */}

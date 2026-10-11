@@ -5,6 +5,7 @@ import { useWalkCourseNav } from '@/features/walk-course/use-walk-course-nav'
 import {
   WalkCourseActivityField,
   WalkCourseSortField,
+  WalkCourseSortInline,
 } from '@/features/walk-course/walk-course-filter-fields'
 import {
   type WalkCourseBasis,
@@ -98,11 +99,20 @@ export function WalkCourseListView({
             applied={params.petActivityLevel}
             onChange={(activity) => apply({ ...filters, activity })}
           />
-          <WalkCourseSortField
-            sort={filters.sort}
-            onChange={(sort) => apply({ ...filters, sort })}
-          />
+          {/* 모바일은 개수 줄 오른쪽 토글이 맡는다 (#1374, `countTrailing`) */}
+          <div className="hidden md:block">
+            <WalkCourseSortField
+              sort={filters.sort}
+              onChange={(sort) => apply({ ...filters, sort })}
+            />
+          </div>
         </div>
+      }
+      countTrailing={
+        <WalkCourseSortInline
+          sort={filters.sort}
+          onChange={(sort) => apply({ ...filters, sort })}
+        />
       }
     />
   )
