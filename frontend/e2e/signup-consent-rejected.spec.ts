@@ -14,7 +14,7 @@ import { chooseEmailSignup, sendSignupCodeWithConsent } from './helpers/signup'
  *
  * 함께 잠그는 접근성 둘:
  * - **N2** 이 시트는 제출 응답이 열어, 열린 순간의 활성 요소가 `BODY` 다(제출 중 `가입하기` 가
- *   `disabled`). Esc 로 닫으면 `BODY` 가 아니라 `가입하기` 로 돌아가야 한다.
+ *   `disabled`). Esc 로 닫으면 `BODY` 가 아니라 거부 사유 폼 알림으로 가야 한다 (#1392).
  * - **N3** `aria-modal="true"` 시트에서 Tab 이 뒤쪽 페이지(상단바 `←`)로 빠지지 않는다.
  *
  * 응답은 `page.route` 로 400 `MEMBER_010` 에 고정한다 — 목 저장소는 동의 3종이 다 켜진 가입을
@@ -109,13 +109,22 @@ test('서버가 동의를 거부하면 시트가 다시 뜨고, "동의하고 �
   await expect(sheetOf(page)).toBeVisible()
 })
 
-test('N2: 다시 뜬 시트를 Esc 로 닫으면 BODY 가 아니라 가입하기로 돌아간다', async ({ page }) => {
+/*
+  #1392: 시트를 닫으면 **거부 사유가 폼 알림으로 다시 선다** — 체크박스가 시트에만 있어 예전에는 닫는
+  순간 실패 이유가 화면에서 사라졌다. 포커스는 그 알림으로 간다(제출 실패 포커스 순서 "첫 오류 칸 →
+  폼 알림" 과 같다). #1295 가 `가입하기` 로 돌려보내던 자리는 알림이 없던 시절의 차선이었다.
+*/
+test('N2: 다시 뜬 시트를 Esc 로 닫으면 BODY 가 아니라 거부 사유 알림으로 간다', async ({
+  page,
+}) => {
   await rejectAtProfileStep(page)
 
   await page.keyboard.press('Escape')
 
   await expect(sheetOf(page)).toHaveCount(0)
-  await expect(submitOf(page)).toBeFocused()
+  const alert = page.locator('main [data-form-alert]')
+  await expect(alert).toContainText(REJECTED_MESSAGE)
+  await expect(alert).toBeFocused()
   expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('BODY')
 })
 
