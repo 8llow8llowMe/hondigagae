@@ -422,3 +422,23 @@ describe('WalkCourseListSection — 첫 화면 사진 우선 로드 (#1132)', ()
     })
   })
 })
+
+/* #1374 — 개수 줄 오른쪽 칸은 모바일에서만 선다. md 이상은 도구 줄 세그먼트가 같은 일을 한다 */
+describe('WalkCourseListSection — 개수 줄 오른쪽 칸 (#1374)', () => {
+  it('넘기면 개수 줄 안에 md 미만에서만 선다', () => {
+    const markup = render({ countTrailing: createElement('span', null, 'TRAILING') })
+    const at = markup.indexOf('TRAILING')
+    const wrapper = markup.slice(
+      markup.lastIndexOf('<div', at),
+      markup.indexOf('>', markup.lastIndexOf('<div', at)) + 1,
+    )
+
+    expect(at).toBeGreaterThan(markup.indexOf(messages.walkCourse.listCount.replace('{count}', '')))
+    expect(wrapper).toContain('md:hidden')
+    expect(wrapper).toContain('ml-auto')
+  })
+
+  it('넘기지 않으면 칸이 없다', () => {
+    expect(render()).not.toContain('ml-auto self-center')
+  })
+})

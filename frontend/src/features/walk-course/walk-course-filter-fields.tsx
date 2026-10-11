@@ -153,6 +153,70 @@ export function WalkCourseSortField({
   )
 }
 
+/**
+ * 정렬 — **모바일 개수 줄 오른쪽의 작은 글자 토글** (#1374).
+ *
+ * 모바일 머리에서 정렬은 라벨 + 44px 세그먼트 한 줄(약 86px)을 썼고, 활동량 줄과 합쳐 첫 코스가
+ * y=386 에서 시작했다. 정렬은 결과를 고르는 조건이 아니라 **결과를 세우는 방식**이라 결과 줄(`코스
+ * N개`) 옆이 제자리다 — 목록 앱의 `개수 · 정렬` 줄과 같다.
+ *
+ * **의미는 `WalkCourseSortField` 와 같다** — 같은 `radiogroup` · 같은 키보드(`handleRadioGroupKeyDown`)
+ * · 같은 이름(`정렬`)이다. 보이는 라벨은 없다: 두 선택지 글자가 정렬임을 말하고, 그룹 이름은
+ * 접근 이름이 갖는다. 누르는 자리는 44 그대로다. `md` 이상은 도구 줄의 세그먼트가 선다.
+ */
+export function WalkCourseSortInline({
+  sort,
+  onChange,
+}: {
+  sort: WalkCourseSort | null
+  onChange: (next: WalkCourseSort | null) => void
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={messages.walkCourse.sortGroupLabel}
+      className="flex items-center"
+    >
+      <InlineOption selected={sort === null} onSelect={() => onChange(null)}>
+        {messages.walkCourse.sortCourseNo}
+      </InlineOption>
+      <span aria-hidden className="text-fg-subtle text-caption">
+        ·
+      </span>
+      <InlineOption selected={sort === 'DISTANCE_ASC'} onSelect={() => onChange('DISTANCE_ASC')}>
+        {messages.walkCourse.sortDistanceAsc}
+      </InlineOption>
+    </div>
+  )
+}
+
+function InlineOption({
+  selected,
+  onSelect,
+  children,
+}: {
+  selected: boolean
+  onSelect: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      tabIndex={radioTabIndex(selected)}
+      onKeyDown={handleRadioGroupKeyDown}
+      onClick={onSelect}
+      className={cn(
+        'text-body-2 focus-visible:ring-brand-500 inline-flex h-11 items-center rounded-md px-2 whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none',
+        selected ? 'text-fg font-semibold' : 'text-fg-muted hover:text-fg font-medium',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
 function Segment({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div

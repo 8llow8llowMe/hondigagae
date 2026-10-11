@@ -152,7 +152,8 @@ export function WalkCourseRow({
           `alt` 는 빈 문자열이다 — 바로 아래에 이름표가 글자로 있다 (D6).
         */}
         {thumbnail !== null && (
-          <div className="bg-band relative aspect-16/10">
+          // 모바일은 2:1 — 16:10 이 375 에서 약 214px 라 한 화면에 코스가 하나뿐이었다 (#1374)
+          <div className="bg-band relative aspect-2/1 md:aspect-16/10">
             <Image
               src={thumbnail}
               alt=""
