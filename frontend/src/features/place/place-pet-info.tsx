@@ -1,4 +1,4 @@
-import { CheckIcon } from '@/components/icons'
+import { CheckIcon, ChevronDownIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
 import { messages } from '@/lib/messages'
 import { petSizeVerdict } from '@/lib/place/pet-size'
@@ -67,21 +67,67 @@ export function PlacePetInfoSection({
         <p className="text-body-2 text-fg font-semibold break-keep">{verdict}</p>
       )}
 
-      {lines.length > 0 && (
-        /*
-          2열은 폭이 있을 때만이다. 1024~1279 는 좌측 400 레일을 뺀 우측이 좁아 한 열로
-          되돌린다 — 두 열로 두면 문장이 어절마다 끊긴다. 768~1023 은 한 컬럼이라 전폭이다.
-        */
-        <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-x-8 lg:grid-cols-1 xl:grid-cols-2">
-          {lines.map((line) => (
-            <PetInfoLine key={line.label} label={line.label} value={line.value} />
-          ))}
-        </ul>
-      )}
+      {lines.length > 0 && <PetInfoLines lines={lines} />}
 
       <p className="bg-band text-caption text-fg-muted rounded-md p-3 break-keep">
         {messages.place.detailPetInfoDisclaimer}
       </p>
+    </div>
+  )
+}
+
+/** 처음부터 펼쳐 두는 줄 수 (#1371) */
+export const PET_INFO_VISIBLE_LINES = 5
+
+/*
+  2열은 폭이 있을 때만이다. 1024~1279 는 좌측 400 레일을 뺀 우측이 좁아 한 열로 되돌린다 — 두 열로
+  두면 문장이 어절마다 끊긴다. 768~1023 은 한 컬럼이라 전폭이다. 접힌 목록도 같은 틀이다.
+*/
+const PET_INFO_LIST_CLASS =
+  'grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-x-8 lg:grid-cols-1 xl:grid-cols-2'
+
+/**
+ * 동반 정보 목록 — **앞 5줄만 펼치고 나머지는 접는다** (#1371).
+ *
+ * 원천 항목을 전부 펼치면 375 에서 약 700px(mock 14줄)이라, 그 아래 `오늘 ○○에게` 판정 · 혼잡도가
+ * 한참 밀렸다. 순서는 `petInfoLines` 그대로다 — 구역 · 크기 · 목줄 · 유형 · 동물이 먼저라 들어갈 수
+ * 있는지는 펼친 줄이 답하고, 준비물 · 부대시설 같은 세부가 접힌다.
+ *
+ * **네이티브 `<details>` 다.** 이 섹션은 서버 컴포넌트이고, 열고 닫기 · 키보드 · 펼침 상태 낭독을
+ * 브라우저가 맡는다. **남는 줄이 하나뿐이면 접지 않는다** — `1개 더 보기` 는 펼치는 수고가 더 크다.
+ */
+function PetInfoLines({ lines }: { lines: { label: string; value: string }[] }) {
+  const collapses = lines.length > PET_INFO_VISIBLE_LINES + 1
+  const shown = collapses ? lines.slice(0, PET_INFO_VISIBLE_LINES) : lines
+  const rest = collapses ? lines.slice(PET_INFO_VISIBLE_LINES) : []
+
+  return (
+    <div className="flex flex-col gap-3">
+      <ul className={PET_INFO_LIST_CLASS}>
+        {shown.map((line) => (
+          <PetInfoLine key={line.label} label={line.label} value={line.value} />
+        ))}
+      </ul>
+      {rest.length > 0 && (
+        <details className="group flex flex-col gap-3">
+          <summary className="text-body-2 text-link focus-visible:ring-brand-500 inline-flex min-h-11 cursor-pointer list-none items-center gap-1 self-start font-semibold focus-visible:ring-2 focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+            <span className="group-open:hidden">
+              {messages.place.detailPetInfoMore.replace('{count}', String(rest.length))}
+            </span>
+            <span className="hidden group-open:inline">{messages.place.detailPetInfoLess}</span>
+            <ChevronDownIcon
+              size={20}
+              aria-hidden
+              className="shrink-0 transition-transform group-open:rotate-180"
+            />
+          </summary>
+          <ul className={PET_INFO_LIST_CLASS}>
+            {rest.map((line) => (
+              <PetInfoLine key={line.label} label={line.label} value={line.value} />
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   )
 }

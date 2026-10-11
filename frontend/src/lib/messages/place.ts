@@ -179,6 +179,12 @@ export const placeMessages = {
   detailPetRental: '대여 가능 품목',
   /** intro.chkPet — DTO 주석이 "판단은 petInfo 우선" 이라 참고 값으로만 둔다 */
   detailPetSourceText: '원문 표기',
+  /**
+   * 접어 둔 동반 정보를 여는 줄 (#1371). `{count}` 는 접힌 줄 수다. 열린 뒤에는 `접기` — `<details>`
+   * 의 `open` 상태로 두 글자를 갈아 끼운다(스크린리더는 펼침 상태를 따로 듣는다).
+   */
+  detailPetInfoMore: '{count}개 더 보기',
+  detailPetInfoLess: '접기',
 
   // ── 장소 상세 · 적합도 패널 (아트보드 `혼디가개 장소 상세` 01·03·04) ──────────
 
