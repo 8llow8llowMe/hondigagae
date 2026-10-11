@@ -260,19 +260,40 @@ describe('PlaceRow — 좁은 컨테이너에서도 제목이 남는다 (#240)',
 /*
   #530 — 동반 정보가 없는 장소가 서버 `name` 그대로 `정보 없음` 배지를 달고 카테고리
   태그 옆에 섰다. 낱말을 갖고 있는 이웃 때문에 **무엇의 정보가 없다는 것인지** 더
-  안 읽혔다 — 홈 행 · 상세 헤더와 같은 처리다.
+  안 읽혔다 — 그래서 #530 은 배지를 뺐다.
+
+  #1379 — dev 실데이터의 72% 가 `UNKNOWN` 이라, 배지 없는 행이 `동반 가능` 행 사이에서
+  "제한 없음" 으로 읽혔다. 숨기지 않고 지도 미리보기와 같은 **`동반 정보 없음` 점선**으로 드러낸다.
 */
-describe('PlaceRow — 동반 정보 없음 (#530)', () => {
+describe('PlaceRow — 동반 정보 없음 (#530 · #1379)', () => {
   const unknown: PlaceSummary = {
     ...placeSummary,
     petAllowanceType: { code: 'UNKNOWN', name: '정보 없음', description: null },
   }
 
-  it('UNKNOWN 이면 동반 배지를 그리지 않는다', () => {
-    expect(render(unknown)).not.toContain('정보 없음')
+  /** 문구를 감싼 배지의 여는 태그 — 마크업 전체에서 클래스를 찾으면 다른 요소에 걸려도 통과한다 */
+  function badgeTag(markup: string, text: string): string | null {
+    return markup.match(new RegExp(`<span[^>]*>${text}</span>`))?.[0] ?? null
+  }
+
+  it('UNKNOWN 이면 축 이름을 붙인 `동반 정보 없음` 을 점선으로 그린다', () => {
+    const tag = badgeTag(render(unknown), '동반 정보 없음')
+
+    expect(tag).not.toBeNull()
+    expect(tag).toContain('border-dashed')
   })
 
-  /* 동반 배지만 빠진다 — 분류는 메타 줄에 그대로다 */
+  /* 서버 `name` 만 홀로 서면 #530 의 문제(무엇의 정보인가)가 돌아온다 */
+  it('서버 문구 `정보 없음` 을 그대로 쓰지 않는다', () => {
+    expect(render(unknown)).not.toContain('>정보 없음<')
+  })
+
+  /* 지도 미리보기와 같은 말이어야 같은 상태로 읽힌다 */
+  it('지도 미리보기와 같은 메시지를 쓴다', () => {
+    expect(render(unknown)).toContain(`>${messages.place.petAllowanceUnknown}<`)
+  })
+
+  /* 동반 배지만 바뀐다 — 분류는 메타 줄에 그대로다 */
   it('분류는 함께 사라지지 않는다', () => {
     const markup = render({ ...unknown, indoor: null })
 
@@ -280,16 +301,20 @@ describe('PlaceRow — 동반 정보 없음 (#530)', () => {
   })
 
   /*
-    **문구가 아니라 `code` 로 거른다.** `name` 은 서버 문구라 언제든 바뀌고, 문구 비교는
+    **문구가 아니라 `code` 로 가른다.** `name` 은 서버 문구라 언제든 바뀌고, 문구 비교는
     그때 조용히 어긋난다 (api-integration-guide.md §6).
   */
-  it('같은 문구라도 code 가 다르면 그린다', () => {
+  it('같은 문구라도 code 가 다르면 서버 문구를 실선 배지로 그린다', () => {
     const sameWording: PlaceSummary = {
       ...placeSummary,
       petAllowanceType: { code: 'NOT_ALLOWED', name: '정보 없음', description: null },
     }
+    const markup = render(sameWording)
+    const tag = badgeTag(markup, '정보 없음')
 
-    expect(render(sameWording)).toContain('정보 없음')
+    expect(tag).not.toBeNull()
+    expect(tag).not.toContain('border-dashed')
+    expect(markup).not.toContain('동반 정보 없음')
   })
 })
 
