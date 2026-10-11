@@ -7,6 +7,8 @@
 - `plans`, `places`, `pets`, `walk-courses`처럼 도메인 의미가 드러나는 이름을 사용한다.
 - 비교/요약/분석 API도 가능하면 리소스 체인 안에서 의미가 드러나도록 구성한다.
   - 예: `GET /api/v1/places/{placeId}/suitability` (장소 여행 적합도)
+  - 예: `GET /api/v1/places/recommendations` (장소 추천 — 특정 장소가 아니라 컬렉션에 대한 분석이라 `places` 바로 아래 리터럴로 둔다.
+    `/{placeId}` 와 같은 깊이라 라우팅 테스트로 고정한다, #1368)
   - 예: `GET /api/v1/members/me/pets/{petId}/preferences` (반려견 성향 분석 결과)
 
 ## 2. 응답 구조 원칙

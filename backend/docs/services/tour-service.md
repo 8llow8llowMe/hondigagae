@@ -45,6 +45,12 @@
   `다른 곳이 더 나아요` · `기상특보가 있어 바깥 활동을 줄이는 게 좋아요`). 오늘 판정은 특보를 붙일지와 같은 한 번의 `targetDate.equals(LocalDate.now())` 다.
   반려견 이름은 넣지 않는다(화면이 `오늘 몽과` 로 붙인다). **산책 위험도에는 headline 을 두지 않는다** — 지도 미리보기(#1233 ⑤)는 산책을
   결론이 아니라 근거 사실 한 줄(`walkSafetyLevel.name` · 체감온도)로만 쓴다. 결론은 적합도 하나가 말한다
+- `GET /api/v1/places/recommendations` — 장소 추천 "오늘 가기 좋은 곳" (#1368). 적합도와 같은 반려견 조건 파라미터 + `limit`(기본 3, 1~10,
+  밖이면 `INSIGHT_105`). 지역은 받지 않는다(`insight.recommendation.area-code`, 기본 39). 각 항목은 목록 카드 요약(`PlaceItem` 과 같은 뜻)
+  + 적합도 판정(`score` · `suitabilityLevel` · `headline` · `reasons` · `weather` · `congestion` · `indoorAlternatives`)이고, 특보와 날씨 출처는
+  목록 머리에 한 번. **점수는 적합도 한 곳 판정과 같은 `PlaceSuitabilityProcessor.score` 로 낸다** — 같은 조건이면 추천 카드와 상세 적합도가
+  같은 값을 말한다. 점수를 못 낸 곳은 빼므로 `score` 는 비지 않고, 추천할 곳이 없으면 `items: []`(200). 리터럴 경로라 `/{placeId}` 로 잡히지
+  않는다(`PlaceRecommendationRouteTest`). 후보 · 정렬 · 다양성 · 캐시 규칙은 `weather-insight-integration.md` §6-5
 - `GET /api/v1/places/{placeId}/walk-safety` — 산책 위험도 (추정 노면온도 + 기상청 여름철 체감온도 + 안전 시간대).
   체감온도는 기상청 산식으로 계산하며 폭염특보 기준(33/35℃)이 판정 임계다. NOAA 열지수는 참고로 병기하고,
   두 값 모두 계산 근거 문구(feelsLikeBasis/heatIndexBasis)를 함께 내린다

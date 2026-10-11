@@ -33,6 +33,7 @@
   - `GET /api/v1/emergencies/facilities` (동물병원·동물약국 반경 검색, `openNowOnly` 지금 영업 중 필터)
   - `GET /internal/v1/places/visible-ids` (내부 전용 — plan 의 일정 항목 벌크 검증)
   - `GET /api/v1/places/{placeId}/suitability` (날씨+동반조건+혼잡도, score + XAI reasons)
+  - `GET /api/v1/places/recommendations` (장소 추천 — 제주 후보를 적합도와 같은 규칙으로 판정해 순위 · 유형 다양성, #1368)
   - `GET /api/v1/places/{placeId}/walk-safety` (추정 노면온도·열지수 기반 산책 위험도)
 - 상태: 구현 (`place`, `emergency`, `insight`, `walkcourse` 조회). 적재 배치(#383) 미착수.
   `walkcourse` 원천은 두루누비가 아니라 **제주올레**다 — 두루누비 걷기 코스에 제주가 0개다
