@@ -1,8 +1,9 @@
 import { expect, type Page, test } from '@playwright/test'
 
+import { MOCK_EMAIL_CODE } from '../src/lib/api/mock/auth-data'
 import { messages } from '../src/lib/messages'
 import { trackAppRouterMount, waitForAppRouterMounted } from './helpers/app-router'
-import { chooseEmailSignup } from './helpers/signup'
+import { chooseEmailSignup, sendSignupCodeWithConsent } from './helpers/signup'
 
 /**
  * 회원가입 — 가입 방법 고르기 · 약관 시트 (#1284, 회원가입-세부명세 D14).
@@ -81,4 +82,46 @@ test('이메일 단계의 ← 는 방법 고르기로 돌아가고 포커스를 
   await page.getByRole('button', { name: messages.auth.signupBackToMethod }).click()
 
   await expect(page.getByRole('button', { name: messages.auth.signupWithEmail })).toBeFocused()
+})
+
+/*
+  3단계에서 서버가 동의를 거부하면 시트가 다시 뜬다. 그냥 닫아도 **실패 이유가 폼 알림으로 남고
+  포커스가 그 알림으로 온다** — 체크박스가 시트에만 있어 닫으면 아무것도 안 보이던 갈래 (#1392).
+*/
+test('3단계 동의 거부: 시트가 다시 뜨고, 닫으면 서버 문구 알림에 포커스가 온다', async ({
+  page,
+}) => {
+  const rejected = '이용약관과 개인정보 처리방침에 동의해야 가입할 수 있습니다.'
+  await page.route('**/api/bff/members/signup', (route) =>
+    route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        dataHeader: { success: false, resultCode: 'MEMBER_010', resultMessage: rejected },
+        dataBody: null,
+      }),
+    }),
+  )
+  await open(page)
+  await chooseEmailSignup(page)
+  await page.locator('#email').fill('reject-1392@hondigagae.dev')
+  await sendSignupCodeWithConsent(page)
+  await expect(page.locator('#code')).toBeFocused()
+  await page.keyboard.insertText(MOCK_EMAIL_CODE)
+  await page.getByRole('button', { name: messages.auth.verifyCode, exact: true }).click()
+  await expect(page.locator('#password')).toBeFocused()
+
+  await page.locator('#password').fill('abcd123!')
+  await page.locator('#name').fill('홍길동')
+  await page.locator('#nickname').fill('길동')
+  await page.getByRole('button', { name: messages.auth.signupSubmit, exact: true }).click()
+
+  const sheet = page.getByRole('dialog', { name: messages.auth.consentSheetTitle })
+  await expect(sheet.getByRole('button', { name: messages.auth.consentAndSignup })).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(sheet).toHaveCount(0)
+  const alert = page.locator('main [data-form-alert]')
+  await expect(alert).toContainText(rejected)
+  await expect(alert).toBeFocused()
 })
