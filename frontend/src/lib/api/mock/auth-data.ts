@@ -3,6 +3,7 @@ import type { SignupConsent } from '@/lib/auth/signup-consent'
 import { EMAIL_PATTERN } from '@/lib/form/email-pattern'
 import { PASSWORD_PATTERN } from '@/lib/form/password-pattern'
 import type { ApiResponse, ValidationErrorItem } from '@/types/api'
+import type { VerificationCodeSendResponse } from '@/types/auth'
 
 /**
  * 인증 mock.
@@ -24,6 +25,16 @@ export type MockResult = {
    * BFF 가 이 값을 봉인해 브라우저에 심고, 콜백 때 되돌려 준다.
    */
   oauthState?: string
+}
+
+/**
+ * 두 send-code 의 성공 본문 (#1309). 백엔드 `SEND_INFO` 처럼 **상수 하나**다 — 가입 여부 · 소셜 전용
+ * 여부로 값이 갈리면 그 차이가 계정 열거 신호가 된다 (`auth-service.md` "발송 응답의 시간 정보와
+ * 429 의 Retry-After"). 값은 dev 실측(코드 5분 · 재발송 60초)과 같다.
+ */
+export const MOCK_CODE_SEND_INFO: VerificationCodeSendResponse = {
+  codeExpiresInSeconds: 300,
+  resendAvailableInSeconds: 60,
 }
 
 /** 개발용 고정 인증코드. 백엔드 예시(A3K7MP2X)와 같은 8자 영숫자 형태다 */
@@ -534,7 +545,7 @@ export function resolveAuthMock(
     }
     // 가입 여부와 무관하게 항상 성공한다 — 계정 열거 방지
     store.pendingEmails.add(email)
-    return { status: 200, payload: ok(null) }
+    return { status: 200, payload: ok(MOCK_CODE_SEND_INFO) }
   }
 
   if (path === '/auth/email/verify-code' && method === 'POST') {
@@ -593,7 +604,8 @@ export function resolveAuthMock(
       store.passwordResetCodes.set(email, { code: MOCK_PASSWORD_RESET_CODE, attempts: 0 })
     }
 
-    return { status: 200, payload: ok(null) }
+    // 본문도 분기 무관한 상수다 — 위 판정이 응답에 새지 않게 (`MOCK_CODE_SEND_INFO`)
+    return { status: 200, payload: ok(MOCK_CODE_SEND_INFO) }
   }
 
   if (path === '/auth/password/reset' && method === 'POST') {

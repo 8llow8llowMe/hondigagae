@@ -1,3 +1,5 @@
+import { formatRemaining, formatWait } from '@/lib/format/wait'
+
 /**
  * 폼 문구.
  *
@@ -48,6 +50,13 @@ export const formMessages = {
 
   /** 응답 형태를 해석하지 못했을 때의 최후 문구 */
   submitFailed: '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.',
+
+  /*
+    429 서버 문구 **뒤에 덧붙이는** 남은 시간 (#1309). 서버 문구("잠시 후 다시 시도해주세요")는 그대로
+    두고 "잠시" 가 얼마인지만 보탠다 — 서버 문구를 다시 쓰지 않는다(form-guide §4). 값은 `Retry-After`
+    가 있을 때만 온다(`appendRetryAfter`).
+  */
+  retryAfter: (seconds: number) => `${formatWait(seconds)} 뒤 다시 시도할 수 있어요.`,
 } as const
 
 /** 인증 화면 문구 */
@@ -157,7 +166,14 @@ export const authMessages = {
     섞였다. 가입 2단계와 재설정 2단계가 이 키 하나를 같이 쓴다.
   */
   resendCode: '다시 보내기',
-  resendCooldown: (seconds: number) => `다시 보내기 (${seconds}초 후 가능)`,
+  // 대기가 길 수 있다(IP 상한 `AUTH_016` 은 최대 약 1시간) — 1분 이상은 분으로 쓴다 (#1309)
+  resendCooldown: (seconds: number) => `다시 보내기 (${formatWait(seconds)} 후 가능)`,
+  /*
+    코드 칸 아래 만료 줄 (#1309). 시간은 발송 응답의 `codeExpiresInSeconds` 다. 만료돼도 제출은 막지
+    않는다 — 서버가 `AUTH_005` 로 답하고 그 흐름(1단계로 되돌림)이 이미 있다.
+  */
+  codeExpiresIn: (seconds: number) => `코드는 ${formatRemaining(seconds)} 뒤 만료돼요`,
+  codeExpired: '코드가 만료됐어요. 다시 보내기로 새 코드를 받아 주세요.',
   changeEmail: '이메일 다시 입력',
   nameLabel: '이름',
   nicknameLabel: '닉네임',

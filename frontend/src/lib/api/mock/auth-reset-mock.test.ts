@@ -45,6 +45,20 @@ describe('POST /auth/password/reset/send-code', () => {
     expect(unknown?.payload.dataHeader).toEqual(known?.payload.dataHeader)
   })
 
+  it('본문은 코드 만료 · 재발송 대기 시간이고, 계정 종류와 무관하게 같다 (#1309)', () => {
+    const general = sendCode(GENERAL_EMAIL)
+    const social = sendCode(SOCIAL_ONLY_EMAIL)
+    const unknown = sendCode(UNKNOWN_EMAIL)
+
+    expect(general?.payload.dataBody).toEqual({
+      codeExpiresInSeconds: 300,
+      resendAvailableInSeconds: 60,
+    })
+    // 코드를 실제로 발급했는지(일반 계정만)가 본문에 새지 않는다 — 백엔드 `SEND_INFO` 상수
+    expect(social?.payload).toEqual(general?.payload)
+    expect(unknown?.payload).toEqual(general?.payload)
+  })
+
   it('소셜 전용 계정도 200 이지만 코드는 발급되지 않는다', () => {
     // 백엔드는 이 계정에 코드가 아니라 "소셜 로그인을 이용해 주세요" 안내 메일을 보낸다
     expect(sendCode(SOCIAL_ONLY_EMAIL)?.status).toBe(200)

@@ -6,8 +6,10 @@ import { FormFailure } from '@/components/form-failure'
 import { FormNotice } from '@/components/form-notice'
 import { Input } from '@/components/input'
 import { PasswordInput } from '@/components/password-input'
+import { CodeExpiryLine } from '@/features/auth/code-expiry-line'
 import type { EmailValues, PasswordResetValues } from '@/features/auth/schemas'
 import { VerificationCodeInput } from '@/features/auth/verification-code-input'
+import { cooldownAnnounceSeconds } from '@/lib/form/code-timers'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { type FailureAnnounce, submitFailureAnnounce } from '@/lib/form/submit-failure-focus'
 import { messages } from '@/lib/messages'
@@ -99,6 +101,8 @@ export type PasswordResetCodeStepProps = {
   errorStatus: number | null
   submitting: boolean
   cooldownSeconds: number
+  /** 코드 만료까지 남은 초 (#1309). 지났으면 0, 받은 코드가 없으면 null — `CodeExpiryLine` */
+  expiresInSeconds: number | null
   /** 재발송이 인플라이트인가. 쿨다운과 별개로 이중 클릭을 막는다 (form-guide.md §6) */
   resending: boolean
   /** 발송 성공 안내. **이메일 존재 여부와 무관하게 늘 같은 문구다** (계정 열거 방지) */
@@ -117,6 +121,7 @@ export function PasswordResetCodeStep({
   errorStatus,
   submitting,
   cooldownSeconds,
+  expiresInSeconds,
   resending,
   notice,
   onValueChange,
@@ -127,8 +132,9 @@ export function PasswordResetCodeStep({
 }: PasswordResetCodeStepProps) {
   const isCoolingDown = cooldownSeconds > 0
   // 매 초 갱신되는 카운트다운을 aria-live 에 그대로 실으면 초마다 읽힌다.
-  // 보이는 초는 버튼 라벨(비-live)에 두고 알림은 10초 단위로만 낸다 — CodeStep 과 같은 처리
-  const announceSeconds = isCoolingDown && cooldownSeconds % 10 === 0 ? cooldownSeconds : null
+  // 보이는 초는 버튼 라벨(비-live)에 두고 알림은 드물게 낸다 — 1분 미만 10초 · 이상 분 경계
+  // (#1309, `cooldownAnnounceSeconds`). CodeStep 과 같은 처리
+  const announceSeconds = cooldownAnnounceSeconds(cooldownSeconds)
 
   return (
     <form
@@ -152,16 +158,20 @@ export function PasswordResetCodeStep({
       {/* 이메일은 줄바꿈 기회가 없는 토큰이다 — 375px 폭에서 넘치지 않게 break-all */}
       <p className="text-body-2 text-fg-muted break-all">{email}</p>
 
-      {/* 이 단계의 두 칸은 둘 다 필수라 `*` 를 달지 않는다 (#1283 C5) */}
-      <Field id="code" label={messages.auth.codeLabel} error={errors.fields.code}>
-        {/* 입력 중에 대문자화 · 공백 제거 — 가입 2단계와 같은 칸이다 (#1078) */}
-        <VerificationCodeInput
-          id="code"
-          value={values.code}
-          onValueChange={(value) => onValueChange('code', value)}
-          invalid={errors.fields.code !== undefined}
-        />
-      </Field>
+      {/* 만료 줄은 칸에 붙는다 — 폼 간격(16)이 아니라 칸 안 간격(4)이다 (#1309) */}
+      <div className="flex flex-col gap-1">
+        {/* 이 단계의 두 칸은 둘 다 필수라 `*` 를 달지 않는다 (#1283 C5) */}
+        <Field id="code" label={messages.auth.codeLabel} error={errors.fields.code}>
+          {/* 입력 중에 대문자화 · 공백 제거 — 가입 2단계와 같은 칸이다 (#1078) */}
+          <VerificationCodeInput
+            id="code"
+            value={values.code}
+            onValueChange={(value) => onValueChange('code', value)}
+            invalid={errors.fields.code !== undefined}
+          />
+        </Field>
+        <CodeExpiryLine expiresInSeconds={expiresInSeconds} />
+      </div>
 
       <div className="flex items-center justify-between gap-2">
         <Button

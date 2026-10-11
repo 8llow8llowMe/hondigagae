@@ -15,13 +15,14 @@ import {
   passwordResetSchema,
   type PasswordResetValues,
 } from '@/features/auth/schemas'
+import { useCodeTimers } from '@/features/auth/use-code-timers'
 import { resetPassword, sendPasswordResetCode } from '@/lib/api/auth'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import { handOffLoginEmail } from '@/lib/auth/login-email-handoff'
 import { codeStepAfterResend, type ResendOutcome } from '@/lib/form/code-step-after-resend'
-import { remainingSeconds } from '@/lib/form/cooldown'
 import { apiErrorToFormErrors, type FormErrors } from '@/lib/form/field-errors'
 import { formErrorsAfterEdit } from '@/lib/form/form-failure-display'
+import { appendRetryAfter, toErrorsWithRetryAfter } from '@/lib/form/retry-after'
 import {
   focusResendResult,
   focusSubmitFailure,
@@ -29,9 +30,7 @@ import {
 } from '@/lib/form/submit-failure-focus'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
-
-/** 백엔드 `PasswordResetProcessor.RESEND_COOLDOWN` (소스 실측) */
-const RESEND_COOLDOWN_SECONDS = 60
+import type { VerificationCodeSendResponse } from '@/types/auth'
 
 type Step = 'email' | 'code' | 'done'
 
@@ -51,10 +50,15 @@ export function PasswordResetView() {
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
 
-  // 쿨다운은 "남은 초" state 를 감산하지 않고 시작 시각을 들고 매 렌더 다시 계산한다 —
-  // 백그라운드 탭에서 setInterval 이 스로틀링돼도 남은 초가 어긋나지 않는다 (form-guide.md §2)
-  const [cooldownStartedAt, setCooldownStartedAt] = useState<number | null>(null)
-  const [, forceCooldownTick] = useState(0)
+  // 재발송 쿨다운 · 코드 만료 (#1309). 길이는 발송 응답과 429 의 `Retry-After` 로 받는다 —
+  // 마감 시각 기반이라 백그라운드 탭에서도 어긋나지 않는다 (form-guide.md §2, 가입 2단계와 같은 훅)
+  const {
+    cooldownSeconds,
+    expiresInSeconds,
+    start: startCodeTimers,
+    coolDown: coolDownResend,
+    reset: resetCodeTimers,
+  } = useCodeTimers()
   const [isResending, setResending] = useState(false)
   const resendingRef = useRef(false)
   // 재발송이 **끝났다**는 사건 — 포커스 effect 의 트리거다 (#1102, `signup-form.tsx` 와 같다)
@@ -72,24 +76,6 @@ export function PasswordResetView() {
 
   // 2단계 ErrorState 의 재시도가 재설정 재제출인지 재발송 재시도인지 구분한다
   const [codeAction, setCodeAction] = useState<'reset' | 'resend'>('reset')
-
-  useEffect(() => {
-    if (cooldownStartedAt === null) return
-    const interval = setInterval(() => {
-      const remaining = remainingSeconds(cooldownStartedAt, RESEND_COOLDOWN_SECONDS, Date.now())
-      if (remaining <= 0) {
-        setCooldownStartedAt(null)
-        return
-      }
-      forceCooldownTick((tick) => tick + 1)
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [cooldownStartedAt])
-
-  const cooldownSeconds =
-    cooldownStartedAt === null
-      ? 0
-      : remainingSeconds(cooldownStartedAt, RESEND_COOLDOWN_SECONDS, Date.now())
 
   // 단계 **전환** 시에만 새 단계의 첫 입력으로 포커스를 옮긴다. 진입 시에도 돌면 화면에
   // 들어오자마자 포커스가 입력으로 가서 스크린리더가 제목을 건너뛴다. 판정을 "최초 실행
@@ -115,23 +101,27 @@ export function PasswordResetView() {
     containerRef.current?.querySelector<HTMLElement>(`#${focusId}`)?.focus()
   }, [step])
 
-  const emailForm = useForm<EmailValues, void>({
+  const emailForm = useForm<EmailValues, VerificationCodeSendResponse>({
     schema: emailSchema,
     initialValues: { email: '' },
     onSubmit: async (values) => {
       setStepBackMessage(null)
       try {
-        await sendPasswordResetCode(values.email)
+        const sent = await sendPasswordResetCode(values.email)
         setEmailErrorStatus(null)
+        return sent
       } catch (error) {
         setEmailErrorStatus(error instanceof ApiError ? error.status : NO_RESPONSE_STATUS)
         throw error
       }
     },
-    onSuccess: (_result, values) => {
-      // **성공 응답은 계정이 있든 없든 같다.** 여기서 분기를 만들면 계정 열거가 된다 (D1)
+    // 429(`AUTH_003` · `AUTH_016`)에 남은 시간을 덧붙인다 (#1309) — 그 밖은 공용 매핑과 같다
+    toErrors: toErrorsWithRetryAfter,
+    onSuccess: (sent, values) => {
+      // **성공 응답은 계정이 있든 없든 같다.** 여기서 분기를 만들면 계정 열거가 된다 (D1).
+      // 시간 값도 분기 무관한 상수다(BE `SEND_INFO`) — 그대로 시계에 건다 (#1309)
       setEmail(values.email)
-      setCooldownStartedAt(Date.now())
+      startCodeTimers(sent)
       setResetErrorStatus(null)
       /*
         **2단계 폼을 비운다.** `AUTH_005`·`AUTH_017` 로 되돌아온 뒤 새 코드를 받고 오는 경로가
@@ -177,6 +167,8 @@ export function PasswordResetView() {
           (`AuthErrorCode` 실측). 덧붙이면 같은 말이 두 번 나온다.
         */
         if (error.resultCode === 'AUTH_005' || error.resultCode === 'AUTH_017') {
+          // 이 코드는 더 쓸 수 없다 — 시계를 걷는다. 3단계 진입 · 완료와 같은 판단이다 (#1309)
+          resetCodeTimers()
           setStep('email')
           setStepBackMessage(apiErrorToFormErrors(error, messages.form.submitFailed).form)
         }
@@ -191,6 +183,8 @@ export function PasswordResetView() {
         로그인 화면이 읽기 전까지만 남고, 읽으면 지워진다.
       */
       handOffLoginEmail(email)
+      // 코드를 다 썼다 — 완료 화면에서 시계가 1초마다 다시 그리지 않게 걷는다 (#1309)
+      resetCodeTimers()
       setStep('done')
     },
   })
@@ -236,9 +230,10 @@ export function PasswordResetView() {
     setCodeAction('resend')
     let result: ResendResult = 'failed'
     void sendPasswordResetCode(email)
-      .then(() => {
+      .then((sent) => {
         result = 'sent'
-        setCooldownStartedAt(Date.now())
+        // 새 코드다 — 만료도 새로 센다 (#1309)
+        startCodeTimers(sent)
         setResetErrorStatus(null)
         /*
           직전 폼 전체 실패(#1102)와 코드 칸 오류 · 값(#1109)을 걷는다. 남기면 성공한 재발송 위에
@@ -251,13 +246,17 @@ export function PasswordResetView() {
         if (error instanceof ApiError && error.kind === 'rate-limited') {
           // AUTH_003(이메일 60초) · AUTH_016(IP 상한) 둘 다 429 다. 쿨다운을 유지해 버튼을
           // 계속 비활성으로 두고, 원인은 서버 문구가 갈라 준다 — 우리가 짓지 않는다.
-          // 상태도 429 로 둔다 (#1102) — 직전 5xx 상태가 남아 있으면 이 알림이 일시 장애에 가린다
-          setCooldownStartedAt(Date.now())
+          // 상태도 429 로 둔다 (#1102) — 직전 5xx 상태가 남아 있으면 이 알림이 일시 장애에 가린다.
+          // 쿨다운 길이는 `Retry-After` 다 (#1309) — `AUTH_016` 이면 최대 약 1시간이다
+          coolDownResend(error.retryAfterSeconds)
           setResetErrorStatus(error.status)
           // 코드 칸 오류 · 값은 남기고 429 문구를 얹는다 — 새 코드가 오지 않았다 (#1109)
           applyResendOutcome({
             result: 'failed',
-            failure: apiErrorToFormErrors(error, messages.form.submitFailed),
+            failure: appendRetryAfter(
+              apiErrorToFormErrors(error, messages.form.submitFailed),
+              error,
+            ),
           })
           return
         }
@@ -271,7 +270,7 @@ export function PasswordResetView() {
         // `loading` 이 풀리는 같은 렌더에서 센다 — 요청 중에는 `FormFailure` 가 직전 실패를 걷는다
         setResendOutcome((previous) => ({ count: previous.count + 1, result }))
       })
-  }, [cooldownSeconds, email, applyResendOutcome])
+  }, [cooldownSeconds, email, applyResendOutcome, startCodeTimers, coolDownResend])
 
   /*
     **재발송 뒤 포커스** (#1102). 버튼이 요청 중 `loading`, 끝나면 쿨다운으로 `disabled` 라 포커스가
@@ -366,6 +365,7 @@ export function PasswordResetView() {
           errorStatus={resetErrorStatus}
           submitting={resetForm.isSubmitting}
           cooldownSeconds={cooldownSeconds}
+          expiresInSeconds={expiresInSeconds}
           resending={isResending}
           // 오류가 떠 있으면 성공 안내를 끈다 — role=status 와 role=alert 가 동시에 뜬다
           notice={resetForm.errors.form === null ? messages.auth.resetCodeSent : undefined}
@@ -379,7 +379,7 @@ export function PasswordResetView() {
           onResend={handleResend}
           onChangeEmail={() => {
             resetForm.reset()
-            setCooldownStartedAt(null)
+            resetCodeTimers()
             setResetErrorStatus(null)
             setStep('email')
           }}

@@ -1,4 +1,4 @@
-import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
+import { ApiError, NO_RESPONSE_STATUS, parseRetryAfterSeconds } from '@/lib/api/error'
 import { unwrap, unwrapNullable, unwrapVoid } from '@/lib/api/response'
 import type { ApiResponse } from '@/types/api'
 
@@ -42,11 +42,37 @@ export type FormRequestOptions = {
   signal?: AbortSignal
 }
 
+/** `request()` 가 돌려주는 것 — 래퍼 판별 전의 응답 */
+type RawResponse = {
+  payload: ApiResponse<unknown>
+  status: number
+  /** `Retry-After` 를 초로 읽은 값. 없으면 null (#1309) */
+  retryAfterSeconds: number | null
+}
+
+/**
+ * 래퍼 판별을 돌리고, 실패면 `Retry-After` 를 실어 다시 던진다 (#1309).
+ *
+ * `unwrap*` 은 본문만 보는 순수 함수라(서버 전송 `server.ts` 도 같이 쓴다) 헤더를 모른다. 헤더를
+ * 아는 곳이 여기라 여기서 붙인다 — 네 전송 함수가 각자 붙이면 하나가 빠지기 쉽다.
+ */
+function withRetryAfter<T>(retryAfterSeconds: number | null, judge: () => T): T {
+  try {
+    return judge()
+  } catch (error) {
+    if (retryAfterSeconds === null || !(error instanceof ApiError)) throw error
+    throw new ApiError(
+      error.status,
+      error.resultCode,
+      error.rawMessage,
+      error.fieldErrors,
+      retryAfterSeconds,
+    )
+  }
+}
+
 /** 전송만 담당한다. 래퍼 판별은 호출부(clientFetch / clientFetchNullable / clientFetchVoid)가 한다 */
-async function request(
-  path: string,
-  options: RequestOptions,
-): Promise<{ payload: ApiResponse<unknown>; status: number }> {
+async function request(path: string, options: RequestOptions): Promise<RawResponse> {
   const { method = 'GET', body, signal } = options
 
   // exactOptionalPropertyTypes 아래에서는 undefined 를 명시적으로 넘길 수 없다.
@@ -67,17 +93,18 @@ async function request(
   }
 
   const payload = (await response.json().catch(() => null)) as ApiResponse<unknown> | null
+  const retryAfterSeconds = parseRetryAfterSeconds(response.headers.get('retry-after'))
 
   if (payload === null) {
-    throw new ApiError(response.status, null, null)
+    throw new ApiError(response.status, null, null, null, retryAfterSeconds)
   }
 
-  return { payload, status: response.status }
+  return { payload, status: response.status, retryAfterSeconds }
 }
 
 export async function clientFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { payload, status } = await request(path, options)
-  return unwrap(payload as ApiResponse<T>, status)
+  const { payload, status, retryAfterSeconds } = await request(path, options)
+  return withRetryAfter(retryAfterSeconds, () => unwrap(payload as ApiResponse<T>, status))
 }
 
 /**
@@ -92,8 +119,8 @@ export async function clientFetchNullable<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T | null> {
-  const { payload, status } = await request(path, options)
-  return unwrapNullable(payload as ApiResponse<T>, status)
+  const { payload, status, retryAfterSeconds } = await request(path, options)
+  return withRetryAfter(retryAfterSeconds, () => unwrapNullable(payload as ApiResponse<T>, status))
 }
 
 /**
@@ -118,13 +145,14 @@ export async function clientFetchForm<T>(path: string, options: FormRequestOptio
   }
 
   const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null
-  if (payload === null) throw new ApiError(response.status, null, null)
+  const retryAfterSeconds = parseRetryAfterSeconds(response.headers.get('retry-after'))
+  if (payload === null) throw new ApiError(response.status, null, null, null, retryAfterSeconds)
 
-  return unwrap(payload, response.status)
+  return withRetryAfter(retryAfterSeconds, () => unwrap(payload, response.status))
 }
 
 /** `dataBody` 없이 성공하는 엔드포인트용 (signup / logout / email 인증) */
 export async function clientFetchVoid(path: string, options: RequestOptions = {}): Promise<void> {
-  const { payload, status } = await request(path, options)
-  unwrapVoid(payload, status)
+  const { payload, status, retryAfterSeconds } = await request(path, options)
+  withRetryAfter(retryAfterSeconds, () => unwrapVoid(payload, status))
 }

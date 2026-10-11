@@ -5,6 +5,7 @@ import {
   classify,
   isRetriable,
   NO_RESPONSE_STATUS,
+  parseRetryAfterSeconds,
   shouldOfferRetry,
   toErrorStatus,
 } from '@/lib/api/error'
@@ -92,5 +93,42 @@ describe('classify — 409 / 429', () => {
 
   it('403 은 여전히 forbidden 이다', () => {
     expect(classify(403)).toBe('forbidden')
+  })
+})
+
+describe('parseRetryAfterSeconds — Retry-After 를 초로 (#1309)', () => {
+  it('정수 초를 읽는다', () => {
+    expect(parseRetryAfterSeconds('60')).toBe(60)
+    expect(parseRetryAfterSeconds('3540')).toBe(3540)
+    expect(parseRetryAfterSeconds('1')).toBe(1)
+  })
+
+  it('헤더가 없으면 null 이다', () => {
+    expect(parseRetryAfterSeconds(null)).toBeNull()
+  })
+
+  it('HTTP-date 형식은 읽지 않는다 — 백엔드는 정수 초만 낸다', () => {
+    expect(parseRetryAfterSeconds('Wed, 21 Oct 2026 07:28:00 GMT')).toBeNull()
+  })
+
+  it('정수가 아닌 값은 읽지 않는다', () => {
+    expect(parseRetryAfterSeconds('')).toBeNull()
+    expect(parseRetryAfterSeconds('1.5')).toBeNull()
+    expect(parseRetryAfterSeconds('-1')).toBeNull()
+    expect(parseRetryAfterSeconds('60s')).toBeNull()
+  })
+
+  it('0 은 null 이다 — 백엔드 최소값은 1이라 계약 밖 값으로 보고 대체값에 맡긴다', () => {
+    expect(parseRetryAfterSeconds('0')).toBeNull()
+  })
+})
+
+describe('ApiError.retryAfterSeconds', () => {
+  it('생략하면 null 이다 — 기존 호출부는 그대로다', () => {
+    expect(new ApiError(429, 'AUTH_003', '잠시 후').retryAfterSeconds).toBeNull()
+  })
+
+  it('다섯 번째 인자로 받는다', () => {
+    expect(new ApiError(429, 'AUTH_003', '잠시 후', null, 60).retryAfterSeconds).toBe(60)
   })
 })

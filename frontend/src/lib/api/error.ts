@@ -7,7 +7,7 @@ export type ErrorKind =
   | 'not-found' // 404 — 데이터 부재 또는 타인 리소스
   | 'gone' // 410 — 있었지만 만료됐다 (PLAN_024 공유 링크)
   | 'conflict' // 409 — 이미 존재 (MEMBER_001 이메일 중복)
-  | 'rate-limited' // 429 — 쿨다운·잠금 (AUTH_003 / AUTH_015)
+  | 'rate-limited' // 429 — 쿨다운·잠금·IP 상한 (AUTH_003 / AUTH_015 / AUTH_016)
   | 'forbidden' // 그 외 4xx
   | 'temporary' // 5xx · 무응답
 
@@ -27,12 +27,21 @@ export class ApiError extends Error {
    * 문자열이라는 사실이 필드 목록을 가려 버린다(이 이슈가 난 원인).
    */
   readonly fieldErrors: ValidationErrorItem[] | null
+  /**
+   * 429 의 `Retry-After` — 다시 시도할 수 있을 때까지 남은 **초** (#1309). 헤더가 없거나 읽을 수
+   * 없으면 `null` 이다.
+   *
+   * 본문이 아니라 헤더로 온다(BE #1293). 봉투(`dataHeader`)는 그대로라 `rawMessage` 와 섞지 않는다.
+   * BFF 가 이 헤더 **하나만** 골라 넘긴다 — `bff-response-headers.ts`.
+   */
+  readonly retryAfterSeconds: number | null
 
   constructor(
     status: number,
     resultCode: string | null,
     rawMessage: unknown,
     fieldErrors: ValidationErrorItem[] | null = null,
+    retryAfterSeconds: number | null = null,
   ) {
     super(typeof rawMessage === 'string' ? rawMessage : `API 오류 (status ${status})`)
     this.name = 'ApiError'
@@ -40,11 +49,30 @@ export class ApiError extends Error {
     this.resultCode = resultCode
     this.rawMessage = rawMessage
     this.fieldErrors = fieldErrors
+    this.retryAfterSeconds = retryAfterSeconds
   }
 
   get kind(): ErrorKind {
     return classify(this.status)
   }
+}
+
+/**
+ * `Retry-After` 헤더 값을 초로 읽는다 (#1309). 읽지 못하면 `null`.
+ *
+ * **정수 초만 인정한다.** 표준은 HTTP-date 형식도 허용하지만 백엔드는 정수 초(최소 1)만 낸다
+ * (`auth-service.md` "발송 응답의 시간 정보와 429 의 Retry-After"). 날짜를 해석하려면 서버와
+ * 브라우저의 시계 차이를 떠안아야 해서, 그 형식이 오면 없는 것으로 보고 화면이 대체값을 쓴다.
+ *
+ * **0 도 null 이다.** 백엔드는 최소 1을 낸다 — 0 이 오면 "기다릴 것 없음" 이 아니라 계약 밖 값이라,
+ * 쿨다운을 바로 풀지 않고 대체값(60초)에 맡긴다.
+ */
+export function parseRetryAfterSeconds(value: string | null): number | null {
+  if (value === null) return null
+  const trimmed = value.trim()
+  if (!/^\d+$/.test(trimmed)) return null
+  const seconds = Number(trimmed)
+  return Number.isSafeInteger(seconds) && seconds > 0 ? seconds : null
 }
 
 /**
@@ -67,7 +95,8 @@ export function classify(status: number): ErrorKind {
   if (status === 401) return 'unauthorized'
   if (status === 400) return 'validation'
   if (status === 409) return 'conflict'
-  // 시간이 지나면 풀리지만 즉시 재시도는 무의미하다. 재시도 버튼을 주면 잠금이 연장된다
+  // 시간이 지나면 풀리지만 즉시 재시도는 무의미하다. 재시도 버튼을 주면 잠금이 연장된다.
+  // AUTH_016(IP 시간당 상한)은 최대 약 1시간이다 — 남은 시간은 `ApiError.retryAfterSeconds`
   if (status === 429) return 'rate-limited'
   if (status >= 500 || status === NO_RESPONSE_STATUS) return 'temporary'
   return 'forbidden'

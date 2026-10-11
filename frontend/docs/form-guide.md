@@ -231,7 +231,7 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
   부른다 — **성공은 폼의 첫 입력(코드 칸)**, 막혔으면 제출 실패와 같은 순서(429 알림 · 5xx 일시 장애).
   성공은 포커스를 잃었을 때만 옮긴다(요청 중 코드 칸을 눌러 둔 사람의 자리를 빼앗지 않는다). 성공
   안내(`FormNotice`)로 보내지 않는 이유: 문구가 그대로라 다시 읽힐 것이 없고, 쿨다운 진입은 버튼 옆
-  `aria-live` 가 "다시 보내기 (60초 후 가능)" 으로 이미 알린다. 재전송이 성공하면 직전 폼 전체 실패
+  `aria-live` 가 "다시 보내기 (1분 후 가능)" 으로 이미 알린다. 재전송이 성공하면 직전 폼 전체 실패
   (429 · 5xx 문구)도 걷는다.
   - **재전송이 코드 칸에 남기는 것** ([#1109](https://github.com/8llow8llowMe/hondigagae/issues/1109),
     사용자 결정 2026-10-01). 판정은 `codeStepAfterResend`(`lib/form/code-step-after-resend.ts`) 하나를
