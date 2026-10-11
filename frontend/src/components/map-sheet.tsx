@@ -4,6 +4,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type Ref,
   useCallback,
   useRef,
   useState,
@@ -153,6 +154,7 @@ export function MapSheet({
   className,
   maxTopInset = 0,
   headerSize = 'md',
+  ref,
 }: {
   /**
    * 시트의 접근성 이름. **화면마다 다르다** — 장소 찾기는 "장소 목록", 긴급 시설은
@@ -189,6 +191,11 @@ export function MapSheet({
   maxTopInset?: number | `var(--${string})` | undefined
   /** 머리 밀도 — `sm` 은 개수 줄을 작은 글줄로 좁힌다 (`MapSheetHeaderSize` 주석, #1314) */
   headerSize?: MapSheetHeaderSize
+  /**
+   * 시트 표면(`section`). 지도가 첫 결과를 맞출 때 **시트 윗변을 재서 가린 몫을 뺀다** (#1379) —
+   * 높이는 단계 · 탭바 · 끄는 중 오프셋이 함께 정해 계산으로 되짚지 않고 잰다.
+   */
+  ref?: Ref<HTMLElement>
 }) {
   const [dragOffset, setDragOffset] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -330,6 +337,7 @@ export function MapSheet({
 
   return (
     <section
+      ref={ref}
       aria-label={label}
       style={{ height }}
       className={cn(
