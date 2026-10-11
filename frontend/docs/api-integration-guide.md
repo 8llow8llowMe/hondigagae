@@ -137,6 +137,10 @@ export function toMessage(raw: unknown, fallback: string): string {
   `PLAN_124`). 받는 값의 문법은 `@PathVariable long`(= `NumberUtils.parseNumber`) 이라
   부호·공백·앞자리 0·16진수를 받고 **범위를 넘으면 거부한다** — 8진수는 아니다.
   목 구현과 실측 근거: `src/lib/api/mock/path-variable.ts`, 명세는 일정상세 **D5-1·D5-2**.
+- **429 의 남은 시간은 `ApiError.retryAfterSeconds`(초, 없으면 `null`)다** (#1309). 게이트웨이의 `Retry-After`
+  헤더(정수 초)를 BFF 가 **그 헤더 하나만** 골라 넘기고(`bff-response-headers.ts` — 응답 헤더를 통째로 넘기지
+  않는다), 브라우저 전송(`client.ts`)이 읽어 `ApiError` 에 싣는다. 정수 초가 아니면(HTTP-date 포함) `null` 이다. 화면 쪽 쓰임은
+  `lib/form/retry-after.ts`(알림 문구) · `lib/form/code-timers.ts`(재발송 쿨다운).
 - **404와 5xx의 시각 언어를 다르게 한다.** 데이터 없음에 에러 톤·재시도 버튼을 쓰지 않는다.
 
 ```ts

@@ -474,6 +474,21 @@ describe('resolveMock — 인증', () => {
     expect(result?.payload.dataHeader.success).toBe(true)
   })
 
+  it('인증코드 발송 본문은 코드 만료 · 재발송 대기 시간이다 — 가입 여부와 무관하게 같다 (#1309)', () => {
+    const send = (email: string) =>
+      resolveMock('/auth/email/send-code', 'POST', '', JSON.stringify({ email }))
+
+    const fresh = send('new-1309@hondigagae.dev')
+    const existing = send('demo@hondigagae.dev')
+
+    expect(fresh?.payload.dataBody).toEqual({
+      codeExpiresInSeconds: 300,
+      resendAvailableInSeconds: 60,
+    })
+    // 한 글자라도 다르면 그것이 열거 신호다 — 백엔드 `SEND_INFO` 상수와 같다
+    expect(existing?.payload).toEqual(fresh?.payload)
+  })
+
   it('틀린 인증코드는 400 AUTH_004 다', () => {
     resolveMock('/auth/email/send-code', 'POST', '', JSON.stringify({ email: 'x@hondigagae.dev' }))
     const result = resolveMock(

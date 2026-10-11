@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 
 import { GATEWAY_UNREACHABLE_STATUS, gatewayUnreachablePayload } from '@/lib/api/bff-error'
+import { bffResponseHeaders, readRetryAfter } from '@/lib/api/bff-response-headers'
 import {
   EVENT_STREAM_MIME,
   eventStreamHeaders,
@@ -44,6 +45,7 @@ import { joinCookiePairs } from '@/lib/http/set-cookie'
  *  5. 본문을 형태 그대로 통과시킨다 — JSON 도, `multipart/form-data`(파일 업로드)도
  *     (`@/lib/api/forwarded-body`)
  *  6. SSE 는 **버퍼링하지 않고 그대로 흘려보낸다** (#91 — `handleEventStream`)
+ *  7. 응답 헤더는 **`Retry-After` 하나만** 넘긴다 (#1309 — `@/lib/api/bff-response-headers`)
  *
  * docs/architecture-guide.md §5, docs/auth-guide.md
  */
@@ -60,6 +62,8 @@ type GatewayResult = {
   refreshToken: string | null
   /** `/authorize` 가 내려준 소셜 state. 없으면 null (백엔드 배포 전 과도기 포함) */
   oauthState: string | null
+  /** 429 의 `Retry-After` 원문 (#1309). 실응답에서만 읽는다 — mock · 불통은 null */
+  retryAfter: string | null
 }
 
 /**
@@ -102,6 +106,7 @@ async function callGateway(
         payload: mock.payload,
         refreshToken: mock.refreshToken ?? null,
         oauthState: mock.oauthState ?? null,
+        retryAfter: null,
       }
     }
   }
@@ -134,6 +139,7 @@ async function callGateway(
       payload: gatewayUnreachablePayload(cause),
       refreshToken: null,
       oauthState: null,
+      retryAfter: null,
     }
   }
 
@@ -154,6 +160,7 @@ async function callGateway(
     payload,
     refreshToken: extractRefreshToken(setCookies),
     oauthState: extractOAuthState(setCookies),
+    retryAfter: readRetryAfter(response.headers),
   }
 }
 
@@ -426,7 +433,15 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
     await clearOAuthState()
   }
 
-  return NextResponse.json(stripped.body, { status: result.status })
+  /*
+    `Retry-After` 만 골라 단다 (#1309). 429(`AUTH_003` · `AUTH_015` · `AUTH_016`)의 남은 초가 여기에만
+    온다 — 예전에는 이 줄이 헤더를 하나도 넘기지 않아 화면이 남은 시간을 알 수 없었다.
+  */
+  const headers = bffResponseHeaders(result.retryAfter)
+  return NextResponse.json(
+    stripped.body,
+    headers ? { status: result.status, headers } : { status: result.status },
+  )
 }
 
 export const GET = handle
