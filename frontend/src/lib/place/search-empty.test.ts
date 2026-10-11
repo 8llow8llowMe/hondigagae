@@ -27,25 +27,60 @@ describe('searchEmptyCopy — 검색어가 걸린 0건 (#431 · #1155)', () => {
 
 describe('mapEmptyCopy — 지도 보기의 빈 목록 (#1155)', () => {
   it('검색어로 받은 결과가 아예 없으면 검색어 탓이다 — 지역 탓으로 말하지 않는다', () => {
-    const copy = mapEmptyCopy({ keyword: '애월 카페', fetchedCount: 0 })
+    const copy = mapEmptyCopy({ keyword: '애월 카페', fetchedCount: 0, radiusBounded: false })
 
     expect(copy.title).toBe(messages.place.searchEmptyTitle.replace('{keyword}', '애월 카페'))
     expect(copy.title).not.toBe(messages.map.emptyInView)
-    expect(copy.clearKeyword).toBe(true)
+    expect(copy.action).toBe('clearKeyword')
   })
 
   it('받은 결과가 조회 영역 밖에만 있으면 지역 문구 그대로다', () => {
-    const copy = mapEmptyCopy({ keyword: '애월', fetchedCount: 3 })
+    const copy = mapEmptyCopy({ keyword: '애월', fetchedCount: 3, radiusBounded: false })
 
     expect(copy.title).toBe(messages.map.emptyInView)
     expect(copy.description).toBe(messages.map.emptyInViewDescription)
-    expect(copy.clearKeyword).toBe(false)
+    expect(copy.action).toBeNull()
   })
 
   it('검색어가 없으면 지역 문구 그대로다', () => {
-    const copy = mapEmptyCopy({ keyword: null, fetchedCount: 0 })
+    const copy = mapEmptyCopy({ keyword: null, fetchedCount: 0, radiusBounded: false })
 
     expect(copy.title).toBe(messages.map.emptyInView)
-    expect(copy.clearKeyword).toBe(false)
+    expect(copy.action).toBeNull()
+  })
+})
+
+describe('mapEmptyCopy — 반경 조회의 검색어 0건 (#1332)', () => {
+  it('장소가 없다가 아니라 지도 범위 안에 없다고 말하고 검색어를 되돌려 준다', () => {
+    const copy = mapEmptyCopy({ keyword: '수월봉', fetchedCount: 0, radiusBounded: true })
+
+    expect(copy.title).toContain('지도 범위 안')
+    expect(copy.title).toContain('‘수월봉’')
+    expect(copy.title).not.toContain('{keyword}')
+    expect(copy.description).toBe(messages.map.searchEmptyInRangeDescription)
+  })
+
+  it('다음 행동은 제주 전체에서 찾기다 — 검색어 지우기가 아니다', () => {
+    expect(mapEmptyCopy({ keyword: '수월봉', fetchedCount: 0, radiusBounded: true }).action).toBe(
+      'searchWider',
+    )
+  })
+
+  it('반경 조회가 아니면 지금 문구 그대로다 — 장소 탭 문구는 바뀌지 않는다', () => {
+    const copy = mapEmptyCopy({ keyword: '수월봉', fetchedCount: 0, radiusBounded: false })
+
+    expect(copy.title).toBe(messages.place.searchEmptyTitle.replace('{keyword}', '수월봉'))
+    expect(copy.description).toBe(messages.place.searchEmptyDescription)
+  })
+
+  it('반경 조회라도 결과가 영역 밖에만 있으면 지역 문구다', () => {
+    const copy = mapEmptyCopy({ keyword: '수월봉', fetchedCount: 2, radiusBounded: true })
+
+    expect(copy.title).toBe(messages.map.emptyInView)
+    expect(copy.action).toBeNull()
+  })
+
+  it('검색어가 없으면 반경 조회라도 지역 문구다', () => {
+    expect(mapEmptyCopy({ keyword: null, fetchedCount: 0, radiusBounded: true }).action).toBeNull()
   })
 })
