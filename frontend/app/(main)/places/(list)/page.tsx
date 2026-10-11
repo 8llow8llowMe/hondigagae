@@ -131,6 +131,8 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
             facilityLayer
             /* 지도 아일랜드 — 흰 헤더 띠 대신 지도 위 알약 (#1287) */
             island
+            /* 첫 화면을 첫 결과에 맞춘다 — 기본 시야는 모바일에서 핀 몇 개만 보였다 (#1379) */
+            fitResults
           />
         </HydrationBoundary>
       </main>
