@@ -211,6 +211,35 @@ class PlaceIdentityPolicyTest {
     }
 
     @Test
+    @DisplayName("본 시설 이름에 괄호 · 대괄호 수식어를 붙인 100m 안 행은 하위 시설이다 — 생각하는 정원 (#1340)")
+    void recognizesSubFacilityOfParent() {
+        // prod 실측: 본 시설 125445 · 면세점 4054291(28m) · 청원 2907434(58m)
+        assertThat(PlaceIdentityPolicy.isSubFacilityOf("생각하는 정원", "생각하는 정원[면세점(TAX REFUND SHOP)]", 28d)).isTrue();
+        assertThat(PlaceIdentityPolicy.isSubFacilityOf("생각하는 정원", "생각하는정원(청원)", 58d)).isTrue();
+        // 경계는 포함한다
+        assertThat(PlaceIdentityPolicy.isSubFacilityOf("생각하는 정원", "생각하는정원(청원)", 100d)).isTrue();
+    }
+
+    @Test
+    @DisplayName("반경 밖 · 방향이 거꾸로 · 수식어가 양쪽에 없거나 있는 쌍 · 이름이 다른 쌍은 하위 시설이 아니다 (#1340)")
+    void rejectsNonSubFacilityPairs() {
+        // 반경 밖 — 괄호가 지역 표기(관덕정(제주) 꼴)인 다른 곳은 거리로 거른다
+        assertThat(PlaceIdentityPolicy.isSubFacilityOf("생각하는 정원", "생각하는정원(청원)", 101d)).isFalse();
+        // 방향이 거꾸로 — 수식어 붙은 쪽이 부모일 수 없다
+        assertThat(PlaceIdentityPolicy.isSubFacilityOf("생각하는정원(청원)", "생각하는 정원", 28d)).isFalse();
+        // 둘 다 수식어 없음 — 같은 이름의 두 행은 하위 시설 관계가 아니다(병합이 볼 일)
+        assertThat(PlaceIdentityPolicy.isSubFacilityOf("생각하는 정원", "생각하는정원", 10d)).isFalse();
+        // 둘 다 수식어 있음 — 형제 하위 시설끼리는 서로의 부모가 아니다
+        assertThat(PlaceIdentityPolicy.isSubFacilityOf("생각하는 정원[면세점(TAX REFUND SHOP)]", "생각하는정원(청원)", 30d)).isFalse();
+        // 이름이 다르다 — 부분일치도 받지 않는다
+        assertThat(PlaceIdentityPolicy.isSubFacilityOf("생각하는 정원", "생각하는 정원 카페(본점)", 10d)).isFalse();
+        assertThat(PlaceIdentityPolicy.isSubFacilityOf("노리매", "노리매공원(매표소)", 10d)).isFalse();
+        // 정규화하면 비는 이름은 받지 않는다
+        assertThat(PlaceIdentityPolicy.isSubFacilityOf("", "(청원)", 0d)).isFalse();
+        assertThat(PlaceIdentityPolicy.isSubFacilityOf(null, "생각하는정원(청원)", 0d)).isFalse();
+    }
+
+    @Test
     @DisplayName("반경 값은 실측으로 정한 그대로다")
     void keepsMeasuredRadii() {
         assertThat(PlaceIdentityPolicy.MERGE_EXACT_NAME_RADIUS_M).isEqualTo(1_000d);
@@ -218,5 +247,6 @@ class PlaceIdentityPolicyTest {
         assertThat(PlaceIdentityPolicy.MERGE_SHARED_NAME_RADIUS_M).isEqualTo(100d);
         assertThat(PlaceIdentityPolicy.IMAGE_BACKFILL_RADIUS_M).isEqualTo(500d);
         assertThat(PlaceIdentityPolicy.EMERGENCY_DUPLICATE_RADIUS_M).isEqualTo(1_000d);
+        assertThat(PlaceIdentityPolicy.SUB_FACILITY_RADIUS_M).isEqualTo(100d);
     }
 }

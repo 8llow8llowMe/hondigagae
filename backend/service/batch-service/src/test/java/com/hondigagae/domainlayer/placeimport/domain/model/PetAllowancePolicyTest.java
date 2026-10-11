@@ -93,6 +93,25 @@ class PetAllowancePolicyTest {
         assertThat(PetAllowancePolicy.petAvailableOf(allowance)).isEqualTo(expected);
     }
 
+    @ParameterizedTest(name = "하위 {0} + 본 시설 [{1}] → {2}")
+    @CsvSource(delimiter = '|', value = {
+        "ALLOWED           | PARTIALLY_ALLOWED                  | PARTIALLY_ALLOWED",  // 면세점 — 본 시설 제한을 받는다
+        "UNKNOWN           | PARTIALLY_ALLOWED                  | PARTIALLY_ALLOWED",  // 청원 — 근거 없어도 받는다
+        "ALLOWED           | NOT_ALLOWED                        | NOT_ALLOWED",
+        "ALLOWED           | PARTIALLY_ALLOWED,NOT_ALLOWED      | NOT_ALLOWED",        // 본 시설 후보 여럿 — 더 제한적인 쪽
+        "NOT_ALLOWED       | PARTIALLY_ALLOWED                  | NOT_ALLOWED",        // 하위가 더 제한적이면 그대로
+        "ALLOWED           | UNKNOWN                            | ALLOWED",            // 본 시설 UNKNOWN 은 근거가 아니다
+        "UNKNOWN           | ALLOWED                            | UNKNOWN",            // 본 시설 ALLOWED 는 물려주지 않는다
+        "PARTIALLY_ALLOWED | ALLOWED                            | PARTIALLY_ALLOWED",
+        "UNKNOWN           | ''                                 | UNKNOWN"
+    })
+    @DisplayName("하위 시설은 본 시설의 제한(일부 · 불가)만 물려받는다 — 넓히는 방향(ALLOWED)은 물려주지 않는다 (#1340)")
+    void inheritsOnlyParentRestriction(PetAllowanceType own, String parents, PetAllowanceType expected) {
+        List<PetAllowanceType> parentAllowances = split(parents).stream().map(String::trim).map(PetAllowanceType::valueOf).toList();
+
+        assertThat(PetAllowancePolicy.withParentRestriction(own, parentAllowances)).isEqualTo(expected);
+    }
+
     private static List<String> split(String csv) {
         return csv.isBlank() ? List.of() : Arrays.asList(csv.split(","));
     }

@@ -53,6 +53,14 @@ public final class PlaceIdentityPolicy {
      * {@code 백화점약국}(안양/광명 10.6km). <b>이 값을 올리지 않는다.</b>
      */
     public static final double EMERGENCY_DUPLICATE_RADIUS_M = 1_000d;
+    /**
+     * 하위 시설(본 시설 이름에 괄호 · 대괄호 수식어를 붙인 행)을 본 시설에 딸린 것으로 볼 거리 상한 (#1340).
+     *
+     * <p>prod 실측(#1340)에서 이 모양의 쌍 4개가 모두 0~58m 안에 있었다 — {@code 생각하는 정원}(125445)과
+     * {@code 생각하는 정원[면세점(TAX REFUND SHOP)]}(4054291) 28m, {@code 생각하는정원(청원)}(2907434) 58m.
+     * 괄호가 시설이 아니라 지역 표기({@code 관덕정(제주)} 꼴)인 다른 곳을 거리로 거르려고 넉넉히 잡지 않는다.
+     */
+    public static final double SUB_FACILITY_RADIUS_M = 100d;
 
     private PlaceIdentityPolicy() {
     }
@@ -129,6 +137,35 @@ public final class PlaceIdentityPolicy {
 
     private static boolean isLodging(String contentTypeId) {
         return PlaceContentType.LODGING.getCode().equals(contentTypeId);
+    }
+
+    /**
+     * {@code childTitle} 행이 {@code parentTitle} 행에 딸린 하위 시설인지 판정한다 (#1340). 방향이 있다 — 인자를 바꾸면 답이 다르다.
+     *
+     * <p>세 가지를 <b>모두</b> 만족해야 한다.
+     * <ul>
+     *   <li>본 시설 이름에는 괄호 · 대괄호 수식어가 없고, 하위 시설 이름에는 있다({@link #hasFacilityQualifier}).
+     *       둘 다 없으면 같은 이름의 두 행이고(병합이 볼 일), 둘 다 있으면 형제 하위 시설이다</li>
+     *   <li>수식어를 걷은 정규화 이름({@link PlaceNameMatcher#normalize})이 같고 비어 있지 않다. 부분일치는 받지 않는다</li>
+     *   <li>{@value #SUB_FACILITY_RADIUS_M}m 이내</li>
+     * </ul>
+     *
+     * <p>병합과 달리 행을 합치지 않는다 — 하위 시설은 실제로 다른 곳(매장 · 카페)이라 목록에 남아야 한다. 동반 구분 재계산이
+     * 본 시설의 제한을 하위 시설에 물려줄 때만 쓴다({@code PetAllowancePolicy.withParentRestriction}).
+     */
+    public static boolean isSubFacilityOf(String parentTitle, String childTitle, double distanceMeters) {
+        if (hasFacilityQualifier(parentTitle) || !hasFacilityQualifier(childTitle)) {
+            return false;
+        }
+        return PlaceNameMatcher.isExactMatch(parentTitle, childTitle) && distanceMeters <= SUB_FACILITY_RADIUS_M;
+    }
+
+    /**
+     * 이름에 괄호 · 대괄호 수식어가 붙어 있는지 — {@code 생각하는정원(청원)}, {@code 생각하는 정원[면세점(TAX REFUND SHOP)]}.
+     * 하위 시설 후보를 고르는 쪽({@code PlacePetAllowanceReflectProcessor})도 이것으로 본 시설 · 하위 시설을 가른다.
+     */
+    public static boolean hasFacilityQualifier(String title) {
+        return title != null && (title.indexOf('(') >= 0 || title.indexOf('[') >= 0);
     }
 
     /**
