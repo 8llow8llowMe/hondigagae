@@ -10,9 +10,12 @@ import java.util.regex.Pattern;
  * 새는 것을 완전히 막지는 못한다 — 모델은 스키마 지시나 자기 습관에서 대괄호를 끌어오기도 한다
  * (#233). 프롬프트가 1차 방어, 여기가 마지막 방어다.
  *
- * <p>하는 일은 두 가지뿐이고 둘 다 뜻을 바꾸지 않는다.
+ * <p>하는 일은 세 가지뿐이고 모두 뜻을 바꾸지 않는다.
  *
  * <ul>
+ *   <li>일차 표기를 붙인다. {@code "1일 차"} → {@code "1일차"} (#1335). 프롬프트 규칙 6 의 표기다. {@code 차}
+ *       뒤가 문장 끝 · 한글 아닌 글자 · 조사({@code 는 · 에 · 부터 …})일 때만 붙인다 — 허용 목록이다. 차량 · 차례 ·
+ *       차박 · 차이처럼 다른 낱말이면 그대로 둔다</li>
  *   <li>대괄호를 지운다. {@code "[4일차] 흐림"} → {@code "4일차 흐림"}. 한국어 안내문에서 대괄호는
  *       쓰지 않는 표기라 짝이 맞는지 따지지 않고 문자 자체를 없앤다</li>
  *   <li>일차 범위를 접는다. {@code "1일차~3일차"} → {@code "1~3일차"}. 대괄호를 지운 뒤 남는
@@ -25,6 +28,9 @@ import java.util.regex.Pattern;
 final class LlmTextCleaner {
 
     private static final Pattern BRACKETS = Pattern.compile("[\\[\\]]");
+    /** {@code 차} 뒤에 올 수 있는 조사. 조사 뒤는 다시 끝이거나 한글이 아니어야 한다 — "차가운" 의 {@code 가} 를 거른다. */
+    private static final Pattern SPACED_DAY = Pattern.compile(
+        "(\\d+)일[ \\t]+차(?=$|[^가-힣]|(?:에는|에도|부터|까지|는|은|에|엔|의|도|가|와|과|만)(?:$|[^가-힣]))");
     private static final Pattern DAY_RANGE = Pattern.compile("(\\d+)일차\\s*~\\s*(\\d+)일차");
     private static final Pattern REPEATED_SPACES = Pattern.compile(" {2,}");
 
@@ -40,6 +46,7 @@ final class LlmTextCleaner {
             return null;
         }
         String cleaned = BRACKETS.matcher(text).replaceAll("");
+        cleaned = SPACED_DAY.matcher(cleaned).replaceAll("$1일차");
         cleaned = DAY_RANGE.matcher(cleaned).replaceAll("$1~$2일차");
         cleaned = REPEATED_SPACES.matcher(cleaned).replaceAll(" ");
         return cleaned.strip();
