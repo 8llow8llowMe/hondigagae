@@ -266,6 +266,15 @@ describe('RegionalWeatherSection — 동점 문장 (#638)', () => {
     expect(markup).not.toContain('가장 나아요')
   })
 
+  /*
+    #1380 — 동점은 "어디든 좋다" 가 아니라 "고를 차이가 없다" 다. 다섯 권역이 모두 강수 90% 로 같은
+    점수인 날에도 `좋아요` 가 나가 바로 아래 근거(`야외 일정에 영향`)와 부딪쳤다(ux-review §3-4).
+  */
+  it('전부 동점이면 좋다고 하지 않고 차이가 없다고 한다', () => {
+    expect(messages.home.regionTiedAll).toBe('권역별 차이가 없어요')
+    expect(render(TIED_DAY)).not.toContain('좋아요')
+  })
+
   it('두 곳만 동점이면 그 이름들을 세운다', () => {
     const markup = render(TWO_TIED_DAY)
 
@@ -662,8 +671,8 @@ describe('RegionalWeatherSkeleton — 높이 (#963 → #1068)', () => {
 })
 
 /*
-  #1356 — 전 권역 동점인 날 모바일에서 칸 레일을 접는다. 머리 문장이 이미 `어느 권역이든
-  좋아요` 라고 말하고 칸은 같은 숫자를 늘어놓을 뿐이다. 견줄 거리가 있는 날은 접지 않는다.
+  #1356 — 전 권역 동점인 날 모바일에서 칸 레일을 접는다. 머리 문장이 이미 `권역별 차이가
+  없어요`(#1380) 라고 말하고 칸은 같은 숫자를 늘어놓을 뿐이다. 견줄 거리가 있는 날은 접지 않는다.
 */
 describe('RegionalWeatherSection — 동점 날 모바일 접기 (#1356)', () => {
   /** 칸 레일 컨테이너의 여는 태그 — `scroll-rail` 클래스로 집는다 */
