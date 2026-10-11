@@ -3,7 +3,12 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { petInfoLines, PlacePetInfoSection, sizeVerdictLine } from '@/features/place/place-pet-info'
+import {
+  PET_INFO_VISIBLE_LINES,
+  petInfoLines,
+  PlacePetInfoSection,
+  sizeVerdictLine,
+} from '@/features/place/place-pet-info'
 import { messages } from '@/lib/messages'
 import { placeDetail } from '@/test/fixtures/place'
 
@@ -145,7 +150,8 @@ describe('PlacePetInfoSection — 우리 아이 기준 결론이 맨 위다 (#10
 
   it('결론은 체크 목록 항목이 아니다', () => {
     const html = renderWithPet('몽실이')
-    const list = html.slice(html.indexOf('<ul'), html.indexOf('</ul>'))
+    // 목록은 펼친 줄 · 접힌 줄 둘일 수 있다 (#1371) — 첫 목록부터 끝까지 본다
+    const list = html.slice(html.indexOf('<ul'), html.lastIndexOf('</ul>'))
 
     expect(list).not.toContain(VERDICT)
     // 조건 줄 수만큼만 항목이 선다 — 결론 몫의 `li` 가 없다
@@ -219,5 +225,85 @@ describe('petInfo 가 없을 때 — 동반 여부가 등록됐는지와 세부 
   /** 다음 행동(전화)은 제목 머리의 방문 핵심 줄이 준다 (#1226) — 여기서 같은 번호를 다시 세우지 않는다 */
   it('전화 링크를 따로 세우지 않는다', () => {
     expect(renderEmpty(null)).not.toContain('tel:')
+  })
+})
+
+/*
+  #1371 — 앞 5줄만 펼치고 나머지는 네이티브 `<details>` 로 접는다. 전부 펼치면 375 에서 약 700px 이라
+  그 아래 판정 · 혼잡도가 한참 밀렸다.
+*/
+describe('PlacePetInfoSection — 앞 5줄만 펼친다 (#1371)', () => {
+  /** 원천 항목을 n 줄 채운 동반 정보 — 줄 수만 바꾼다 */
+  function petInfoWith(lines: number) {
+    const fields = [
+      'acmpyTypeCd',
+      'acmpyPsblCpam',
+      'acmpyNeedMtr',
+      'relaAcdntRiskMtr',
+      'relaPosesFclty',
+      'relaFrnshPrdlst',
+      'relaRntlPrdlst',
+      'relaPurcPrdlst',
+      'etcAcmpyInfo',
+    ] as const
+    // 구역 · 크기는 늘 선다. 목줄은 끄고 나머지 원천 칸으로 줄 수를 맞춘다
+    const filled = Object.fromEntries(
+      fields.map((key, index) => [key, index < lines - 2 ? `값${index}` : null]),
+    )
+    return { ...petInfo, leashRequired: false, ...filled }
+  }
+  const render = (info: typeof petInfo) =>
+    renderToStaticMarkup(
+      createElement(PlacePetInfoSection, {
+        petInfo: info,
+        allowance: placeDetail.petAllowanceType,
+        sourceText: null,
+        petName: null,
+        petSizeCode: null,
+        petSizeName: null,
+      }),
+    )
+  /** `<details>` 앞(펼친 목록)의 `li` 수 */
+  const visibleCount = (html: string) => {
+    const end = html.includes('<details') ? html.indexOf('<details') : html.length
+    return html.slice(0, end).split('<li').length - 1
+  }
+
+  it('펼쳐 두는 줄은 다섯이다', () => {
+    expect(PET_INFO_VISIBLE_LINES).toBe(5)
+  })
+
+  it('일곱 줄이면 다섯을 펼치고 둘을 접는다 — 접힌 수를 말한다', () => {
+    const info = petInfoWith(7)
+    const html = render(info)
+
+    expect(petInfoLines(info, null)).toHaveLength(7)
+    expect(visibleCount(html)).toBe(5)
+    expect(html).toContain('<details')
+    expect(html).toContain(messages.place.detailPetInfoMore.replace('{count}', '2'))
+    expect(html.slice(html.indexOf('<details')).split('<li').length - 1).toBe(2)
+  })
+
+  /* `1개 더 보기` 는 펼치는 수고가 더 크다 */
+  it('여섯 줄이면 접지 않는다', () => {
+    const html = render(petInfoWith(6))
+
+    expect(html).not.toContain('<details')
+    expect(visibleCount(html)).toBe(6)
+  })
+
+  it('다섯 줄 이하면 접지 않는다', () => {
+    expect(render(petInfoWith(4))).not.toContain('<details')
+  })
+
+  /* 열린 뒤에는 `접기` — 같은 summary 안에서 `open` 상태로 갈아 끼운다 */
+  it('여는 줄은 summary 하나이고 열림 · 닫힘 글자를 함께 갖는다', () => {
+    const html = render(petInfoWith(9))
+    const summary = html.slice(html.indexOf('<summary'), html.indexOf('</summary>'))
+
+    expect(html.split('<summary').length - 1).toBe(1)
+    expect(summary).toContain(messages.place.detailPetInfoMore.replace('{count}', '4'))
+    expect(summary).toContain(messages.place.detailPetInfoLess)
+    expect(summary).toContain('min-h-11')
   })
 })
