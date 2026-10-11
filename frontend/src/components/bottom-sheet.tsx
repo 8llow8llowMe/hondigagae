@@ -3,7 +3,7 @@
 import { type ReactNode, type RefObject, useRef } from 'react'
 
 import { toBody } from '@/lib/ui/body-portal'
-import { useOverlay } from '@/lib/ui/overlay'
+import { isBackdropDismissClick, useOverlay } from '@/lib/ui/overlay'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -71,7 +71,9 @@ export function BottomSheet({
         type="button"
         aria-hidden
         tabIndex={-1}
-        onClick={onClose}
+        onClick={(event) => {
+          if (isBackdropDismissClick(event.detail)) onClose()
+        }}
         className="overlay-backdrop absolute inset-0"
       />
 
