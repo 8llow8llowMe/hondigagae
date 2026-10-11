@@ -23,8 +23,8 @@ import { SuitabilityListSkeleton } from '@/features/home/suitability-list-skelet
 import { TripBannerCard } from '@/features/home/trip-banner'
 import { UpcomingPlanRow } from '@/features/home/upcoming-plan-row'
 import {
+  useRecommendations,
   useRegionalWeather,
-  useSuitabilities,
   useWalkSafety,
 } from '@/features/home/use-home-insight'
 import { WalkVerdict } from '@/features/home/walk-verdict'
@@ -43,14 +43,13 @@ import { getPositionIfGranted, type PositionResult } from '@/lib/geo/current-pos
 import { DEFAULT_BASIS_PLACE_ID, isDefaultBasis } from '@/lib/insight/basis-place'
 import { collectIndoorAlternatives } from '@/lib/insight/indoor'
 import { pickCardReason, placeCardsEnd } from '@/lib/insight/place-cards'
-import {
-  appliedFactorsOf,
-  orderByScore,
-  pickTopPlaces,
-  resolveBasisPlaceId,
-  splitSharedReasons,
-} from '@/lib/insight/reasons'
+import { appliedFactorsOf, resolveBasisPlaceId, splitSharedReasons } from '@/lib/insight/reasons'
 import { clearRecentPlaceId, isBasisPlaceGone, readRecentPlaceId } from '@/lib/insight/recent-place'
+import {
+  allCardsCautious,
+  recommendationFailure,
+  toRecommendationCards,
+} from '@/lib/insight/recommendation'
 import { walkTimesBasis, walkTimesQueryPosition } from '@/lib/insight/walk-times-position'
 import { pickWeatherWarning } from '@/lib/insight/weather-warning'
 import { messages } from '@/lib/messages'
@@ -60,10 +59,12 @@ import { pickHomePlans } from '@/lib/plan/trip-banner'
 import { withCompanionParticle } from '@/lib/text/korean'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
-import type { PlaceSummary } from '@/types/place'
 import type { PlanSummaryItem } from '@/types/plan'
 
-/** 홈은 요약 화면이다. 3장이 적당하다 — 공통명세 S5-2 (N=3) */
+/**
+ * 홈은 요약 화면이다. 3장이 적당하다 — 공통명세 S5-2 (N=3). 장소 추천의 `limit` 이 이 값이다
+ * (#1380) — 서버 기본값(3)과 같지만 경로가 늘 명시한다(`recommendationsPath`).
+ */
 const TOP_PLACE_COUNT = 3
 
 /** 실내 대안도 같은 이유로 3곳이다 — 홈-세부명세 D1 의 "3열" */
@@ -86,7 +87,7 @@ const AI_PLAN_HREF = '/ai-plans/new'
  *
  * **데스크톱은 2단이다.** 좌 400 고정(sticky) + 우 가변.
  * 좌측 = 변하지 않는 맥락(프로필 · 판정 · 골든타임 — 카드 한 장), 우측 = 지금 할 일
- * (소개 · 적합도 · 실내 대안 · 바로가기 · 일정 · 권역).
+ * (소개 · 실내 대안 · 적합도 · 바로가기 · 일정 · 권역).
  *
  * **열 구분선 1px 을 걷었다.** 2a 에서는 우측 열의 `border-left` 가 두 기둥을 갈랐는데,
  * L0 바닥이 카드 사이로 비쳐 선 없이 갈린다. 선을 남기면 카드 테두리와 두 겹이 된다.
@@ -109,8 +110,8 @@ const AI_PLAN_HREF = '/ai-plans/new'
  *
  * **모바일은 한 컬럼이고 DOM 순서가 곧 보이는 순서다** (#1356). 두 열을 좌 → 우로 이어
  * 붙이므로, 무엇이 첫 화면에 드는지는 좌측 레일의 길이가 정한다 — 그래서 좌측에는 요약 카드
- * 하나만 두고 나머지는 우측 열에 모바일 우선순위로 세운다: 요약 → 소개(조건부) → 오늘 갈 만한
- * 곳 → 실내(조건부) → 바로가기 → 일정(로그인) → 권역. 카드 사이 8px 로 바닥이 비친다.
+ * 하나만 두고 나머지는 우측 열에 모바일 우선순위로 세운다: 요약 → 소개(조건부) → 실내(조건부,
+ * #1380) → 오늘 갈 만한 곳 → 바로가기 → 일정(로그인) → 권역. 카드 사이 8px 로 바닥이 비친다.
  *
  * **최소 골격**: 최악에도 nav + 적합도 영역 + 바로가기 줄(병원 칸)은 남는다. 홈 전체를 `ErrorState` 로
  * 덮지 않는다 — 진입점이 죽으면 아무 데도 갈 수 없다.
@@ -118,7 +119,6 @@ const AI_PLAN_HREF = '/ai-plans/new'
 export function HomeView({
   authed,
   showAboutIntro,
-  places,
   plans,
   todayIso,
   todayLabel,
@@ -130,7 +130,6 @@ export function HomeView({
    * (`about-intro-card.tsx`).
    */
   showAboutIntro: boolean
-  places: PlaceSummary[]
   plans: PlanSummaryItem[]
   /**
    * `2026-09-07` — **오늘도 서버가 정한다.** 클라이언트에서 `new Date()` 를 부르면
@@ -267,19 +266,49 @@ export function HomeView({
   const facilities = useNearbyFacilities(grantedPosition, DEFAULT_RADIUS_METERS)
   const nearestHospital = pickNearestHospital(facilities.data)
 
-  const topPlaces = pickTopPlaces(places, TOP_PLACE_COUNT)
-  const suitabilities = useSuitabilities(
-    topPlaces.map((place) => place.placeId),
-    condition,
-  )
+  /*
+    **장소 추천 한 번이다** (#1380 · 홈-세부명세 D10-1). 예전에는 서버가 목록(`GET /places`)을 받아
+    두고 여기서 앞 3곳의 적합도를 하나씩 불렀다 — 추천이 "장소 ID 앞 3곳" 이었고 동반 미확인 장소가
+    섰다. 서버 프리페치하지 않는 이유는 `useRecommendations` 머리주석(콜드 18초).
+  */
+  /*
+    **조건이 정해진 뒤에 부른다** (`useRecommendations` 의 `enabled`). 로그인 사용자는 반려견 목록이 오고
+    (`isPending` 거짓 — 실패도 정해진 것이다, 조건 없음으로 간다) 고른 반려견이 복원돼야(`undefined` 가
+    아니다 — `selected-pet-store.ts`) 조건이 선다. 게스트는 조건이 늘 없음이라 기다리지 않는다.
+  */
+  const conditionReady = !authed || (!petList.isPending && storedPetId !== undefined)
+  const recommendations = useRecommendations(condition, TOP_PLACE_COUNT, conditionReady)
 
-  const loaded = suitabilities.flatMap((query) => (query.data === undefined ? [] : [query.data]))
-  const pending = suitabilities.some((query) => query.isPending)
-  const allFailed = suitabilities.length > 0 && suitabilities.every((query) => query.isError)
-  const refetching = suitabilities.some((query) => query.isFetching && query.data !== undefined)
+  /*
+    **기준 장소는 렌더에서만 뺀다** (#428, `toRecommendationCards`). `basisPlaceId` 는 `localStorage`
+    를 읽는 effect 뒤에야 정해져, 질의에 묶으면 하이드레이션 뒤 key 가 바뀌어 재조회가 한 번 더 돈다.
 
-  const heading =
-    selectedPet === null
+    **서버 순서 그대로다** (D10-2). 예전 `orderByScore` 는 목록 앞 3곳을 도착 순서대로 받던 때의
+    처방이었다 — 이제 점수 · 동반 · 혼잡 · 다양성까지 서버가 정해 준다. 점수 없는 곳도 서버가 뺀다.
+  */
+  const cards =
+    recommendations.data === undefined
+      ? []
+      : toRecommendationCards(recommendations.data, basisPlaceId)
+  const loaded = cards.map((card) => card.data)
+  /*
+    **받은 것이 있으면 그린다.** 백그라운드 재조회만 실패한 경우 카드를 걷고 오류로 덮으면, 방금 보던
+    카드가 이유 없이 사라진다 (`facility-layer-status.ts` 와 같은 규칙).
+  */
+  const failure =
+    recommendations.isError && recommendations.data === undefined
+      ? recommendationFailure(recommendations.error)
+      : null
+  const refetching = recommendations.isFetching && recommendations.data !== undefined
+
+  /*
+    **카드가 전부 `주의 필요` 이하면 제목을 낮춘다** (#1380 · D10-3, `allCardsCautious`). 추천은 가장
+    나은 곳을 고를 뿐이라 비 · 특보 날에는 1위도 `주의 필요` 다 — 그 위에 `갈 만한 곳` 이 서면 제목과
+    카드가 서로를 부정한다.
+  */
+  const heading = allCardsCautious(loaded)
+    ? messages.home.suitabilityCautiousHeading
+    : selectedPet === null
       ? messages.home.suitabilityFallback
       : // 동반격 조사(와/과)는 이름의 받침에 따라 갈린다 — 고정하면 한쪽이 반드시 틀린다
         messages.home.suitabilityHeading.replace('{name}', withCompanionParticle(selectedPet.name))
@@ -292,60 +321,29 @@ export function HomeView({
   const applied = appliedFactorsOf(loaded)
   const sortNote = messages.home.sortNote[applied]
 
-  const placeById = new Map(places.map((place) => [place.placeId, place]))
-
-  /*
-    **기준 장소를 추천에서 뺀다** (#428). 좌측 판정이 "{장소} 기준" 으로 이미 그 장소를
-    말하고 있는데 우측 추천 1번에 같은 장소가 다시 섰다 — DESIGN.md §1 "같은 사실을 한
-    화면에서 두 번 말하지 않는다. 반복은 강조가 아니라 소음이다".
-
-    **조회는 그대로 두고 렌더에서만 뺀다.** `basisPlaceId` 는 `localStorage` 를 읽는
-    effect 뒤에야 정해지므로 첫 렌더와 하이드레이션 뒤의 값이 다르다 — 질의 집합을 여기에
-    묶으면 그 시점에 키가 바뀌어 재조회가 한 번 더 돈다.
-  */
-  const visible = loaded.filter((data) => data.placeId !== basisPlaceId)
-
-  /*
-    **점수를 낸 곳이 먼저다** (#428). 서버 순서를 그대로 쓰던 동안 `판단 근거 부족`
-    (점수 없음) 항목이 목록 맨 위에서 가장 큰 시각 무게를 받고 있었다 — 정보 가치와
-    시각 무게가 정반대였다. §1 "위계는 크기와 순서로 만든다".
-
-    **점수 안에서는 서버 순서를 지킨다.** 정렬은 "점수가 있나 없나" 한 축뿐이다 —
-    점수끼리 다시 세우면 서버가 고른 순서(적합도 외 요인이 섞인다)를 FE 가 뒤집는다.
-  */
-  // 뽑은 N장 안에서만 점수 높은 순이다 — 전체 정렬이 아니다 (#1356, D8-1)
-  const scored = orderByScore(visible.filter((data) => data.score !== null))
-  const unscored = visible.filter((data) => data.score === null)
-
   /*
     카드 전부에 똑같이 붙는 문장은 장소별 근거가 아니라 **이 화면의 전제**다 (#304).
     카드에서 걷어 목록 위에 한 번만 적는다 — 남는 문장이 곧 장소 간 차이가 된다.
   */
   const { shared: sharedReasons, perPlace: placeReasons } = splitSharedReasons(
-    scored.map((data) => data.reasons),
+    loaded.map((data) => data.reasons),
   )
 
   /*
-    끝 카드 (#1069). 카드가 칸을 다 채우지 못한 날만 선다 — 목록 아래 버튼 줄 둘(`점수를
-    내지 못한 곳` · `전체 보기`)이 이 한 장으로 합쳐졌다. 3곳이 다 차면 끝 카드 없이 머리의
-    `장소 찾기` 가 맡는다. **수는 전체 수다** — 남은 수로 쓰면 같은 링크가 추천 수에 따라
-    다른 수를 말한다 (#905 R7).
+    끝 카드 (#1069). 카드가 칸을 다 채우지 못한 날만 선다 — 후보가 모자라거나 기준 장소가 추천에
+    들어 카드에서 빠진 날이다. 3곳이 다 차면 끝 카드 없이 머리의 `장소 찾기` 가 맡는다.
+    **수를 싣지 않는다** (#1380 · D10-4) — 추천 API 는 목록 전체 수를 주지 않는다.
   */
-  const endCard = placeCardsEnd({
-    cards: scored.length,
-    unscored: unscored.length,
-    total: places.length,
-    capacity: TOP_PLACE_COUNT,
-  })
+  const endCard = placeCardsEnd({ cards: cards.length, capacity: TOP_PLACE_COUNT })
 
   /*
-    비 예보일 때의 실내 대안. **추가 호출이 없다** — 위 적합도 응답에 이미 들어 있다.
-    위에서 보여 준 장소는 제외한다 (`collectIndoorAlternatives`).
+    비 예보일 때의 실내 대안. **추가 호출이 없다** — 위 추천 항목에 이미 들어 있다.
+    카드로 선 장소는 제외한다 (`collectIndoorAlternatives`).
   */
   // 거리의 기준은 카드로 선 장소다 — 줄마다 `{장소}에서` 라고 적으므로(#1356) 화면에 없는 장소를 부르지 않는다
   const indoorAlternatives = collectIndoorAlternatives(
-    scored,
-    visible.map((data) => data.placeId),
+    loaded,
+    loaded.map((data) => data.placeId),
     INDOOR_ALTERNATIVE_COUNT,
   )
 
@@ -414,6 +412,8 @@ export function HomeView({
           regionalWeather.data?.weatherWarning,
           walkSafety.data?.weatherWarning,
           walkTimes.data?.weatherWarning,
+          // 같은 단일 지점 특보다. 콜드면 가장 늦게 와 마지막 폴백이다 (#1380, `pickWeatherWarning`)
+          recommendations.data?.weatherWarning,
         ])}
       />
 
@@ -625,9 +625,33 @@ export function HomeView({
 
             비로그인 · 소개를 본 적 없음일 때만 선다. 닫거나 `/about` 을 한 번 열면 쿠키가 남아
             다음부터 서지 않는다 — 그 뒤 모바일의 통로는 맨 아래 `/about` 링크다(지우지 않는다).
-            × 뒤 초점은 다음 형제(`오늘 갈 만한 곳`)로 간다 (`about-intro-card.tsx`).
+            × 뒤 초점은 다음 형제 카드로 간다 (`about-intro-card.tsx`) — 실내 대안이 선 날은 그
+            카드, 아니면 `오늘 갈 만한 곳` 이다(#1380).
           */}
           {aboutIntroShown && <AboutIntroCard onDismiss={dismissAboutIntro} />}
+
+          {/*
+            비 예보일 때의 실내 대안 — **`오늘 갈 만한 곳` 위다** (#1380 · 홈-세부명세 D10-5).
+
+            예전에는 목록 바로 아래 곁가지였다("비가 오면 이쪽"). 그런데 대안이 서는 날은 서버가 **비
+            예보로** 채운 날이고, 그날 카드는 전부 야외 감점을 단 채 섰다 — 사용자가 먼저 봐야 할 것은
+            실내다(ux-review-2026-10-11 §3-4). 특보(호우 · 태풍) 날도 대안은 비 예보를 따라 온다 —
+            특보만 있고 비 예보가 없으면 서버가 채우지 않아 섹션이 없다.
+
+            **조건을 따로 세우지 않는다.** 이 섹션은 대안이 있을 때만 서고(`IndoorAlternativesSection`
+            이 빈 배열이면 `null`), 대안은 비 예보일 때만 온다 — "비 · 특보일에는 위로" 가 곧 "서는
+            날은 늘 위" 다. 대안이 없는 날은 지금처럼 아무것도 없다.
+
+            **DOM 순서로 올린다.** `order` 로 당기면 보이는 순서와 키보드 · 스크린리더 순서가 갈린다
+            (WCAG 1.3.2, D1 "모바일 순서를 DOM 순서로"). 캡션도 `아래 장소에서` 로 바뀌었다.
+
+            **카드와 같은 응답에서 온다** — 추천이 도착하는 순간 카드와 함께 서므로, 골격이 서 있는
+            동안에는 자리가 없다가 데이터와 함께 위에 끼어든다(그 순간 카드 머리가 이 섹션 높이만큼
+            내려간다). 밴드가 없다(#428) — 없는 섹션은 간격도 없다.
+          */}
+          {indoorAlternatives.length > 0 && (
+            <IndoorAlternativesSection alternatives={indoorAlternatives} />
+          )}
 
           <Surface
             lead
@@ -654,6 +678,7 @@ export function HomeView({
               안에서 같은 사실이 두 번 섰다 (DESIGN.md §1). 3곳이 다 차 끝 카드가 없는 날에는
               수가 빠지지만, 그날 할 일은 수를 읽는 것이 아니라 머리의 `장소 찾기` 다 — 요약
               화면에서 목록 전체 수는 결정을 바꾸지 않는다. 모바일은 원래 이 줄이 없었다.
+              (#1380 부터는 끝 카드도 수를 말하지 않는다 — 추천 API 가 목록 전체 수를 주지 않는다.)
             */
             /*
               **모바일에도 목록으로 가는 길을 머리에 둔다** (#1356). 버튼은 `md` 이상 전용이라
@@ -714,20 +739,24 @@ export function HomeView({
 
               스켈레톤 · 오류 · 빈 상태는 예전처럼 **카드가 통째로 하는 말**이다.
             */}
-            {pending && visible.length === 0 ? (
+            {recommendations.isPending ? (
               <SuitabilityListSkeleton />
-            ) : allFailed ? (
+            ) : failure?.retry === true ? (
               <ErrorState
                 headingLevel={3}
                 inset="card"
-                title={messages.common.temporaryErrorTitle}
-                onRetry={() => suitabilities.forEach((query) => void query.refetch())}
+                title={failure.title}
+                onRetry={() => void recommendations.refetch()}
               />
-            ) : visible.length === 0 ? (
+            ) : failure !== null || cards.length === 0 ? (
+              /*
+                **재시도할 수 없는 실패(404 · 4xx)도 빈 상태 모양이다** (`recommendationFailure`). 다시
+                눌러도 같은 답이라 버튼을 달지 않고 서버 문구를 제목으로 낸다 — 길은 `장소 찾기` 다.
+              */
               <EmptyState
                 headingLevel={3}
                 inset="card"
-                title={messages.home.emptyPlacesTitle}
+                title={failure?.title ?? messages.home.emptyPlacesTitle}
                 description={messages.home.emptyPlacesDesc}
                 action={
                   <Link
@@ -744,24 +773,22 @@ export function HomeView({
                 카드는 크기가 같고 위계는 **순서**가 만든다 — 1위가 캐러셀의 첫 장, 그리드의
                 왼쪽 칸이다. 접으면 동반 여부까지 접혀 2위 이하의 첫 질문이 비었다.
 
-                **점수를 못 낸 곳은 카드가 아니다** (#428) — 끝 카드 안의 한 줄로 개수만 말한다.
-
-                **카드 구성이 바뀌면 틀을 새로 세운다(`key`).** 적합도 세 건은 따로 도착해 목록이
-                `[끝 카드]` → `[1위, 2위, 끝 카드]` 처럼 앞쪽에 카드가 끼어든다. 스냅 컨테이너는
-                배치가 바뀌면 **직전에 붙어 있던 항목을 따라 다시 스냅한다** — 768 실측에서 먼저
-                선 끝 카드를 따라가 scrollLeft 가 0 → 1014 → 446 으로 밀려, 첫 화면이 1위가 아니라
-                끝 카드였다. 새로 세우면 스크롤이 0 에서 시작해 **1위가 항상 첫 장이다.** 같은
-                구성의 재조회(`refetching`)는 key 가 같아 스크롤을 건드리지 않는다.
+                **카드 구성이 바뀌면 틀을 새로 세운다(`key`).** 스냅 컨테이너는 배치가 바뀌면
+                **직전에 붙어 있던 항목을 따라 다시 스냅한다** — 적합도 세 건이 따로 도착하던 때 768
+                실측에서 먼저 선 끝 카드를 따라가 scrollLeft 가 0 → 1014 → 446 으로 밀렸다. 추천은 한
+                번에 오지만 반려견을 바꾸거나 기준 장소가 정해지면(effect 뒤) 구성이 바뀐다. 새로 세우면
+                스크롤이 0 에서 시작해 **1위가 항상 첫 장이다.** 같은 구성의 재조회(`refetching`)는
+                key 가 같아 스크롤을 건드리지 않는다.
               */
               <PlaceInsightCardList
-                key={`${scored.map((data) => data.placeId).join(',')}|${endCard === null ? '' : 'end'}`}
+                key={`${cards.map((card) => card.data.placeId).join(',')}|${endCard === null ? '' : 'end'}`}
                 busy={refetching}
               >
-                {scored.map((data, index) => (
+                {cards.map(({ data, place }, index) => (
                   <PlaceInsightCard
                     key={data.placeId}
                     data={data}
-                    place={placeById.get(data.placeId)}
+                    place={place}
                     reason={pickCardReason(placeReasons[index] ?? data.reasons)}
                     // 첫 카드 사진은 모바일 첫 화면의 LCP 다 — 지연 로딩하지 않는다 (#1358)
                     preload={index === 0}
@@ -771,19 +798,6 @@ export function HomeView({
               </PlaceInsightCardList>
             )}
           </Surface>
-
-          {/*
-            비 예보일 때의 실내 대안. **장소 목록 바로 아래다** — 위 목록을 뒤집는 정보가
-            아니라 "비가 오면 이쪽" 이라는 곁가지라, 목록에서 떨어뜨리면 무엇의 대안인지
-            읽히지 않는다.
-
-            **밴드가 사라졌다** (#428). 2a 에서는 대안이 있을 때만 밴드를 그려야 했다 —
-            비가 안 오는 날 섹션이 `null` 이라 무조건 그리면 아래 일정 밴드와 회색 줄이
-            두 겹으로 겹쳤다. 3a 는 카드 사이 간격이 경계라 **없는 섹션은 간격도 없다.**
-          */}
-          {indoorAlternatives.length > 0 && (
-            <IndoorAlternativesSection alternatives={indoorAlternatives} />
-          )}
 
           {/*
             바로가기 한 줄 — AI 일정 · 제주올레 · 동물병원 (#1356). 예전 좌측 레일 끝의 배너 셋이다.

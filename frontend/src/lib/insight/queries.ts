@@ -18,6 +18,12 @@ export const insightKeys = {
   suitability: (placeId: string, conditionKey: string) =>
     [...insightKeys.all, 'suitability', placeId, conditionKey] as const,
   /**
+   * 장소 추천 (#1380). 장소 축이 없고 **조건과 개수**가 응답을 가른다 — 개수가 다르면 다양성
+   * 규칙(같은 유형은 `limit` 의 절반까지)이 달라져 앞 몇 곳도 달라질 수 있다.
+   */
+  recommendations: (conditionKey: string, limit: number) =>
+    [...insightKeys.all, 'recommendations', conditionKey, limit] as const,
+  /**
    * 기간 혼잡도 (#430). **조건이 아니라 일수가 key 에 들어간다** — 이 엔드포인트는 반려견
    * 조건을 받지 않고(붐빔은 장소와 날짜의 속성이다), 7일과 30일은 응답 자체가 다르다.
    *

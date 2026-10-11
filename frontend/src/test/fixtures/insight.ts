@@ -1,6 +1,8 @@
 import type { CodeNameMetadata } from '@/types/api'
 import type {
   PlaceCongestionResponse,
+  PlaceRecommendationItem,
+  PlaceRecommendationResponse,
   PlaceSuitabilityResponse,
   WalkSafetyResponse,
 } from '@/types/insight'
@@ -171,6 +173,90 @@ export const suitabilityWithIndoor: PlaceSuitabilityResponse = {
         description: '일부 구역 또는 조건부로 반려동물 동반이 가능한 장소입니다.',
       },
       allowedPetSize: { code: 'SMALL', name: '소형견', description: '소형견만 동반 가능합니다.' },
+    },
+  ],
+}
+
+/**
+ * 추천 장소 한 곳 (#1380) — `PlaceRecommendationItem`.
+ *
+ * 판정 조각(근거 · 날씨 · 혼잡도)은 **적합도 fixture 의 것을 그대로** 쓴다 — 서버도 적합도의 Item 을
+ * 그대로 싣는다. 요약 필드는 Swagger `@Schema(example)`(`가세오름` · 표선면 가시리 · 좌표)다.
+ */
+export const recommendationItem: PlaceRecommendationItem = {
+  placeId: '212481712381923328',
+  contentType: { code: 'TOURIST_SPOT', name: '관광지', description: '자연·문화 관광지' },
+  title: '가세오름',
+  addr1: '제주특별자치도 서귀포시 표선면 가시리',
+  sigunguCode: '3',
+  lat: 33.3608276172,
+  lng: 126.7818122232,
+  firstImage: 'https://tong.visitkorea.or.kr/cms/resource/63/2512763_image2_1.jpg',
+  firstImage2: null,
+  petAllowanceType: {
+    code: 'ALLOWED',
+    name: '동반 가능',
+    description: '반려동물 동반이 가능한 장소입니다.',
+  },
+  maxPetWeightKg: null,
+  indoor: false,
+  score: suitability.score ?? 82,
+  suitabilityLevel: suitability.suitabilityLevel,
+  headline: '오늘 가기 좋아요',
+  reasons: suitability.reasons,
+  weather: suitability.weather,
+  congestion: suitability.congestion as NonNullable<PlaceSuitabilityResponse['congestion']>,
+  indoorAlternatives: [],
+  petConditionApplied: true,
+  weatherApplied: true,
+  congestionApplied: false,
+}
+
+/** `SuitabilityLevel.MEDIUM` 의 `displayName` / `description` 그대로 */
+const SUITABILITY_MEDIUM = {
+  code: 'MEDIUM',
+  name: '보통',
+  description: '일부 조건을 확인하고 가면 무난합니다.',
+  scoreDescription: '점수가 중간이면 주의할 조건이 한둘 있다는 뜻입니다.',
+}
+
+/** `SuitabilityLevel.LOW` 의 `displayName` / `description` 그대로 */
+export const SUITABILITY_LOW = {
+  code: 'LOW',
+  name: '주의 필요',
+  description: '반려견과 방문하기에 불리한 조건이 있습니다.',
+  scoreDescription: '점수가 낮을수록 피하거나 시간대를 옮기는 편이 좋습니다.',
+}
+
+/**
+ * `GET /places/recommendations` (#1380). 점수 · 등급은 dev 실측(2026-10-11)의 모양 — 84 `여행 적합` ·
+ * 75 `보통` · 75 `보통` — 이고, 서버 순서(점수 높은 순) 그대로다.
+ */
+export const recommendations: PlaceRecommendationResponse = {
+  targetDate: '2026-10-11',
+  weatherProviderName: '기상청 단기예보',
+  weatherWarning: null,
+  items: [
+    { ...recommendationItem, placeId: '212481712381923401', title: '캠파제주', score: 84 },
+    {
+      ...recommendationItem,
+      placeId: '212481712381923402',
+      title: '수목원테마파크',
+      score: 75,
+      suitabilityLevel: SUITABILITY_MEDIUM,
+      petAllowanceType: {
+        code: 'PARTIALLY_ALLOWED',
+        name: '부분 동반 가능',
+        description: '일부 구역 또는 조건부로 반려동물 동반이 가능한 장소입니다.',
+      },
+      indoor: null,
+    },
+    {
+      ...recommendationItem,
+      placeId: '212481712381923403',
+      title: '갑선이오름',
+      score: 75,
+      suitabilityLevel: SUITABILITY_MEDIUM,
     },
   ],
 }

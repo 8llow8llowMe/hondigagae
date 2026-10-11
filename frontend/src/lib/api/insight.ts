@@ -65,6 +65,22 @@ export function walkSafetyPath(placeId: string, condition: PetCondition | null):
 }
 
 /**
+ * 장소 추천 (#1368 · #1380) — 홈 `오늘 갈 만한 곳`.
+ *
+ * **반려견 조건은 적합도와 같은 조립(`toInsightQuery`)이다.** 서버가 추천 후보마다 적합도 한 곳
+ * 판정과 같은 `PlaceSuitabilityProcessor.score` 를 부르므로(`weather-insight-integration.md` §6-5),
+ * 조건을 싣는 함수가 갈리면 추천 카드의 점수와 그 장소 상세의 적합도가 FE 에서 갈린다.
+ *
+ * **`limit` 은 기본값(3)이어도 명시한다** — 홈 카드 수(`TOP_PLACE_COUNT`)와 서버 기본값이 따로
+ * 움직이면 카드 수가 조용히 바뀐다. **`targetDate` 는 보내지 않는다** — 생략하면 서버가 오늘로
+ * 잡고, FE 가 날짜를 만들면 브라우저 타임존이 KST 가 아닌 사용자에게 어제가 나간다(권역 비교와
+ * 같은 판단). 오늘일 때만 응답에 특보가 붙는다.
+ */
+export function recommendationsPath(condition: PetCondition | null, limit: number): string {
+  return paths.places.recommendations(toInsightQuery(condition, { limit: String(limit) }))
+}
+
+/**
  * 기간 혼잡도 (#430).
  *
  * **반려견 조건을 싣지 않는다.** 붐빔은 장소와 날짜의 속성이라 반려견이 바뀌어도 같은

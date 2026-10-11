@@ -6,6 +6,7 @@ import { mockNearbyFacilities } from '@/lib/api/mock/emergency-data'
 import { resolveFavoriteMock } from '@/lib/api/mock/favorite-data'
 import {
   mockCongestions,
+  mockRecommendations,
   mockRegionalWeather,
   mockSuitability,
   mockWalkSafety,
@@ -60,7 +61,7 @@ function fail(status: number, resultCode: string, resultMessage: string): MockRe
 }
 
 /** `/places/{placeId}` 로 착각하면 안 되는 하위 경로 */
-const SUB_RESOURCES = new Set(['nearby', 'sitemap'])
+const SUB_RESOURCES = new Set(['nearby', 'sitemap', 'recommendations'])
 
 /** 백엔드 `size` 허용 범위 (1~50). 벗어나면 400 이다 */
 const MIN_SIZE = 1
@@ -145,6 +146,24 @@ export function resolveMock(
 
   // 사이트맵용 전량 (#1210) — 페이지 없이 세 필드. 상세 분기보다 먼저다
   if (path === '/places/sitemap') return sitemapPlaces()
+
+  /*
+    장소 추천 (#1380). **상세 분기보다 먼저다** — `/places/{placeId}` 와 같은 깊이라 늦게 보면
+    `bindPathVariable` 이 `recommendations` 를 숫자로 못 풀어 400(`PLACE_113`)을 낸다.
+
+    `limit` 은 `@Min(1)` · `@Max(10)` 이고 기본 3 이다 — 벗어나면 `INSIGHT_105`. 조건 유무는 골든타임
+    목과 같이 `heatSensitive` 로 본다: FE 는 조건이 있으면 boolean 셋을 늘 명시해 보낸다(`toInsightQuery`).
+  */
+  if (path === '/places/recommendations') {
+    const limit = Number.parseInt(params.get('limit') ?? '3', 10)
+    if (!Number.isInteger(limit) || limit < 1 || limit > 10) {
+      return fail(400, 'INSIGHT_105', '추천 개수는 1 이상 10 이하만 가능합니다.')
+    }
+    return {
+      status: 200,
+      payload: ok(mockRecommendations(limit, params.has('heatSensitive'))),
+    }
+  }
 
   /*
     오늘의 산책 골든타임 (#158). `lat`/`lng` 는 mock 이 쓰지 않는다 — 제주 안에서 좌표를

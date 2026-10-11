@@ -4,7 +4,8 @@ import type { AlternativePlaceItem, PlaceSuitabilityResponse } from '@/types/ins
  * 홈이 세우는 실내 대안 한 줄 — 서버 항목에 **거리를 잰 기준 장소의 이름**을 붙였다 (#1356).
  *
  * 홈은 장소 여러 곳의 대안을 하나로 접으므로 `직선 3km` 만 두면 어디서 3km 인지 알 수 없다.
- * 섹션 캡션(`위 목록의 장소에서`)이 범위는 말하지만 줄마다 어느 장소인지는 말하지 못했다.
+ * 섹션 캡션(`아래 장소에서` — #1380 전에는 `위 목록의 장소에서`)이 범위는 말하지만 줄마다 어느
+ * 장소인지는 말하지 못했다.
  */
 export type IndoorAlternative = AlternativePlaceItem & {
   /** `distanceMeters` 를 잰 기준 — 그 대안을 실어 온 적합도 응답의 `placeTitle` */
@@ -14,11 +15,12 @@ export type IndoorAlternative = AlternativePlaceItem & {
 /**
  * 비 예보일 때 홈이 제안할 실내 대안 (홈-세부명세 D1 · D5-1 §13).
  *
- * **추가 호출이 없다.** `indoorAlternatives` 는 홈이 이미 부르는
- * `GET /places/{id}/suitability` 응답에 들어 있다 — 비가 예보된 날에만 채워지고
- * 아니면 빈 배열이라, 이 함수가 빈 배열을 돌려주는 날은 섹션 자체가 안 뜬다.
+ * **추가 호출이 없다.** `indoorAlternatives` 는 홈이 이미 부르는 장소 추천
+ * (`GET /places/recommendations`, #1380 — 그전에는 적합도 N건) 항목에 들어 있다 — 비가 예보된
+ * 날에만 채워지고 아니면 빈 배열이라, 이 함수가 빈 배열을 돌려주는 날은 섹션 자체가 안 뜬다.
+ * 추천 항목은 `toRecommendationCards` 가 적합도 응답 모양으로 옮겨 넘긴다.
  *
- * 적합도를 N곳 조회하므로 **같은 대안이 여러 응답에 겹쳐 온다** — 서로 가까운 장소들이
+ * 장소 여러 곳의 대안이므로 **같은 대안이 여러 항목에 겹쳐 온다** — 서로 가까운 장소들이
  * 같은 실내를 가리키기 때문이다. `placeId` 로 접지 않으면 홈에 같은 미술관이 세 번 뜬다.
  *
  * **이미 목록에 있는 장소는 대안이 아니다.** 위에서 "오늘 맞는 곳" 으로 보여 준 곳을
