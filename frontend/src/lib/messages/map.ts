@@ -77,6 +77,13 @@ export const mapMessages = {
 
   emptyInView: '이 지역에는 표시할 곳이 없어요',
   emptyInViewDescription: '지도를 움직이거나 조건을 풀어 보세요.',
+  /**
+   * 반경 조회의 검색어 0건 (#1332). **장소가 없다가 아니라 범위 안에 없다** — 담기 화면은 그날 기준점
+   * 주변, 재검색은 그때 보던 영역만 찾는다. 버튼이 제주 전체(목록 보기)로 다시 찾는다.
+   */
+  searchEmptyInRangeTitle: '지도 범위 안에는 ‘{keyword}’ 로 찾은 곳이 없어요',
+  searchEmptyInRangeDescription: '지금 지도 주변만 찾았어요. 더 먼 곳은 제주 전체에서 찾아 보세요.',
+  searchWider: '제주 전체에서 찾기',
 
   // ── 패널 · 시트 ────────────────────────────────────────────────────────
 

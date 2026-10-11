@@ -442,3 +442,17 @@ describe('PlaceMapView — 반려견 칩 (#1301)', () => {
     }
   })
 })
+
+/*
+  #1332 — 반경 조회의 검색어 0건은 범위를 말하고 제주 전체(목록 보기)로 보낸다.
+  판정은 `mapEmptyCopy`(search-empty.test.ts)가 잠그고, 여기서는 **판정에 넘기는 값과 버튼의 목적지**만 본다.
+*/
+describe('PlaceMapView — 반경 조회의 검색어 0건 (#1332)', () => {
+  it('결과가 주변 조회에서 왔는지를 판정에 넘긴다', () => {
+    expect(code).toContain('radiusBounded: usingNearby')
+  })
+
+  it('제주 전체에서 찾기는 목록 보기 주소로 간다', () => {
+    expect(code).toMatch(/<ButtonLink href=\{listHref\}[^>]*>\s*\{messages\.map\.searchWider\}/)
+  })
+})
