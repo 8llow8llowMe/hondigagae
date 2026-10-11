@@ -517,13 +517,15 @@ export function SignupForm({
       : emailForm.errors
 
   /*
-    동의 오류가 체크박스에 붙었으면 폼 전체 오류는 끈다 — 같은 문구가 `FormAlert` 와
-    체크박스 아래에 두 번 보인다. "필드 오류가 잡혔으면 대표 메시지를 또 띄우지 않는다"는
-    `field-errors.ts` 의 판단을 동의 블록 너머로 이은 것이다.
+    동의 오류가 시트의 체크박스에 붙어 **시트가 떠 있는 동안만** 폼 전체 오류를 끈다 — 같은 문구가
+    `FormAlert` 와 체크박스 아래에 두 번 보이지 않게. 체크박스는 이제 시트에만 있어서(#1284), 시트를
+    그냥 닫으면 이 조건이 풀려 서버 문구가 폼 알림으로 다시 서야 한다 — 아니면 실패 이유가 화면에
+    하나도 남지 않는다 (#1392).
   */
-  const profileStepErrors: FormErrors = hasConsentErrors(consentErrors)
-    ? { fields: profileForm.errors.fields, form: null }
-    : profileForm.errors
+  const profileStepErrors: FormErrors =
+    consentSheet !== null && hasConsentErrors(consentErrors)
+      ? { fields: profileForm.errors.fields, form: null }
+      : profileForm.errors
 
   /*
     **1 · 3단계 제출 실패 뒤 포커스** (#1078). 2단계는 위 `codeForm` effect 가 맡는다.
@@ -577,7 +579,18 @@ export function SignupForm({
       consentSheet === 'signup'
         ? returnFocusTarget<HTMLElement>(containerRef.current, profileStepErrors)
         : null
+    const showsRejection = consentSheet === 'signup' && hasConsentErrors(consentErrors)
     setConsentSheet(null)
+    /*
+      **서버 거부 문구는 시트가 닫혀야 폼 알림으로 선다** (#1392, `profileStepErrors`). 닫는 순간에는
+      아직 DOM 에 없어 위 복귀 대상이 그것을 고를 수 없다 — 그려진 다음 프레임에 알림으로 옮긴다.
+      `BottomSheet` 의 복귀(effect 정리)보다 늦게 돌아 그것을 덮는다.
+    */
+    if (showsRejection) {
+      requestAnimationFrame(() => {
+        containerRef.current?.querySelector<HTMLElement>('[data-form-alert]')?.focus()
+      })
+    }
   }
 
   /*

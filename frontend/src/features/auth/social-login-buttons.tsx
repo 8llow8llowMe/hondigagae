@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 
 import { Button, type ButtonVariant } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
@@ -99,6 +99,18 @@ export function SocialLoginButtons({
   const [pending, setPending] = useState<string | null>(null)
   // disabled 반영 전 연속 클릭을 막는다 (form-guide.md §6) — 두 버튼을 번갈아 누르는 것도 막힌다
   const startingRef = useRef(false)
+  /*
+    **사라진 뒤에는 이동하지 않는다** (#1392). 가입 약관 시트 안에서 인가를 누르고 응답 전에 시트를
+    닫으면 이 컴포넌트가 사라지는데, 도는 요청이 끝나 `location.assign` 이 불리면 취소한 사용자가
+    제공자 화면으로 끌려간다.
+  */
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   /*
     **동의를 안 받았으면 아예 부르지 않는다.** `/authorize` 는 동의가 비어도 성공하고,
@@ -123,6 +135,7 @@ export function SocialLoginButtons({
 
     void oauthAuthorize(provider, consent)
       .then((result) => {
+        if (!mountedRef.current) return
         globalThis.location.assign(result.authorizationUrl)
       })
       .catch((unknownError: unknown) => {
