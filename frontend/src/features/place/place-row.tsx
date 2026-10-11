@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
 import { ChevronRightIcon } from '@/components/icons'
+import { MetricBadge } from '@/components/metric'
 import { ThumbnailTile } from '@/components/thumbnail-tile'
 import { placeTypeLabel } from '@/features/place/filter-labels'
 import { listThumbnailSrc } from '@/lib/image/thumbnail'
@@ -171,21 +172,30 @@ export function PlaceRowContent({
  * 가이드 §5. **등급 색을 쓰지 않는다.** 동반 가능/불가는 적합도 등급이 아니라 장소의 속성이고,
  * 색을 주면 사용자가 그것을 적합도 신호로 읽는다. 구분은 서버 `name` 문구가 맡는다 (DESIGN.md §2-3).
  *
- * **`petAllowanceType.code === 'UNKNOWN'` 이면 그리지 않는다** (#530). 서버 `name` 이 `정보 없음`
- * 이라 무엇의 정보가 없다는 것인지 말하지 않는다. **`code` 로 거른다** — `name` 은 서버 문구라
- * 언제든 바뀔 수 있고, 문구 비교는 그때 조용히 어긋난다.
+ * **`petAllowanceType.code === 'UNKNOWN'` 이면 점선 `동반 정보 없음` 이다** (#1379). #530 은 이 칩을
+ * 아예 그리지 않았다 — 서버 `name` 이 `정보 없음` 이라 무엇의 정보가 없다는 것인지 말하지 않아서다.
+ * 그런데 dev 실데이터의 72% 가 `UNKNOWN` 이라, 칩 없는 행이 `동반 가능` 행 사이에서 "제한 없음" 으로
+ * 읽혔다. 그래서 숨기지 않고 **지도 미리보기와 같은 말 · 같은 모양**(`messages.place.petAllowanceUnknown`,
+ * `MetricBadge unknown` 점선)으로 드러낸다 — 화면마다 말이 다르면 같은 상태로 읽히지 않는다.
+ * 서버 `name` 대신 화면 문구를 쓰는 것은 축 이름(`동반`)을 앞에 세우기 위해서다 (명세 D8).
+ * **`code` 로 거른다** — `name` 은 서버 문구라 언제든 바뀔 수 있고, 문구 비교는 그때 조용히 어긋난다.
  *
  * **`실내 여부 미확인` 점선 배지는 목록 행에서 뺐다** (#1267). 모르는 정보를 행마다 반복하면
  * 잡음이다 — 메타 줄에서 실내/야외 낱말이 빠지는 것으로 충분하고, 배지는 상세 · 미리보기에 남는다.
+ * 동반은 다르다 — 이 서비스가 행마다 답해야 하는 질문이 그것이다.
  */
 function PetBadge({ place }: { place: PlaceSummary }) {
-  if (place.petAllowanceType.code === 'UNKNOWN') return null
-
   return (
     <div className="mt-1.5 flex">
-      <Badge tone="neutral" size="sm">
-        {place.petAllowanceType.name}
-      </Badge>
+      {place.petAllowanceType.code === 'UNKNOWN' ? (
+        <MetricBadge tone="unknown" size="sm">
+          {messages.place.petAllowanceUnknown}
+        </MetricBadge>
+      ) : (
+        <Badge tone="neutral" size="sm">
+          {place.petAllowanceType.name}
+        </Badge>
+      )}
     </div>
   )
 }
