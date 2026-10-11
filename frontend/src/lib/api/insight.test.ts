@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   congestionsPath,
+  recommendationsPath,
   suitabilityPath,
   toInsightQuery,
   toPetCondition,
@@ -149,5 +150,36 @@ describe('기간 혼잡도 경로 (#430)', () => {
     expect(path).not.toContain('petSizeType')
     expect(path).not.toContain('petSociality')
     expect(path).not.toContain('heatSensitive')
+  })
+})
+
+/*
+  장소 추천 (#1368 · #1380). 계약은 origin/develop 소스 실측(2026-10-11) —
+  `PlaceInsightWebController#getRecommendations`: 반려견 조건 7종(적합도와 같은 이름) · `limit` 1~10(기본 3) ·
+  `targetDate` 선택(기본 오늘).
+*/
+describe('장소 추천 경로 (#1380)', () => {
+  /*
+    **적합도와 같은 조립을 쓴다.** 추천 카드의 점수와 그 장소 상세의 적합도가 같은 조건에서 갈리면
+    둘 중 하나가 거짓이 된다(BE §6-5) — 조건을 싣는 함수가 둘이면 그 갈림이 FE 에서 생긴다.
+  */
+  it('반려견 조건을 적합도와 같은 쿼리로 싣는다', () => {
+    const condition = toPetCondition(pet)
+    const query = new URLSearchParams(recommendationsPath(condition, 3).split('?')[1])
+    const suitability = new URLSearchParams(suitabilityPath('123', condition).split('?')[1])
+
+    query.delete('limit')
+    expect(query.toString()).toBe(suitability.toString())
+  })
+
+  /* 기본값(3)이어도 명시한다 — 홈 카드 수와 서버 기본값이 갈리면 카드 수가 조용히 바뀐다 */
+  it('limit 을 늘 싣는다', () => {
+    expect(recommendationsPath(null, 3)).toBe('/places/recommendations?limit=3')
+    expect(recommendationsPath(toPetCondition(pet), 5)).toContain('limit=5')
+  })
+
+  /* 오늘은 서버가 정한다 — 브라우저 타임존이 KST 가 아니면 어제를 묻게 된다 (권역 비교와 같은 판단) */
+  it('targetDate 를 보내지 않는다', () => {
+    expect(recommendationsPath(toPetCondition(pet), 3)).not.toContain('targetDate')
   })
 })

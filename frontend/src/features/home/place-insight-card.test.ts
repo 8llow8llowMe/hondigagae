@@ -9,8 +9,9 @@ import {
   PlaceInsightCardList,
 } from '@/features/home/place-insight-card'
 import { placeCardsEnd } from '@/lib/insight/place-cards'
+import { toRecommendationCards } from '@/lib/insight/recommendation'
 import { messages } from '@/lib/messages'
-import { suitability, suitabilityInsufficient } from '@/test/fixtures/insight'
+import { recommendations, suitability, suitabilityInsufficient } from '@/test/fixtures/insight'
 import { placeSummary } from '@/test/fixtures/place'
 import { readSourceWithoutComments } from '@/test/source'
 import type {
@@ -229,46 +230,82 @@ describe('PlaceInsightCard — 근거 한 줄', () => {
   })
 })
 
+/*
+  #1380 — 카드는 그대로이고 **추천 항목이 카드가 받는 모양으로 옮겨져 온다** (`toRecommendationCards`).
+  옮긴 값으로 전제 · 정체 · 판정이 모두 서는지 본다 — 목록 응답에만 있던 필드에 기대지 않는다.
+*/
+describe('PlaceInsightCard — 추천 항목에서 온 카드 (#1380)', () => {
+  const [first, second] = toRecommendationCards(recommendations, null)
+  if (first === undefined || second === undefined) throw new Error('fixture 는 카드 셋이다')
+
+  const markup = renderToStaticMarkup(createElement(PlaceInsightCard, first))
+
+  it('제목 · 점수 · 등급어가 선다', () => {
+    expect(markup).toContain('캠파제주')
+    expect(markup).toContain('84')
+    expect(markup).toContain(first.data.suitabilityLevel.name)
+    expect(markup).toContain('href="/places/212481712381923401"')
+  })
+
+  it('사진 · 동반 칩 · 실내외가 선다', () => {
+    expect(markup).toContain('<img')
+    expect(markup).toContain('동반 가능')
+    expect(markup).toContain(messages.home.outdoor)
+  })
+
+  /* 실내 여부가 null 이면 모른다 — `실내` · `야외` 어느 쪽도 쓰지 않는다 */
+  it('실내 여부를 모르면 메타 줄에 실내외가 없다', () => {
+    const unknown = renderToStaticMarkup(createElement(PlaceInsightCard, second))
+
+    expect(unknown).toContain('부분 동반 가능')
+    expect(unknown).not.toContain(` · ${messages.home.indoor}<`)
+    expect(unknown).not.toContain(` · ${messages.home.outdoor}<`)
+  })
+})
+
 describe('PlaceCardsEndCard — 끝 카드', () => {
-  function end(cards: number, unscored: number) {
-    const value = placeCardsEnd({ cards, unscored, total: 20, capacity: 3 })
+  function end(cards: number) {
+    const value = placeCardsEnd({ cards, capacity: 3 })
 
     if (value === null) throw new Error('끝 카드가 서야 하는 입력이다')
     return renderToStaticMarkup(createElement(PlaceCardsEndCard, { end: value }))
   }
 
-  /* 남은 수가 아니라 전체 수다 (#905 R7) */
-  it('전체 수로 장소 목록에 간다', () => {
-    const markup = end(2, 0)
+  /*
+    **수가 없다** (#1380 · 홈-세부명세 D10-4). 예전 `장소 {n}곳 전체 보기` 의 `{n}` 은 목록 전체
+    수였는데(#905 R7), 추천 API 는 그 수를 주지 않는다 — 수를 위해 목록을 따로 부르지 않는다.
+  */
+  it('수 없이 장소 목록에 간다', () => {
+    const markup = end(2)
 
     expect(markup).toContain('href="/places"')
-    expect(markup).toContain(messages.home.allPlaces.replace('{n}', '20'))
+    expect(markup).toContain(messages.home.allPlaces)
+    expect(messages.home.allPlaces).not.toMatch(/\{n\}|\d/)
   })
 
   /* 꺾쇠는 문구가 아니라 장식 조각이다 — 줄바꿈 없는 공백으로 앞 낱말에 붙는다 */
   it('꺾쇠는 aria-hidden 조각이고 앞 낱말과 떨어지지 않는다', () => {
     expect(messages.home.allPlaces).not.toContain('›')
-    expect(end(2, 0)).toContain('<span aria-hidden="true"> ›</span>')
+    expect(end(2)).toContain('<span aria-hidden="true">\u00a0›</span>')
   })
 
-  it('점수를 못 낸 곳이 있을 때만 안내 줄이 선다', () => {
-    const line = messages.home.unscoredInAllPlaces.replace('{n}', '1')
-
-    expect(end(1, 1)).toContain(line)
-    expect(end(2, 0)).not.toContain('점수를 내지 못한')
+  /* 점수를 못 낸 곳은 서버가 추천에서 뺀다 — 셀 것이 없다 (#1380) */
+  it('점수를 못 낸 곳의 줄이 없다', () => {
+    expect(end(1)).not.toContain('점수를 내지 못한')
+    expect(Object.keys(messages.home)).not.toContain('unscoredInAllPlaces')
   })
 
   /* L2 항목의 채널은 채움이다 — 테두리를 두르지 않는다 (DESIGN.md §0) */
   it('--band 채움이고 테두리가 없다', () => {
-    const markup = end(2, 0)
+    const markup = end(2)
 
     expect(markup).toContain('bg-band')
     expect(markup).not.toMatch(/class="[^"]*\bborder\b/)
   })
 
   it('그리드의 남은 빈 칸을 전부 차지한다', () => {
-    expect(end(2, 0)).toContain('lg:col-span-1')
-    expect(end(1, 0)).toContain('lg:col-span-2')
+    expect(end(2)).toContain('lg:col-span-1')
+    expect(end(1)).toContain('lg:col-span-2')
   })
 })
 

@@ -7,7 +7,6 @@ import { HomeView } from '@/features/home/home-view'
 import { ABOUT_SEEN_COOKIE, hasSeenAbout } from '@/lib/about/seen-cookie'
 import { walkTimesPath } from '@/lib/api/insight'
 import { paths } from '@/lib/api/paths'
-import { placeListPath } from '@/lib/api/place'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
 import { todayDay, weekdayOf } from '@/lib/date/day'
@@ -18,10 +17,8 @@ import { getServerQueryClient } from '@/lib/query/query-client'
 import { siteJsonLd } from '@/lib/seo/json-ld'
 import { pageMetadata } from '@/lib/seo/page-metadata'
 import { siteUrl } from '@/lib/seo/site'
-import { DEFAULT_PLACE_FILTERS } from '@/lib/url/place-filters'
 import type { SliceResponse } from '@/types/api'
 import type { WalkTimesResponse } from '@/types/insight'
-import type { PlaceSummary } from '@/types/place'
 import type { PlanSummaryItem } from '@/types/plan'
 
 /** `2026-08-29 (금) · 제주시` — 지역은 이 서비스가 제주 전용이라 고정이다 */
@@ -45,19 +42,19 @@ export const metadata = pageMetadata({
  * 프리페치는 **전부 `retry: false` + 개별 catch** 다. 한 조회가 실패해도 홈 전체가
  * 죽지 않아야 한다 (architecture-guide.md §9).
  *
- * 판정·적합도는 여기서 프리페치하지 않는다 — 기준 장소와 반려견 조건이 **클라이언트
- * localStorage 에서 결정**되므로 서버가 key 를 알 수 없다.
+ * 판정·장소 추천은 여기서 프리페치하지 않는다 — 기준 장소와 반려견 조건이 **클라이언트
+ * localStorage 에서 결정**되므로 서버가 key 를 알 수 없다. 장소 추천은 그에 더해 **캐시 미스
+ * 콜드 응답이 dev 실측 18초**라(#1380), 조건 없는 key 로라도 서버에서 기다리면 첫 HTML 이 막힌다.
+ *
+ * **장소 목록(`GET /places`)을 더는 받지 않는다** (#1380). 홈에서 그 목록의 쓰임은 적합도를 잴
+ * 후보(앞 3곳)와 끝 카드의 전체 수뿐이었다 — 추천 API 가 후보를 직접 고르고, 끝 카드는 수를
+ * 말하지 않는다 (홈-세부명세 D10-1 · D10-4).
  */
 export default async function HomePage() {
   const session = await readSession()
   const authed = session !== null
 
   const queryClient = getServerQueryClient()
-
-  // 적합도 후보. 공개 API 라 미로그인도 조회한다
-  const placesPromise = serverFetch<SliceResponse<PlaceSummary>>(
-    placeListPath(DEFAULT_PLACE_FILTERS, null),
-  ).catch(() => null)
 
   // 일정은 보호 리소스다. 미로그인이면 부르지 않는다
   const plansPromise =
@@ -73,17 +70,13 @@ export default async function HomePage() {
     (`lib/insight/walk-times-position.ts`) 같은 key 로 캐시에 넣으면 첫 HTML 에 문장이 들어간다.
     반려견 조건이 있는 로그인 사용자는 key 가 달라 예전처럼 클라이언트가 받는다.
 
-    공개 API 이고 약 80ms 라 장소 · 일정과 **병렬로** 받는다. 실패하면 클라이언트가 받는다.
+    공개 API 이고 약 80ms 라 일정과 **병렬로** 받는다. 실패하면 클라이언트가 받는다.
   */
   const walkTimesPromise = serverFetch<WalkTimesResponse>(
     walkTimesPath(WALK_TIMES_PREFETCH_POSITION.lat, WALK_TIMES_PREFETCH_POSITION.lng, null),
   ).catch(() => null)
 
-  const [places, plans, walkTimes] = await Promise.all([
-    placesPromise,
-    plansPromise,
-    walkTimesPromise,
-  ])
+  const [plans, walkTimes] = await Promise.all([plansPromise, walkTimesPromise])
 
   if (walkTimes !== null) {
     queryClient.setQueryData(
@@ -117,7 +110,6 @@ export default async function HomePage() {
       <HomeView
         authed={authed}
         showAboutIntro={!authed && !seenAbout}
-        places={places?.contents ?? []}
         plans={plans?.contents ?? []}
         todayIso={todayIso}
         todayLabel={formatTodayLabel(todayIso)}

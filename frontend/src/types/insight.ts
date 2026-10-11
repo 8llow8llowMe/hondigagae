@@ -207,6 +207,83 @@ export type PlaceSuitabilityResponse = {
   weatherWarning: WeatherWarningItem | null
 }
 
+/**
+ * 추천 장소 한 곳 — `GET /places/recommendations` 의 `items[]` (#1368 · #1380).
+ *
+ * 근거: tour-service `PlaceRecommendationItem` **origin/develop 소스 실측** · dev 실호출(2026-10-11, 200).
+ * 앞쪽 요약 필드는 장소 목록 항목(`PlaceSummary`)과, 뒤쪽 판정 필드는 적합도 응답
+ * (`PlaceSuitabilityResponse`)과 **같은 뜻 · 같은 표현**이다 — 하위 조각(날씨 · 혼잡도 · 근거 ·
+ * 실내 대안)은 적합도의 Item 을 그대로 쓴다. 홈 카드가 받는 모양으로 옮기는 것은
+ * `lib/insight/recommendation.ts` `toRecommendationCards` 다.
+ *
+ * **후보는 서버가 이미 걸렀다** (`backend/docs/weather-insight-integration.md` §6-5) — 동반
+ * `ALLOWED` · `PARTIALLY_ALLOWED` 만, 대표 사진 · 좌표가 있는 곳만, 점수를 낸 곳만 온다.
+ */
+export type PlaceRecommendationItem = {
+  /** Snowflake 라 문자열이다. `Number()` 를 거치지 않는다 */
+  placeId: string
+  contentType: CodeNameMetadata
+  title: string
+  addr1: string | null
+  sigunguCode: string | null
+  lat: number
+  lng: number
+  /** 추천 후보는 사진이 있는 장소뿐이라 비지 않는다 (서버 후보 조건) */
+  firstImage: string
+  firstImage2: string | null
+  /** `ALLOWED` · `PARTIALLY_ALLOWED` 만 온다. 동반 미확인(`UNKNOWN`)은 후보에서 빠졌다 */
+  petAllowanceType: CodeNameMetadata
+  /** 입장 가능 체중 상한(kg). 원문에 숫자가 있을 때만 온다 — null 은 "제한 없음" 이 아니라 "모름" 이다 */
+  maxPetWeightKg: number | null
+  /** 실내 여부. null 이면 원천에 정보가 없다 */
+  indoor: boolean | null
+  /**
+   * 적합도 점수(0~100). **추천에 오른 장소는 점수가 있다** — 점수를 못 낸 곳(`INSUFFICIENT`)은
+   * 서버가 추천하지 않는다. 그래서 적합도 응답과 달리 `null` 이 아니다.
+   */
+  score: number
+  suitabilityLevel: ScoreMetricMetadata
+  /** 결론 한 문장. 적합도 응답의 `headline` 과 같은 규칙(`SuitabilityHeadline`)이다 */
+  headline: string | null
+  /** 점수 영향이 큰 순서다. **재정렬하지 않는다** */
+  reasons: SuitabilityReasonItem[]
+  /**
+   * 이 장소 격자의 그날 날씨. 스키마는 nullable 을 적지 않았지만(점수가 있으면 날씨가 있다)
+   * 적합도와 같은 조각이라 **받는 쪽을 적합도와 같은 폭으로 둔다** — null 이면 섹션을 숨긴다.
+   */
+  weather: DailyWeatherItem | null
+  /** 연결된 예측이 없으면 `level` 이 `UNKNOWN` 이다 */
+  congestion: CongestionItem
+  /** 비 예보이고 이 장소에 실내 공간이 없을 때만 채워진다. 아니면 빈 배열 */
+  indoorAlternatives: AlternativePlaceItem[]
+  petConditionApplied: boolean
+  weatherApplied: boolean
+  congestionApplied: boolean
+}
+
+/**
+ * `GET /places/recommendations` — 오늘(그 날) 반려견과 가기 좋은 곳 (#1368 · #1380).
+ *
+ * 근거: tour-service `PlaceRecommendationResponse` · `PlaceInsightWebController#getRecommendations`
+ * **origin/develop 소스 실측** · dev 실호출(2026-10-11 — 200, **캐시 미스 콜드 18초**, 캐시 600초).
+ *
+ * **순서가 곧 서버 판정이다** — 점수 desc → 동반 `ALLOWED` 먼저 → 덜 붐비는 곳 → `placeId` asc,
+ * 같은 유형은 `limit` 의 절반(올림)까지 먼저 담는다(다양성). FE 가 다시 세우지 않는다.
+ */
+export type PlaceRecommendationResponse = {
+  /** 판정 기준 일자 (`yyyy-MM-dd`) */
+  targetDate: string
+  /** 날씨 정보 출처 — 지역 공통이라 목록 머리에 한 번 온다 */
+  weatherProviderName: string | null
+  /**
+   * 발효 중인 기상특보. **기준 일자가 오늘일 때만 붙고**, 없으면 null 이다. 적합도 · 산책 위험도와
+   * 같은 단일 지점 특보다 (`WeatherWarningItem` 머리주석). 경보면 각 장소 점수가 0 이 된다.
+   */
+  weatherWarning: WeatherWarningItem | null
+  /** 추천 장소. 추천할 곳이 없으면 빈 배열(200)이다 — 예보 범위 밖 날짜도 빈 배열이다 */
+  items: PlaceRecommendationItem[]
+}
+
 /** `GET /places/{placeId}/walk-safety` */
 export type WalkSafetyResponse = {
   placeId: string

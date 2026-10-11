@@ -6,14 +6,13 @@ import type { ReactNode } from 'react'
 import { ImageIcon } from '@/components/icons'
 import { METRIC_WORD_TONE, type MetricTone, MetricValue } from '@/components/metric'
 import { imageSrc } from '@/lib/image/remote-host'
-import { crowdedLabel, type PlaceCardsEnd } from '@/lib/insight/place-cards'
+import { crowdedLabel, type PlaceCardPlace, type PlaceCardsEnd } from '@/lib/insight/place-cards'
 import { congestionTone, suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { shortAddress } from '@/lib/place/address'
 import { placeIllustration } from '@/lib/place/illustration'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceSuitabilityResponse, SuitabilityReasonItem } from '@/types/insight'
-import type { PlaceSummary } from '@/types/place'
 
 /**
  * 서버가 "판정하지 않았다" 를 말하는 코드. 동반 가능 여부도 이 값을 쓴다 — **낱말(`정보
@@ -106,8 +105,11 @@ export function PlaceInsightCard({
   preload = false,
 }: {
   data: PlaceSuitabilityResponse
-  /** 목록 응답의 장소. 사진·주소·실내 여부·동반 여부는 적합도 응답에 없다 */
-  place: PlaceSummary | undefined
+  /**
+   * 사진·주소·실내 여부·동반 여부. 적합도 응답에 없는 것들이다 — #1380 부터 추천 항목에서 온다
+   * (`toRecommendationCards`). 예전에는 목록 응답에서 찾아 넘겨 없을 수 있었다(`undefined`).
+   */
+  place: PlaceCardPlace | undefined
   /**
    * 이 장소만의 근거 한 줄 (`pickCardReason`). **카드가 고르지 않는다** — 무엇이 공통인지는
    * 다른 카드를 봐야 알 수 있고, 그것은 목록을 가진 쪽만 안다.
@@ -180,8 +182,9 @@ export function PlaceInsightCard({
  * **`--band` 채움이다.** L2 항목의 채널이 채움이라(DESIGN.md §0) 테두리를 두르지 않고, 사진
  * 카드와 같은 폭·높이의 면으로 선다 — 캐러셀에서는 마지막 장이고 그리드에서는 빈 칸이다.
  *
- * 점수를 못 낸 곳의 안내가 **여기에 든다.** 예전에는 목록 아래 버튼 줄 둘(`점수를 내지 못한
- * 곳 N곳 ›` · `장소 N곳 전체 보기`)이 따로 섰는데, 둘 다 `/places` 로 가는 같은 링크였다.
+ * 예전에는 목록 아래 버튼 줄 둘(`점수를 내지 못한 곳 N곳 ›` · `장소 N곳 전체 보기`)이 따로 섰는데,
+ * 둘 다 `/places` 로 가는 같은 링크라 이 한 장으로 합쳤다(#1069). **#1380 부터 수와 점수 못 낸 곳의
+ * 줄이 없다** — 추천 API 가 목록 전체 수를 주지 않고, 점수를 못 낸 곳은 서버가 뺀다 (D10-4).
  */
 export function PlaceCardsEndCard({ end }: { end: PlaceCardsEnd }) {
   return (
@@ -197,15 +200,10 @@ export function PlaceCardsEndCard({ end }: { end: PlaceCardsEnd }) {
         className="group bg-band focus-visible:ring-brand-500 flex h-full min-h-40 flex-col justify-center gap-1 rounded-md px-5 py-6 focus-visible:ring-2 focus-visible:outline-none"
       >
         <span className="text-body-1 text-link group-hover:text-link-hover font-semibold break-keep tabular-nums">
-          {messages.home.allPlaces.replace('{n}', String(end.total))}
+          {messages.home.allPlaces}
           {/* 줄바꿈 없는 공백 — 1024 의 좁은 칸에서 꺾쇠만 다음 줄로 떨어졌다 */}
           <span aria-hidden>{' ›'}</span>
         </span>
-        {end.unscored > 0 && (
-          <span className="text-body-2 text-fg-muted tabular-nums">
-            {messages.home.unscoredInAllPlaces.replace('{n}', String(end.unscored))}
-          </span>
-        )}
       </Link>
     </li>
   )
@@ -266,7 +264,7 @@ function Photo({
   allowance,
   preload,
 }: {
-  place: PlaceSummary | undefined
+  place: PlaceCardPlace | undefined
   allowance: string | null
   preload: boolean
 }) {
@@ -317,7 +315,7 @@ function Photo({
  * **전체 주소를 쓰지 않는다.** `addr1` 은 길어 375px 에서 두 줄을 먹는다. 시군구·읍면까지만.
  * 거리(`2.3km`)는 **백엔드가 주지 않아 넣지 않는다** — 지어내지 않는다.
  */
-function metaLine(place: PlaceSummary | undefined): string {
+function metaLine(place: PlaceCardPlace | undefined): string {
   if (place === undefined) return ''
 
   const indoor =

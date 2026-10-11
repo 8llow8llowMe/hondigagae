@@ -1,5 +1,6 @@
 import { splitReasons } from '@/lib/insight/reasons'
 import type { CongestionItem, SuitabilityReasonItem } from '@/types/insight'
+import type { PlaceSummary } from '@/types/place'
 
 /**
  * 홈 추천 장소 카드의 순수 규칙 (#1069).
@@ -7,6 +8,19 @@ import type { CongestionItem, SuitabilityReasonItem } from '@/types/insight'
  * 카드(`place-insight-card.tsx`)는 받은 값만 그리고, **무엇을 한 줄로 고를지 · 끝 카드를
  * 세울지** 는 여기서 정한다 — 렌더 분기가 아니라 판정이라 함수 단위로 잠근다.
  */
+
+/**
+ * 카드가 장소에서 읽는 것 — 사진 · 일러스트 분류 · 동반 칩 · `지역 · 실내외` 줄 (#1380).
+ *
+ * **`PlaceSummary` 를 통째로 받지 않는다.** 예전에는 목록 응답(`GET /places`)을 그대로 넘겼는데,
+ * 카드가 추천 응답에서 오면 목록에만 있는 필드(`tel` · `sourceName` · `allowedPetSize` …)가 없다 —
+ * 빈 값으로 채우면 "출처 없음" 을 지어낸 객체가 된다. 카드가 실제로 읽는 다섯 필드로 좁혔고,
+ * `PlaceSummary` 는 여전히 이 모양을 만족한다.
+ */
+export type PlaceCardPlace = Pick<
+  PlaceSummary,
+  'firstImage' | 'contentType' | 'petAllowanceType' | 'addr1' | 'indoor'
+>
 
 /**
  * 카드 한 장에 붙는 **그 장소만의 근거 한 줄.**
@@ -49,10 +63,6 @@ export function crowdedLabel(congestion: CongestionItem | null): string | null {
 }
 
 export type PlaceCardsEnd = {
-  /** 장소 목록 전체 수 — `장소 {n}곳 전체 보기` */
-  total: number
-  /** 점수를 내지 못해 카드로 서지 않은 수. 0 이면 안내 줄이 없다 */
-  unscored: number
   /**
    * 그리드에서 차지할 칸 수 — **남은 빈 칸 전부**다. 카드가 한 장이면 빈 칸이 둘이라, 한 칸만
    * 차지하면 셋째 칸이 흰 구멍으로 남는다 (1440 실측). 캐러셀은 이 값을 쓰지 않는다.
@@ -63,31 +73,28 @@ export type PlaceCardsEnd = {
 /**
  * 끝 카드를 세울지 — **카드가 칸을 다 채우지 못했을 때만** 선다.
  *
- * 추천이 3곳 미만이면 그리드에 빈 칸이 남는다. 그 칸을 `장소 N곳 전체 보기` 가 채우고,
- * 점수를 못 낸 곳의 안내도 여기에 든다 — 예전 목록 아래 버튼 줄 둘(`점수를 내지 못한 곳` ·
- * `전체 보기`)이 이 한 장으로 합쳐진다. **3곳이 다 차면 끝 카드가 없다** — 목록 머리의
- * `장소 찾기` 가 그 몫을 맡는다.
+ * 카드가 3장 미만이면 그리드에 빈 칸이 남는다. 그 칸을 `장소 전체 보기` 가 채운다. **3곳이 다
+ * 차면 끝 카드가 없다** — 목록 머리의 `장소 찾기` 가 그 몫을 맡는다. 추천 API 는 후보가 모자라거나
+ * 기준 장소가 추천에 들면(카드에서 뺀다) 3곳을 못 채운다.
  *
  * **캐러셀도 같은 규칙이다.** 칸은 그리드의 개념이지만 두 틀이 같은 카드 묶음을 담아야
  * 폭을 바꿀 때 카드가 생겼다 사라지지 않는다.
  *
- * 점수를 낸 곳이 하나도 없어도 선다 — 점수 못 낸 곳을 지우면 사용자는 그 장소가 조회되지
- * 않았다는 것조차 모른다 (#428). 카드도 점수 못 낸 곳도 없는 날은 호출부의 빈 상태다.
+ * **수와 `점수 못 낸 곳` 줄을 걷었다** (#1380 · 홈-세부명세 D10-4). 예전에는 목록 전체 수
+ * (`장소 {n}곳 전체 보기`)와 점수를 못 낸 곳의 수를 함께 실었는데, 추천 API 는 목록 전체 수를 주지
+ * 않고 점수를 못 낸 곳은 서버가 추천에서 뺀다 — 수를 위해 목록을 따로 부르면 걷어 낸 왕복이
+ * 돌아온다. 카드가 하나도 없는 날은 호출부의 빈 상태다.
  */
 export function placeCardsEnd({
   cards,
-  unscored,
-  total,
   capacity,
 }: {
-  /** 카드로 선 수(점수를 낸 곳) */
+  /** 카드로 선 수 */
   cards: number
-  unscored: number
-  total: number
   /** 한 줄에 서는 칸 수 — 홈은 `TOP_PLACE_COUNT` */
   capacity: number
 }): PlaceCardsEnd | null {
   if (cards >= capacity) return null
 
-  return { total, unscored, span: capacity - cards }
+  return { span: capacity - cards }
 }
