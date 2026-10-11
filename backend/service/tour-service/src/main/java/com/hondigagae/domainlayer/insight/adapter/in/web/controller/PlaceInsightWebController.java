@@ -2,10 +2,12 @@ package com.hondigagae.domainlayer.insight.adapter.in.web.controller;
 
 import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.PlaceCongestionResponse;
+import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.PlaceRecommendationResponse;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.PlaceSuitabilityResponse;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.WalkSafetyResponse;
 import com.hondigagae.domainlayer.insight.application.exception.InsightValidationMessage;
 import com.hondigagae.domainlayer.insight.application.model.PlaceInsightQuery;
+import com.hondigagae.domainlayer.insight.application.model.PlaceRecommendationQuery;
 import com.hondigagae.domainlayer.insight.application.port.in.PlaceInsightWebUseCase;
 import com.hondigagae.domainlayer.insight.domain.model.PetCondition;
 import com.hondigagae.shared.travel.pet.ActivityLevel;
@@ -95,6 +97,60 @@ public class PlaceInsightWebController {
             .build();
 
         return ResponseEntity.ok().body(Response.success(placeInsightWebUseCase.getSuitability(query)));
+    }
+
+    @Operation(summary = "장소 추천 (오늘 가기 좋은 곳)",
+        description = "제주 안의 반려견 동반 장소 중 그 날 가기 좋은 곳을 적합도 순으로 골라 줍니다. "
+            + "각 장소의 점수 · 등급 · headline · reasons 는 장소 여행 적합도(`/{placeId}/suitability`)와 같은 규칙으로 냅니다 - "
+            + "같은 날짜 · 같은 반려견 조건이면 추천 카드와 그 장소 적합도가 같은 값을 말합니다.\n\n"
+            + "후보는 동반 가능(ALLOWED) · 일부 허용(PARTIALLY_ALLOWED)이고 대표 사진과 좌표가 있는 관광지 · 문화시설 · 레포츠입니다. "
+            + "점수를 못 낸 장소(예보 범위 밖 · 날씨를 받지 못한 곳)는 추천하지 않으므로 items 의 score 는 비지 않습니다. "
+            + "순서는 점수 높은 순이고, 같은 점수면 동반 가능 → 덜 붐비는 곳 순입니다. 같은 유형은 limit 의 절반(올림)까지 먼저 담고, "
+            + "자리가 남을 때만 같은 유형으로 채웁니다. 추천할 곳이 없으면 items 는 빈 배열입니다(200).\n\n"
+            + "특보(weatherWarning)와 날씨 출처는 지역 공통이라 목록 머리에 한 번 옵니다. 결과는 같은 조건에서 몇 분간 재사용될 수 있습니다.\n\n"
+            + "**필수 없음.** 반려견 조건은 전부 생략 가능하며 적합도와 같은 뜻입니다. limit 기본 3(1~10). 지역은 받지 않습니다(제주 고정).\n\n"
+            + "호출 예\n"
+            + "- 오늘, 조건 없이 3곳: `GET /api/v1/places/recommendations`\n"
+            + "- 더위에 약한 소형 퍼그, 특정 날짜 5곳: `GET /api/v1/places/recommendations?targetDate=2026-09-10&petSizeType=SMALL&heatSensitive=true&breed=퍼그&limit=5`")
+    @GetMapping("/recommendations")
+    public ResponseEntity<Response<PlaceRecommendationResponse>> getRecommendations(
+        @Parameter(description = "[선택, 기본 오늘] 판정 기준 일자 (yyyy-MM-dd). 예보는 오늘부터 약 11일까지라 그보다 먼 날짜는 추천이 비어 옵니다", example = "2026-09-10")
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+        @RequestParam(required = false) LocalDate targetDate,
+
+        @Parameter(description = "[선택] 반려견 크기. SMALL 10kg 미만 · MEDIUM 10~25kg · LARGE 25kg 이상. 생략하면 크기 조건을 판정에 넣지 않습니다. 장소의 입장 조건과 대조합니다", example = "SMALL")
+        @RequestParam(required = false) PetSizeType petSizeType,
+
+        @Parameter(description = "[선택, 기본 false] 더위에 민감한지. true 면 고온 감점을 키웁니다", example = "false")
+        @RequestParam(defaultValue = "false") boolean heatSensitive,
+
+        @Parameter(description = "[선택, 기본 false] 추위에 민감한지. true 면 저온 감점을 키웁니다", example = "false")
+        @RequestParam(defaultValue = "false") boolean coldSensitive,
+
+        @Parameter(description = "[선택, 기본 false] 소음에 민감한지. true 면 혼잡도 감점을 키웁니다", example = "false")
+        @RequestParam(defaultValue = "false") boolean noiseSensitive,
+
+        @Parameter(description = "[선택] 활동량. LOW 짧은 산책 선호 · MEDIUM 보통 · HIGH 긴 산책 선호. 생략하면 활동량 조건을 판정에 넣지 않습니다", example = "MEDIUM")
+        @RequestParam(required = false) ActivityLevel activityLevel,
+
+        @Parameter(description = "[선택] 견종 이름(한글). 아직 적합도 점수에는 반영되지 않습니다 - 반려견 조건 지정 여부(petConditionApplied)와 근거 문구의 주어(예: 퍼그(소형견)는 …)에만 쓰입니다", example = "퍼그")
+        @RequestParam(required = false) String breed,
+
+        @Parameter(description = "[선택] 사회성. LOW 면 혼잡도 감점을 키웁니다. 보통/높음은 판정에 영향이 없습니다", example = "LOW")
+        @RequestParam(required = false) SocialityLevel petSociality,
+
+        @Parameter(description = "[선택, 기본 3] 추천 개수 (1~10). 후보가 모자라면 그보다 적게 옵니다", example = "3")
+        @Min(value = 1, message = InsightValidationMessage.RECOMMENDATION_LIMIT_RANGE_INVALID)
+        @Max(value = 10, message = InsightValidationMessage.RECOMMENDATION_LIMIT_RANGE_INVALID)
+        @RequestParam(defaultValue = "3") int limit
+    ) {
+        PlaceRecommendationQuery query = PlaceRecommendationQuery.builder()
+            .targetDate(targetDate)
+            .petCondition(toPetCondition(petSizeType, heatSensitive, coldSensitive, noiseSensitive, activityLevel, breed, petSociality))
+            .limit(limit)
+            .build();
+
+        return ResponseEntity.ok().body(Response.success(placeInsightWebUseCase.getRecommendations(query)));
     }
 
     @Operation(summary = "장소 산책 위험도",

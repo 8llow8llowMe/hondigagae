@@ -1,16 +1,21 @@
 package com.hondigagae.domainlayer.insight.application.service;
 
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.PlaceCongestionResponse;
+import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.PlaceRecommendationResponse;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.PlaceSuitabilityResponse;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.WalkSafetyResponse;
 import com.hondigagae.domainlayer.insight.adapter.in.web.presenter.PlaceCongestionPresenter;
+import com.hondigagae.domainlayer.insight.adapter.in.web.presenter.PlaceRecommendationPresenter;
 import com.hondigagae.domainlayer.insight.adapter.in.web.presenter.PlaceSuitabilityPresenter;
 import com.hondigagae.domainlayer.insight.adapter.in.web.presenter.WalkSafetyPresenter;
+import com.hondigagae.domainlayer.insight.application.info.PlaceRecommendationInfo;
 import com.hondigagae.domainlayer.insight.application.info.PlaceSuitabilityInfo;
 import com.hondigagae.domainlayer.insight.application.info.WalkSafetyInfo;
 import com.hondigagae.domainlayer.insight.application.model.PlaceInsightQuery;
+import com.hondigagae.domainlayer.insight.application.model.PlaceRecommendationQuery;
 import com.hondigagae.domainlayer.insight.application.port.in.PlaceInsightWebUseCase;
 import com.hondigagae.domainlayer.insight.application.service.processor.PlaceCongestionProcessor;
+import com.hondigagae.domainlayer.insight.application.service.processor.PlaceRecommendationProcessor;
 import com.hondigagae.domainlayer.insight.application.service.processor.PlaceSuitabilityProcessor;
 import com.hondigagae.domainlayer.insight.application.service.processor.WalkSafetyProcessor;
 import java.time.LocalDate;
@@ -36,6 +41,8 @@ public class PlaceInsightWebFacade implements PlaceInsightWebUseCase {
     private final WalkSafetyPresenter walkSafetyPresenter;
     private final PlaceCongestionProcessor placeCongestionProcessor;
     private final PlaceCongestionPresenter placeCongestionPresenter;
+    private final PlaceRecommendationProcessor placeRecommendationProcessor;
+    private final PlaceRecommendationPresenter placeRecommendationPresenter;
 
     @Override
     public PlaceSuitabilityResponse getSuitability(PlaceInsightQuery query) {
@@ -60,5 +67,12 @@ public class PlaceInsightWebFacade implements PlaceInsightWebUseCase {
     public PlaceCongestionResponse getCongestions(long placeId, LocalDate fromDate, LocalDate toDate) {
         return placeCongestionPresenter.toResponse(
             placeCongestionProcessor.getCongestions(placeId, fromDate, toDate));
+    }
+
+    /** 장소 추천. 기상청을 부르므로 적합도와 같이 트랜잭션을 걸지 않는다 (클래스 주석). */
+    @Override
+    public PlaceRecommendationResponse getRecommendations(PlaceRecommendationQuery query) {
+        PlaceRecommendationInfo info = placeRecommendationProcessor.recommend(query);
+        return placeRecommendationPresenter.toResponse(info);
     }
 }

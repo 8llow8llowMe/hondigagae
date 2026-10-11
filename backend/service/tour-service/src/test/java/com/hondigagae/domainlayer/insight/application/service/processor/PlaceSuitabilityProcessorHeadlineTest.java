@@ -48,7 +48,7 @@ class PlaceSuitabilityProcessorHeadlineTest {
     private final WeatherWarningProcessor weatherWarningProcessor = mock(WeatherWarningProcessor.class);
     private final PlaceSuitabilityProcessor processor = new PlaceSuitabilityProcessor(
         placeProfileQueryPort, congestionForecastPort, weatherForecastProcessor, insightMapper,
-        new InsightProperties(null, null, null, null, null, null, null, null, null, null, null, null),
+        new InsightProperties(null, null, null, null, null, null, null, null, null, null, null, null, null),
         weatherWarningProcessor);
 
     @BeforeEach

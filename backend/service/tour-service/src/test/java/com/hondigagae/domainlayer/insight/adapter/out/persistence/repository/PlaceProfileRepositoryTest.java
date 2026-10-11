@@ -71,6 +71,52 @@ class PlaceProfileRepositoryTest {
         assertThat(findAroundCenter()).isEmpty();
     }
 
+    @Test
+    @DisplayName("추천 후보는 지역 · 유형 · 동반 구분 · 사진 · 좌표 조건을 모두 갖춘 살아 있는 행만이다 (#1368)")
+    void findsRecommendationCandidates() {
+        placeProfileRepository.save(candidate(1L, "가세오름", ContentType.TOURIST_SPOT).build());
+        placeProfileRepository.save(candidate(2L, "제주 박물관", ContentType.CULTURE)
+            .petAllowanceType(PetAllowanceType.PARTIALLY_ALLOWED).build());
+        placeProfileRepository.save(candidate(3L, "승마장", ContentType.LEPORTS).build());
+        // 빠져야 하는 행
+        placeProfileRepository.save(candidate(10L, "병합된 행", ContentType.TOURIST_SPOT).mergedIntoId(1L).build());
+        placeProfileRepository.save(candidate(11L, "숨긴 행", ContentType.TOURIST_SPOT).delistedAt(LocalDateTime.now()).build());
+        placeProfileRepository.save(candidate(12L, "동반 불가", ContentType.TOURIST_SPOT)
+            .petAvailable(false).petAllowanceType(PetAllowanceType.NOT_ALLOWED).build());
+        placeProfileRepository.save(candidate(13L, "동반 미확인", ContentType.TOURIST_SPOT)
+            .petAllowanceType(PetAllowanceType.UNKNOWN).build());
+        placeProfileRepository.save(candidate(14L, "사진 없음", ContentType.TOURIST_SPOT).firstImage(null).build());
+        placeProfileRepository.save(candidate(15L, "사진 빈 문자열", ContentType.TOURIST_SPOT).firstImage(" ").build());
+        placeProfileRepository.save(candidate(16L, "좌표 없음", ContentType.TOURIST_SPOT).lat(null).lng(null).build());
+        placeProfileRepository.save(candidate(17L, "면세점", ContentType.SHOPPING).build());
+        placeProfileRepository.save(candidate(18L, "애견 카페", ContentType.RESTAURANT).build());
+        placeProfileRepository.save(candidate(19L, "다른 지역", ContentType.TOURIST_SPOT).areaCode("1").build());
+
+        List<PlaceEntity> found = placeProfileRepository.findRecommendationCandidates(
+            "39", List.of("12", "14", "28"), PlaceProfileRepository.RECOMMENDABLE_PET_ALLOWANCE_TYPES);
+
+        assertThat(found).extracting(PlaceEntity::getTitle).containsExactlyInAnyOrder("가세오름", "제주 박물관", "승마장");
+    }
+
+    private PlaceEntity.PlaceEntityBuilder candidate(long id, String title, ContentType contentType) {
+        return PlaceEntity.builder()
+            .id(id)
+            .source(PlaceSource.TOUR_API)
+            .sourceKey("key-" + id)
+            .contentTypeId(contentType.getCode())
+            .title(title)
+            .addr1("제주특별자치도 제주시")
+            .areaCode("39")
+            .sigunguCode("4")
+            .lat(new BigDecimal("33.5000"))
+            .lng(new BigDecimal("126.5300"))
+            .firstImage("https://img/" + id + ".jpg")
+            .petAvailable(true)
+            .petAllowanceType(PetAllowanceType.ALLOWED)
+            .allowedPetSize(AllowedPetSize.UNKNOWN)
+            .syncedAt(LocalDateTime.now());
+    }
+
     private List<PlaceEntity> findAroundCenter() {
         return placeProfileRepository.findIndoorWithinBox(
             new BigDecimal("33.40"), new BigDecimal("33.60"),
