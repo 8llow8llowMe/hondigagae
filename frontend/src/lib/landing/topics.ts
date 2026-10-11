@@ -1,7 +1,12 @@
 import { paths } from '@/lib/api/paths'
 import { messages } from '@/lib/messages'
 import { isPlaceId } from '@/lib/place/place-id'
-import { DEFAULT_PLACE_FILTERS, toPlaceApiQuery, toPlaceFilterQuery } from '@/lib/url/place-filters'
+import {
+  DEFAULT_PLACE_FILTERS,
+  PLACES_DEFAULT_FILTERS,
+  toPlaceApiQuery,
+  toPlaceFilterQuery,
+} from '@/lib/url/place-filters'
 import { PLACES_DEFAULT_VIEW, viewModeHref } from '@/lib/url/view-mode'
 import type { ContentTypeCode, PlaceFilters } from '@/types/place'
 
@@ -58,7 +63,8 @@ export function parseLandingCursor(raw: string | string[] | undefined): string |
 export function landingExplorerHref(topic: LandingTopic): string {
   return viewModeHref(
     '/places',
-    toPlaceFilterQuery(landingFilters(topic)),
+    // `/places` 의 기본값과 견준다 — 동반 가능만은 그 화면의 기본이라 주소에서 빠진다 (#1379)
+    toPlaceFilterQuery(landingFilters(topic), PLACES_DEFAULT_FILTERS),
     'list',
     PLACES_DEFAULT_VIEW,
   )

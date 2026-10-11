@@ -21,7 +21,7 @@ import {
 } from '@/features/place/place-map-filter-sheet'
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { messages } from '@/lib/messages'
-import { DEFAULT_PLACE_FILTERS, toPlaceFilterQuery } from '@/lib/url/place-filters'
+import { toPlaceFilterQuery } from '@/lib/url/place-filters'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceFilters } from '@/types/place'
 
@@ -79,7 +79,7 @@ export function PlaceMapFilterBar({
   petSwitch?: boolean
   className?: string
 }) {
-  const { apply, reset } = usePlaceFilterNav()
+  const { apply, reset, defaults } = usePlaceFilterNav()
   const { pet } = useSelectedPet(authed)
   const kind = placeKindOf(filters)
 
@@ -103,7 +103,7 @@ export function PlaceMapFilterBar({
 
   const allowedOnly = filters.petAllowanceType === 'ALLOWED'
   const sheetCount = mapSheetFilterCount(filters)
-  const dirty = toPlaceFilterQuery(filters) !== toPlaceFilterQuery(DEFAULT_PLACE_FILTERS)
+  const dirty = toPlaceFilterQuery(filters, defaults) !== ''
 
   const rail = useScrollRail<HTMLDivElement>()
 

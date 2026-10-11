@@ -19,7 +19,7 @@ import {
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { messages } from '@/lib/messages'
 import { INSET_BLEED_CLASS, INSET_CLASS } from '@/lib/ui/inset'
-import { DEFAULT_PLACE_FILTERS, toPlaceFilterQuery } from '@/lib/url/place-filters'
+import { toPlaceFilterQuery } from '@/lib/url/place-filters'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceFilters } from '@/types/place'
 
@@ -56,7 +56,7 @@ export function PlaceFilterChips({
   /** 레이아웃 유틸리티만 — 폭에 따라 숨기는 `lg:hidden` 이 이것으로 온다 */
   className?: string
 }) {
-  const { apply, reset } = usePlaceFilterNav()
+  const { apply, reset, defaults } = usePlaceFilterNav()
   const { pet } = useSelectedPet(authed)
 
   const rail = useScrollRail<HTMLDivElement>()
@@ -87,7 +87,7 @@ export function PlaceFilterChips({
   // 필터는 결과만 줄이고 이유는 보이지 않는다
   const moreActive = filters.indoor !== null || filters.petSizeType !== null
 
-  const dirty = toPlaceFilterQuery(filters) !== toPlaceFilterQuery(DEFAULT_PLACE_FILTERS)
+  const dirty = toPlaceFilterQuery(filters, defaults) !== ''
 
   return (
     <>
