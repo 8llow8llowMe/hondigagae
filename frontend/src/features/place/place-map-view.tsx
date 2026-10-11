@@ -7,7 +7,7 @@ import Link from 'next/link'
 
 import type { ReactNode } from 'react'
 
-import { Button } from '@/components/button'
+import { Button, ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
@@ -613,23 +613,32 @@ export function PlaceMapView({
   )
 
   const { apply: applyFilters } = usePlaceFilterNav()
-  const emptyCopy = mapEmptyCopy({ keyword: filters.keyword, fetchedCount: places.length })
+  const emptyCopy = mapEmptyCopy({
+    keyword: filters.keyword,
+    fetchedCount: places.length,
+    radiusBounded: usingNearby,
+  })
+  /*
+    **제주 전체에서 찾기는 목록 보기로 간다** (#1332). 목록은 반경 없는 `GET /places` 라 검색어가
+    제주 전체에 걸린다 — `listHref` 는 필터(검색어 포함)를 그대로 싣는다. 담기 화면에서는 목록 행에도
+    담기 버튼이 있어 흐름이 끊기지 않는다. 목록 주소가 없는 화면이면 검색어 지우기로 물러선다.
+  */
+  const emptyAction =
+    emptyCopy.action === 'searchWider' && listHref !== undefined ? (
+      <ButtonLink href={listHref} variant="secondary" size="md">
+        {messages.map.searchWider}
+      </ButtonLink>
+    ) : emptyCopy.action !== null ? (
+      <Button
+        variant="secondary"
+        size="md"
+        onClick={() => applyFilters({ ...filters, keyword: null })}
+      >
+        {messages.place.clearKeyword}
+      </Button>
+    ) : undefined
   const emptyState = (
-    <EmptyState
-      title={emptyCopy.title}
-      description={emptyCopy.description}
-      action={
-        emptyCopy.clearKeyword ? (
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={() => applyFilters({ ...filters, keyword: null })}
-          >
-            {messages.place.clearKeyword}
-          </Button>
-        ) : undefined
-      }
-    />
+    <EmptyState title={emptyCopy.title} description={emptyCopy.description} action={emptyAction} />
   )
 
   /*
