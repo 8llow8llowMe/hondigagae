@@ -10,7 +10,9 @@ import {
   levelForBoxMeters,
   levelForSpanMeters,
   type MapBounds,
+  type MapInsets,
   metersPerPixel,
+  pointsCamera,
   shouldRefit,
 } from '@/lib/map/viewport'
 
@@ -399,5 +401,171 @@ describe('shouldRefit', () => {
   it('칸이 숨어 크기가 0 이면 다시 맞추지 않는다', () => {
     expect(shouldRefit({ fitted, next: { width: 0, height: 256 }, moved: false })).toBe(false)
     expect(shouldRefit({ fitted, next: { width: 888, height: 0 }, moved: false })).toBe(false)
+  })
+})
+
+/*
+  #1379 — `/places` 첫 결과 맞춤. 지도 위에 뜬 시트 · 조작 줄 · 도킹 스택이 가린 몫(`insets`)을 빼고
+  남은 칸에 맞춘다. 수치는 375×748 모바일 지도(탭바 64 를 뺀 높이) — 조작 줄 바닥 60, `mid` 시트 301 —
+  과 1280×800 데스크톱(도킹 스택 400, 조작 줄 120)이다.
+*/
+describe('framedCamera — 가린 몫 (#1379)', () => {
+  const anchor = { lat: 33.38, lng: 126.55 }
+  const box = { widthMeters: 60_000, heightMeters: 25_000 }
+  const MOBILE: MapInsets = { top: 60, right: 0, bottom: 301, left: 0 }
+  const DESKTOP: MapInsets = { top: 120, right: 0, bottom: 0, left: 400 }
+
+  /** 카메라 중심 기준으로 기준점이 칸의 어디(px)에 서는가 — 카카오 투영과 같은 환산(`metersPerPixel`) */
+  function anchorPixel(
+    camera: { lat: number; lng: number; level: number },
+    width: number,
+    height: number,
+  ) {
+    const mpp = metersPerPixel(camera.level)
+    const metersPerLng = 111_320 * Math.cos((anchor.lat * Math.PI) / 180)
+
+    return {
+      x: width / 2 + ((anchor.lng - camera.lng) * metersPerLng) / mpp,
+      y: height / 2 - ((anchor.lat - camera.lat) * 111_320) / mpp,
+    }
+  }
+
+  it('남은 칸으로 단계를 정한다 — 가린 몫까지 세면 핀이 시트 뒤에 선다', () => {
+    // 남북으로 긴 사각형이라 높이가 단계를 정한다 — 가린 몫을 빼면 한 단계 멀어진다
+    const tall = { widthMeters: 10_000, heightMeters: 30_000 }
+    const camera = framedCamera({
+      anchor,
+      spanMeters: tall,
+      width: 375,
+      height: 748,
+      seaRatio: 0.35,
+      insets: MOBILE,
+    })
+
+    expect(camera.level).toBe(levelForBoxMeters(tall, 375, 748 - 60 - 301))
+    expect(camera.level).toBeGreaterThan(levelForBoxMeters(tall, 375, 748))
+  })
+
+  it('모바일 — 기준점이 조작 줄과 시트 사이 띠의 가운데에 선다', () => {
+    const camera = framedCamera({
+      anchor,
+      spanMeters: box,
+      width: 375,
+      height: 748,
+      seaRatio: 0.35,
+      insets: MOBILE,
+    })
+    const pixel = anchorPixel(camera, 375, 748)
+
+    expect(pixel.x).toBeCloseTo(375 / 2, 6)
+    expect(pixel.y).toBeCloseTo(60 + (748 - 60 - 301) / 2, 6)
+  })
+
+  it('데스크톱 — 기준점이 도킹 스택 오른쪽 남은 칸의 가운데에 선다', () => {
+    const camera = framedCamera({
+      anchor,
+      spanMeters: box,
+      width: 1280,
+      height: 800,
+      seaRatio: 0.35,
+      insets: DESKTOP,
+    })
+    const pixel = anchorPixel(camera, 1280, 800)
+
+    expect(camera.level).toBe(levelForBoxMeters(box, 1280 - 400, 800 - 120))
+    expect(pixel.x).toBeCloseTo(400 + (1280 - 400) / 2, 6)
+    expect(pixel.y).toBeCloseTo(120 + (800 - 120) / 2, 6)
+    // 기준점이 오른쪽에 서려면 지도 중심이 서쪽이어야 한다
+    expect(camera.lng).toBeLessThan(anchor.lng)
+  })
+
+  it('남는 칸이 없으면 덮개를 무시한다 — 0 으로 재면 최대 축소로 떨어진다', () => {
+    const covered = framedCamera({
+      anchor,
+      spanMeters: box,
+      width: 375,
+      height: 300,
+      seaRatio: 0.35,
+      insets: { top: 200, right: 0, bottom: 200, left: 0 },
+    })
+    const plain = framedCamera({ anchor, spanMeters: box, width: 375, height: 300, seaRatio: 0.35 })
+
+    expect(covered).toEqual(plain)
+  })
+
+  /*
+    가로 모드 폰(812×375) — 조작 줄 120 · 시트 169 를 빼면 86 이 남는다. 그 안에 맞추면 제주가 점이 되는
+    축척으로 열렸다(#1379 검토). 너무 좁으면 가려지더라도 칸 전체에 맞춘다.
+  */
+  it('남는 칸이 너무 좁으면 덮개를 무시한다 — 가로 모드 폰', () => {
+    const landscape = framedCamera({
+      anchor,
+      spanMeters: box,
+      width: 812,
+      height: 375,
+      seaRatio: 0.35,
+      insets: { top: 120, right: 0, bottom: 169, left: 0 },
+    })
+    const plain = framedCamera({ anchor, spanMeters: box, width: 812, height: 375, seaRatio: 0.35 })
+
+    expect(landscape).toEqual(plain)
+  })
+
+  it('덮개가 null 이면 예전과 같다', () => {
+    const plain = framedCamera({ anchor, spanMeters: box, width: 375, height: 748, seaRatio: 0.35 })
+
+    expect(
+      framedCamera({
+        anchor,
+        spanMeters: box,
+        width: 375,
+        height: 748,
+        seaRatio: 0.35,
+        insets: null,
+      }),
+    ).toEqual(plain)
+  })
+
+  /* `keepLevel`(#873) — 단계는 그대로 두고 그 단계로 위도 폭을 잰다 */
+  it('level 을 주면 그 단계로 놓는다', () => {
+    const camera = framedCamera({
+      anchor,
+      spanMeters: 20_000,
+      width: 375,
+      height: 700,
+      seaRatio: 0.35,
+      level: 4,
+    })
+
+    expect(camera.level).toBe(4)
+    expect(camera.lat).toBe(framedCenterLat(anchor.lat, 700, 4, 0.35))
+    expect(camera.lng).toBe(anchor.lng)
+  })
+})
+
+describe('pointsCamera', () => {
+  it('점을 감싸는 사각형의 가운데가 기준점이다', () => {
+    const camera = pointsCamera(
+      [
+        { lat: 33.2, lng: 126.2 },
+        { lat: 33.5, lng: 126.9 },
+        { lat: 33.3, lng: 126.5 },
+      ],
+      1_000,
+    )
+
+    expect(camera?.anchor.lat).toBeCloseTo(33.35, 10)
+    expect(camera?.anchor.lng).toBeCloseTo(126.55, 10)
+    expect(camera?.spanMeters.heightMeters).toBeCloseTo(0.3 * 111_320, 6)
+  })
+
+  it('한 점이면 두 변 모두 하한이다 — 0 이면 SDK 가 최대 배율로 확대한다', () => {
+    const camera = pointsCamera([{ lat: 33.4, lng: 126.5 }], 5_000)
+
+    expect(camera?.spanMeters).toEqual({ widthMeters: 5_000, heightMeters: 5_000 })
+  })
+
+  it('점이 없으면 null', () => {
+    expect(pointsCamera([], 1_000)).toBeNull()
   })
 })
