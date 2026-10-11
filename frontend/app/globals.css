@@ -302,6 +302,17 @@ body {
 
   탭바는 768 미만에만 있으므로 그 위에서는 0 이다 (`.pb-tabbar` 와 같은 계산).
 */
+/*
+  **탭바가 없는 화면은 그 자리도 비우지 않는다** (#1369). 상세 화면(`hidesTabBar`)은 탭바를 그리지
+  않으므로 `--tabbar-h` 를 0 으로 둔다 — 그래야 아래 바닥 여백 · 지도 높이 계산이 빈 64px 를 남기지
+  않는다. 탭바 자신의 표식(`data-tab-bar`)으로 재므로 경로 목록을 CSS 에 다시 적지 않는다.
+  768 이상에서 탭바는 `display: none` 이지만 DOM 에 있어 값이 그대로다 — 그 폭의 규칙들은 이미
+  `--tabbar-h` 를 쓰지 않는다.
+*/
+:root:not(:has([data-tab-bar])) {
+  --tabbar-h: 0px;
+}
+
 .page-canvas {
   min-block-size: calc(100dvh - var(--header-h));
   padding-block-end: calc(var(--tabbar-h) + env(safe-area-inset-bottom));

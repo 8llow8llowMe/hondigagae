@@ -186,7 +186,7 @@ export function PlaceDetailSkeleton() {
       </div>
 
       {/* 모바일 하단 바 — `PlaceDetailActionBar` 와 같은 고정 자리 */}
-      <div className="border-border bg-bg sticky bottom-16 z-30 border-t md:bottom-0 lg:hidden">
+      <div className="border-border bg-bg pb-safe sticky bottom-0 z-30 border-t lg:hidden">
         <ActionBarSkeleton />
       </div>
     </div>
