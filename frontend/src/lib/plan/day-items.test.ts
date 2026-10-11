@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { messages } from '@/lib/messages'
 import {
+  addPlaceToastMessage,
   appendMoveItemPayload,
   appendPlaceItemPayload,
   appendWalkCourseItemPayload,
@@ -277,6 +278,36 @@ describe('appendPlaceItemPayload — 장소 담기 (#82)', () => {
     expect(first?.itemType).toBe('PLACE')
   })
 
+  it('새 항목의 startTime 을 채운다 — 앞 항목 마지막 시각 + 2:30 (#1383 · D24)', () => {
+    // 앞에 10:00 하나뿐이다 (시장 · 이동은 시각이 없다)
+    expect(appendPlaceItemPayload(ITEMS, 2, place).items.at(-1)?.startTime).toBe('12:30:00')
+  })
+
+  it('빈 일자에 담으면 10:00 이다 — 새 일정 만들고 담기도 이 경로다', () => {
+    expect(appendPlaceItemPayload([], 1, place).items[0]?.startTime).toBe('10:00:00')
+  })
+
+  it('앞 시각 + 2:30 이 20:00 을 넘으면 startTime 키를 넣지 않는다', () => {
+    const late = [planItem({ planItemId: 'z', day: 1, sequence: 0, startTime: '19:00:00' })]
+    expect(appendPlaceItemPayload(late, 1, place).items.at(-1)).not.toHaveProperty('startTime')
+  })
+
+  it('끝 숙박 앞에 끼우면 숙박이 아니라 그 앞 항목의 시각을 본다', () => {
+    const withLodging = [
+      planItem({ planItemId: 'p', day: 1, sequence: 0, startTime: '13:00:00' }),
+      planItem({
+        planItemId: 'l',
+        day: 1,
+        sequence: 1,
+        startTime: '21:00:00',
+        itemType: { code: 'LODGING', name: '숙박', description: null },
+      }),
+    ]
+    const payload = appendPlaceItemPayload(withLodging, 1, place)
+    expect(payload.items[1]?.title).toBe(place.title)
+    expect(payload.items[1]?.startTime).toBe('15:30:00')
+  })
+
   it('sequence 를 0부터 다시 매기고 새 항목이 마지막 번호를 받는다', () => {
     const payload = appendPlaceItemPayload(ITEMS, 2, place)
 
@@ -369,6 +400,18 @@ describe('walkCourseIdsOf — 같은 일자 중복 담기 판정 (#620)', () => 
   /* placeIdsOf 쪽 회귀는 day-items.test.ts:206 근처가 이미 지킨다 — 여기서는 반대 방향을 본다 */
   it('placeIdsOf 는 WALK 를 여전히 세지 않는다', () => {
     expect(placeIdsOf(withWalk).has(WALK_ID)).toBe(false)
+  })
+})
+
+describe('addPlaceToastMessage — 담기 성공 토스트 (#1383 · D24-2)', () => {
+  it('채운 시각을 HH:mm 으로 말하고 바꿀 수 있다고 덧붙인다', () => {
+    expect(addPlaceToastMessage('오설록 티뮤지엄', 2, '12:30:00')).toBe(
+      '오설록 티뮤지엄을 2일차 12:30에 담았어요. 시각은 일정에서 바꿀 수 있어요.',
+    )
+  })
+
+  it('시각을 못 채웠으면 예전 문장 그대로다', () => {
+    expect(addPlaceToastMessage('카페', 1, undefined)).toBe('카페를 1일차에 담았어요')
   })
 })
 

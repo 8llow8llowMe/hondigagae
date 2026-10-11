@@ -30,10 +30,15 @@ import { useForm } from '@/lib/form/use-form'
 import { formatCourseDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
 import { addPlanDays } from '@/lib/plan/date'
-import { appendWalkCourseItemPayload, walkCourseIdsOf } from '@/lib/plan/day-items'
+import {
+  appendWalkCourseItemPayload,
+  insertedItemStartTime,
+  walkCourseIdsOf,
+} from '@/lib/plan/day-items'
 import { groupItemsByDay } from '@/lib/plan/detail'
 import { toPlanCreatePayload } from '@/lib/plan/form'
 import { toPlanDaySaveError } from '@/lib/plan/save-error'
+import { formatStartTime } from '@/lib/plan/start-time'
 import { withObjectParticle, withTopicParticle } from '@/lib/text/korean'
 import { EMPTY_PLAN_FORM_VALUES, type PlanDetail, type PlanFormValues } from '@/types/plan'
 
@@ -70,11 +75,17 @@ export function walkCourseAddToastMessage(
   courseLabel: string,
   planTitle: string,
   day: number,
+  /** 담기가 채운 시각(`HH:mm:ss`). 있으면 그 시각과 "바꿀 수 있어요" 를 함께 말한다 (D24-2) */
+  startTime?: string,
 ): string {
-  return messages.plan.walkAddToast
+  const time = formatStartTime(startTime ?? null)
+  const template = time === null ? messages.plan.walkAddToast : messages.plan.walkAddTimedToast
+
+  return template
     .replace('{course}', withObjectParticle(courseLabel))
     .replace('{planTitle}', planTitle)
     .replace('{day}', String(day))
+    .replace('{time}', time ?? '')
 }
 
 /**
@@ -418,7 +429,12 @@ function useAddWalkCourseToPlan({
           void queryClient.invalidateQueries({ queryKey: planKeys.list() })
 
           showToast({
-            message: walkCourseAddToastMessage(course.courseLabel, planTitle, day),
+            message: walkCourseAddToastMessage(
+              course.courseLabel,
+              planTitle,
+              day,
+              insertedItemStartTime(dayItems),
+            ),
             action: {
               label: messages.plan.addToPlanToastAction,
               onAction: () => router.push(`/plans/${planId}`),

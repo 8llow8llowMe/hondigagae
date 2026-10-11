@@ -787,6 +787,11 @@ export const planMessages = {
 
   /** `{title}`(조사 포함) · `{day}` 치환. 성공만 토스트로 말한다 */
   addPlaceToast: '{title} {day}일차에 담았어요',
+  /**
+   * 담기가 시각을 채웠을 때 (#1383 · 일정상세-세부명세 D24-2). `{time}` 은 `HH:mm`.
+   * **채운 시각이 추천값이라는 것을 여기서 한 번만 말한다** — 저장 뒤에는 출처가 남지 않는다.
+   */
+  addPlaceTimedToast: '{title} {day}일차 {time}에 담았어요. 시각은 일정에서 바꿀 수 있어요.',
 
   addPlaceErrorTitle: '담지 못했어요',
   /**
@@ -987,6 +992,9 @@ export const planMessages = {
    * 알 수 없다.
    */
   walkAddToast: '{course} {planTitle} {day}일차에 담았어요.',
+  /** 담기가 시각을 채웠을 때 — `addPlaceTimedToast` 와 같은 이유 (D24-2) */
+  walkAddTimedToast:
+    '{course} {planTitle} {day}일차 {time}에 담았어요. 시각은 일정에서 바꿀 수 있어요.',
   /**
    * 5xx·무응답. **`addPlaceErrorDescription` 을 재사용하지 않는다** — 분류는
    * `toPlanDaySaveError` 가 공유하고 문구만 화면이 준다 (D5).

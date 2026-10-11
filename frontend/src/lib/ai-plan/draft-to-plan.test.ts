@@ -94,9 +94,28 @@ describe('draftToPlanPayload — 항목 매핑', () => {
     expect('memo' in (result.items?.[0] ?? {})).toBe(false)
   })
 
-  it('startTime 을 보내지 않는다 — 초안에 없다', () => {
-    const result = payload([{ day: 1, items: [item()] }])
-    expect('startTime' in (result.items?.[0] ?? {})).toBe(false)
+  it('startTime 을 그날 순서 슬롯으로 채운다 — 비우면 산책 위험도가 꺼진다 (#1383 · D24)', () => {
+    const result = payload([
+      { day: 1, items: [item(), item(), item()] },
+      { day: 2, items: [item()] },
+    ])
+    expect(result.items?.map((entry) => [entry.day, entry.startTime])).toEqual([
+      [1, '10:00:00'],
+      [1, '12:30:00'],
+      [1, '15:00:00'],
+      [2, '10:00:00'],
+    ])
+  })
+
+  it('여섯 번째 항목부터는 startTime 키를 넣지 않는다', () => {
+    const result = payload([{ day: 1, items: Array.from({ length: 6 }, () => item()) }])
+    expect('startTime' in (result.items?.[4] ?? {})).toBe(true)
+    expect('startTime' in (result.items?.[5] ?? {})).toBe(false)
+  })
+
+  it('걸러낸 항목은 슬롯을 차지하지 않는다 — sequence 와 같은 자리를 받는다', () => {
+    const result = payload([{ day: 1, items: [item({ title: '  ' }), item()] }])
+    expect(result.items?.[0]?.startTime).toBe('10:00:00')
   })
 
   it('title 을 100자로 자른다 (ITEM_TITLE_LENGTH_INVALID)', () => {
