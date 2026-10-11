@@ -17,20 +17,17 @@ import { PROTECTED_PATHS } from '../../../proxy'
  */
 const HOME = source('src/features/home/home-view.tsx')
 
-/** AI 배너의 `<Banner …>` 열기 태그 — 제목 메시지로 집는다 */
-function aiBannerTag(): string {
-  const tag = openingTags(HOME, /<Banner\b/g).find((banner) =>
-    banner.includes('messages.home.aiPlanBannerTitle'),
-  )
-  if (tag === undefined) throw new Error('AI 일정 생성 배너가 홈에 없다')
+/** 바로가기 줄의 열기 태그 (#1356 — AI 배너가 한 줄 세 칸의 첫 칸이 됐다) */
+function shortcutsTag(): string {
+  const tag = openingTags(HOME, /<HomeShortcuts\b/g)[0]
+  if (tag === undefined) throw new Error('바로가기 줄이 홈에 없다')
   return tag
 }
 
-describe('홈 → AI 일정 생성 배너 (#905 R1)', () => {
-  it('홈이 /ai-plans/new 로 가는 배너를 갖는다', () => {
+describe('홈 → AI 일정 생성 진입점 (#905 R1 · #1356)', () => {
+  it('홈이 /ai-plans/new 로 가는 칸을 넘긴다', () => {
     expect(HOME).toContain("const AI_PLAN_HREF = '/ai-plans/new'")
-    expect(aiBannerTag()).toContain('AI_PLAN_HREF')
-    expect(aiBannerTag()).toContain('messages.home.aiPlanBannerDescription')
+    expect(shortcutsTag()).toContain('AI_PLAN_HREF')
   })
 
   /*
@@ -39,32 +36,36 @@ describe('홈 → AI 일정 생성 배너 (#905 R1)', () => {
     같은 처리다.
   */
   it('게스트는 로그인을 거친다 — authed 로 갈라 toLoginHref 로 감싼다', () => {
-    expect(aiBannerTag()).toContain('href={authed ? AI_PLAN_HREF : toLoginHref(AI_PLAN_HREF)}')
+    expect(shortcutsTag()).toContain(
+      'aiPlanHref={authed ? AI_PLAN_HREF : toLoginHref(AI_PLAN_HREF)}',
+    )
     expect(PROTECTED_PATHS).toContain('/ai-plans')
     expect(toLoginHref('/ai-plans/new')).toBe('/login?returnTo=%2Fai-plans%2Fnew')
   })
 
-  /* 진입점을 숨기지 않는다 — 게스트가 AI 여행 설계의 존재를 알 길이 이 배너다 */
+  /* 진입점을 숨기지 않는다 — 게스트가 AI 여행 설계의 존재를 알 길이 이 칸이다 */
   it('게스트에게도 보인다 — authed 조건으로 감싸지 않는다', () => {
-    const at = HOME.indexOf(aiBannerTag())
-    const wrapper = HOME.slice(HOME.lastIndexOf('<Surface>', at) - 40, at)
+    const at = HOME.indexOf(shortcutsTag())
+    const before = HOME.slice(at - 40, at)
 
-    expect(wrapper).toContain('<Surface>')
-    expect(wrapper).not.toContain('authed &&')
-    expect(wrapper).not.toContain('authed ?')
+    expect(before).not.toContain('authed &&')
+    expect(before).not.toContain('authed ?')
   })
 
-  /* `Banner` 의 아이콘 자리는 danger 색 고정이라 상시 진입점이 경보처럼 읽힌다 */
-  it('leading 을 주지 않는다', () => {
-    expect(aiBannerTag()).not.toContain('leading')
-  })
+  /*
+    **장소 추천 뒤다** (#1356). 배너 셋이 좌측 레일 끝에 있던 때 1024 미만에서는 그 셋이
+    `오늘 갈 만한 곳` 보다 먼저 서서 장소 카드가 첫 화면에 들지 못했다.
+  */
+  it('오늘 갈 만한 곳 뒤에 선다', () => {
+    const at = HOME.indexOf(shortcutsTag())
 
-  /* "오늘 언제 나가나" 다음에 "그럼 일정을 짜 볼까" — 골든타임 아래, 올레 배너 위 */
-  it('골든타임 아래, 올레 배너 위에 선다', () => {
-    const at = HOME.indexOf(aiBannerTag())
-
+    expect(HOME.indexOf('titleId="suitability-heading"')).toBeLessThan(at)
     expect(HOME.indexOf('<WalkTimesSection')).toBeLessThan(at)
-    expect(at).toBeLessThan(HOME.indexOf('href="/olle"'))
+  })
+
+  /* 배너 셋은 걷혔다 — 같은 진입점이 두 벌로 서지 않는다 */
+  it('홈에 전폭 배너가 남아 있지 않다', () => {
+    expect(HOME).not.toContain('<Banner')
   })
 
   it('문구가 비어 있지 않다', () => {

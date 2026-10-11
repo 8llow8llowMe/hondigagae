@@ -14,10 +14,13 @@ import { readSource, stripComments } from '@/test/source'
  */
 const homeView = stripComments(readSource('src/features/home/home-view.tsx'))
 
-describe('진입점은 홈 배너다 (S6-1)', () => {
-  it('홈이 /olle 배너를 그린다', () => {
-    expect(homeView).toContain('href="/olle"')
-    expect(homeView).toContain('messages.walkCourse.bannerTitle')
+const shortcuts = stripComments(readSource('src/features/home/home-shortcuts.tsx'))
+
+describe('진입점은 홈 바로가기다 (S6-1 · #1356)', () => {
+  it('홈이 바로가기 줄을 그리고, 그 줄이 /olle 칸을 갖는다', () => {
+    expect(homeView).toContain('<HomeShortcuts')
+    expect(shortcuts).toContain('href="/olle"')
+    expect(shortcuts).toContain('messages.walkCourse.bannerTitle')
   })
 
   /**
@@ -31,13 +34,14 @@ describe('진입점은 홈 배너다 (S6-1)', () => {
   })
 
   /**
-   * `Banner` 의 아이콘 자리는 danger 색 고정이다(병원 배너 전용). 산책 코스에 쓰면
-   * 상시 진입점이 경보처럼 읽힌다 — 진짜 경보를 구분할 수 없게 된다.
+   * 바로가기 줄에서 **danger 색은 병원 칸 하나다** (배너 시절 `leading` 자리의 규칙 그대로).
+   * 산책 코스 칸까지 칠하면 상시 진입점이 경보처럼 읽힌다 — 진짜 경보를 구분할 수 없게 된다.
    */
-  it('배너에 danger 아이콘을 붙이지 않는다', () => {
-    const banner = /<Banner\s+href="\/olle"[\s\S]*?\/>/.exec(homeView)?.[0] ?? ''
+  it('올레 칸 아이콘을 danger 로 칠하지 않는다', () => {
+    const olle = /<ShortcutItem\s+href="\/olle"[\s\S]*?\/>/.exec(shortcuts)?.[0] ?? ''
 
-    expect(banner).not.toContain('leading')
+    expect(olle).not.toBe('')
+    expect(olle).not.toContain('danger')
   })
 
   it('배너 문구에 코스 개수를 박지 않는다 — 적재(#383)로 바뀐다', () => {

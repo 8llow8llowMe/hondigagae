@@ -46,6 +46,9 @@ import { cn } from '@/lib/utils/cn'
  * **기상특보 띠는 그리지 않는다.** 특보는 클라이언트 조회 뒤에야 뜨므로 폴백이 없던
  * 때에도 같은 자리에서 밀렸다 — 이 파일이 만든 점프가 아니다.
  *
+ * **순서도 실화면과 같다** (#1356) — 좌측은 요약 카드 한 장, 우측은 갈 만한 곳 → 바로가기 →
+ * 권역이다. 소개 카드 · 실내 · 일정은 조건부라 그리지 않는다.
+ *
  * **실화면과 같은 층·같은 자리로 그린다** (#475). `HomeView` 는 `Canvas` 위에
  * `rail-layout` 2단이고, 좌측 sticky 레일의 클래스를 같은 자리에 건다 — 어긋나면 lg 에서
  * 폴백이 풀리는 순간 좌측 열이 위로 뛴다 (`route-state-surface.test.ts` 가 쌍으로 잠근다).
@@ -73,38 +76,39 @@ export default function HomeLoading() {
 
             <WalkTimesSkeleton />
           </Surface>
-
-          {/*
-            배너 셋(AI 일정 · 제주올레 · 병원·약국) — `Banner` 는 `py-4` + 간격 없는 제목·설명 두 줄.
-            **제주올레만 80 이다** — 캐릭터(64, `-mb-4`)가 글 덩어리보다 커서 몸이 48 로 선다.
-          */}
-          {Array.from({ length: 3 }, (_, index) => (
-            <Surface key={index} aria-busy>
-              <div
-                aria-hidden
-                className={cn('flex flex-col py-4', index === 1 && 'min-h-20', INSET_CLASS.card)}
-              >
-                <Skeleton className="h-6 w-40" />
-                <Skeleton className="h-4.5 w-56" />
-              </div>
-            </Surface>
-          ))}
         </SurfaceStack>
 
         <SurfaceStack className="lg:pl-3">
-          <RegionalWeatherSkeleton />
-
           {/* 맞는 곳 — 제목은 반려견 이름이 있어야 정해지므로 자리만 비운다 */}
           <Surface
             lead
             title={<Skeleton className="h-7 w-48 md:h-9 md:w-64" />}
             /* 제목 아래 줄이 없다 — `N곳` 개수 줄을 #1069 에서 걷었다 (`home-view.tsx`) */
-            /* `장소 찾기` 버튼 자리 — md 이상에서만 선다 */
-            trailing={<Skeleton className="hidden h-11 w-24 shrink-0 md:block" />}
+            /* `장소 찾기` 자리 — 모바일은 글자 링크(#1356), md 이상은 버튼 */
+            trailing={<Skeleton className="h-6 w-20 shrink-0 md:h-11 md:w-24" />}
             aria-busy
           >
             <SuitabilityListSkeleton />
           </Surface>
+
+          {/*
+            바로가기 한 줄 (#1356) — `HomeShortcuts` 의 세 칸(아이콘 24 · 이름 · 설명줄, `py-4`).
+            예전 좌측 레일 끝의 배너 셋이 이 한 줄이 됐다.
+          */}
+          <Surface aria-busy>
+            <div aria-hidden className="grid grid-cols-3">
+              {Array.from({ length: 3 }, (_, index) => (
+                <div key={index} className="flex flex-col items-center gap-1 px-2 py-4">
+                  <Skeleton className="mb-1 size-6" />
+                  <Skeleton className="h-5 w-16" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              ))}
+            </div>
+          </Surface>
+
+          {/* 권역 비교 — 우측 열의 끝이다 (#1356) */}
+          <RegionalWeatherSkeleton />
         </SurfaceStack>
       </div>
     </Canvas>

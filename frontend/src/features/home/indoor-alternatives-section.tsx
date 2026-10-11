@@ -4,8 +4,8 @@ import { Badge } from '@/components/badge'
 import { ChevronRightIcon } from '@/components/icons'
 import { Surface, SurfaceList } from '@/components/surface'
 import { formatDistance } from '@/lib/format/distance'
+import type { IndoorAlternative } from '@/lib/insight/indoor'
 import { messages } from '@/lib/messages'
-import type { AlternativePlaceItem } from '@/types/insight'
 
 /**
  * 비 예보일 때의 실내 대안 — 홈-세부명세 D1(데스크톱 우측 "비 올 때 실내") · D5-1 §13.
@@ -20,11 +20,7 @@ import type { AlternativePlaceItem } from '@/types/insight'
  * 일자가 없다. 여기서 할 일은 장소 상세로 보내는 것뿐이다 (D4 — 실내 대안 카드 클릭 →
  * `/places/{placeId}`).
  */
-export function IndoorAlternativesSection({
-  alternatives,
-}: {
-  alternatives: AlternativePlaceItem[]
-}) {
+export function IndoorAlternativesSection({ alternatives }: { alternatives: IndoorAlternative[] }) {
   if (alternatives.length === 0) return null
 
   return (
@@ -53,7 +49,7 @@ export function IndoorAlternativesSection({
  * 보강 조회해 채우지 않는다: 비 오는 날 3행을 위해 요청 3건을 더 쏘는 값이 아니고,
  * 없는 것을 지어내지 않는 것이 이 서비스의 규칙이다.
  */
-function IndoorAlternativeRow({ alternative }: { alternative: AlternativePlaceItem }) {
+function IndoorAlternativeRow({ alternative }: { alternative: IndoorAlternative }) {
   return (
     <li>
       <Link
@@ -65,10 +61,9 @@ function IndoorAlternativeRow({ alternative }: { alternative: AlternativePlaceIt
             {alternative.title}
           </span>
           <span className="text-caption text-fg-muted mt-1 font-medium tabular-nums">
-            {messages.home.indoorDistance.replace(
-              '{distance}',
-              formatDistance(alternative.distanceMeters),
-            )}
+            {messages.home.indoorDistance
+              .replace('{place}', alternative.nearPlaceTitle)
+              .replace('{distance}', formatDistance(alternative.distanceMeters))}
           </span>
         </span>
 

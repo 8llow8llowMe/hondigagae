@@ -1,5 +1,8 @@
 'use client'
 
+import { useId, useState } from 'react'
+
+import { ChevronDownIcon } from '@/components/icons'
 import { METRIC_WORD_TONE } from '@/components/metric'
 import { Skeleton } from '@/components/skeleton'
 import { WalkTimesCurve } from '@/components/walk-times-curve'
@@ -85,6 +88,7 @@ export function WalkTimesSection({
   basis,
   onRetry,
   retryLabel,
+  collapseCurveOnMobile = false,
 }: {
   data: WalkTimesResponse | null
   loading?: boolean
@@ -107,7 +111,19 @@ export function WalkTimesSection({
    * 버튼 이름 하나뿐이고, 기본값이 옛 문구라 홈 마크업은 그대로다.
    */
   retryLabel?: string
+  /**
+   * **모바일에서 곡선을 접어 둔다** (#1356, 홈만 넘긴다). 시간대별 기온 · 노면 표가 375 에서
+   * 약 150px 이고, 홈이 첫 화면에서 답할 것은 "언제" 한 줄(위 판정 자리)이라 표는 펼쳐 볼
+   * 근거다. 펼침 버튼은 `md` 미만에만 서고 `md` 이상은 언제나 펼쳐 둔다 — 판정 카드의
+   * 접힘(`walk-verdict.tsx`)과 같은 경계다.
+   *
+   * 산책 코스 상세는 넘기지 않는다 — 그 화면의 곡선은 "이 코스를 언제 걷나" 의 본문이다.
+   */
+  collapseCurveOnMobile?: boolean
 }) {
+  const [curveOpen, setCurveOpen] = useState(false)
+  const curveId = useId()
+
   /*
     **곡선의 스크롤 상태를 이 섹션이 든다** ([#730](https://github.com/8llow8llowMe/hondigagae/issues/730)).
     화살표를 제목 줄로 올리려면 상태가 제목과 곡선의 **공통 조상**에 있어야 한다.
@@ -176,11 +192,41 @@ export function WalkTimesSection({
           곡선을 그리는데 feature 간 직접 임포트가 금지라 올렸다 — 이 자리의 마크업은 한
           글자도 바뀌지 않는다 (이 파일의 기존 테스트가 그 합격 기준이다).
         */}
-        <WalkTimesCurve
-          hourly={data.hourly}
-          goldenStart={data.goldenStart}
-          goldenEnd={data.goldenEnd}
-        />
+        {/*
+          **펼침 버튼은 곡선 바로 위다** — 펼치면 표가 버튼 아래로 열린다. 기준 캡션은 접혀도
+          남는다: 위 시각이 어디 기준인지(`제주시 기준`)는 표가 아니라 판정 한 줄에 딸린 말이다.
+          **곡선이 비는 날(`hourly: []`)은 버튼도 세우지 않는다** — 열어도 아무것도 없는 버튼이다.
+        */}
+        {collapseCurveOnMobile && data.hourly.length > 0 ? (
+          <>
+            <button
+              type="button"
+              aria-expanded={curveOpen}
+              aria-controls={curveId}
+              onClick={() => setCurveOpen((prev) => !prev)}
+              className="text-body-2 text-link focus-visible:ring-brand-500 inline-flex min-h-11 items-center gap-1 self-start font-semibold focus-visible:ring-2 focus-visible:outline-none md:hidden"
+            >
+              {messages.home.goldenCurveToggle}
+              <ChevronDownIcon
+                size={20}
+                className={cn('shrink-0 transition-transform', curveOpen && 'rotate-180')}
+              />
+            </button>
+            <div id={curveId} className={cn(!curveOpen && 'hidden md:block')}>
+              <WalkTimesCurve
+                hourly={data.hourly}
+                goldenStart={data.goldenStart}
+                goldenEnd={data.goldenEnd}
+              />
+            </div>
+          </>
+        ) : (
+          <WalkTimesCurve
+            hourly={data.hourly}
+            goldenStart={data.goldenStart}
+            goldenEnd={data.goldenEnd}
+          />
+        )}
 
         <p className="text-caption text-fg-muted font-medium">
           {BASIS_MESSAGE[basis]} · {messages.home.goldenPavementNote}

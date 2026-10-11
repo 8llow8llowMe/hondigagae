@@ -53,19 +53,8 @@ describe('홈 → /about 진입점', () => {
 describe('홈 → /about 소개 카드 (#950)', () => {
   const PAGE = source('app/(main)/(home)/page.tsx')
   const ABOUT_PAGE = source('app/(main)/about/page.tsx')
-  /** 좌측 레일 사본 — 1024 미만에서만 보인다 */
-  const RAIL_CARD = '<AboutIntroCard className="lg:hidden" onDismiss={dismissAboutIntro} />'
-  /** 우측 열 사본 — 1024 이상에서만 보인다 */
-  const MAIN_CARD = '<AboutIntroCard className="hidden lg:block" onDismiss={dismissAboutIntro} />'
-  const GUARD = '{aboutIntroShown && ('
-
-  /** 사본을 감싼 조건식이 시작하는 자리 — 조건 없이 서는 사본이면 -1 */
-  function guarded(card: string): number {
-    const at = HOME.indexOf(card)
-    const guard = HOME.lastIndexOf(GUARD, at)
-    if (at < 0 || guard < 0) return -1
-    return HOME.slice(guard + GUARD.length, at).trim() === '' ? guard : -1
-  }
+  /** #1356 부터 한 벌이다 — 폭마다 다른 자리라 두던 사본 둘이 한 자리로 모였다 */
+  const CARD = '{aboutIntroShown && <AboutIntroCard onDismiss={dismissAboutIntro} />}'
 
   /* 로그인한 사람은 이미 가입했다. 소개를 본 사람에게 소개로 가는 카드를 다시 보일 까닭이 없다 */
   it('서버가 정한다 — 비로그인이고 소개를 본 적이 없을 때만', () => {
@@ -75,53 +64,45 @@ describe('홈 → /about 소개 카드 (#950)', () => {
 
   it('홈이 조건부로 카드를 세운다 — 서버 값과 닫기 상태 둘 다', () => {
     expect(HOME).toContain('const aboutIntroShown = showAboutIntro && !aboutIntroDismissed')
-    expect(guarded(RAIL_CARD)).toBeGreaterThan(-1)
-    expect(guarded(MAIN_CARD)).toBeGreaterThan(-1)
+    expect(HOME).toContain(CARD)
   })
 
   /*
-    **두 자리, 보이는 쪽만** (#963). 1024 이상은 우측 권역 카드 아래(좌측 첫 카드가 약 720px 이라
-    그 아래면 1024×768 · 1280×800 첫 화면 밖이었다), 미만은 첫 카드 아래다. 숨은 쪽은
-    `display: none` 이라 탭 순서 · 접근성 트리에서 빠진다 — 사본이 둘이어도 두 번 서지 않는다.
+    **한 벌이다** (#1356). #963 은 1024 미만 · 이상의 자리가 달라 `lg:hidden` · `hidden lg:block`
+    사본 둘을 두었는데, 좌측 레일이 오늘 요약 카드 한 장이 되면서 두 자리가 DOM 의 한 자리로
+    모였다. 폭 클래스가 돌아오면 사본도 함께 돌아온 것이다.
   */
-  it('사본은 둘 — 좌 1024 미만 · 우 1024 이상', () => {
-    expect(HOME.split('<AboutIntroCard').length - 1).toBe(2)
+  it('카드는 한 벌이고 폭 클래스가 없다', () => {
+    expect(HOME.split('<AboutIntroCard').length - 1).toBe(1)
+    expect(HOME).not.toMatch(/<AboutIntroCard className=/)
   })
 
   /*
-    **1024 미만은 develop 과 같은 DOM 이다.** 첫 카드(골든타임이 마지막 블록) 바로 다음 형제가
-    소개 카드이고 그다음이 AI 배너다 — 보이는 순서 = DOM 순서라 키보드 · 스크린리더가 판정 다음에
-    곧바로 카드에 닿는다(WCAG 1.3.2 · 2.4.3). × 뒤 초점도 이 순서를 믿는다.
+    **오늘 상태를 본 다음, 오늘 갈 만한 곳 앞이다** (소개 명세 2026-09-15 §1-1). 우측 열 머리(여행
+    배너 다음)라 1024 이상은 첫 화면 안이고, 1024 미만은 좌측 레일(오늘 요약 카드) 바로 다음이다.
+    × 뒤 초점은 다음 형제를 믿는다 — 다음 형제가 `오늘 갈 만한 곳` 이어야 한다.
   */
-  it('좌 사본 — 첫 카드 바로 다음 형제, AI 배너 앞', () => {
-    const at = guarded(RAIL_CARD)
-    const firstCardEnd = HOME.indexOf('</Surface>', HOME.indexOf('<WalkTimesSection'))
-    const between = HOME.slice(firstCardEnd + '</Surface>'.length, at)
+  it('우측 열 머리 — 오늘 요약 카드 뒤, 오늘 갈 만한 곳 바로 앞 형제', () => {
+    const at = HOME.indexOf(CARD)
+    const rightStack = HOME.indexOf('<SurfaceStack className="lg:pl-3">')
+    const next = HOME.indexOf('<Surface', at + CARD.length)
 
-    // 걷힌 JSX 주석은 `{}` 로 남는다
-    expect(between.replace(/\{\}/g, '').trim()).toBe('')
-    expect(at).toBeLessThan(HOME.indexOf('messages.home.aiPlanBannerTitle'))
-  })
-
-  /* **오늘 상태를 본 다음이다** (소개 명세 2026-09-15 §1-1) — 권역도 오늘 상태다 */
-  it('우 사본 — 권역 카드 바로 다음 형제, 오늘 갈 만한 곳 앞', () => {
-    const at = guarded(MAIN_CARD)
-    const regional = HOME.indexOf('<RegionalWeatherSection')
-    const regionalEnd = HOME.indexOf('/>', regional) + '/>'.length
-    const suitability = HOME.indexOf('<Surface', at)
-
-    expect(HOME.slice(regionalEnd, at).replace(/\{\}/g, '').trim()).toBe('')
-    expect(HOME.slice(suitability, HOME.indexOf('>', suitability))).toContain(
-      'titleId="suitability-heading"',
-    )
+    expect(at).toBeGreaterThan(rightStack)
+    expect(at).toBeGreaterThan(HOME.indexOf('<WalkTimesSection'))
+    expect(
+      HOME.slice(at + CARD.length, next)
+        .replace(/\{\}/g, '')
+        .trim(),
+    ).toBe('')
+    expect(HOME.slice(next, HOME.indexOf('>', next))).toContain('titleId="suitability-heading"')
   })
 
   /*
-    **1024 미만 레이아웃은 손대지 않는다.** 카드를 한 벌로 두려고 두 스택을 `display: contents`
-    로 풀고 `order` 로 당기는 안을 한 번 구현했다가 걷었다 — DOM 순서가 보이는 순서와 갈리고
-    홈 전체 간격이 바뀌었다. 레일 · 스택 · 첫 카드의 클래스가 develop 그대로인지 잠근다.
+    **보이는 순서 = DOM 순서다.** 한 벌로 모은 방법은 `display: contents` + `order` 가 아니라 DOM 을
+    모바일 우선순위로 다시 짠 것이다 — `order` 로 당기면 키보드 · 스크린리더가 보이는 순서와 다르게
+    닿는다(WCAG 1.3.2 · 2.4.3, #963 기각안). 레일 · 스택 클래스가 그대로인지 함께 잠근다.
   */
-  it('1024 미만 레이아웃 클래스는 그대로다', () => {
+  it('order · display: contents 로 순서를 당기지 않는다', () => {
     const stacks = [...HOME.matchAll(/<SurfaceStack className="([^"]*)">/g)].map((m) => m[1])
 
     expect(HOME).toContain('<div className="rail-layout">')
@@ -132,19 +113,14 @@ describe('홈 → /about 소개 카드 (#950)', () => {
     expect(HOME).not.toMatch(/className=\{?["'`][^"'`]*(?<![\w-])(?:\w+:)*contents\b/)
   })
 
-  /*
-    **닫기는 한 상태다** — 한쪽 × 가 다른 쪽도 치운다. 사본마다 상태를 가지면 닫은 뒤 창을
-    1024 너머로 바꾸는 순간 숨어 있던 사본이 선다.
-  */
-  it('두 사본이 닫기 상태 하나를 나눠 쓴다', () => {
+  it('닫기 상태는 HomeView 하나가 갖는다', () => {
     expect(HOME).toContain('const [aboutIntroDismissed, setAboutIntroDismissed] = useState(false)')
     expect(HOME).toMatch(/const dismissAboutIntro = \(\) => setAboutIntroDismissed\(true\)/)
-    expect(HOME.split('onDismiss={dismissAboutIntro}').length - 1).toBe(2)
   })
 
   /* 카드를 닫은 사람은 이 링크로만 `/about` 에 닿는다 — 카드가 생겼다고 링크를 걷지 않는다 */
   it('맨 아래 /about 링크는 그대로 남는다', () => {
-    expect(HOME.indexOf('href="/about"')).toBeGreaterThan(HOME.indexOf(MAIN_CARD))
+    expect(HOME.indexOf('href="/about"')).toBeGreaterThan(HOME.indexOf(CARD))
   })
 
   it('/about 을 열면 본 것으로 적는다', () => {

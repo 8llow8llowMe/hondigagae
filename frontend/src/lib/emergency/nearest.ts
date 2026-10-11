@@ -54,18 +54,21 @@ export function pickNearestHospital(
 }
 
 /**
- * 홈 병원 배너의 설명줄.
+ * 홈 바로가기 `동물병원` 칸의 설명줄 (#1356 — 배너 세 장이 한 줄 세 칸이 됐다).
  *
- * **찾지 못했으면 지금까지의 고정 문구로 남는다.** 좌표 미허용 · 조회 전 · 실패 · 반경 안에
- * 병원이 없음이 모두 `null` 로 들어온다 — 배너는 어떤 상태에서도 사라지지 않아야 하고
- * (`components/banner.tsx`), 그 고정 문구는 수를 세지 않으므로 어긋날 것이 없다.
+ * **찾지 못했으면 고정 문구로 남는다.** 좌표 미허용 · 조회 전 · 실패 · 반경 안에
+ * 병원이 없음이 모두 `null` 로 들어온다 — 칸은 어떤 상태에서도 사라지지 않아야 하고,
+ * 그 고정 문구는 수를 세지 않으므로 어긋날 것이 없다.
+ *
+ * **시설 이름을 싣지 않는다.** 칸 폭(약 110px)에 들어가지 않는다 — 거리와 열림 여부만 말하고
+ * 이름은 눌러 들어간 화면이 말한다.
  *
  * **개수를 말하지 않는다** ([#206](https://github.com/8llow8llowMe/hondigagae/issues/206)).
  * 시설 하나를 가리킬 뿐이고 그 값은 눌러 들어갈 화면과 **같은 API** 에서 왔다 — 예전에
  * 홈이 "3곳" 을 박아 두고 목록은 "반경 안에 없어요" 라고 말했던 어긋남이 여기서는
  * 구조적으로 생기지 않는다.
  */
-export function hospitalBannerDescription(nearest: NearestHospital | null): string {
+export function hospitalShortcutCaption(nearest: NearestHospital | null): string {
   if (nearest === null) return messages.home.emergencyDesc
 
   const template =
@@ -75,9 +78,7 @@ export function hospitalBannerDescription(nearest: NearestHospital | null): stri
         ? messages.home.emergencyNearestOpen
         : messages.home.emergencyNearest
 
-  return template
-    .replace('{name}', nearest.facility.name)
-    .replace('{distance}', formatDistance(nearest.facility.distanceMeters))
+  return template.replace('{distance}', formatDistance(nearest.facility.distanceMeters))
 }
 
 function nearestOf(
