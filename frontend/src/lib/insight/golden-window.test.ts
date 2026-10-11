@@ -4,6 +4,7 @@ import {
   describeGoldenWindow,
   formatHourRuns,
   isWithinGoldenWindow,
+  lacksSafeHour,
   markGoldenWindow,
 } from '@/lib/insight/golden-window'
 import type { HourlyWalkSafetyItem } from '@/types/insight'
@@ -307,5 +308,50 @@ describe('formatHourRuns', () => {
 
   it('구간이 없으면 빈 문자열이다', () => {
     expect(formatHourRuns([])).toBe('')
+  })
+})
+
+/*
+  #1362 — 창 안이 전부 안전 아님이면 제목이 `좋은 시간` 이라고 말하지 않는다. 판정은 `describeGoldenWindow`
+  결과로 한다. 모르는 것(`UNKNOWN`)을 나쁜 것으로 말하지 않는다.
+*/
+describe('lacksSafeHour (#1362)', () => {
+  const at = (hh: number, code: string, name: string): HourlyWalkSafetyItem => ({
+    at: `${DAY}${String(hh).padStart(2, '0')}:00:00`,
+    walkSafetyLevel: { code, name, description: null, scoreDescription: null },
+    temperature: 30,
+    estimatedPavementCelsius: 40,
+    precipitationProbability: 0,
+  })
+  const lacks = (hours: HourlyWalkSafetyItem[]) =>
+    lacksSafeHour(describeGoldenWindow(hours, `${DAY}12:00:00`, `${DAY}14:00:00`))
+
+  it('창 안이 전부 주의면 참이다', () => {
+    expect(lacks([12, 13, 14].map((hh) => at(hh, 'CAUTION', '주의')))).toBe(true)
+  })
+
+  it('안전 시각이 하나라도 있으면 거짓이다 — 섞인 날은 문장이 푼다', () => {
+    expect(
+      lacks([at(12, 'CAUTION', '주의'), at(13, 'SAFE', '안전'), at(14, 'CAUTION', '주의')]),
+    ).toBe(false)
+  })
+
+  it('전부 안전이면 거짓이다', () => {
+    expect(lacks([12, 13, 14].map((hh) => at(hh, 'SAFE', '안전')))).toBe(false)
+  })
+
+  it('판단 근거 부족만 있으면 거짓이다 — 모르는 것을 나쁜 것으로 말하지 않는다', () => {
+    expect(lacks([12, 13, 14].map((hh) => at(hh, 'UNKNOWN', '판단 근거 부족')))).toBe(false)
+  })
+
+  it('창 안 시각이 없으면 거짓이다', () => {
+    expect(lacks([at(9, 'CAUTION', '주의')])).toBe(false)
+  })
+
+  /* 창 밖의 안전한 아침이 창 안의 주의를 덮지 않는다 */
+  it('창 밖의 안전 시각은 세지 않는다', () => {
+    expect(
+      lacks([at(9, 'SAFE', '안전'), at(12, 'CAUTION', '주의'), at(13, 'CAUTION', '주의')]),
+    ).toBe(true)
   })
 })
