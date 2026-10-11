@@ -2,7 +2,7 @@
 
 import { type ReactNode, type RefObject, useId, useRef } from 'react'
 
-import { useOverlay } from '@/lib/ui/overlay'
+import { isBackdropDismissClick, useOverlay } from '@/lib/ui/overlay'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -81,7 +81,9 @@ export function Modal({
         type="button"
         aria-hidden
         tabIndex={-1}
-        onClick={onClose}
+        onClick={(event) => {
+          if (isBackdropDismissClick(event.detail)) onClose()
+        }}
         className="overlay-backdrop absolute inset-0"
       />
 

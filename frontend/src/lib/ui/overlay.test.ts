@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { nextFocusIndex, tabbableOf } from '@/lib/ui/overlay'
+import { isBackdropDismissClick, nextFocusIndex, tabbableOf } from '@/lib/ui/overlay'
 
 /*
   `useOverlay` 자체는 여기서 검증하지 않는다 — 이 저장소는 node 환경이라 effect 도
@@ -71,5 +71,20 @@ describe('nextFocusIndex — 끝에서 감는다', () => {
   it('탭 정지가 하나뿐이면 어느 쪽이든 제자리다', () => {
     expect(nextFocusIndex(0, 1, false)).toBe(0)
     expect(nextFocusIndex(0, 1, true)).toBe(0)
+  })
+})
+
+describe('isBackdropDismissClick — 여는 더블클릭이 시트를 닫지 않는다 (#1339)', () => {
+  it('한 번 누른 덮개 클릭은 닫는다', () => {
+    expect(isBackdropDismissClick(1)).toBe(true)
+  })
+
+  it('연속 클릭의 두 번째부터는 닫지 않는다 — 여는 버튼을 더블클릭한 두 번째 클릭이다', () => {
+    expect(isBackdropDismissClick(2)).toBe(false)
+    expect(isBackdropDismissClick(3)).toBe(false)
+  })
+
+  it('키보드가 낸 클릭(detail 0)은 닫는다', () => {
+    expect(isBackdropDismissClick(0)).toBe(true)
   })
 })
