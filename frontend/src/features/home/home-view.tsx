@@ -763,6 +763,8 @@ export function HomeView({
                     data={data}
                     place={placeById.get(data.placeId)}
                     reason={pickCardReason(placeReasons[index] ?? data.reasons)}
+                    // 첫 카드 사진은 모바일 첫 화면의 LCP 다 — 지연 로딩하지 않는다 (#1358)
+                    preload={index === 0}
                   />
                 ))}
                 {endCard !== null && <PlaceCardsEndCard end={endCard} />}
