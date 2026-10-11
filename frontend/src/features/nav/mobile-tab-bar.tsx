@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { HomeIcon, MyPageIcon, PlanIcon, SearchIcon } from '@/components/icons'
 import { MOBILE_TAB_ITEMS, toLoginHref } from '@/features/nav/menu-items'
 import { isActiveNav } from '@/lib/nav/active'
+import { hidesTabBar } from '@/lib/nav/tab-bar'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -18,11 +19,17 @@ import { cn } from '@/lib/utils/cn'
  * 이동해 오조작이 늘어난다. 대신 `returnTo` 를 붙여 로그인으로 보낸다.
  *
  * 태블릿(768+)에는 두지 않는다 — 헤더와 같이 보이면 목적지가 두 곳이 된다.
+ *
+ * **상세 화면에서는 그리지 않는다** (#1369, `hidesTabBar`). 장소 상세의 행동 바 위에 겹쳐 쌓여
+ * 화면의 17%를 가렸다. `usePathname` 은 서버 렌더에서도 값이 있어 첫 HTML 부터 없다 — 깜박이지
+ * 않는다. 탭바가 없으면 `--tabbar-h` 도 0 이 된다(`app/globals.css` — `[data-tab-bar]` 유무로 잰다).
  */
 const ICONS = [HomeIcon, SearchIcon, PlanIcon, MyPageIcon] as const
 
 export function MobileTabBar({ authed }: { authed: boolean }) {
   const pathname = usePathname()
+
+  if (hidesTabBar(pathname)) return null
 
   return (
     <nav

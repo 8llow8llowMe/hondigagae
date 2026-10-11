@@ -598,7 +598,9 @@ export function PlaceDetailSection({
         바 아래끝 748 = 탭바 위끝, 맨 아래까지 굴렸을 때 푸터 마지막 줄 716 — 둘 다
         탭바 뒤로 들어가지 않는다.
 
-        그래서 **탭바가 있는 폭에서만 그만큼 올린다** — `md` 부터는 바닥에 붙는다.
+        **#1369 부터 이 화면에는 탭바가 없다** (`hidesTabBar`). 탭바 위에 이 바가 겹쳐 쌓여 화면의
+        17%(141px)를 가렸다 — 이제 모든 폭에서 바닥에 붙고, 홈 인디케이터는 `pb-safe` 가 비킨다.
+        위의 `bottom-16` 이야기는 그 전의 기록이다.
 
         **sticky 라 자리를 스스로 차지한다** — 본문 끝에 바 높이만큼 여백을 따로 두지
         않아도 마지막 줄이 가려지지 않는다 (fixed 였다면 필요했다).
@@ -606,10 +608,7 @@ export function PlaceDetailSection({
         **배경은 이 갈래만 갖는다** — 본문 위를 지나가는 띠라 불투명해야 한다. 카드 안의
         데스크톱 갈래는 카드가 면을 소유한다 (§0).
       */}
-      <PlaceDetailActionBar
-        {...actions}
-        className="bg-bg sticky bottom-16 z-30 md:bottom-0 lg:hidden"
-      />
+      <PlaceDetailActionBar {...actions} className="bg-bg pb-safe sticky bottom-0 z-30 lg:hidden" />
     </article>
   )
 }
