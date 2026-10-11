@@ -21,6 +21,7 @@ import { updatePlan } from '@/lib/api/plan'
 import { apiErrorToFormErrors, NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 import { describePet } from '@/lib/pet/describe'
+import { planDetailTitle } from '@/lib/plan/detail-title'
 import {
   planEditPetIds,
   planEditPetsHint,
@@ -185,6 +186,13 @@ export function PlanEditModal({
           무효화해 봐야 **같은 응답이 다시 올 뿐**이다. `review`(완료 전용) · `emergency`
           (위치 기반) · `petKeys`(반려견 자체는 안 바뀐다)도 같은 이유로 건드리지 않는다.
         */
+
+        /*
+          **탭 제목도 새 이름으로 바꾼다** (#1383 · D24-5). 탭 제목은 서버 `generateMetadata` 가 한 번
+          정해 새로고침 전까지 옛 이름으로 남는다. `router.refresh()` 는 서버 컴포넌트 전체를 다시
+          받으므로 쓰지 않는다. 이 모달은 일정 상세(관리 메뉴)에서만 열린다.
+        */
+        document.title = `${planDetailTitle(null, next.title)} · 혼디가개`
 
         if (petsChanged) showToast({ message: messages.plan.editPetsSaved })
         onClose()
