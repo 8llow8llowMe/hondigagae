@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   WalkCourseActivityField,
   WalkCourseSortField,
+  WalkCourseSortInline,
 } from '@/features/walk-course/walk-course-filter-fields'
 import { messages } from '@/lib/messages'
 import { expectSingleTabStop } from '@/test/radio-group'
@@ -194,5 +195,37 @@ describe('세그먼트 — 묶음 하나가 탭 스톱 하나다 (#825)', () => 
 
   it('정렬 — 고른 칸만 탭 스톱이다', () => {
     expectSingleTabStop(renderSort(null))
+  })
+})
+
+/*
+  #1374 — 모바일은 정렬이 개수 줄 오른쪽의 글자 토글이다. 의미 · 키보드 · 이름은 세그먼트와 같다.
+*/
+describe('WalkCourseSortInline — 모바일 개수 줄 정렬 (#1374)', () => {
+  const renderInline = (sort: WalkCourseSort | null) =>
+    renderToStaticMarkup(createElement(WalkCourseSortInline, { sort, onChange: vi.fn() }))
+
+  it('이름이 정렬인 radiogroup 이고 선택지는 세그먼트와 같은 둘이다', () => {
+    const markup = renderInline(null)
+
+    expect(markup).toContain('role="radiogroup"')
+    expect(markup).toContain('aria-label="정렬"')
+    expect(markup.match(/role="radio"/g)).toHaveLength(2)
+    expect(markup).toContain(messages.walkCourse.sortCourseNo)
+    expect(markup).toContain(messages.walkCourse.sortDistanceAsc)
+  })
+
+  it('고른 쪽이 checked 이고 탭 정지가 하나다', () => {
+    const markup = renderInline('DISTANCE_ASC')
+    const selected = markup.split('</button>').find((part) => part.includes('aria-checked="true"'))
+
+    expect(selected).toContain(messages.walkCourse.sortDistanceAsc)
+    expectSingleTabStop(markup)
+  })
+
+  it('누르는 자리가 44 다', () => {
+    for (const tag of renderInline(null).match(/<button[^>]*>/g) ?? []) {
+      expect(tag).toContain('h-11')
+    }
   })
 })

@@ -321,3 +321,18 @@ describe('WalkCourseCardGrid — 열 수 (#837)', () => {
     expect(tag).toContain('px-4')
   })
 })
+
+/* #1374 — 모바일 사진은 2:1. 16:10 이 375 에서 약 214px 라 한 화면에 코스가 하나뿐이었다 */
+describe('WalkCourseRow — 모바일 사진 비율 (#1374)', () => {
+  it('사진 칸이 md 미만 2:1, 이상 16:10 이다', () => {
+    const markup = render(WALK_COURSE_WITH_COORDS)
+    const at = markup.indexOf('<img')
+    const box = markup.slice(
+      markup.lastIndexOf('<div', at),
+      markup.indexOf('>', markup.lastIndexOf('<div', at)) + 1,
+    )
+
+    expect(box).toContain('aspect-2/1')
+    expect(box).toContain('md:aspect-16/10')
+  })
+})

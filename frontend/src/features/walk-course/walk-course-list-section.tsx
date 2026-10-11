@@ -68,6 +68,11 @@ export type WalkCourseListSectionProps = {
   /** 조건 컨트롤. **라우터를 아는 쪽이 만들어 넘긴다** — 이 컴포넌트는 순수하게 남는다 */
   tools?: ReactNode
   /**
+   * 개수 줄 오른쪽 — **모바일에서만 선다** (#1374). 목록 화면이 정렬 토글을 넣는다. `md` 이상은 도구
+   * 줄의 세그먼트가 같은 일을 하므로 이 칸은 `md:hidden` 이다.
+   */
+  countTrailing?: ReactNode
+  /**
    * 지금 보고 있는 조건 ([#783](https://github.com/8llow8llowMe/hondigagae/issues/783)).
    * 행이 상세 링크에 실어 보내면 상세의 `코스 목록으로` 가 같은 목록으로 돌아온다.
    */
@@ -94,6 +99,7 @@ export function WalkCourseListSection({
   onRetry,
   onShowAll,
   tools,
+  countTrailing,
   filters,
 }: WalkCourseListSectionProps) {
   // 개수는 목록이 실제로 있을 때만 말한다 — 로딩 중에는 아직 모르고 오류에는 셀 수 없다
@@ -151,8 +157,18 @@ export function WalkCourseListSection({
         <p aria-live="polite" className="text-body-2 text-fg font-semibold tabular-nums">
           {countable && messages.walkCourse.listCount.replace('{count}', String(totalCount))}
         </p>
+        {/*
+          정렬 토글 — 개수 줄 오른쪽 끝 (#1374). `-my-2` 로 줄 높이를 거의 글자 그대로 두고, 누르는 자리는
+          44. 대기 · 오류에서도 선다 — 정렬은 결과가 없어도 바꿀 수 있는 조건이다.
+        */}
+        {countTrailing !== undefined && (
+          <div className="-my-2 ml-auto self-center md:hidden">{countTrailing}</div>
+        )}
+        {/* 모바일은 정렬 토글이 개수 줄 끝을 차지하므로 기준 줄은 다음 줄로 내린다 */}
         {countable && basis !== null && (
-          <p className="text-caption text-fg-muted break-keep">{basisLine(basis)}</p>
+          <p className="text-caption text-fg-muted w-full break-keep md:w-auto">
+            {basisLine(basis)}
+          </p>
         )}
       </div>
 
