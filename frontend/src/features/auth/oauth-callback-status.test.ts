@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { OAuthCallbackStatus } from '@/features/auth/oauth-callback-view'
 import { ApiError } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
+import { readSourceWithoutComments } from '@/test/source'
 
 function render(provider: string, exchange: Parameters<typeof OAuthCallbackStatus>[0]['exchange']) {
   return renderToStaticMarkup(createElement(OAuthCallbackStatus, { provider, exchange }))
@@ -172,7 +173,7 @@ describe('OAuthCallbackStatus', () => {
     **그 목적지가 `/signup` 에서 `/signup/social/{provider}` 로 바뀌었다** (#707).
     제공자를 실어 보내지 않으면 도착한 화면이 버튼을 하나로 좁힐 수 없다.
   */
-  it('MEMBER_010 은 들어온 제공자의 동의 화면으로 보내고 서버 사유를 그대로 보여준다', () => {
+  it('MEMBER_010 은 들어온 제공자의 동의 화면으로 보낸다 — 실패 화면이 아니라 이동 중이다', () => {
     const markup = render('kakao', {
       status: 'failed',
       returnTo: '/',
@@ -183,7 +184,12 @@ describe('OAuthCallbackStatus', () => {
       ),
     })
 
-    expect(markup).toContain('이용약관과 개인정보 처리방침에 동의해야 가입할 수 있습니다.')
+    // #1366 — 처음 온 사용자는 잘못한 것이 없다. 실패 제목 · 서버 사유 대신 이동 중 상태를 말한다
+    expect(markup).not.toContain(messages.auth.oauthFailedTitle)
+    expect(markup).not.toContain('이용약관과 개인정보 처리방침에 동의해야 가입할 수 있습니다.')
+    expect(markup).toContain(`role="status"`)
+    expect(markup).toContain(messages.auth.oauthToSignupConsent)
+    // 이동이 막혔을 때의 손잡이
     expect(markup).toContain('href="/signup/social/kakao"')
     expect(markup).toContain(messages.auth.toSignupConsent)
   })
@@ -220,7 +226,7 @@ describe('OAuthCallbackStatus', () => {
       error: domainError(400, 'MEMBER_011', '만 14세 이상만 가입할 수 있습니다.'),
     })
 
-    expect(markup).toContain('만 14세 이상만 가입할 수 있습니다.')
+    expect(markup).toContain(messages.auth.oauthToSignupConsent)
     expect(markup).toContain('href="/signup/social/naver"')
   })
 
@@ -245,5 +251,21 @@ describe('OAuthCallbackStatus', () => {
 
     expect(markup).toContain(messages.auth.oauthFailedTitle)
     expect(markup).toContain('href="/login"')
+  })
+})
+
+/*
+  #1366 — 이동은 `OAuthCallbackView` 가 한다(훅을 써서 렌더할 수 없어 소스로 잠근다). `replace` 여야
+  뒤로 가기가 1회용 인가코드 콜백으로 돌아와 같은 실패를 다시 밟지 않는다.
+*/
+describe('OAuthCallbackView — 동의 누락이면 바로 이동한다 (#1366)', () => {
+  const VIEW = readSourceWithoutComments('src/features/auth/oauth-callback-view.tsx')
+
+  it('동의 화면 주소를 router.replace 로 보낸다', () => {
+    const view = VIEW.slice(VIEW.indexOf('export function OAuthCallbackView'))
+
+    expect(view).toContain('signupConsentDestination(provider, exchange)')
+    expect(view).toContain('router.replace(consentDestination)')
+    expect(view).not.toContain('router.push')
   })
 })
