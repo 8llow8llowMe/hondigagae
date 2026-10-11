@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { nextPlaceCursor, placeListPath } from '@/lib/api/place'
+import { nearbyPlacesPath, nextPlaceCursor, placeListPath } from '@/lib/api/place'
 import { DEFAULT_PLACE_FILTERS } from '@/lib/url/place-filters'
 import { placeSummary } from '@/test/fixtures/place'
 
@@ -21,6 +21,35 @@ describe('placeListPath', () => {
     expect(placeListPath(DEFAULT_PLACE_FILTERS, '212481712381923328')).toContain(
       'lastPlaceId=212481712381923328',
     )
+  })
+})
+
+describe('nearbyPlacesPath — 재검색에 지역이 실린다 (#1320)', () => {
+  const center = { lat: 33.25, lng: 126.56 }
+
+  it('지역을 골랐으면 sigunguCode 를 싣는다', () => {
+    const params = new URL(
+      nearbyPlacesPath(center, 5000, { ...DEFAULT_PLACE_FILTERS, sigunguCode: '4' }),
+      'http://x',
+    ).searchParams
+
+    expect(params.get('sigunguCode')).toBe('4')
+  })
+
+  it('지역을 고르지 않았으면 sigunguCode 를 보내지 않는다', () => {
+    const params = new URL(nearbyPlacesPath(center, 5000, DEFAULT_PLACE_FILTERS), 'http://x')
+      .searchParams
+
+    expect(params.has('sigunguCode')).toBe(false)
+  })
+
+  it('areaCode 는 여전히 보내지 않는다 — 반경이 범위를 정한다', () => {
+    const params = new URL(
+      nearbyPlacesPath(center, 5000, { ...DEFAULT_PLACE_FILTERS, sigunguCode: '4' }),
+      'http://x',
+    ).searchParams
+
+    expect(params.has('areaCode')).toBe(false)
   })
 })
 
