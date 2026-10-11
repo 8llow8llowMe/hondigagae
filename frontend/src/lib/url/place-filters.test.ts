@@ -294,8 +294,15 @@ describe('화면별 기본 조건 — /places 는 동반 가능만 (#1379)', () 
     expect(toPlaceFilterQuery(DEFAULT_PLACE_FILTERS)).toBe('')
   })
 
-  it('경로가 기본값을 고른다 — /places 만 동반 가능만이다', () => {
+  it('경로가 기본값을 고른다 — /places · 일정 담기 화면이 동반 가능만이다 (#1383)', () => {
     expect(placeFilterDefaults('/places')).toBe(PLACES_DEFAULT_FILTERS)
-    expect(placeFilterDefaults('/plans/1/days/1/add')).toBe(DEFAULT_PLACE_FILTERS)
+    expect(placeFilterDefaults('/plans/223456789012000001/days/2/add')).toBe(PLACES_DEFAULT_FILTERS)
+  })
+
+  it('담기와 비슷한 다른 경로는 공용 기본값 그대로다', () => {
+    expect(placeFilterDefaults('/')).toBe(DEFAULT_PLACE_FILTERS)
+    expect(placeFilterDefaults('/plans/1/days/1')).toBe(DEFAULT_PLACE_FILTERS)
+    expect(placeFilterDefaults('/plans/1/days/1/add/extra')).toBe(DEFAULT_PLACE_FILTERS)
+    expect(placeFilterDefaults('/places/1')).toBe(DEFAULT_PLACE_FILTERS)
   })
 })

@@ -127,6 +127,32 @@ function renderRow(overrides: Record<string, unknown> = {}) {
   )
 }
 
+describe('PlanAddPlaceRow — 동반 불가 · 미확인의 한 번 더 확인 (#1383 · D24-4)', () => {
+  it('확인을 기다리면 이유를 행 안에 한 줄로 말하고 스크린리더 라벨이 그래도 담기다', () => {
+    const markup = renderRow({ confirmReason: 'NOT_ALLOWED' })
+
+    expect(markup).toContain(messages.plan.addPlaceConfirmNotAllowed)
+    expect(markup).toContain('role="status"')
+    expect(markup).toContain(
+      `aria-label="${messages.plan.addPlaceConfirmLabel.replace('{title}', placeSummary.title)}"`,
+    )
+    // 버튼 글자는 담기 그대로다 — 액션 열이 고정 폭이다
+    expect(markup).toContain(`>${messages.plan.addPlaceShort}<`)
+  })
+
+  it('미확인은 출입 조건을 확인하라고 말한다', () => {
+    expect(renderRow({ confirmReason: 'UNKNOWN' })).toContain(messages.plan.addPlaceConfirmUnknown)
+  })
+
+  it('기다리지 않으면 아무 줄도 없다', () => {
+    const markup = renderRow()
+
+    expect(markup).not.toContain(messages.plan.addPlaceConfirmNotAllowed)
+    expect(markup).not.toContain(messages.plan.addPlaceConfirmUnknown)
+    expect(markup).not.toContain('role="status"')
+  })
+})
+
 describe('PlanAddPlaceRow — 거리순 목록의 거리 (#1217)', () => {
   it('거리가 오면 메타 줄 끝에 붙는다', () => {
     const markup = renderRow({ place: { ...placeSummary, distanceMeters: 1234 } })

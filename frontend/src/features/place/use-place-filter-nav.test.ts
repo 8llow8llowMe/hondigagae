@@ -37,7 +37,7 @@ describe('placeFilterHref', () => {
 
 /**
  * `/places` 의 기본 조건은 `동반 가능만`이다 (#1379). 생략할 기본값을 **경로가** 정한다 —
- * 같은 훅을 쓰는 담기 화면은 공용 기본값(동반 축 미지정) 그대로다.
+ * 같은 훅을 쓰는 담기 화면도 #1383 부터 `동반 가능만`이다 (반려견 일정에 담는 화면이다).
  */
 describe('placeFilterHref — 화면별 기본 조건 (#1379)', () => {
   const PLAN_ADD = '/plans/223456789012000001/days/1/add'
@@ -52,10 +52,10 @@ describe('placeFilterHref — 화면별 기본 조건 (#1379)', () => {
     )
   })
 
-  it('담기 화면은 공용 기본값 — 동반 축을 끈 상태가 빈 URL 이다', () => {
-    expect(placeFilterHref(PLAN_ADD, DEFAULT_PLACE_FILTERS, 'map')).toBe(PLAN_ADD)
-    expect(placeFilterHref(PLAN_ADD, PLACES_DEFAULT_FILTERS, 'map')).toBe(
-      `${PLAN_ADD}?petAllowanceType=ALLOWED`,
+  it('담기 화면도 동반 가능만이 빈 URL 이다 — 끄면 ALL 로 적는다 (#1383 · D24-4)', () => {
+    expect(placeFilterHref(PLAN_ADD, PLACES_DEFAULT_FILTERS, 'map')).toBe(PLAN_ADD)
+    expect(placeFilterHref(PLAN_ADD, DEFAULT_PLACE_FILTERS, 'map')).toBe(
+      `${PLAN_ADD}?petAllowanceType=ALL`,
     )
   })
 })
@@ -68,7 +68,7 @@ describe('placeFilterHref — 화면별 기본 조건 (#1379)', () => {
  */
 describe('placeFilterHref — 담기 화면 경로 (#1012)', () => {
   const PLAN_ADD = '/plans/223456789012000001/days/1/add'
-  const withKeyword: PlaceFilters = { ...DEFAULT_PLACE_FILTERS, keyword: '미술관' }
+  const withKeyword: PlaceFilters = { ...PLACES_DEFAULT_FILTERS, keyword: '미술관' }
 
   it('검색어를 실어도 담기 경로가 그대로다', () => {
     const href = placeFilterHref(PLAN_ADD, withKeyword, 'list')
@@ -79,8 +79,8 @@ describe('placeFilterHref — 담기 화면 경로 (#1012)', () => {
   })
 
   it('검색어를 지우면 담기 경로만 남는다 — 지도가 기본 보기다', () => {
-    expect(placeFilterHref(PLAN_ADD, DEFAULT_PLACE_FILTERS, 'map')).toBe(PLAN_ADD)
-    expect(placeFilterHref(PLAN_ADD, DEFAULT_PLACE_FILTERS, 'list')).toBe(`${PLAN_ADD}?view=list`)
+    expect(placeFilterHref(PLAN_ADD, PLACES_DEFAULT_FILTERS, 'map')).toBe(PLAN_ADD)
+    expect(placeFilterHref(PLAN_ADD, PLACES_DEFAULT_FILTERS, 'list')).toBe(`${PLAN_ADD}?view=list`)
   })
 
   /*
