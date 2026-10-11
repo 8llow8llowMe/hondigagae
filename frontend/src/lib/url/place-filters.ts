@@ -46,8 +46,8 @@ export const DEFAULT_PLACE_FILTERS: PlaceFilters = {
  * `UNKNOWN` 이라, 조건 없는 첫 화면은 반려견 서비스의 목록으로 읽히지 않았다 — 검색 랜딩
  * (`/jeju/[topic]`)이 이미 같은 기준이다.
  *
- * **공용 기본값(`DEFAULT_PLACE_FILTERS`)은 그대로 둔다.** 홈 · 담기 · 코스 주변 · 일정 고르기 시트가
- * 그것을 쓰고, 그쪽 기본값은 각자의 이슈가 정한다(홈 #1380 · 담기 #1383). 그래서 기본값은 화면마다
+ * **공용 기본값(`DEFAULT_PLACE_FILTERS`)은 그대로 둔다.** 홈 · 코스 주변 · 일정 고르기 시트가
+ * 그것을 쓰고, 그쪽 기본값은 각자의 이슈가 정한다(홈 #1380). 일정 담기 화면은 #1383 에서 이 값으로 옮겼다. 그래서 기본값은 화면마다
  * 다를 수 있고, 직렬화 · 파싱이 **어느 화면의 기본값인지** 를 받는다(`placeFilterDefaults`).
  *
  * 빈 URL 이 곧 이 상태라 정규 주소(`/places`, #1130) · sitemap · 입구 링크가 그대로다.
@@ -65,9 +65,20 @@ export const PLACES_DEFAULT_FILTERS: PlaceFilters = {
  */
 export const PET_ALLOWANCE_ANY = 'ALL'
 
-/** 이 경로의 기본 조건. `/places` 만 `동반 가능만`이다 — `PLACES_DEFAULT_FILTERS` 주석 */
+/** 일정 일자에 장소를 담는 화면 — `/plans/{planId}/days/{day}/add` */
+const PLAN_ADD_PATH = /^\/plans\/[^/]+\/days\/[^/]+\/add$/
+
+/**
+ * 이 경로의 기본 조건. `/places` 와 **일정 담기 화면**이 `동반 가능만`이다 — `PLACES_DEFAULT_FILTERS` 주석.
+ *
+ * **담기 화면은 #1383 에서 옮겼다.** 반려견 일정에 담는 화면인데 기본이 전체라 `동반 불가` 장소에도
+ * `담기` 가 열려 있었다(mock 재현). 그래도 담으려면 필터를 끄고 한 번 더 누른다
+ * (`add-place-confirm.ts`, 일정상세-세부명세 D24-4).
+ */
 export function placeFilterDefaults(pathname: string): PlaceFilters {
-  return pathname === PLACES_PATH ? PLACES_DEFAULT_FILTERS : DEFAULT_PLACE_FILTERS
+  return pathname === PLACES_PATH || PLAN_ADD_PATH.test(pathname)
+    ? PLACES_DEFAULT_FILTERS
+    : DEFAULT_PLACE_FILTERS
 }
 
 type RawParams = URLSearchParams | Record<string, string | string[] | undefined>

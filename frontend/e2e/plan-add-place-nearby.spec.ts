@@ -68,7 +68,11 @@ test.describe('담기 목록 보기의 거리순 (#1217)', () => {
     await page.goto('/plans')
     const { planId, title } = await createPlanAround(page)
 
-    await page.goto(`/plans/${planId}/days/1/add?view=list`)
+    /*
+      **동반 축을 끈다** — 담기 화면의 기본은 `동반 가능만` 이라(#1383) 기준 장소가 동반 미확인이면
+      목록에 서지 않는다. 이 테스트가 보는 것은 거리순이지 동반 조건이 아니다.
+    */
+    await page.goto(`/plans/${planId}/days/1/add?view=list&petAllowanceType=ALL`)
 
     // 어느 장소에서 잰 거리인지 목록 위 한 줄이 이름으로 말한다 (#1221)
     await expect(

@@ -16,7 +16,11 @@ import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { addPlaceListOrigin } from '@/lib/plan/add-place-focus'
 import { getServerQueryClient } from '@/lib/query/query-client'
-import { parsePlaceFilters, toPlaceFilterQuery } from '@/lib/url/place-filters'
+import {
+  parsePlaceFilters,
+  PLACES_DEFAULT_FILTERS,
+  toPlaceFilterQuery,
+} from '@/lib/url/place-filters'
 import { parseViewMode, PLAN_ADD_DEFAULT_VIEW, viewModeHref } from '@/lib/url/view-mode'
 import type { PlanDetail } from '@/types/plan'
 
@@ -64,7 +68,12 @@ export default async function PlanAddPlacePage({
   if (day < 1) notFound()
 
   const resolved = await searchParams
-  const filters = parsePlaceFilters(resolved)
+  /*
+    **기본은 `동반 가능만` 이다** (#1383 · 일정상세-세부명세 D24-4) — 반려견 일정에 담는 화면이다.
+    필터 컨트롤은 `placeFilterDefaults(pathname)` 로 같은 값을 본다. 어긋나면 칩이 가리키는 조건과
+    페이지가 조회한 조건이 갈린다.
+  */
+  const filters = parsePlaceFilters(resolved, PLACES_DEFAULT_FILTERS)
 
   /*
     **이 화면의 기본 보기도 지도다** (`PLAN_ADD_DEFAULT_VIEW`, #370). 링크를 만드는 쪽과
@@ -73,7 +82,7 @@ export default async function PlanAddPlacePage({
   */
   const view = parseViewMode(resolved, PLAN_ADD_DEFAULT_VIEW)
   const basePath = `/plans/${planId}/days/${rawDay}/add`
-  const filterQuery = toPlaceFilterQuery(filters)
+  const filterQuery = toPlaceFilterQuery(filters, PLACES_DEFAULT_FILTERS)
   const listHref = viewModeHref(basePath, filterQuery, 'list', PLAN_ADD_DEFAULT_VIEW)
   const mapHref = viewModeHref(basePath, filterQuery, 'map', PLAN_ADD_DEFAULT_VIEW)
 
