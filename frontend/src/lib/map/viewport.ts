@@ -216,6 +216,19 @@ export function levelForBoxMeters(box: SpanBox, width: number, height: number): 
 }
 
 /**
+ * 지도 칸 가운데 **위에 떠서 지도를 가리는 몫**(px) — 네 변에서 안쪽으로 잰다.
+ *
+ * `/places` 지도는 모바일에서 아래를 시트(`mid` 45dvh)가, 위를 검색 · 조작 줄이 덮고, 데스크톱에서는
+ * 왼쪽을 도킹 스택(400)이 덮는다(#1379). 그 몫을 빼지 않고 핀을 맞추면 절반이 가린 자리에 선다.
+ */
+export type MapInsets = {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+/**
  * 기준점과 담고 싶은 폭으로 **첫 카메라(중심 + 확대 단계)** 를 만든다.
  *
  * `framedCenterLat` 과 `levelForSpanMeters` 를 한 번에 묶는다 — 두 함수를 호출부가
@@ -227,6 +240,13 @@ export function levelForBoxMeters(box: SpanBox, width: number, height: number): 
  *
  * **사각형(`SpanBox`)은 축마다 맞춘다** (`levelForBoxMeters`) — 담을 것의 모양을 아는
  * 호출부(동선 카드)가 넘긴다.
+ *
+ * **`insets` 를 주면 가리지 않은 칸에 맞춘다** (#1379). 단계는 남은 폭 · 높이로 정하고, 기준점은
+ * 그 칸의 한가운데에 놓는다 — `seaRatio` 는 그때 쓰지 않는다(칸이 기준점 자리를 정한다). 남는 칸이
+ * 너무 좁으면(`MIN_USABLE_PX`) 덮개를 무시한다 — 그 안에 맞추면 최대 축소 가까이로 떨어진다.
+ *
+ * **`level` 을 주면 단계를 정하지 않고 그 단계로 놓는다** — 기준점만 옮기는 조작(`keepLevel`, #873)이
+ * 지금 단계를 넘긴다. 위도 폭 환산에는 단계가 필요해 같은 값으로 잰다.
  */
 export function framedCamera(input: {
   anchor: LatLng
@@ -237,18 +257,119 @@ export function framedCamera(input: {
   spanMeters: number | SpanBox
   width: number
   height: number
-  /** 기준점이 화면 위쪽 몇 할 지점에 올지. 0.5 면 정중앙 */
+  /** 기준점이 화면 위쪽 몇 할 지점에 올지. 0.5 면 정중앙. `insets` 가 있으면 쓰지 않는다 */
   seaRatio: number
+  /** 칸 위에 떠서 지도를 가리는 몫. 주면 남은 칸에 맞춘다 */
+  insets?: MapInsets | null
+  /** 주면 이 단계로 놓는다 — 단계를 다시 정하지 않는다 */
+  level?: number
 }): { lat: number; lng: number; level: number } {
+  const usable = usableFrame(input.width, input.height, input.insets ?? null)
+  const width = usable?.width ?? input.width
+  const height = usable?.height ?? input.height
+
   const level =
-    typeof input.spanMeters === 'number'
-      ? levelForSpanMeters(input.spanMeters, Math.min(input.width, input.height))
-      : levelForBoxMeters(input.spanMeters, input.width, input.height)
+    input.level ??
+    (typeof input.spanMeters === 'number'
+      ? levelForSpanMeters(input.spanMeters, Math.min(width, height))
+      : levelForBoxMeters(input.spanMeters, width, height))
+
+  if (usable === null) {
+    return {
+      lat: framedCenterLat(input.anchor.lat, input.height, level, input.seaRatio),
+      lng: input.anchor.lng,
+      level,
+    }
+  }
+
+  /*
+    기준점이 남은 칸 가운데(`usable.x` · `usable.y`, 칸 위·왼쪽에서 잰 px)에 서야 한다. 세로는
+    `framedCenterLat` 에 그 자리를 비율로 넘기고, 가로는 칸 중심과의 차이만큼 지도 중심을 반대로 민다 —
+    기준점이 오른쪽에 서려면 지도 중심이 기준점보다 서쪽이어야 한다.
+  */
+  const dxMeters = (usable.x - input.width / 2) * metersPerPixel(level)
+  const metersPerLng = METERS_PER_LAT_DEGREE * Math.cos((input.anchor.lat * Math.PI) / 180)
 
   return {
-    lat: framedCenterLat(input.anchor.lat, input.height, level, input.seaRatio),
-    lng: input.anchor.lng,
+    lat: framedCenterLat(input.anchor.lat, input.height, level, usable.y / input.height),
+    lng: input.anchor.lng - dxMeters / metersPerLng,
     level,
+  }
+}
+
+/**
+ * 덮개를 뺀 칸이 이보다 좁으면 덮개를 무시한다(px). 여백(`BOX_PADDING_PX` × 2)을 빼고도 100 은 남아야
+ * 맞출 자리가 된다 — 가로 모드 폰(812×375)은 조작 줄 120 · 시트 169 를 빼면 86 이 남아, 그 안에 맞추면
+ * 제주가 점이 되는 축척(레벨 12~13)으로 열렸다(#1379 검토). 그때는 가려지더라도 칸 전체에 맞추는 편이 낫다.
+ */
+const MIN_USABLE_PX = BOX_PADDING_PX * 2 + 100
+
+/** 덮개를 뺀 칸 — 크기와 그 한가운데(칸 위·왼쪽에서 잰 px). 크기를 모르거나 남는 칸이 너무 좁으면 null */
+function usableFrame(
+  width: number,
+  height: number,
+  insets: MapInsets | null,
+): { width: number; height: number; x: number; y: number } | null {
+  if (insets === null || !(width > 0) || !(height > 0)) return null
+
+  const top = Math.max(0, insets.top)
+  const right = Math.max(0, insets.right)
+  const bottom = Math.max(0, insets.bottom)
+  const left = Math.max(0, insets.left)
+  const usableWidth = width - left - right
+  const usableHeight = height - top - bottom
+  if (usableWidth < MIN_USABLE_PX || usableHeight < MIN_USABLE_PX) return null
+
+  return {
+    width: usableWidth,
+    height: usableHeight,
+    x: left + usableWidth / 2,
+    y: top + usableHeight / 2,
+  }
+}
+
+/**
+ * 여러 점을 담는 **기준점 + 사각형** — `framedCamera` 의 `anchor` · `spanMeters` 로 그대로 넘긴다.
+ *
+ * 동선 카드(`routeCamera`)와 `/places` 첫 결과 맞춤(#1379)이 함께 쓴다. 기준점은 사각형의 한가운데다.
+ *
+ * **두 변 모두에 하한(`minSpanMeters`)을 건다.** 점이 하나거나 같은 자리에 모여 있으면 변이 0 이라,
+ * 그대로 넘기면 SDK 가 최대 배율로 확대해 아무것도 보이지 않는다. 수백 m 떨어진 두 곳이 건물 하나
+ * 크기로 확대되는 것도 같은 문제다.
+ *
+ * 여백은 여기서 곱하지 않는다 — 가장자리에 걸리는 것은 픽셀 크기의 핀이라 `levelForBoxMeters` 가
+ * 픽셀로 뺀다 (#982). 점이 없으면 null.
+ */
+export function pointsCamera(
+  points: readonly LatLng[],
+  minSpanMeters: number,
+): { anchor: LatLng; spanMeters: SpanBox } | null {
+  const first = points[0]
+  if (first === undefined) return null
+
+  let minLat = first.lat
+  let maxLat = first.lat
+  let minLng = first.lng
+  let maxLng = first.lng
+
+  for (const point of points) {
+    minLat = Math.min(minLat, point.lat)
+    maxLat = Math.max(maxLat, point.lat)
+    minLng = Math.min(minLng, point.lng)
+    maxLng = Math.max(maxLng, point.lng)
+  }
+
+  const anchor = { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 }
+  const heightMeters = (maxLat - minLat) * METERS_PER_LAT_DEGREE
+  const widthMeters =
+    (maxLng - minLng) * METERS_PER_LAT_DEGREE * Math.cos((anchor.lat * Math.PI) / 180)
+
+  return {
+    anchor,
+    spanMeters: {
+      widthMeters: Math.max(widthMeters, minSpanMeters),
+      heightMeters: Math.max(heightMeters, minSpanMeters),
+    },
   }
 }
 
