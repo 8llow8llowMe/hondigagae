@@ -76,24 +76,44 @@ for (const size of ['tablet', 'desktop'] as const) {
   })
 }
 
-test.describe('세그먼트 라벨 — 모바일은 지금 그대로다 (#818)', () => {
+test.describe('세그먼트 라벨 — 모바일 (#818 · #1374)', () => {
   /**
-   * **모바일 전폭 균등 분할은 유지한다.** 좁은 폭에서는 칸을 내용 폭으로 두면 세그먼트가
-   * 화면을 다 쓰지 못해 컨트롤로 읽히지 않는다. 라벨이 짧아 잘리지도 않는다 — 390 에서
-   * 정렬 칸은 186px 씩이고 가장 긴 라벨이 67px 다.
+   * **모바일 전폭 균등 분할은 활동량 세그먼트에 남는다.** 좁은 폭에서는 칸을 내용 폭으로 두면
+   * 세그먼트가 화면을 다 쓰지 못해 컨트롤로 읽히지 않는다. 라벨이 짧아 잘리지도 않는다.
    */
-  test('칸이 균등하게 나뉘고 라벨도 잘리지 않는다', async ({ page }) => {
+  test('활동량 칸이 균등하게 나뉘고 라벨도 잘리지 않는다', async ({ page }) => {
     await openList(page, VIEWPORTS.mobile)
 
-    for (const group of GROUPS) {
-      const found = await options(page, group)
-      const widths = found.map((option) => option.width)
-      const spread = Math.max(...widths) - Math.min(...widths)
+    const found = await options(page, messages.walkCourse.activityGroupLabel)
+    const widths = found.map((option) => option.width)
+    const spread = Math.max(...widths) - Math.min(...widths)
 
-      expect(spread, `${group} 칸 폭이 고르지 않다`).toBeLessThanOrEqual(2)
-      for (const option of found) {
-        expect(option.need, `${group} · ${option.text}`).toBeLessThanOrEqual(option.have)
-      }
+    expect(spread, '활동량 칸 폭이 고르지 않다').toBeLessThanOrEqual(2)
+    for (const option of found) {
+      expect(option.need, `활동량 · ${option.text}`).toBeLessThanOrEqual(option.have)
+    }
+  })
+
+  /**
+   * **#1374 부터 모바일 정렬은 결과 줄 오른쪽의 글자 토글이다** — 균등 분할 세그먼트가 아니다.
+   * 칸은 제 글자 폭이고, 잘리지 않아야 하며, 같은 이름의 컨트롤이 **한 폭에 하나만** 보여야 한다
+   * (도구 줄 세그먼트는 `md` 이상 전용이다). `getByRole` 은 `display: none` 을 빼므로 개수 1 이
+   * 곧 "보이는 정렬 하나" 다.
+   */
+  test('정렬은 결과 줄의 글자 토글 하나이고 라벨이 잘리지 않는다', async ({ page }) => {
+    await openList(page, VIEWPORTS.mobile)
+
+    await expect(
+      page.getByRole('radiogroup', { name: messages.walkCourse.sortGroupLabel }),
+    ).toHaveCount(1)
+    const found = await options(page, messages.walkCourse.sortGroupLabel)
+
+    expect(found.map((option) => option.text)).toEqual([
+      messages.walkCourse.sortCourseNo,
+      messages.walkCourse.sortDistanceAsc,
+    ])
+    for (const option of found) {
+      expect(option.need, `정렬 · ${option.text}`).toBeLessThanOrEqual(option.have)
     }
   })
 })
