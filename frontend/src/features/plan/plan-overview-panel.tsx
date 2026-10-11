@@ -244,8 +244,15 @@ function PlanPetCard({ companions, pending }: { companions: PlanCompanions; pend
   }
 
   return (
-    // 카드 안이라 선을 긋지 않는다 — 구획 1 안쪽이고 경계는 아래 구획선이 갖는다 (#447 · #553)
-    <div className="flex flex-col gap-3 pt-1">
+    /*
+      카드 안이라 선을 긋지 않는다 — 구획 1 안쪽이고 경계는 아래 구획선이 갖는다 (#447 · #553).
+
+      **`md` 미만은 한 줄로 흘린다** (#1364). 한 마리당 한 줄(아바타 lg + 이름 + 품종)이라 두
+      마리면 약 125px 이었고, 그만큼 1일차가 첫 화면 밖으로 밀렸다(375 실측 y=605). 좁은 폭은
+      아바타 + 이름만 나란히 두고 품종 · 크기는 `md` 이상에만 둔다 — 한 마리 갈래가 한 줄인 것과
+      같은 무게다.
+    */
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 md:flex-col md:flex-nowrap md:items-stretch md:gap-3">
       {pets.map((pet) => (
         <PlanPetRow key={pet.petId} pet={pet} />
       ))}
@@ -271,7 +278,7 @@ function PlanPetRow({ pet }: { pet: Pet }) {
       <div className="min-w-0">
         <p className="text-body-1 text-fg font-semibold break-keep">{pet.name}</p>
         {traits.length > 0 && (
-          <p className="text-caption text-fg-muted mt-1 line-clamp-1 font-medium">
+          <p className="text-caption text-fg-muted mt-1 line-clamp-1 hidden font-medium md:block">
             {traits.join(' · ')}
           </p>
         )}
@@ -299,6 +306,22 @@ function PlanPetRow({ pet }: { pet: Pet }) {
  * 목차 줄 수다. 같은 파일의 `PLAN_VERDICT_TOC_TITLE_ID` 와 접두어가 맞는다.
  */
 export const PLAN_VERDICT_TOC_MAX_DAYS = 7
+
+/**
+ * 목차 목록의 틀 — **`md` 미만은 칩 줄, 이상은 세로 목록이다** (#1364).
+ *
+ * 세로 목록(줄당 44px)이 모바일 개요 카드를 키워 1일차를 첫 화면 밖으로 밀었다(375 실측
+ * y=605, 3일 일정 목차만 약 150px). 바로 아래 일자 카드가 같은 판정을 다시 말하므로, 좁은 폭의
+ * 목차는 **한눈에 보는 요약 + 건너뛰기**만 하면 된다 — 칩이 그 둘을 다 한다.
+ *
+ * **#841 이 가로 줄을 세로로 되돌린 근거 셋은 지금 모두 해소돼 있다.** ① `D-N` 과 같은 줄이라
+ * 생기던 고아 행 — `D-N` 은 구획 2 머리로 갔다. ② 앵커 신호가 없음 — 칩마다 `›` 가 선다.
+ * ③ 배지마다 축 라벨 — 섹션 머리 하나가 갖는다(#841). 데스크톱은 레일 안 세로 목록 그대로다.
+ *
+ * 골격(대기)도 같은 틀이라 판정이 와도 구획 높이가 튀지 않는다.
+ */
+const TOC_LIST_CLASS =
+  'flex flex-wrap gap-2 md:flex-col md:flex-nowrap md:gap-0 md:[&>li+li]:border-t md:[&>li+li]:border-border'
 
 /**
  * 꼬리의 연속 `정보 없음` 을 뗀 목록 (#847).
@@ -376,11 +399,15 @@ function PlanVerdictToc({
         <p className="text-caption text-fg-muted mb-1 font-medium">
           {messages.plan.verdictTocTitle}
         </p>
-        <ul aria-hidden className="[&>li+li]:border-border flex flex-col [&>li+li]:border-t">
+        {/* 실화면 목록과 같은 틀 — `md` 미만 칩 줄 · 이상 세로 목록 (#1364, 아래 `TOC_LIST_CLASS`) */}
+        <ul aria-hidden className={TOC_LIST_CLASS}>
           {Array.from({ length: pendingRows }, (_, index) => (
-            <li key={index} className="flex min-h-11 items-center gap-2">
+            <li
+              key={index}
+              className="border-border flex min-h-11 items-center gap-2 rounded-full border px-3 md:rounded-none md:border-0 md:px-0"
+            >
               <Skeleton className="h-4 w-12" />
-              <Skeleton className="ml-auto h-6 w-12 rounded-full" />
+              <Skeleton className="h-6 w-12 rounded-full md:ml-auto" />
             </li>
           ))}
         </ul>
@@ -418,8 +445,8 @@ function PlanVerdictToc({
         {messages.plan.verdictTocTitle}
       </p>
 
-      {/* 줄 사이 선은 저장소 공통 패턴이다 — `ul` 이 갖고 첫 줄은 받지 않는다 */}
-      <ul className="[&>li+li]:border-border flex flex-col [&>li+li]:border-t">
+      {/* 줄 사이 선은 저장소 공통 패턴이다 — `ul` 이 갖고 첫 줄은 받지 않는다 (`md` 이상 세로 목록만) */}
+      <ul className={TOC_LIST_CLASS}>
         {shown.map((verdict) => (
           <li key={verdict.day}>
             {/*
@@ -436,15 +463,19 @@ function PlanVerdictToc({
               선 폭이 두 가지**가 된다. 홈의 `hover:bg-band` 행(`home-view.tsx`)이 카드
               끝까지 펴는 것은 그 목록이 카드의 본문 전체라 비교 대상이 없기 때문이다.
             */}
+            {/*
+              **`md` 미만은 칩이다** (#1364) — 테두리 알약 · 좌우 12. 세로 목록의 `-mx-2` 는
+              칩에서는 이웃 칩과 겹치므로 `md` 이상에만 준다. 높이 44 · `›` · 앵커는 같다.
+            */}
             <a
               href={`#${planDayAnchorId(verdict.day)}`}
-              className="focus-visible:ring-brand-500 hover:bg-band -mx-2 flex min-h-11 items-center gap-2 rounded-md px-2 focus-visible:ring-2 focus-visible:outline-none"
+              className="focus-visible:ring-brand-500 hover:bg-band border-border flex min-h-11 items-center gap-2 rounded-full border px-3 focus-visible:ring-2 focus-visible:outline-none md:-mx-2 md:rounded-md md:border-0 md:px-2"
             >
               <span className="text-body-2 text-fg font-medium tabular-nums">
                 {messages.plan.dayLabel.replace('{day}', String(verdict.day))}
               </span>
 
-              <span className="ml-auto">
+              <span className="md:ml-auto">
                 {/*
                   **축 이름을 `sr-only` 로 되살린다** (#848). 보이는 화면에서는 섹션
                   머리(`일자별 적합도`)가 축을 말하지만, 그 머리는 `nav aria-labelledby` 로만

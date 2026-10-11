@@ -550,6 +550,29 @@ describe('PlanOverviewPanel', () => {
     expect(markup).toContain('리트리버')
   })
 
+  /*
+    #1364 — 한 마리당 한 줄이라 두 마리면 약 125px 이었고 1일차가 첫 화면 밖으로 밀렸다(375 y=605).
+    `md` 미만은 아바타 + 이름을 한 줄로 흘리고 품종 · 크기는 `md` 이상에만 둔다. 범위는 품종을 감싼
+    여는 태그 · 두 행을 감싼 여는 태그로 좁힌다.
+  */
+  it('동행 두 마리는 md 미만에서 한 줄로 흐르고 품종은 md 이상에만 선다', () => {
+    const markup = renderOverview({
+      companions: { kind: 'listed', pets: [pet, secondPet], deletedCount: 0 },
+    })
+    const traitTag = markup.slice(
+      markup.lastIndexOf('<p', markup.indexOf('리트리버')),
+      markup.indexOf('>', markup.lastIndexOf('<p', markup.indexOf('리트리버'))) + 1,
+    )
+    // 이름 `<p>` → 이름 칸 `div` → 행 `div` → 두 행을 감싼 `div` 순으로 세 칸 올라간다
+    let wrapper = markup.indexOf('몽실이</p>')
+    for (let level = 0; level < 3; level += 1) wrapper = markup.lastIndexOf('<div', wrapper - 1)
+    const wrapperTag = markup.slice(wrapper, markup.indexOf('>', wrapper) + 1)
+
+    expect(traitTag).toMatch(/class="[^"]*\bhidden\b[^"]*\bmd:block\b/)
+    expect(wrapperTag).toContain('flex-wrap')
+    expect(wrapperTag).toContain('md:flex-col')
+  })
+
   it('반려견 조회가 실패하면 동행 반려견이 없다고 단정하지 않는다 (#1042)', () => {
     expect(renderOverview({ companions: { kind: 'unknown' } })).not.toContain(
       messages.plan.companionNone,
@@ -1196,5 +1219,47 @@ describe('일자별 적합도 목차 — 판정 대기 골격', () => {
     const markup = renderOverview({ verdicts: [], verdictsPending: false })
 
     expect(markup).not.toContain(messages.plan.verdictTocTitle)
+  })
+})
+
+/*
+  #1364 — 일자별 적합도 목차는 `md` 미만에서 칩 줄이다. 세로 목록(줄당 44px)이 모바일 개요 카드를
+  키워 1일차를 첫 화면 밖으로 밀었다. #841 이 가로를 되돌린 근거(고아 행 · 앵커 신호 · 축 라벨)는
+  모두 해소돼 있다 — 칩마다 `›` 가 서고 높이 44 를 지킨다.
+*/
+describe('PlanOverviewPanel — 목차는 md 미만에서 칩이다 (#1364)', () => {
+  it('목록이 md 미만은 줄바꿈 칩 줄, md 이상은 세로 목록이다', () => {
+    const markup = renderOverview({ verdicts: verdictsOf(3) })
+    const nav = markup.indexOf('aria-labelledby="plan-verdict-toc-title"')
+    const ulAt = markup.indexOf('<ul', nav)
+    const ul = markup.slice(ulAt, markup.indexOf('>', ulAt) + 1)
+
+    expect(ul).toContain('flex-wrap')
+    expect(ul).toContain('md:flex-col')
+    // 줄 사이 선은 세로 목록에만 — 칩 사이에 선을 긋지 않는다
+    expect(ul).toContain('md:[&amp;&gt;li+li]:border-t')
+    expect(ul).not.toMatch(/(?<![\w:])\[&amp;&gt;li\+li\]:border-t/)
+  })
+
+  it('모든 앵커가 md 미만에서 테두리 알약이고 md 이상에서 세로 줄로 돌아간다', () => {
+    const anchors = tocAnchors(renderOverview({ verdicts: verdictsOf(3) }))
+
+    expect(anchors).toHaveLength(3)
+    for (const anchor of anchors) {
+      expect(anchor).toMatch(/\brounded-full\b/)
+      expect(anchor).toMatch(/(?<![\w:-])border(?![\w-])/)
+      expect(anchor).toContain('md:border-0')
+      expect(anchor).toContain('md:-mx-2')
+      expect(anchor).toContain('min-h-11')
+    }
+  })
+
+  it('대기 골격도 같은 틀이다 — 판정이 와도 구획이 튀지 않는다', () => {
+    const markup = renderOverview({ verdicts: [], verdictsPending: true })
+    const ulAt = markup.indexOf('<ul aria-hidden')
+    const ul = markup.slice(ulAt, markup.indexOf('>', ulAt) + 1)
+
+    expect(ul).toContain('flex-wrap')
+    expect(ul).toContain('md:flex-col')
   })
 })
