@@ -90,6 +90,24 @@ export function pickTopPlaces<T>(places: T[], limit: number): T[] {
   return places.slice(0, limit)
 }
 
+/**
+ * 뽑은 N장을 **점수 높은 순**으로 세운다 (#1356, 홈-세부명세 D8-1).
+ *
+ * 응답은 조회 순서(= 목록 앞 N개의 순서)로 도착해서, `오늘 갈 만한 곳` 첫 카드가 40점
+ * `주의 필요` 이고 60점이 그 뒤에 서는 날이 있었다 — 첫 카드는 "가장 권하는 곳" 으로 읽힌다.
+ * **전체 정렬이 아니다** — N장 안에서만 세우므로 제목은 여전히 `적합도 순` 이라고 말하지 않는다.
+ *
+ * 같은 점수는 들어온 순서를 지킨다(안정 정렬). `null` 은 0점이 아니라 "점수 없음" 이라
+ * 맨 뒤로 보낸다 — 홈은 점수 없는 장소를 카드로 세우지 않지만 함수가 그것을 전제하지 않는다.
+ */
+export function orderByScore<T extends { score: number | null }>(items: readonly T[]): T[] {
+  return [...items].sort((a, b) => {
+    if (a.score === null) return b.score === null ? 0 : 1
+    if (b.score === null) return -1
+    return b.score - a.score
+  })
+}
+
 /** 목록 캡션이 말할 수 있는 축의 조합 — `messages.home.sortNote` 의 키다 */
 export type AppliedFactors = 'weatherCongestion' | 'weather' | 'congestion' | 'none'
 

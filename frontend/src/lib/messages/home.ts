@@ -72,6 +72,11 @@ export const homeMessages = {
   // ── 오늘의 산책 골든타임 (#158) ────────────────────────────────────────────
   goldenHeading: '오늘 산책하기 좋은 시간',
   /**
+   * 모바일 홈에서 접어 둔 시간대별 곡선을 여는 버튼 (#1356). 상태는 `aria-expanded` 가 말하므로
+   * 열림 · 닫힘에 따라 문구를 바꾸지 않는다.
+   */
+  goldenCurveToggle: '시간대별 기온 · 노면 보기',
+  /**
    * 무엇을 기준으로 잰 곡선인지 밝힌다 (#180).
    *
    * **위치를 못 얻었을 때 그 사실을 감추지 않는다.** 다만 거부·타임아웃·미지원을 구분해
@@ -340,6 +345,8 @@ export const homeMessages = {
    * **`goldenCurve*` 를 재사용하지 않는다** — 같은 홈에 레일이 둘이고, 스크린리더는
    * 두 버튼을 같은 이름으로 읽어 어느 줄을 미는지 구분할 수 없다.
    */
+  /** 전 권역 동점인 날 모바일에서 접어 둔 칸 레일을 여는 버튼 (#1356) */
+  regionRailToggle: '권역별 점수 보기',
   regionRailPrev: '이전 권역 보기',
   regionRailNext: '다음 권역 보기',
   /**
@@ -438,11 +445,18 @@ export const homeMessages = {
   tripBannerSoonTitle: 'D-{days} · {title}',
   tripBannerSoonDescription: '{date} 출발',
   /**
-   * AI 일정 생성 배너 (#905 R1). 모바일 탭에 AI 항목이 없어 홈이 그 진입점을 맡는다.
-   * **무엇을 넣으면 무엇이 나오는지**를 말한다 — 입력(반려견·기간)과 결과(하루 단위 초안).
+   * 홈 바로가기 줄의 이름 (#1356). 예전에는 AI 일정 · 제주올레 · 동물병원 배너 세 장이 전폭
+   * 카드로 쌓여 375 에서 약 250px 을 썼다 — 지금은 한 줄 세 칸이다 (`home-shortcuts.tsx`).
    */
-  aiPlanBannerTitle: 'AI로 일정 짜기',
-  aiPlanBannerDescription: '반려견과 기간만 정하면 하루 단위 초안을 만들어 드려요',
+  shortcutsLabel: '바로가기',
+  /**
+   * AI 일정 생성 칸 (#905 R1 · #1356). 모바일 탭에 AI 항목이 없어 홈이 그 진입점을 맡는다.
+   * **무엇을 넣으면 무엇이 나오는지**를 말한다 — 입력(기간)과 결과(초안).
+   *
+   * 키 이름의 `Banner` 는 배너 시절의 것이다. 칸 폭(375 에서 약 110px)에 맞춰 두 줄 다 짧다.
+   */
+  aiPlanBannerTitle: 'AI 일정 짜기',
+  aiPlanBannerDescription: '기간만 정하면 초안',
   /**
    * 비로그인 첫 방문자의 서비스 소개 카드 (#950). **무엇이 있는지만** 말한다 — 소개 페이지가
    * 답하는 두 질문(무엇을 보고 알려 주나 · 데이터가 어디서 오나)이다. 마케팅 톤(§1)을 열지 않는다.
@@ -450,7 +464,8 @@ export const homeMessages = {
   aboutIntroTitle: '혼디가개가 처음이라면',
   aboutIntroDescription: '무엇을 보고 알려 주는지와 데이터 출처를 모았어요',
   aboutIntroDismiss: '서비스 소개 안내 닫기',
-  emergencyTitle: '주변 동물병원 찾기',
+  /** 바로가기 칸 이름 (#1356) — 설명줄은 아래 `emergency*` 가 상태에 따라 고른다 */
+  emergencyTitle: '동물병원',
   /**
    * **개수를 단정하지 않는다** (#206).
    *
@@ -459,38 +474,44 @@ export const homeMessages = {
    * 어긋나는 순간 **홈이 "3곳" 이라고 말하고 목록은 "반경 안에 없어요" 라고 말한다** —
    * dev 에서 실제로 그랬다.
    *
-   * 이 배너가 전할 것은 "적으니 미리 확인해 두라" 는 **동기**이고, 그것은 수를 세지
-   * 않고도 말할 수 있다. 정확한 수는 다음 화면이 센다.
+   * 이 진입점(#1356 부터 바로가기 병원 칸)이 전할 것은 "미리 확인해 두라" 는 **동기**이고,
+   * 그것은 수를 세지 않고도 말할 수 있다. 정확한 수는 다음 화면이 센다.
    */
-  emergencyDesc: '24시간 진료가 확인된 곳은 많지 않아요',
+  emergencyDesc: '미리 찾아 두기',
   /**
-   * 실제 시설을 찾았을 때의 배너 설명. `{name}` · `{distance}` 치환.
+   * 실제 시설을 찾았을 때의 칸 설명. `{distance}` 치환.
+   *
+   * **시설 이름을 싣지 않는다** (#1356). 배너 시절에는 `24시간 · 제주24시동물병원 480m` 였는데
+   * 바로가기 칸 폭(약 110px)에 이름이 들어가지 않는다 — 이름은 눌러 들어간 화면이 말한다.
    *
    * **위 `emergencyDesc` 의 규칙을 어기는 것이 아니다.** #206 이 금지한 것은 FE 가
    * **수를 적어 두는 것**이었다 — 홈이 "3곳" 이라고 박아 두고 목록은 `/emergencies/facilities`
    * 를 부르니 둘이 어긋났다. 이 문구들은 **그 목록과 같은 API 의 응답**을 그대로 말하므로
    * 어긋날 자리가 없다. 개수도 세지 않는다 (`pickNearestHospital` 머리주석).
    *
-   * 좌표를 못 얻었거나 조회 전·실패면 `emergencyDesc` 로 남는다 — 배너는 어떤 상태에서도
-   * 사라지지 않는다 (`components/banner.tsx`).
+   * 좌표를 못 얻었거나 조회 전·실패면 `emergencyDesc` 로 남는다 — 칸은 어떤 상태에서도
+   * 사라지지 않는다 (`home-shortcuts.tsx`).
    */
-  emergencyNearest24h: '24시간 · {name} {distance}',
+  emergencyNearest24h: '24시간 · {distance}',
   /** 24시간은 없고 지금 문이 열린 곳은 있을 때 */
-  emergencyNearestOpen: '지금 진료중 · {name} {distance}',
+  emergencyNearestOpen: '진료중 · {distance}',
   /**
    * 열림 여부를 말하지 않는 갈래. **`openNow === null` 이 여기로 온다** — null 은 "닫힘"
-   * 이 아니라 "영업시간 정보가 없어 판정할 수 없음" 이라, 배너가 열림/닫힘을 단정하지 않고
+   * 이 아니라 "영업시간 정보가 없어 판정할 수 없음" 이라, 칸이 열림/닫힘을 단정하지 않고
    * 위치만 말한다 (`types/emergency.ts` `openNow`).
    */
-  emergencyNearest: '가장 가까운 곳 · {name} {distance}',
+  emergencyNearest: '가까운 곳 {distance}',
   /**
-   * 실내 대안의 거리 (`AlternativePlaceItem.distanceMeters`). `{distance}` 치환.
+   * 실내 대안의 거리 (`AlternativePlaceItem.distanceMeters`). `{place}` · `{distance}` 치환.
+   *
+   * **`{place}` 는 거리를 잰 기준 장소다** (#1356, `IndoorAlternative.nearPlaceTitle`). 홈은 여러
+   * 장소의 대안을 한 목록으로 접어서 `직선 3km` 만으로는 어디서 3km 인지 알 수 없었다.
    *
    * **`직선` 을 반드시 붙인다.** 서버가 하버사인으로 재므로 직선거리이고, 제주는 산간·
    * 해안도로가 많아 주행거리와 크게 다르다 — 일정 상세의 `plan.distanceStraight` 와 같은
    * 이유이고 같은 표기다.
    */
-  indoorDistance: '직선 {distance}',
+  indoorDistance: '{place}에서 직선 {distance}',
   /**
    * 실내 대안 섹션의 기준을 밝힌다.
    *

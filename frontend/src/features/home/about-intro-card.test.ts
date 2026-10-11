@@ -43,7 +43,7 @@ describe('AboutIntroCard', () => {
     expect(tag).toMatch(/\bsize-11\b/)
   })
 
-  /* 홈에서 개는 올레 배너 한 마리다 (DESIGN.md §0-5) */
+  /* 홈은 데이터 화면이라 개가 서지 않는다 (DESIGN.md §0-5) */
   it('캐릭터를 세우지 않는다', () => {
     expect(markup).not.toContain('data-character')
   })
@@ -76,14 +76,21 @@ describe('AboutIntroCard', () => {
   })
 
   /*
-    누른 버튼이 사라지면 초점이 body 로 떨어진다 — 이 사본의 다음 카드로 넘긴다. 두 자리 모두
-    다음 형제가 곧 다음 카드다: 좌(1024 미만) → AI 배너, 우(1024 이상) → `오늘 갈 만한 곳`.
+    누른 버튼이 사라지면 초점이 body 로 떨어진다 — 다음 카드(`오늘 갈 만한 곳`)로 넘긴다.
   */
   it('닫으면 초점을 다음 카드로 넘긴다', () => {
     const handler = dismissHandler()
 
-    expect(handler).toContain("?.nextElementSibling?.querySelector<HTMLElement>('a, button')")
+    expect(handler).toContain("?.nextElementSibling?.querySelectorAll<HTMLElement>('a, button')")
     expect(handler).toMatch(/onDismiss\(\)\s*next\?\.focus\(\)/)
+  })
+
+  /*
+    #1356 — 다음 카드 머리에 폭마다 하나만 보이는 링크 둘이 있다. DOM 첫 요소를 집으면 768 이상에서
+    숨은 모바일 링크에 `focus()` 를 걸어 초점이 사라진다. 보이는 첫 요소를 고른다.
+  */
+  it('숨은 컨트롤을 건너뛰고 보이는 첫 컨트롤에 초점을 준다', () => {
+    expect(dismissHandler()).toMatch(/\.find\(\(el\) => el\.getClientRects\(\)\.length > 0\)/)
   })
 
   /* 자리는 부르는 쪽이 정한다 — 받은 표시 클래스를 자기 `Surface` 에 그대로 붙인다 */

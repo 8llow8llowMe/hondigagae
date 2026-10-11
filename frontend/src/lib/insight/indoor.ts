@@ -1,6 +1,17 @@
 import type { AlternativePlaceItem, PlaceSuitabilityResponse } from '@/types/insight'
 
 /**
+ * 홈이 세우는 실내 대안 한 줄 — 서버 항목에 **거리를 잰 기준 장소의 이름**을 붙였다 (#1356).
+ *
+ * 홈은 장소 여러 곳의 대안을 하나로 접으므로 `직선 3km` 만 두면 어디서 3km 인지 알 수 없다.
+ * 섹션 캡션(`위 목록의 장소에서`)이 범위는 말하지만 줄마다 어느 장소인지는 말하지 못했다.
+ */
+export type IndoorAlternative = AlternativePlaceItem & {
+  /** `distanceMeters` 를 잰 기준 — 그 대안을 실어 온 적합도 응답의 `placeTitle` */
+  nearPlaceTitle: string
+}
+
+/**
  * 비 예보일 때 홈이 제안할 실내 대안 (홈-세부명세 D1 · D5-1 §13).
  *
  * **추가 호출이 없다.** `indoorAlternatives` 는 홈이 이미 부르는
@@ -15,15 +26,16 @@ import type { AlternativePlaceItem, PlaceSuitabilityResponse } from '@/types/ins
  *
  * 거리는 **기준 장소로부터의 직선거리**다 (`AlternativePlaceItem`). 응답마다 기준이
  * 다르므로 겹치는 대안은 **가장 가까운 값**을 남긴다 — 더 먼 기준의 값을 남기면 화면이
- * 실제보다 멀다고 말한다.
+ * 실제보다 멀다고 말한다. **기준 장소 이름도 그 값을 실어 온 응답의 것을 남긴다** — 거리와
+ * 이름이 다른 응답에서 오면 `A 에서 900m` 가 실제로는 B 에서 잰 값이 된다.
  */
 export function collectIndoorAlternatives(
   suitabilities: PlaceSuitabilityResponse[],
   excludePlaceIds: Iterable<string>,
   limit: number,
-): AlternativePlaceItem[] {
+): IndoorAlternative[] {
   const excluded = new Set(excludePlaceIds)
-  const byPlaceId = new Map<string, AlternativePlaceItem>()
+  const byPlaceId = new Map<string, IndoorAlternative>()
 
   for (const suitability of suitabilities) {
     for (const alternative of suitability.indoorAlternatives) {
@@ -31,7 +43,10 @@ export function collectIndoorAlternatives(
 
       const kept = byPlaceId.get(alternative.placeId)
       if (kept === undefined || alternative.distanceMeters < kept.distanceMeters) {
-        byPlaceId.set(alternative.placeId, alternative)
+        byPlaceId.set(alternative.placeId, {
+          ...alternative,
+          nearPlaceTitle: suitability.placeTitle,
+        })
       }
     }
   }

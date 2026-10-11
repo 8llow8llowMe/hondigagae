@@ -14,7 +14,12 @@ function withAlternatives(
   placeId: string,
   alternatives: AlternativePlaceItem[],
 ): PlaceSuitabilityResponse {
-  return { ...suitability, placeId, indoorAlternatives: alternatives }
+  return {
+    ...suitability,
+    placeId,
+    placeTitle: `장소 ${placeId}`,
+    indoorAlternatives: alternatives,
+  }
 }
 
 describe('collectIndoorAlternatives', () => {
@@ -48,6 +53,31 @@ describe('collectIndoorAlternatives', () => {
     )
 
     expect(collected[0]?.distanceMeters).toBe(900)
+  })
+
+  /* #1356 — `직선 3km` 만으로는 어디서 3km 인지 모른다 */
+  it('거리를 잰 기준 장소의 이름을 붙인다', () => {
+    const collected = collectIndoorAlternatives(
+      [withAlternatives('a', [alternative({ placeId: 'x' })])],
+      [],
+      3,
+    )
+
+    expect(collected[0]?.nearPlaceTitle).toBe('장소 a')
+  })
+
+  /* 거리는 b 에서 쟀는데 이름이 a 면 `장소 a 에서 900m` 라는 거짓이 된다 */
+  it('기준 장소 이름은 남긴 거리와 같은 응답에서 온다', () => {
+    const collected = collectIndoorAlternatives(
+      [
+        withAlternatives('a', [alternative({ placeId: 'x', distanceMeters: 3000 })]),
+        withAlternatives('b', [alternative({ placeId: 'x', distanceMeters: 900 })]),
+      ],
+      [],
+      3,
+    )
+
+    expect(collected[0]).toMatchObject({ distanceMeters: 900, nearPlaceTitle: '장소 b' })
   })
 
   it('가까운 순으로 정렬한다', () => {

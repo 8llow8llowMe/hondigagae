@@ -1,7 +1,9 @@
 'use client'
 
+import { useId, useState } from 'react'
+
 import { Badge } from '@/components/badge'
-import { UmbrellaIcon } from '@/components/icons'
+import { ChevronDownIcon, UmbrellaIcon } from '@/components/icons'
 import { InfoTip } from '@/components/info-tip'
 import { METRIC_FILL_TONE, MetricBadge, MetricValue } from '@/components/metric'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
@@ -55,12 +57,25 @@ export function RegionalWeatherSection({
 }) {
   // 훅은 early return 보다 위다 — 섹션이 뜨는 날과 숨는 날의 훅 순서가 달라지면 안 된다
   const rail = useScrollRail<HTMLUListElement>()
+  const [railOpen, setRailOpen] = useState(false)
+  const railId = useId()
 
   // 조회 실패는 섹션을 통째로 숨긴다 — 홈의 최소 골격에 이 섹션은 없다 (공통명세 S4-1)
   if (data === null) return loading ? <RegionalWeatherSkeleton /> : null
 
   // 헤드라인이 `가장 나아요` 라고 말하는 날의 그 권역만 칸에 `추천` 을 단다 (#1068)
   const recommendedCode = soleRecommendedCode(data.regions, data.recommendedRegion)
+  /*
+    **전 권역이 같은 점수인 날은 모바일에서 칸 레일을 접는다** (#1356). 머리 문장이 이미
+    `오늘은 어느 권역이든 좋아요` 라고 말하고, 칸은 같은 숫자를 늘어놓을 뿐이라 375 에서
+    약 150px 이 비교할 것 없는 표가 된다. **견줄 거리가 있는 날은 접지 않는다** — 권역은
+    서로 견주라고 있는 표다(D1 · #530). `md` 이상은 언제나 펼쳐 둔다.
+  */
+  const tiedTop =
+    data.recommendedRegion === null ? null : findTiedTop(data.regions, data.recommendedRegion)
+  // `headline` 의 `regionTiedAll` 갈래와 같은 판정이다 — 점수 있는 권역이 하나뿐이면 `isAll` 이어도
+  // 머리 문장은 `○○이 가장 나아요` 이고, 칸은 나머지가 왜 비었는지(예보 없음)를 보여 준다
+  const railCollapsible = tiedTop !== null && tiedTop.regions.length >= 2 && tiedTop.isAll
 
   return (
     /*
@@ -151,7 +166,31 @@ export function RegionalWeatherSection({
         채우려면 칸이 155px 이하여야 하는데(`(793−16)/5`), 그 폭으로는 접힘을 못 막는다 —
         두 조건은 동시에 만족할 수 없다.
       */}
-      <div className={cn('scroll-rail border-border border-t py-3 md:py-4', INSET_CLASS.card)}>
+      {railCollapsible && (
+        <div className={cn('border-border border-t md:hidden', INSET_CLASS.card)}>
+          <button
+            type="button"
+            aria-expanded={railOpen}
+            aria-controls={railId}
+            onClick={() => setRailOpen((prev) => !prev)}
+            className="text-body-2 text-link focus-visible:ring-brand-500 inline-flex min-h-11 items-center gap-1 font-semibold focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {messages.home.regionRailToggle}
+            <ChevronDownIcon
+              size={20}
+              className={cn('shrink-0 transition-transform', railOpen && 'rotate-180')}
+            />
+          </button>
+        </div>
+      )}
+      <div
+        id={railId}
+        className={cn(
+          'scroll-rail border-border border-t py-3 md:py-4',
+          railCollapsible && !railOpen && 'hidden md:block',
+          INSET_CLASS.card,
+        )}
+      >
         <ul
           ref={rail.ref}
           onScroll={rail.onScroll}
