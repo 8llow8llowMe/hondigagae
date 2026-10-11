@@ -14,7 +14,7 @@
 | `petRestaurantImportJob` | 식약처 반려동물 동반출입 음식점 (xlsx) | 주 1회 | 좌표는 VWorld 지오코딩으로 채운다 |
 | `placeMergeJob` | (DB) | 적재 뒤 1회 | 원천이 다른 같은 장소를 `merged_into_id` 로 묶는다 (#363). 이어서 동반 가능 여부 재계산 스텝을 돈다 (#886) |
 | `placeImageBackfillJob` | TourAPI 키워드 검색 | 적재 뒤 1회 | 이미지 없는 문화정보원·식약처 장소에 대표 이미지를 빌려 채운다 |
-| `petTourImportJob` | 반려동물 동반여행 API (KorPetTourService2) | 파이프라인 마지막 | TourAPI 장소에 동반 조건(`place_pet_info`)을 붙인다 (#877). 동기화 목록 1콜로 대상을 좁히고 교집합에만 상세를 부른다. 쿼터는 KorService2 와 따로다. 적재 뒤 재계산 스텝 `placePetAllowanceReflectStep` 이 TourAPI 노출 행의 `pet_allowance_type` · `allowed_pet_size` 를 `place_pet_info` 와 흡수 행에서 다시 계산한다 (#886, 가장 제한적인 값) |
+| `petTourImportJob` | 반려동물 동반여행 API (KorPetTourService2) | 파이프라인 마지막 | TourAPI 장소에 동반 조건(`place_pet_info`)을 붙인다 (#877). 동기화 목록 1콜로 대상을 좁히고 교집합에만 상세를 부른다. 쿼터는 KorService2 와 따로다. 적재 뒤 재계산 스텝 `placePetAllowanceReflectStep` 이 TourAPI 노출 행의 `pet_allowance_type` · `allowed_pet_size` 를 `place_pet_info` 와 흡수 행에서 다시 계산한다 (#886, 가장 제한적인 값). 하위 시설은 본 시설의 제한도 받는다 (#1340) |
 | `congestionImportJob` | 관광지 집중률 방문자 추이 예측 API | 일 1회 | 30일 rolling. **주기가 달라 파이프라인에 넣지 않는다** |
 | `olleCourseImportJob` | 제주올레 공공 CSV + TourAPI 좌표 | 주 1회 + 수동 | 산책 코스 마스터 (#383). 포털에서 내려받고 갱신됐을 때만 적재 (#441). 장소 파이프라인과 별개다 |
 
@@ -114,6 +114,7 @@
 - **TourAPI 장소의 `pet_allowance_type` · `allowed_pet_size` 는 재계산 스텝 하나가 소유한다**(#886).
   `placePetAllowanceReflectStep` 한 정의를 `petTourImportJob`(적재 뒤)과 `placeMergeJob`(병합 뒤)이 마지막 단계로 붙인다.
   근거는 `place_pet_info` 와 병합으로 흡수된 행이고, 가장 제한적인 값을 쓴다(규칙 정본 `PetAllowancePolicy`).
+  하위 시설(본 시설 이름 + 괄호 수식어, 100m 안)은 본 시설 결과 중 제한만 더 받는다(#1340, 판정 `PlaceIdentityPolicy.isSubFacilityOf`).
   매 실행 처음부터 다시 계산하므로 근거가 사라지면 값도 돌아간다. 적재 · 병합 SQL 은 두 칸을 쓰지 않는다
   (`JdbcPlaceBulkAdapterSqlTest`). 운영 확인은 `data-refresh-guide.md` §10.
 - **`placeDataPipelineJob` 은 자식이 실패해도 다음 단계로 계속 가고, 실패한 자식이 있으면 부모를

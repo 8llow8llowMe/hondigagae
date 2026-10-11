@@ -184,6 +184,11 @@ idx_place_indoor_pet_available (indoor, petAvailable) ← 실내 대안 추천�
   문화정보원이 "동반 불가" 로 확인한 29곳이 TourAPI 로 흡수되며 UNKNOWN 이 됐다(2026-09-28 dev). 이제 병합 뒤에 도는
   재계산 스텝(#886)이 **흡수된 행을 근거로** 살아남은 행의 두 칸을 다시 계산한다 — `place_pet_info` 와 함께 보고
   가장 제한적인 값을 쓴다(`data-refresh-guide.md` §10).
+- **흡수 행의 제한은 survivor 하나에만 닿는다 — 같은 곳의 하위 시설 행은 재계산이 따로 챙긴다** (#1340). 문화정보원 행은
+  TourAPI 행 하나에만 흡수되므로 `생각하는 정원`(125445)이 받은 "야외만" 이 28m 옆 `생각하는 정원[면세점(TAX REFUND SHOP)]`
+  (4054291)에는 닿지 않았다. 하위 시설은 병합하지 않는다 — 실제로 다른 곳(매장 · 카페)이라 목록에 남아야 한다. 대신 재계산이
+  본 시설 이름 + 괄호 · 대괄호 수식어 · 100m 안(`PlaceIdentityPolicy.isSubFacilityOf`, `SUB_FACILITY_RADIUS_M`)인 행에 본 시설의
+  **제한**(PARTIALLY_ALLOWED · NOT_ALLOWED)만 물려준다. 크기 제한 · 제한 문구는 물려주지 않는다. 규칙과 한계는 `data-refresh-guide.md` §10.
 - 판정 상수(병합 1,000m·300m·100m, 이미지 백필 500m)의 정본은 `PlaceIdentityPolicy` 한곳이다(#363) —
   값을 조정할 때 병합과 백필 중 한쪽만 바뀌는 어긋남을 막는다.
 - 이미지 백필은 완전일치만 받는다. 틀린 사진이 장소에 붙으면 사용자가 곧바로 오해하기 때문이다.
