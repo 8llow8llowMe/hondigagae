@@ -10,7 +10,9 @@ import com.hondigagae.domainlayer.insight.application.port.out.CongestionForecas
 import com.hondigagae.domainlayer.insight.domain.enums.CongestionLevel;
 import com.hondigagae.domainlayer.insight.domain.model.CongestionSnapshot;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -91,6 +93,11 @@ class PlaceCongestionProcessorTest {
             @Override
             public List<CongestionSnapshot> findByPlaceAndDateRange(long placeId, LocalDate from, LocalDate to) {
                 return snapshots;
+            }
+
+            @Override
+            public Map<Long, CongestionSnapshot> findByPlacesAndDate(Collection<Long> placeIds, LocalDate date) {
+                throw new UnsupportedOperationException("이 테스트에서는 쓰지 않는다");
             }
         };
     }

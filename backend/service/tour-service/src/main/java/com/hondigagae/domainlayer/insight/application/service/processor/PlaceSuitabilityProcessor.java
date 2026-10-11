@@ -14,6 +14,7 @@ import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.model.WeatherWarning;
 import com.hondigagae.domainlayer.insight.domain.model.CongestionSnapshot;
 import com.hondigagae.domainlayer.insight.domain.model.DailyWeather;
+import com.hondigagae.domainlayer.insight.domain.model.PetCondition;
 import com.hondigagae.domainlayer.insight.domain.model.PlaceCondition;
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityEvaluator;
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityHeadline;
@@ -69,15 +70,7 @@ public class PlaceSuitabilityProcessor {
             ? weatherWarningProcessor.heaviestWarning().orElse(null)
             : null;
 
-        SuitabilityScore score = SuitabilityEvaluator.evaluate(SuitabilityInput.builder()
-            .place(place)
-            .pet(query.petCondition())
-            .weather(weather.daily())
-            .coverage(weather.coverage())
-            .congestion(congestion)
-            .weatherWarning(warning)
-            .thresholds(insightMapper.toThresholds(insightProperties))
-            .build());
+        SuitabilityScore score = score(place, query.petCondition(), weather.daily(), weather.coverage(), congestion, warning);
 
         return PlaceSuitabilityInfo.builder()
             .placeId(place.placeId())
@@ -91,6 +84,25 @@ public class PlaceSuitabilityProcessor {
             .indoorAlternatives(findIndoorAlternativesIfRainy(place, weather.daily()))
             .petConditionApplied(query.petCondition().isSpecified())
             .build();
+    }
+
+    /**
+     * 모은 근거로 점수를 낸다. 한 곳 판정과 장소 추천(#1368)이 <b>같은 입력 구성</b>을 쓰도록 여기 한 곳에 둔다 — 갈라지면
+     * 같은 장소 · 같은 날짜 · 같은 반려견인데 추천 카드와 상세 화면의 점수가 달라진다.
+     */
+    SuitabilityScore score(
+        PlaceCondition place, PetCondition pet, DailyWeather daily, ForecastCoverage coverage,
+        CongestionSnapshot congestion, WeatherWarning warning
+    ) {
+        return SuitabilityEvaluator.evaluate(SuitabilityInput.builder()
+            .place(place)
+            .pet(pet)
+            .weather(daily)
+            .coverage(coverage)
+            .congestion(congestion)
+            .weatherWarning(warning)
+            .thresholds(insightMapper.toThresholds(insightProperties))
+            .build());
     }
 
     /**
@@ -123,8 +135,9 @@ public class PlaceSuitabilityProcessor {
      * 비 예보가 있고 이 장소에 실내 공간이 없을 때만 대안을 찾는다.
      *
      * <p>실내가 있는 장소에 실내 대안을 붙이면 소음이다. 비가 안 오는 날도 마찬가지다.
+     * 장소 추천(#1368)도 최종 선정된 곳에 이 규칙을 그대로 쓴다.
      */
-    private List<AlternativePlaceInfo> findIndoorAlternativesIfRainy(PlaceCondition place, DailyWeather weather) {
+    List<AlternativePlaceInfo> findIndoorAlternativesIfRainy(PlaceCondition place, DailyWeather weather) {
         if (weather == null || place.hasIndoorShelter()) {
             return List.of();
         }

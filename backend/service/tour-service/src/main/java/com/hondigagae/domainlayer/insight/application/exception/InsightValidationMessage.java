@@ -18,6 +18,7 @@ public final class InsightValidationMessage {
         "INSIGHT_102:조회 일수는 1일 이상 30일 이하만 가능합니다.";
     public static final String LAT_RANGE_INVALID = "INSIGHT_103:위도는 -90 이상 90 이하만 가능합니다.";
     public static final String LNG_RANGE_INVALID = "INSIGHT_104:경도는 -180 이상 180 이하만 가능합니다.";
+    public static final String RECOMMENDATION_LIMIT_RANGE_INVALID = "INSIGHT_105:추천 개수는 1 이상 10 이하만 가능합니다.";
 
     private InsightValidationMessage() {
     }

@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.insight.adapter.out.persistence.repository;
 
 import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.PlaceEntity;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
+import com.hondigagae.shared.travel.place.PetAllowanceType;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Optional;
@@ -53,6 +54,31 @@ public interface PlaceProfileRepository extends JpaRepository<PlaceEntity, Long>
         long excludePlaceId,
         Collection<String> excludedContentTypeIds
     );
+
+    /** 추천 후보가 되는 동반 구분 (#1368). 동반 미확인(UNKNOWN)은 "가기 좋은 곳" 으로 내밀 수 없다. */
+    List<PetAllowanceType> RECOMMENDABLE_PET_ALLOWANCE_TYPES =
+        List.of(PetAllowanceType.ALLOWED, PetAllowanceType.PARTIALLY_ALLOWED);
+
+    /**
+     * 장소 추천 후보 (#1368). 정렬은 하지 않는다 — 점수를 매긴 뒤 애플리케이션이 정한다.
+     *
+     * <p>사진 조건은 null 과 빈 문자열을 함께 거른다. 원천이 사진 없음을 빈 문자열로 보내는 행이 있다.
+     * 호출자는 {@code petAllowanceTypes} 로 {@link #RECOMMENDABLE_PET_ALLOWANCE_TYPES} 를 넘긴다.
+     */
+    @Query("""
+        select p from PlaceEntity p
+        where p.mergedIntoId is null
+          and p.delistedAt is null
+          and p.areaCode = :areaCode
+          and p.contentTypeId in :contentTypeIds
+          and p.petAllowanceType in :petAllowanceTypes
+          and p.firstImage is not null
+          and trim(p.firstImage) <> ''
+          and p.lat is not null
+          and p.lng is not null
+        """)
+    List<PlaceEntity> findRecommendationCandidates(
+        String areaCode, Collection<String> contentTypeIds, Collection<PetAllowanceType> petAllowanceTypes);
 
     /** 병합으로 사라진 행은 적합도 대상이 아니다 — 상세 조회와 같은 기준을 쓴다. */
     Optional<PlaceEntity> findByIdAndMergedIntoIdIsNull(long placeId);

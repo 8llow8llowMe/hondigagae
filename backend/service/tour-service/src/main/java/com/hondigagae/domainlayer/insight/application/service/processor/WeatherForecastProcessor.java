@@ -140,6 +140,17 @@ public class WeatherForecastProcessor {
     }
 
     /**
+     * {@link #dailyForecastsAt} 의 결과를 가르는 키 — 조회 격자와 중기예보 구역 (#1368).
+     *
+     * <p>두 좌표의 키가 같으면 {@code dailyForecastsAt} 이 같은 원천 · 같은 캐시를 읽어 같은 값을 준다. 여러 장소를 한
+     * 요청에서 판정하는 호출부(장소 추천)가 같은 키를 한 번만 부르도록 메모이즈할 때 쓴다. 격자는 조회와 같은
+     * {@link #gridAt} 에서 만든다 — 다른 곳에서 격자를 다시 구하면 묶음 배수가 어긋나 메모가 조용히 갈라진다.
+     */
+    public String dailyForecastKey(double lat, double lng, String sigunguCode) {
+        return gridAt(lat, lng).cacheKey() + "|" + MidTermRegion.of(sigunguCode, lat).cacheKey();
+    }
+
+    /**
      * 특정 날짜의 예보. 단기·중기 어느 쪽도 닿지 않으면 비어 있다.
      *
      * <p><b>비었다는 것은 "날씨가 좋다"가 아니라 "예보가 없다"는 뜻이다.</b> 호출부는 이 구분을

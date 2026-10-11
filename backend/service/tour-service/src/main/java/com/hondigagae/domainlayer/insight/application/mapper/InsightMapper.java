@@ -1,6 +1,9 @@
 package com.hondigagae.domainlayer.insight.application.mapper;
 
 import com.hondigagae.domainlayer.insight.adapter.out.persistence.entity.CongestionForecastEntity;
+import com.hondigagae.domainlayer.insight.application.info.PlaceRecommendationInfo;
+import com.hondigagae.domainlayer.insight.application.port.out.query.CachedPlaceRecommendationQueryResult;
+import com.hondigagae.domainlayer.insight.domain.model.RecommendationCandidate;
 import com.hondigagae.domainlayer.insight.domain.enums.CongestionLevel;
 import com.hondigagae.domainlayer.insight.domain.model.CongestionSnapshot;
 import com.hondigagae.domainlayer.insight.domain.model.PlaceCondition;
@@ -31,6 +34,16 @@ public interface InsightMapper {
     // 엔티티 -> 도메인
     @Mapping(target = "placeId", source = "id")
     PlaceCondition toPlaceConditionFromEntity(PlaceEntity entity);
+
+    // 엔티티 -> 도메인. 판정 입력은 위 매핑을 그대로 쓰고, 목록 카드 요약 필드만 이름대로 더한다.
+    @Mapping(target = "place", source = "entity")
+    RecommendationCandidate toRecommendationCandidateFromEntity(PlaceEntity entity);
+
+    // 추천 결과 Info <-> 캐시 QueryResult. Info 가 포트 밖으로 나가지 않게 캐시는 QueryResult 로 주고받는다
+    // (architecture-guide §4). 필드명이 같아 손으로 옮겨 적지 않는다.
+    CachedPlaceRecommendationQueryResult toRecommendationQueryResult(PlaceRecommendationInfo info);
+
+    PlaceRecommendationInfo toRecommendationInfo(CachedPlaceRecommendationQueryResult cached);
 
     // 엔티티 리스트 -> 도메인 리스트
 

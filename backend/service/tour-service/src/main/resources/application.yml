@@ -103,3 +103,10 @@ insight:
   feels-like-danger-celsius: ${INSIGHT_FEELS_LIKE_DANGER_CELSIUS:35.0}
   alternative-radius-meters: ${INSIGHT_ALTERNATIVE_RADIUS_METERS:5000}
   alternative-size: ${INSIGHT_ALTERNATIVE_SIZE:5}
+  # 장소 추천(GET /api/v1/places/recommendations) 후보군과 결과 캐시 (#1368).
+  # 쇼핑(38)은 운영 데이터 대부분이 면세점·상점이라, 음식점(39)·숙박(32)은 하루 행선지가 아니라 뺀다.
+  recommendation:
+    area-code: ${INSIGHT_RECOMMENDATION_AREA_CODE:39}
+    content-type-ids: ${INSIGHT_RECOMMENDATION_CONTENT_TYPE_IDS:12,14,28}
+    # 특보는 키에 담겨(오늘만) 바뀌면 새로 계산하므로, 결과가 특보 조회 캐시 TTL 이상 낡지 않는다 — 적합도 한 곳 판정과 같은 한계다.
+    cache-ttl-seconds: ${INSIGHT_RECOMMENDATION_CACHE_TTL_SECONDS:600}
