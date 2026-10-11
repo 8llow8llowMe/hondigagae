@@ -1,5 +1,9 @@
 'use client'
 
+import { useEffect } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+
 import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { Skeleton } from '@/components/skeleton'
@@ -65,6 +69,17 @@ function signupConsentPath(provider: string, returnTo: string): string {
  * - **`flush` 다.** 인증 셸 `main`(`px-4` · 데스크톱 카드 `md:px-5 md:py-6`)이 이미 여백을 갖는데 `EmptyState` 가
  *   `py-12` + `main` 인셋을 한 번 더 먹어 제목이 x=49 에 섰다(375 · 다른 인증 화면은 33).
  */
+/**
+ * 실패가 **가입 동의 누락**이면 갈 곳, 아니면 `null` (#1366). 화면(`OAuthCallbackStatus`)과 이동
+ * (`OAuthCallbackView`)이 같은 판정을 쓰게 한 곳에 둔다.
+ */
+function signupConsentDestination(provider: string, exchange: OAuthExchangeState): string | null {
+  if (exchange.status !== 'failed') return null
+  const resultCode = exchange.error instanceof ApiError ? exchange.error.resultCode : null
+  if (oauthNextAction(resultCode) !== 'signup-consent') return null
+  return signupConsentPath(provider, exchange.returnTo)
+}
+
 export function OAuthCallbackStatus({
   provider,
   exchange,
@@ -96,6 +111,30 @@ export function OAuthCallbackStatus({
         </p>
         <Skeleton />
         <Skeleton className="w-2/3" />
+      </div>
+    )
+  }
+
+  const consentDestination = signupConsentDestination(provider, exchange)
+
+  /*
+    **처음 온 소셜 사용자는 실패 화면을 보지 않는다** (#1366). `MEMBER_010` · `MEMBER_011` 은
+    "아직 동의하지 않았다" 는 뜻이지 사용자가 잘못한 것이 아니다 — 다음 행동이 동의 하나뿐이라
+    `OAuthCallbackView` 가 그 화면으로 바로 보낸다. 여기는 그 사이(이동 중)에 서는 자리다.
+    링크를 남기는 것은 이동이 막혔을 때(느린 망 · 스크립트 실패)의 손잡이다.
+  */
+  if (consentDestination !== null) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p role="status" className="text-body-1 text-fg font-semibold">
+          {messages.auth.oauthToSignupConsent}
+        </p>
+        <Link
+          href={consentDestination}
+          className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex min-h-11 items-center self-start font-semibold focus-visible:ring-2 focus-visible:outline-none"
+        >
+          {messages.auth.toSignupConsent} ›
+        </Link>
       </div>
     )
   }
@@ -161,6 +200,16 @@ export function OAuthCallbackView({
   state: string | null
 }) {
   const exchange = useOAuthExchange({ provider, code, state })
+  const router = useRouter()
+  const consentDestination = signupConsentDestination(provider, exchange)
+
+  /*
+    **동의 누락이면 바로 동의 화면으로 간다** (#1366). `replace` 다 — 뒤로 가기가 이 콜백(1회용
+    인가코드)으로 돌아오면 같은 실패를 다시 밟는다.
+  */
+  useEffect(() => {
+    if (consentDestination !== null) router.replace(consentDestination)
+  }, [consentDestination, router])
 
   return <OAuthCallbackStatus provider={provider} exchange={exchange} />
 }
