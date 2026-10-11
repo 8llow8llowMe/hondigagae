@@ -101,6 +101,14 @@ const MapView = dynamic(() => import('@/features/place/map-view'), { ssr: false 
 
 카카오 지도는 반드시 이 형태. 세부는 `external-api-guide.md`.
 
+### 서버 렌더된 `<img>` 의 `onError` 는 불리지 않을 수 있다 ([#1382](https://github.com/8llow8llowMe/hondigagae/issues/1382))
+
+HTML 을 받자마자 브라우저가 사진을 받기 시작해, 404 의 `error` 이벤트가 **하이드레이션 전에 지나가면**
+React 의 `onError` 가 불리지 않는다(react-dom 19.2 는 하이드레이션한 `<img>` 의 이벤트를 되살리지 않는다).
+업로드 사진처럼 열리지 않을 수 있는 `<img>` 는 `onError` 하나에 기대지 말고
+`src/lib/hooks/use-image-fallback.ts` 의 `useImageFallback(url)` 을 쓴다 — 마운트 때 `ref` 로
+`complete && naturalWidth === 0` 을 한 번 더 읽는다. `PetAvatar` · `PetPhoto` · `ProfileAvatar` 가 쓴다.
+
 ### 서버 전용 모듈 잠금
 
 토큰·세션을 다루는 모듈은 최상단에 `import 'server-only'` 를 둔다. 클라이언트에서 임포트되면 빌드가 실패해 사고를 사전에 막는다.
