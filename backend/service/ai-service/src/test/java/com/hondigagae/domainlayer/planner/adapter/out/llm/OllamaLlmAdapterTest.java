@@ -492,7 +492,7 @@ class OllamaLlmAdapterTest {
     void cleansPromptMarkersLeakedIntoDraftReasonsAndNotes() {
         stubResponse("""
             {"days":[{"day":1,"items":[{"place":1,"note":"[1일차] 비 예보라 실내"}],"lodging":null}],
-             "reasons":[{"code":"WEATHER_OK","description":"[2일차]~[3일차] 강수확률 80%라 실내 위주"}]}
+             "reasons":[{"code":"WEATHER_OK","description":"[2일차]~[3일차] 강수확률 80%라 실내 위주로 짰어요. 1일 차는 맑아 밖을 걸어요."}]}
             """);
 
         AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록")));
@@ -500,7 +500,8 @@ class OllamaLlmAdapterTest {
         assertThat(draft.days().get(0).items().get(0).note()).isEqualTo("1일차 비 예보라 실내");
         // 이름은 모델이 쓰지 않는다 — 코드표의 이름이라 정리할 표기가 없다
         assertThat(draft.reasons().get(0).name()).isEqualTo("날씨 양호");
-        assertThat(draft.reasons().get(0).description()).isEqualTo("2~3일차 강수확률 80%라 실내 위주");
+        // "1일 차" 를 붙이는 것도 같은 정리다 (#1335) — 해요체 대조(사실 대조)보다 앞이라 문장이 살아남는다
+        assertThat(draft.reasons().get(0).description()).isEqualTo("2~3일차 강수확률 80%라 실내 위주로 짰어요. 1일차는 맑아 밖을 걸어요.");
     }
 
     /*

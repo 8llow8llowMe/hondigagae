@@ -41,6 +41,9 @@ import lombok.extern.slf4j.Slf4j;
  *       (dev 의 여행지 원천은 개요가 "관광지" 한 낱말이다) 모델이 이름에서 짐작한다 — 용두암을
  *       "용암 동굴 탐방", 서귀포해양도립공원을 "수영장 주변 산책로" 로 적었다. 동굴 · 수영장 · 정상 ·
  *       전망 같은 주장은 장소 이름 · 분류 · 유형에 그 낱말이 있을 때만 남긴다</li>
+ *   <li><b>근거는 완결된 "~해요" 체 문장만 남긴다 (#1335).</b> 사실 대조 다음에 본다. prod 의 "1일 차 비우려
+ *       실내 카페 포함, 2일차 구름많음에 해수욕장 및 박물관, …" 처럼 명사형으로 날짜를 이어 붙인 문장은
+ *       {@code 요} 로 끝나지 않아 빠진다. 메모는 보지 않는다 — 짧은 메모의 형식은 이 규칙 범위 밖이다</li>
  * </ul>
  *
  * <p><b>문장 단위로 걷는다.</b> 메모 한 줄에 맞는 말과 틀린 말이 섞여 있는 일이 흔하다 —
@@ -110,6 +113,15 @@ final class AiPlanDraftFactGuard {
         new FeatureClaim(Pattern.compile("계곡"), List.of("계곡")),
         new FeatureClaim(Pattern.compile("등대"), List.of("등대")),
         new FeatureClaim(Pattern.compile("해변|백사장|모래사장"), List.of("해변", "해수욕장", "해안", "비치")));
+
+    /**
+     * 근거 문장이 "~해요" 체로 끝났는가 (#1335). {@code 해요} · {@code 했어요} · {@code 예요} · {@code 이에요} ·
+     * {@code 세요} 가 모두 {@code 요} 로 끝난다. 같은 말투의 {@code ~죠} 도 받는다. 뒤에 마침표 · 느낌표 · 물결 ·
+     * 닫는 따옴표 · 괄호와 공백은 붙어도 된다. {@code 요} 로 끝나는 명사 {@code 필요} · {@code 중요} · {@code 주요} 는
+     * 어미가 아니라 뺀다 — "반려견 눈 보호 필요." 는 명사형이다. prod 의 "1일 차 비우려 실내 카페 포함, 2일차 … 식당" 과
+     * "… 오후 일정으로 배치" 가 여기서 걸린다.
+     */
+    private static final Pattern HAEYO_ENDING = Pattern.compile("((?<![필중주])요|죠)[.!?~…\"'”’)」』]*\\s*$");
 
     /** 문장 경계. 마침표 · 물음표 · 느낌표 뒤 공백에서 자른다 — {@code 3.5km} 같은 소수점은 자르지 않는다. */
     private static final Pattern SENTENCE_BOUNDARY = Pattern.compile("(?<=[.!?])\\s+");
@@ -227,6 +239,16 @@ final class AiPlanDraftFactGuard {
                 reason.code(), reason.description());
             return null;
         }
+        // 사실 다음이 형식이다 (#1335). 화면 "이렇게 짰어요" 에 그대로 나가는 문장이라 해요체로 끝나지 않는 문장
+        // (명사형 나열 · "~배치" · "~합니다")은 뺀다. 고쳐 쓰지 않는다 — 어미를 붙이면 뜻을 지어내게 된다.
+        String formed = keepSentences(kept, sentence -> !HAEYO_ENDING.matcher(sentence).find());
+        if (formed == null) {
+            counts.reasonsDropped++;
+            log.info("LLM reason is not a complete haeyo sentence code={} description={} - dropped",
+                reason.code(), reason.description());
+            return null;
+        }
+        kept = formed;
         if (kept.equals(reason.description())) {
             return reason;
         }
