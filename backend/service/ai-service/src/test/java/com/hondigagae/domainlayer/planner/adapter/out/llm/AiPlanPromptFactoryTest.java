@@ -68,6 +68,17 @@ class AiPlanPromptFactoryTest {
         assertThat(system).contains("생애 단계는 입력에 적힌 표현만");
     }
 
+    @Test
+    @DisplayName("근거 문장은 완결된 해요체 한두 문장이고, 날짜별 명사형 나열은 나쁜 예로 못 박는다 (#1335)")
+    void systemPromptPinsReasonSentenceForm() {
+        String system = factory.systemPrompt();
+
+        assertThat(system).contains("4. 근거(reasons)는 최대 3개");
+        assertThat(system).contains("마침표로 끝나는 완결된 \"~해요\" 체 문장");
+        assertThat(system).contains("근거 하나에 이유 하나");
+        assertThat(system).contains("나쁜 예: \"1일차 비 우려 실내 카페 포함, 2일차 구름많음에 해수욕장 및 박물관\"");
+    }
+
     /*
      * #570. 1일차·2일차가 둘 다 `애월한담공원` 으로 시작한 초안이 나왔는데, 프롬프트에 회피
      * 지시가 **아예 없었다.** 숙소까지 함께 못박지 않으면 모델이 숙소를 날마다 바꾼다.

@@ -292,6 +292,112 @@ class AiPlanDraftFactGuardTest {
         }
     }
 
+    /*
+     * #1335 — 화면 "이렇게 짰어요" 에 명사형으로 날짜를 이어 붙인 근거가 나갔다(prod). 근거는 완결된 "~해요" 체
+     * 문장만 남긴다. 문장 단위로 걷는 것은 사실 대조와 같다.
+     */
+    @Nested
+    @DisplayName("근거 문장 형식 (#1335)")
+    class ReasonSentenceForm {
+
+        @Test
+        @DisplayName("명사형으로 날짜를 쉼표로 이은 근거는 빠진다 — prod 문장 그대로다")
+        void dropsNounListedReason() {
+            AiPlanDraft draft = draft(List.of(day(1)), List.of(reason("WEATHER_OK",
+                "1일차 비우려 실내 카페 포함, 2일차 구름많음에 해수욕장 및 박물관, 3일차 맑음에 해양도립공원과 식당")));
+
+            AiPlanDraft guarded = guard(3, Map.of()).apply(draft);
+
+            assertThat(guarded.reasons()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("해요체로 끝나지 않는 한 문장 근거도 빠진다 — \"~배치\" 는 문장이 아니다")
+        void dropsReasonEndingInNoun() {
+            AiPlanDraft draft = draft(List.of(day(1)), List.of(
+                reason("INDOOR_ALTERNATIVE", "비가 예상되는 첫날 실내 카페를 오후 일정으로 배치"),
+                reason("PET_ALLOWED", "모든 장소가 반려견 동반 가능합니다.")));
+
+            AiPlanDraft guarded = guard(3, Map.of()).apply(draft);
+
+            assertThat(guarded.reasons()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("해요체 문장은 글자 하나 바뀌지 않는다 — ~해요 · ~했어요 · ~예요 · ~이에요 · ~세요")
+        void keepsHaeyoSentencesAsIs() {
+            List<AiPlanDraftReason> reasons = List.of(
+                reason("INDOOR_ALTERNATIVE", "비가 오는 1일차에는 실내 카페를 오후에 넣었어요."),
+                reason("PET_ALLOWED", "모든 장소가 반려견 동반 가능이에요. 소형견 기준이에요!"),
+                reason("REST_SLOT", "오후마다 카페에서 쉬어 가요. 물을 자주 챙겨 주세요"));
+
+            AiPlanDraft guarded = guard(3, Map.of()).apply(draft(List.of(day(1)), reasons));
+
+            assertThat(guarded.reasons()).isEqualTo(reasons);
+        }
+
+        @Test
+        @DisplayName("해요체 문장과 명사형 문장이 섞이면 해요체 문장만 남는다")
+        void keepsOnlyHaeyoSentencesInMixedReason() {
+            AiPlanDraft draft = draft(List.of(day(1)), List.of(reason("WEATHER_OK",
+                "비 소식이 있는 1일차에는 실내 카페를 넣었어요. 2일차 구름많음에 해수욕장 및 박물관. 3일차는 맑아 바다를 걸어요.")));
+
+            AiPlanDraft guarded = guard(3, Map.of()).apply(draft);
+
+            assertThat(guarded.reasons()).singleElement().extracting(AiPlanDraftReason::description)
+                .isEqualTo("비 소식이 있는 1일차에는 실내 카페를 넣었어요. 3일차는 맑아 바다를 걸어요.");
+        }
+
+        @Test
+        @DisplayName("메모는 형식으로 거르지 않는다 — 짧은 메모의 형식은 #1335 범위 밖이다")
+        void leavesNoteFormAlone() {
+            AiPlanDraft draft = draft(List.of(day(1, visit(MUSEUM, "비 예보라 실내 관람"))), List.of());
+
+            AiPlanDraft guarded = guard(3, Map.of()).apply(draft);
+
+            assertThat(note(guarded, 1)).isEqualTo("비 예보라 실내 관람");
+        }
+
+        @Test
+        @DisplayName("'요' 로 끝나는 명사(필요 · 중요 · 주요)는 해요체가 아니다")
+        void dropsSentenceEndingInYoNoun() {
+            AiPlanDraft draft = draft(List.of(day(1)), List.of(
+                reason("WEATHER_OK", "실내 카페를 넣었어요. 반려견 눈 보호 필요."),
+                reason("REST_SLOT", "실내 위주가 중요."),
+                reason("PET_ALLOWED", "동반 가능한 주요")));
+
+            AiPlanDraft guarded = guard(3, Map.of()).apply(draft);
+
+            assertThat(guarded.reasons()).singleElement().extracting(AiPlanDraftReason::description)
+                .isEqualTo("실내 카페를 넣었어요.");
+        }
+
+        @Test
+        @DisplayName("닫는 따옴표 · 괄호 · 끝 공백 뒤의 해요체와 '~죠' 는 남는다")
+        void keepsHaeyoWithTrailingMarks() {
+            List<AiPlanDraftReason> reasons = List.of(
+                reason("REST_SLOT", "모델이 적은 말: \"카페에서 쉬어 가요.\""),
+                reason("INDOOR_ALTERNATIVE", "실내 장소를 넣었어요(비 소식 대비요) "),
+                reason("PET_ALLOWED", "동반 가능한 곳만 넣었죠."));
+
+            AiPlanDraft guarded = guard(3, Map.of()).apply(draft(List.of(day(1)), reasons));
+
+            assertThat(guarded.reasons()).isEqualTo(reasons);
+        }
+
+        @Test
+        @DisplayName("사실 대조와 형식 검사가 한 근거에서 각각 문장을 뺀다")
+        void trimsByFactsThenByForm() {
+            AiPlanDraft draft = draft(List.of(day(1)), List.of(reason("REST_SLOT",
+                "카페에서 쉬는 시간을 넣었어요. 장소 사이가 가까워 이동이 짧아요. 2일차 구름많음에 해수욕장 및 박물관")));
+
+            AiPlanDraft guarded = guard(3, Map.of()).apply(draft);
+
+            assertThat(guarded.reasons()).singleElement().extracting(AiPlanDraftReason::description)
+                .isEqualTo("카페에서 쉬는 시간을 넣었어요.");
+        }
+    }
+
     private static AiPlanDraftFactGuard guard(int dayCount, Map<Integer, Double> maxTemperatureByDay) {
         return new AiPlanDraftFactGuard(CANDIDATES, dayCount, maxTemperatureByDay);
     }

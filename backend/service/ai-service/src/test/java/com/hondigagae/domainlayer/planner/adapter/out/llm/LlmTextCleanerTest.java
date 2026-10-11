@@ -28,6 +28,30 @@ class LlmTextCleanerTest {
     }
 
     @Test
+    @DisplayName("\"1일 차\" 는 \"1일차\" 로 붙인다 — 프롬프트 규칙 6 의 표기다 (#1335)")
+    void joinsSpacedDayNotation() {
+        assertThat(LlmTextCleaner.clean("1일 차 비 소식에 실내 카페를 넣었어요.")).isEqualTo("1일차 비 소식에 실내 카페를 넣었어요.");
+        assertThat(LlmTextCleaner.clean("1일 차 ~ 3일 차 맑아요.")).isEqualTo("1~3일차 맑아요.");
+    }
+
+    @Test
+    @DisplayName("\"일 차량\" 은 일차 표기가 아니다 — 고치지 않는다")
+    void leavesVehicleWordAlone() {
+        assertThat(LlmTextCleaner.clean("1일 차량 이동은 짧게 잡았어요.")).isEqualTo("1일 차량 이동은 짧게 잡았어요.");
+    }
+
+    @Test
+    @DisplayName("\"차\" 뒤가 조사면 붙이고, 차례 · 차박 · 차이처럼 다른 낱말이면 그대로다")
+    void joinsOnlyBeforeParticles() {
+        assertThat(LlmTextCleaner.clean("2일 차에는 맑아요.")).isEqualTo("2일차에는 맑아요.");
+        assertThat(LlmTextCleaner.clean("3일 차부터 비가 와요.")).isEqualTo("3일차부터 비가 와요.");
+        assertThat(LlmTextCleaner.clean("1일 차, 2일 차 모두 맑아요.")).isEqualTo("1일차, 2일차 모두 맑아요.");
+        assertThat(LlmTextCleaner.clean("3일 차례로 돌아요.")).isEqualTo("3일 차례로 돌아요.");
+        assertThat(LlmTextCleaner.clean("1일 차박을 해요.")).isEqualTo("1일 차박을 해요.");
+        assertThat(LlmTextCleaner.clean("2일 차이로 비가 와요.")).isEqualTo("2일 차이로 비가 와요.");
+    }
+
+    @Test
     @DisplayName("범위 사이의 공백도 같은 꼴로 본다")
     void collapsesDayRangeWithSpaces() {
         assertThat(LlmTextCleaner.clean("2일차 ~ 3일차 비 예보")).isEqualTo("2~3일차 비 예보");
