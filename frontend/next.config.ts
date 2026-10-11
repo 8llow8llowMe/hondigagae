@@ -51,6 +51,25 @@ const nextConfig: NextConfig = {
     ]),
   },
 
+  /*
+    **public/ 정적 이미지의 캐시를 7일로 둔다** (#1136 · seo-review-2026-10-03 §3-2 #2). Next 는 public 파일에
+    `public, max-age=0` 을 줘서 일러스트 · 앱 아이콘이 화면마다 재검증 왕복을 탔다. 파일명에 해시가 없어
+    `immutable` 은 못 준다 — 바꾼 그림이 늦어도 7일 안에는 닿는다.
+
+    `/_next/static/*` 은 여기서 건드리지 않는다. Next 가 해시 파일명에 `immutable` 1년을 주고, 운영에서는
+    이 설정으로 덮어쓸 수도 없다. 메타데이터 라우트(`app/apple-icon.png` · `icon.svg` · `favicon.ico`)도
+    Next 가 자기 값을 주는 자리라 넣지 않았다.
+  */
+  headers() {
+    const cache = [{ key: 'Cache-Control', value: 'public, max-age=604800' }]
+    return Promise.resolve([
+      { source: '/illustrations/:path*', headers: cache },
+      { source: '/icon-:size.png', headers: cache },
+      { source: '/maskable-icon-:size.png', headers: cache },
+      { source: '/safari-pinned-tab.svg', headers: cache },
+    ])
+  },
+
   // sharp 를 추적 대상에서 아예 뺀다. unoptimized 라 런타임에 쓰이지 않는데도
   // next 의 optional dependency 라서 그냥 두면 번들에 들어간다.
   // 번들에 네이티브 바이너리가 하나도 없어야 배포 파이프라인의 아키텍처 검사가 의미를 가진다.
