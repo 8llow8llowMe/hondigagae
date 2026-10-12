@@ -55,3 +55,13 @@ export const useSelectedPetStore = create<SelectedPetStore>((set) => ({
 }))
 
 export const SELECTED_PET_STORAGE_KEY = STORAGE_KEY
+
+/**
+ * 지금 고른 반려견 id — **마운트 뒤에만 부른다** (#1381). 스토어를 아직 복원하지 않았으면
+ * (`undefined`) 저장값을 직접 읽는다. 렌더 중에 부르면 서버(`null`)와 값이 갈린다 —
+ * 하이드레이션 이후에만 마운트되는 컴포넌트의 지연 초기화에서 쓴다 (AI 조건 폼).
+ */
+export function currentSelectedPetId(): string | null {
+  const stored = useSelectedPetStore.getState().selectedPetId
+  return stored === undefined ? readStored() : stored
+}
