@@ -777,6 +777,28 @@ body {
 }
 
 /*
+  **마우스로 잡고 끄는 레일** (#1404, `useDragScroll`). 쉴 때는 잡을 수 있다는 커서(마우스 환경만 — 터치에는 커서가
+  없다), 끄는 동안(`[data-dragging]` — 클래스면 리렌더가 지운다)은 쥔 커서 · 글자 선택 끔 · **스냅 끔**이다. 스냅을 켜 둔 채 `scrollLeft` 를
+  쓰면 브라우저가 매 프레임 가까운 칸으로 되돌려 레일이 손을 따라오지 않는다. 놓으면 훅이 칸을 골라 옮긴다.
+  자식의 링크 커서(pointer)까지 덮어야 끄는 동안 손 모양이 바뀌지 않는다.
+*/
+@media (pointer: fine) {
+  .drag-scroll {
+    cursor: grab;
+  }
+}
+
+.drag-scroll[data-dragging],
+.drag-scroll[data-dragging] * {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.drag-scroll[data-dragging] {
+  scroll-snap-type: none;
+}
+
+/*
   가로 스크롤 줄의 화살표를 앉히는 기준면 (src/components/scroll-rail.tsx).
 
   **`position: relative` 만으로는 안 된다.** 그것만 주면 안쪽 스크롤러의 **내용 폭**이

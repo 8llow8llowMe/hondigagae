@@ -332,6 +332,12 @@ describe('PlaceInsightCardList — 틀', () => {
     expect(markup).toContain('w-(--home-place-card-w)')
   })
 
+  /* #1404 — 마우스로 잡고 끄는 레일. 끝 흐림은 사진 카드 위에서 이상하게 읽혀 걷었다 */
+  it('레일이 끌기 커서를 달고 끝 흐림 마스크는 걸지 않는다', () => {
+    expect(markup).toContain('drag-scroll')
+    expect(markup).not.toMatch(/scroll-fade-(left|right|both|wide)/)
+  })
+
   /* #1400 — 추천이 10곳이라 1024+ 도 레일이다. 그리드로 두면 네 줄이 된다 */
   it('1024 이상도 그리드로 바뀌지 않는다 — 스크롤 · 스냅을 끄지 않는다', () => {
     expect(markup).not.toContain('lg:grid')

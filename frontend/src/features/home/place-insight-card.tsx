@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
 
 import { ImageIcon } from '@/components/icons'
 import { METRIC_WORD_TONE, type MetricTone, MetricValue } from '@/components/metric'
-import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
+import { ScrollRailArrows, useDragScroll, useScrollRail } from '@/components/scroll-rail'
 import { imageSrc } from '@/lib/image/remote-host'
 import { crowdedLabel, type PlaceCardPlace } from '@/lib/insight/place-cards'
 import { congestionTone, suitabilityTone } from '@/lib/insight/tone'
@@ -30,6 +30,9 @@ const UNKNOWN_CODE = 'UNKNOWN'
  *   카드의 가장자리가 비쳐 "옆에 더 있다" 를 말한다. `scroll-snap` 으로 카드 경계에서 멈추고, 1위가
  *   항상 첫 장이다(DOM 순서 그대로).
  * - **화살표는 마우스 환경에만** 선다(`ScrollRailArrows` overlay, `.scroll-rail-arrow`). 터치는 밀어서 넘긴다.
+ * - **마우스로 카드를 잡고 끌어도 넘어간다** (`useDragScroll`, #1404). 끈 직후의 클릭은 링크로 가지 않는다.
+ * - **끝 흐림이 없다** (#1404) — 공용 48px 는 카드 끝이 뚝 잘린 것처럼, 넓히면 카드가 바랜 것처럼 보였다. 다른 레일은
+ *   셀이 작아 흐림이 맞고, 이 레일은 비치는 다음 카드 조각이 그 몫을 한다.
  *
  * **예전 1024+ 는 3열 그리드였다** — 추천이 3곳뿐이라 한 줄에 다 섰다. #1400 부터 서버 상한(10)까지 받으므로
  * 그리드로 두면 네 줄이 된다. 홈은 요약 화면이라 세로로 늘리지 않고 옆으로 넘긴다(홈-세부명세 D11).
@@ -54,6 +57,8 @@ export function PlaceInsightCardList({
   busy?: boolean
 }) {
   const rail = useScrollRail<HTMLUListElement>()
+  // 마우스로 카드를 잡고 끌어 넘긴다 (#1404) — 터치는 네이티브 스와이프 그대로
+  useDragScroll(rail.ref)
 
   return (
     <div className="scroll-rail">
@@ -64,7 +69,12 @@ export function PlaceInsightCardList({
         className={cn(
           // 인셋과 스냅 기준을 같은 값으로 둔다 (첫 카드가 제목과 같은 세로선에 선다)
           'flex snap-x snap-mandatory scroll-px-4 scrollbar-none gap-3 overflow-x-auto px-4 pt-1 pb-4 md:scroll-px-5 md:px-5 md:pb-5 lg:gap-4',
-          rail.fadeClassName,
+          /*
+            잡을 수 있다는 커서 (#1404, `app/globals.css`). **끝 흐림(`rail.fadeClassName`)을 걸지 않는다** — 사진 카드
+            위의 마스크는 넓혀도 좁혀도 이상하게 읽혔다(사용자 평가 2026-10-12). "옆에 더 있다" 는 비치는 다음 카드와
+            화살표가 말한다.
+          */
+          'drag-scroll',
           busy && 'opacity-55',
         )}
       >
