@@ -40,16 +40,19 @@ describe('MapCanvas — 크기가 바뀌면 다시 맞춘다 (#982)', () => {
     되어 사용자가 끌어 둔 지도가 되돌아간다. 값 서명(`routeCameraKey`)에 건다.
   */
   it('동선 카드는 카메라 memo 를 값 서명에 건다', () => {
+    // 카메라는 `PlanRouteMap` 으로 옮겼다 (#1415) — 일자는 prop `day` 로 들어온다
+    const map = readSourceWithoutComments('src/features/plan/plan-route-map.tsx')
     const card = readSourceWithoutComments('src/features/plan/plan-route-card.tsx')
 
-    expect(card).toContain('routeCameraKey(selectedDay, model.stops)')
-    expect(card).toContain('}, [cameraKey])')
+    expect(map).toContain('routeCameraKey(day, model.stops)')
+    expect(map).toContain('}, [cameraKey])')
+    expect(card).toContain('<PlanRouteMap')
   })
 
   it('동선 카드가 되잡기를 켠다', () => {
-    const card = readSourceWithoutComments('src/features/plan/plan-route-card.tsx')
+    const map = readSourceWithoutComments('src/features/plan/plan-route-map.tsx')
 
-    expect(card).toContain('refitOnResize: true')
+    expect(map).toContain('refitOnResize: true')
   })
 
   it.each([
