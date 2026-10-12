@@ -207,15 +207,32 @@ function FacilityRowHeader({
         붙인다 — 행을 위아래로 훑으면 거리가 한 세로선에 늘어선다. 배지가 많아 줄이 넘치면 `flex-wrap` 으로 아랫줄
         오른쪽에 선다. **위치를 못 받은 날은 없다** — 제주 중심에서 잰 거리를 내 거리로 읽게 하지 않는다.
       */}
-      {showDistance && (
-        <span
-          data-facility-distance
-          className="text-title-2 text-fg ms-auto shrink-0 font-bold tabular-nums"
-        >
-          {formatDistance(facility.distanceMeters)}
-        </span>
-      )}
+      {showDistance && <FacilityDistance facility={facility} className="ms-auto" />}
     </div>
+  )
+}
+
+/**
+ * 거리 한 조각 — 이름과 같은 크기 · 굵게 (#1406). **목록 행은 이름 줄 끝**(`FacilityRowHeader`), **지도 패널 행은 오른쪽
+ * 칸의 전화 위**(`EmergencyMapPanel`)에 같은 조각을 세운다 — 모양이 한 벌이어야 두 화면에서 같은 정보로 읽힌다.
+ *
+ * 패널 행이 자리를 따로 잡는 이유: 400 패널은 오른쪽에 전화 칸이 붙어 이름 줄이 좁고, 이름 줄 끝(`ms-auto`)에 두면 긴 이름의
+ * 거리가 아랫줄에 혼자 떨어지고 짧은 이름은 줄 중간에 섰다(1440 실측). 오른쪽 칸에 두면 모든 행이 한 세로선에 선다.
+ */
+export function FacilityDistance({
+  facility,
+  className,
+}: {
+  facility: NearbyFacilityItem
+  className?: string
+}) {
+  return (
+    <span
+      data-facility-distance
+      className={cn('text-title-2 text-fg shrink-0 font-bold tabular-nums', className)}
+    >
+      {formatDistance(facility.distanceMeters)}
+    </span>
   )
 }
 

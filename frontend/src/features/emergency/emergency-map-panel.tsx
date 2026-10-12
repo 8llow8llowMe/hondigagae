@@ -2,7 +2,12 @@
 
 import { useEffect, useRef } from 'react'
 
-import { CallButton, DirectionsLink, FacilityRowContent } from '@/features/emergency/facility-row'
+import {
+  CallButton,
+  DirectionsLink,
+  FacilityDistance,
+  FacilityRowContent,
+} from '@/features/emergency/facility-row'
 import { toLatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
@@ -75,11 +80,19 @@ export function EmergencyMapPanel({
                   'focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
                 )}
               >
-                <FacilityRowContent facility={entry} showDistance={showDistance} />
+                {/* 거리는 이름 줄이 아니라 오른쪽 칸이다 (#1406) — 400 패널에서 이름 줄 끝에 두면 줄바꿈이 들쭉날쭉했다 */}
+                <FacilityRowContent facility={entry} showDistance={false} />
               </button>
 
-              {/* 버튼의 형제다. 선택 여부와 무관하게 항상 있다 */}
-              <CallButton name={entry.name} tel={entry.tel} />
+              {/*
+                오른쪽 칸 — **거리 위 · 전화 아래** (#1406). 버튼의 형제다. 전화는 선택 여부와 무관하게 항상 있다.
+                거리가 칸 맨 위라 행을 훑으면 거리가 오른쪽 끝 한 세로선에 늘어선다. `self-start` — 가운데에 붙이면 진료시간이
+                두 줄인 키 큰 행에서 거리가 이름보다 35px 내려갔다. 위치 폴백이면 거리 없이 전화만이다.
+              */}
+              <div className="flex shrink-0 flex-col items-end gap-2 self-start">
+                {showDistance && <FacilityDistance facility={entry} />}
+                <CallButton name={entry.name} tel={entry.tel} />
+              </div>
             </div>
 
             {/* 선택된 행에만. 전화 옆이 아니라 아래 전폭이라 오조작이 적다 */}
