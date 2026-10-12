@@ -1061,7 +1061,16 @@ export function PlaceMapView({
           island ? 'top-2 md:top-17' : 'top-5 lg:top-6',
         )}
       >
-        <div className="content-container flex items-start justify-end gap-2 px-4 md:px-10">
+        {/*
+          **아일랜드는 뷰포트 오른쪽 끝 16 이다** (#1397) — 알약(`.island-bar`)과 같은 x, 왼쪽 로고와 대칭. 위 설명의
+          콘텐츠 열 정렬은 목록 보기 띠 헤더와 맞추려던 것인데 아일랜드에는 띠가 없다. 담기 지도는 띠가 있어 그대로다.
+        */}
+        <div
+          className={cn(
+            'flex items-start justify-end gap-2 px-4',
+            island ? null : 'content-container md:px-10',
+          )}
+        >
           {/*
             **검색은 토글 왼쪽, 1024 미만에서만** (#596). 그 위는 좌측 패널 머리가 같은
             일을 하므로 둘 다 그리면 데스크톱 지도에 검색창이 둘이 된다.
@@ -1143,7 +1152,12 @@ export function PlaceMapView({
           **카드가 있을 때만 줄을 둔다** — 빈 줄의 `pt-2` 가 재검색 알약을 8px 밀어 내렸다(`hasFacilityNotice`).
         */}
         {facilityLayer && hasFacilityNotice(facilityStatus) && (
-          <div className="content-container flex justify-end px-4 pt-2 md:px-10">
+          <div
+            className={cn(
+              'flex justify-end px-4 pt-2',
+              island ? null : 'content-container md:px-10',
+            )}
+          >
             <PlaceMapFacilityNotice
               status={facilityStatus}
               onRetry={() => void facilityQuery.refetch()}

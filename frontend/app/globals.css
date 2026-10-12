@@ -2322,9 +2322,13 @@ body:has(.map-island) .global-header {
 }
 
 /*
-  알약의 **허용 상자** — 왼쪽 = `max(지도 왼쪽 경계, 로고 상자 오른쪽 148) + 16`, 오른쪽 = 콘텐츠 열 오른쪽 − 40
-  (목록 보기 띠 헤더의 계정 · 지도 조작 카드와 같은 x, #412). 알약은 이 안에서 오른쪽 정렬이라 도킹을 여닫아도
-  움직이지 않는다 — 상자의 왼쪽만 바뀐다. `100%` 는 `fixed` 의 기준(뷰포트) 폭이다.
+  알약의 **허용 상자** — 왼쪽 = `max(지도 왼쪽 경계, 로고 상자 오른쪽 148) + 16`, 오른쪽 = **뷰포트 끝 − 16**.
+  알약은 이 안에서 오른쪽 정렬이라 도킹을 여닫아도 움직이지 않는다 — 상자의 왼쪽만 바뀐다.
+
+  **오른쪽은 로고(왼쪽 16)와 대칭이다** (#1397). 예전에는 콘텐츠 열(1440) 오른쪽 − 40 이었다 — 목록 보기 띠 헤더의
+  계정과 같은 x 로 두려던 #412 의 근거인데, 아일랜드에는 띠 헤더가 없어 맞출 대상이 없다. 그 탓에 1912 에서 알약이
+  화면 끝에서 276 떨어져 지도 한복판에 떴다. 아래 지도 조작 기둥도 같은 16 이다(`place-map-view.tsx` ·
+  `emergency-map-view.tsx`).
 
   `148` = 로고 알약 상자 오른쪽 끝(왼쪽 16 + 좌우 12 · 테두리 1 + 락업 106). 로고 락업이 바뀌면 함께 고친다
   (`styles/map-island.test.ts` 가 소스로 묶는다).
@@ -2337,7 +2341,7 @@ body:has(.map-island) .global-header {
   top: 8px;
   container: island-bar / inline-size;
   inset-inline-start: calc(max(var(--island-map-left), 148px) + 16px);
-  inset-inline-end: max(40px, calc((100% - var(--content-max)) / 2 + 40px));
+  inset-inline-end: 16px;
 }
 
 .island-menu-collapsed {

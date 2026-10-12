@@ -333,7 +333,7 @@ describe('제목이 필터보다 먼저다 (#546)', () => {
 describe('지도 갈래는 검색을 두 자리에 둔다 (#584)', () => {
   /* 오버레이는 지도 위 떠 있는 줄, 패널은 그 뒤 — `map-panel-width` 가 경계다 */
   const overlay = mapView.slice(
-    mapView.indexOf('pointer-events-none absolute inset-x-0 top-5'),
+    mapView.indexOf('pointer-events-none absolute inset-x-0 top-2'),
     mapView.indexOf('map-panel-width'),
   )
 

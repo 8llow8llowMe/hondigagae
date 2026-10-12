@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 
 import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
-import { MAP_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
+import { MAP_ISLAND_INSET_VAR, MapSheet, type SheetStop } from '@/components/map-sheet'
 import { ViewToggle } from '@/components/view-toggle'
 import { EmergencyFilterBar } from '@/features/emergency/emergency-filter-bar'
 import { EmergencyMapPanel } from '@/features/emergency/emergency-map-panel'
@@ -24,6 +25,7 @@ import {
 import { useEmergencyBoard } from '@/features/emergency/use-emergency-board'
 import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
+import { MapToolCard } from '@/features/map/map-tool-card'
 import { ResearchHereButton } from '@/features/map/research-here-button'
 import { useMapFailureFallback } from '@/features/map/use-map-failure-fallback'
 import { toFacilityPin } from '@/lib/emergency/facility-pin'
@@ -489,7 +491,16 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
   )
 
   return (
-    <div className="relative">
+    /*
+      **지도 아일랜드다** (#1397) — `/places` 지도 보기와 같은 장치. 루트의 `map-island` 를 셸의 `body:has(.map-island)`
+      규칙이 읽어 흰 띠 헤더를 걷고 알약(`IslandHeader`)을 세운다 · 지도를 y 0 부터 깐다(`app/globals.css`).
+      `data-dock` 은 알약 허용 상자 왼쪽(400)과 로고 알약(패널 접힘)이 읽는다. 미리보기가 없어 `data-preview` 는 없다.
+      **높이를 루트가 진다** — `.map-canvas-height.map-island` 가 같은 요소에 있어야 헤더 몫을 빼지 않는 규칙이 이긴다.
+    */
+    <div
+      className="map-canvas-height map-island relative"
+      data-dock={panelOpen ? 'open' : 'closed'}
+    >
       {/* 지도가 바탕이다. 데스크톱은 좌측 패널이 그 위에 얹힌다 */}
       <MapCanvas
         pins={pins}
@@ -507,7 +518,7 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         /* 왼쪽은 도킹 패널이 덮는다 — 카카오 로고 · 축척을 우하단으로 비킨다 (#1232 D5) */
         copyrightPosition="right"
         onFailure={setFailure}
-        className="map-canvas-height w-full"
+        className="h-full w-full"
       />
 
       {/*
@@ -538,12 +549,12 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
 
       {/*
         여백이 `/places` 지도 보기와 정확히 같다 — 같은 컨트롤이면 같은 자리에 있어야 한다.
-        **뷰포트가 아니라 콘텐츠 열(1440)의 오른쪽 끝에 매단다** (#412) — 지도는 전폭이고
-        목록 보기 헤더는 `--content-max` 안이라, 그러지 않으면 1440 위에서 같은 토글이 두
-        보기에서 다른 자리에 선다. 근거와 실측은 `place-map-view.tsx` 의 같은 자리에 있다.
+        **아일랜드라 뷰포트 오른쪽 끝 16 이다** (#1397) — 알약(`.island-bar`)과 같은 x, 왼쪽 로고와 대칭. 예전의
+        콘텐츠 열 정렬(#412)은 목록 보기 띠 헤더와 맞추려던 것인데 이제 이 화면에 띠가 없다.
+        세로는 768 이상 알약(위 8 · 높이 48) 아래 12 = y 68, 그 아래는 알약이 없어 y 8 이다(#1300 D2-1).
       */}
-      <div className="pointer-events-none absolute inset-x-0 top-5 z-30 lg:top-6">
-        <div className="content-container flex items-start justify-end gap-2 px-4 md:px-10">
+      <div className="pointer-events-none absolute inset-x-0 top-2 z-30 md:top-17">
+        <div className="flex items-start justify-end gap-2 px-4">
           {/*
             **검색은 토글 **왼쪽**, 1024 미만에서만** (#584). 그 위는 좌측 패널 머리가
             같은 일을 하고(아래), 둘 다 그리면 데스크톱 지도에 검색창이 둘이 된다.
@@ -575,10 +586,26 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
           </div>
 
           <div className="pointer-events-auto flex shrink-0 flex-col items-end gap-2">
-            <ViewToggle current="map" listHref={listHref} mapHref={mapHref} />
+            {/*
+              **패널이 열린 1024 이상은 두지 않는다** (#1397) — `/places` 아일랜드와 같다(#1300 D1-2). 목록이 옆에
+              보이고, 패널 개수 줄의 `크게 보기` 가 같은 주소로 간다. 패널을 접으면 그 링크도 접혀(inert) 다시 선다.
+            */}
+            <ViewToggle
+              current="map"
+              listHref={listHref}
+              mapHref={mapHref}
+              className={panelOpen ? 'lg:hidden' : ''}
+            />
 
-            {/* 제주 밖이면 렌더하지 않는다 — 눌러도 갈 곳이 없다 */}
-            {board.inJeju && <MapLocateButton onLocate={board.locate} />}
+            {/*
+              **아이콘 묶음 카드다** (#1397) — `/places` 의 우측 조작(#1300 D1-2)과 같은 표면. 이 화면은 층 토글이
+              없어 `내 위치` 칸 하나다. 제주 밖이면 렌더하지 않는다 — 눌러도 갈 곳이 없다
+            */}
+            {board.inJeju && (
+              <MapToolCard>
+                <MapLocateButton onLocate={board.locate} variant="cell" />
+              </MapToolCard>
+            )}
           </div>
         </div>
 
@@ -596,7 +623,7 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
           함께 둔다(`.map-research-offset` 알약과 같은 판단).
         */}
         {board.fallback !== null && (
-          <div className="content-container px-4 pt-2 md:px-10 lg:hidden">
+          <div className="px-4 pt-2 lg:hidden">
             <div className="bg-bg border-border pointer-events-auto max-w-md rounded-lg border px-3 py-2 shadow-md">
               <PositionNotice reason={board.fallback} onRetry={board.locate} />
             </div>
@@ -639,6 +666,12 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
             검색(343px)보다 넓다 — 글자 버튼이 들어가는 자리에서 아이콘으로 줄이면
             같은 컨트롤이 화면마다 다른 이유 없이 갈린다. 오버레이만 자리가 없다.
           */}
+          {/*
+            **로고 띠** (#1397) — 맨 위 64. 로고는 셸의 `IslandHeader` 가 `fixed` 로 이 위에 세운다. `/places` 목록 칸의
+            띠와 같은 것이다(`place-map-view.tsx`).
+          */}
+          <div aria-hidden className="border-border h-16 shrink-0 border-b" />
+
           <div className="border-border border-b px-3 py-2">
             <EmergencySearchField
               filters={board.filters}
@@ -655,7 +688,22 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
             </div>
           )}
 
-          <div className="border-border bg-bg-sunken border-b px-4 py-2">{caption}</div>
+          {/*
+            **개수 줄 오른쪽에 `크게 보기`** (#1397) — 지도 위 `목록 보기` 를 대신해 같은 주소(`listHref`)로 간다. `/places`
+            아일랜드의 개수 줄(#1300 D1-2)과 같은 모양 · 같은 접근 이름(`목록 크게 보기`)이다. 기준 줄(`내 위치 기준`)은
+            개수 뒤에 이어 붙인다 — 400 칸에 셋을 따로 세우면 개수가 잘린다.
+          */}
+          <div className="text-caption text-fg-muted border-border bg-bg-sunken flex min-h-11 items-center justify-between gap-2 border-b ps-4 pe-2 font-medium">
+            <p className="min-w-0 truncate tabular-nums">{`${countLine} · ${basisLine}`}</p>
+            <Link
+              href={listHref}
+              className="text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex min-h-11 shrink-0 items-center gap-1 rounded-sm px-2 font-semibold focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <span className="sr-only">{`${messages.map.expandListPrefix} `}</span>
+              {messages.map.expandList}
+              <ChevronRightIcon size={16} />
+            </Link>
+          </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
         </div>
@@ -690,9 +738,9 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         /*
           **최대 단계가 지도 위 검색·보기 전환을 덮지 않게 한다** (#901 D2). 비율(85dvh)로
           두면 윗변이 기기 높이를 따라가 **짧은 기기일수록 더 덮는다** — 640 실측에서 24px
-          덮었다. 값의 유도는 `MAP_TOP_CONTROLS_INSET` 주석에 있다.
+          덮었다. 아일랜드라 폭으로 갈리는 CSS 변수(60 / 120)다 — 유도는 `.map-island` 규칙(`app/globals.css`).
         */
-        maxTopInset={MAP_TOP_CONTROLS_INSET}
+        maxTopInset={MAP_ISLAND_INSET_VAR}
         toolbar={toolbar}
         header={caption}
       >
