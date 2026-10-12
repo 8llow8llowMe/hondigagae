@@ -1304,7 +1304,7 @@ export const planMessages = {
   briefingScheduleVisited: '다녀옴',
   /** 다음 갈 곳 길찾기 (#1415 D15-6) */
   briefingScheduleDirections: '{title} 길찾기',
-  /** `{title}` 치환 — 기준 장소가 처음·마지막 **어느 쪽도 아닐 때만** 쓰는 줄이다 */
+  /** `{title}` 치환 — 옛 요약 카드의 기준 줄, 그리고 타임라인에서는 기준 장소가 그날 항목에 없을 때만 쓰는 줄이다 */
   briefingScheduleBasisPlace: '이 날 기준 장소 · {title}',
   briefingScheduleOpenDay: '이 날 일정 보기',
   /** 지도 위 기준 줄 — 핀은 대표 장소 하나뿐이라 "이 날의 경로" 로 읽히지 않게 못박는다 */
