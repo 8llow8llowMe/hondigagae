@@ -325,6 +325,18 @@ body {
 }
 
 /*
+  **진행 대기 화면은 흰 한 면이다** — DESIGN.md §0 의 예외, 이슈 #1401.
+
+  AI 일정 생성을 기다리는 동안(최대 80초) 볼 것은 진행 표시 하나다. 회색 바닥 위 카드 한 장은 면 경계 ·
+  테두리만 더했다. 바닥(`Canvas`)은 서버 페이지가 그리고 대기 여부는 클라이언트가 알므로, 대기 화면이
+  표식(`.ai-plan-wait`, `ai-plan-job-view.tsx`)을 달고 이 규칙이 바닥을 칠한다 — 지도 아일랜드
+  (`body:has(.map-island)`)와 같은 축이다. 두 클래스라 `bg-bg-sunken` 유틸리티를 이긴다.
+*/
+.page-canvas:has(.ai-plan-wait) {
+  background-color: var(--bg);
+}
+
+/*
   2단 레일 레이아웃 — DESIGN.md §7-1 · §7-2.
 
   **열 구분선은 우측 열의 `border-left` 로 그린다** (사용처에서 `lg:border-l`).

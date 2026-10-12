@@ -250,8 +250,23 @@ describe('/ai-plans/jobs/[jobId] — 여섯 상태가 한 카드에 든다 (#473
     완료는 셋이다 — 이미 담음(#1041) · 조건 상실 · 담기.
   */
   it('여섯 상태가 껍데기를 거치고 완료 셋만 bare 다', () => {
-    expect(jobView.match(/<AiPlanJobShell>/g)).toHaveLength(6)
+    // 대기는 카드 없는 흰 한 면이다(`plain`, #1401) — 껍데기(h1)는 그대로 거친다
+    expect(jobView.match(/<AiPlanJobShell>/g)).toHaveLength(5)
+    expect(jobView.match(/<AiPlanJobShell plain>/g)).toHaveLength(1)
     expect(jobView.match(/<AiPlanJobShell bare>/g)).toHaveLength(3)
+  })
+
+  /*
+    #1401 — 대기만 흰 한 면. 바닥은 서버 페이지의 `Canvas` 라 표식을 달고 CSS 가 칠한다(DESIGN.md §0 예외).
+    `plain` 이 진행 갈래에만 있어야 한다 — 실패 · 취소까지 번지면 회색 바닥 규칙이 조용히 무너진다.
+  */
+  it('plain 은 진행 대기 갈래 하나이고 표식이 바닥 규칙과 이어진다', () => {
+    const wait = jobView.slice(jobView.indexOf('if (job === null || polling)'))
+    expect(wait.indexOf('<AiPlanJobShell plain>')).toBeLessThan(wait.indexOf('<AiPlanProgress'))
+    expect(jobView).toContain("plain && 'ai-plan-wait'")
+    expect(code('app/globals.css')).toMatch(
+      /\.page-canvas:has\(\.ai-plan-wait\)\s*\{\s*background-color:\s*var\(--bg\);/,
+    )
   })
 
   /*
