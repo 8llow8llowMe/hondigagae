@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { Surface, SurfaceStack } from '@/components/surface'
 import { AiPlanCanceled } from '@/features/ai-plan/ai-plan-canceled'
+import { AiPlanCommitBar } from '@/features/ai-plan/ai-plan-commit-bar'
 import { AiPlanCommitPanel, AiPlanCommittedPanel } from '@/features/ai-plan/ai-plan-commit-panel'
 import { AiPlanDraftPreview } from '@/features/ai-plan/ai-plan-draft-preview'
 import { AiPlanFailed } from '@/features/ai-plan/ai-plan-failed'
@@ -682,6 +683,9 @@ function AiPlanCommitContainer({
         onDiscard={() => setDiscarding(true)}
         againHref={`/ai-plans/new?from=${encodeURIComponent(jobId)}`}
       />
+
+      {/* 모바일 하단 고정 담기 (#1381) — 스택의 마지막 자식이라 sticky 가 페이지 끝까지 따라온다 */}
+      <AiPlanCommitBar submitting={form.isSubmitting} />
 
       <ConfirmModal
         open={discarding}

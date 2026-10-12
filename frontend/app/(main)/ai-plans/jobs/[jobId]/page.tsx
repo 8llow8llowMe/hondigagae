@@ -6,7 +6,7 @@ import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 
 export const metadata: Metadata = {
-  title: messages.aiPlan.jobTitle,
+  title: `${messages.aiPlan.jobTitle} · 혼디가개`,
 }
 
 /**

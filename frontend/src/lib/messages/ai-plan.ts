@@ -83,6 +83,13 @@ export const aiPlanMessages = {
   fieldRegion: '지역',
   /** `sigunguCode === null`. **"선택 안 함" 이 아니라 "전체" 다** */
   fieldRegionAll: '제주 전체',
+  /**
+   * 메모의 권역 낱말을 보고 지역 칩을 제안한다 (#1381). `{region}` 은 `SIGUNGU_LABEL` 값이다 —
+   * 지금 둘 다 `…시` 라 받침이 없어 `로` 로 고정한다. 받침 있는 지역이 생기면 조사를 계산한다.
+   */
+  regionSuggest: '{region}로 좁힐까요?',
+  regionSuggestApply: '{region}로 좁히기',
+  regionSuggestDismiss: '괜찮아요',
   fieldRegionHint:
     '좁히면 그 시군구 안에서만 골라요. 조건에 맞는 곳이 없으면 만들지 못할 수 있어요.',
 

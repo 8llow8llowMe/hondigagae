@@ -48,6 +48,9 @@ export type AiPlanCommitPanelProps = {
  * 자식으로 세운다 — 배치 책임이 담는 쪽에 있다 (#464 가 `PetForm` 의 `footer` 를 걷은 것과
  * 같은 이동). 그래야 카드 사이 간격(모바일 8 / 데스크톱 24)을 스택이 이 블록에도 준다.
  */
+/** 모바일 하단 바의 버튼이 이 폼을 제출한다 (`form` 속성, #1381) */
+export const AI_PLAN_COMMIT_FORM_ID = 'ai-plan-commit'
+
 export function AiPlanCommitPanel({
   title,
   errors,
@@ -64,6 +67,7 @@ export function AiPlanCommitPanel({
 }: AiPlanCommitPanelProps) {
   return (
     <form
+      id={AI_PLAN_COMMIT_FORM_ID}
       noValidate
       onSubmit={(event) => {
         event.preventDefault()
@@ -147,7 +151,8 @@ export function AiPlanCommitPanel({
       */}
 
       <div className="flex flex-col gap-2">
-        <Button type="submit" size="lg" loading={submitting}>
+        {/* 768 미만에서는 하단 바(`AiPlanCommitBar`)가 같은 일을 한다 — 두 개를 겹쳐 두지 않는다 */}
+        <Button type="submit" size="lg" loading={submitting} className="hidden md:inline-flex">
           {messages.aiPlan.commitSubmit}
         </Button>
         <p className="text-caption text-fg-muted">{messages.aiPlan.commitHint}</p>
