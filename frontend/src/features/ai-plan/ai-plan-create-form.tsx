@@ -16,6 +16,7 @@ import { AiPlanOptionsSection } from '@/features/ai-plan/ai-plan-options-section
 import { SIGUNGU_CODES, SIGUNGU_LABEL } from '@/features/place/filter-labels'
 import { BUDGET_PRESETS_MANWON } from '@/lib/ai-plan/budget'
 import { type DetailsInput, detailsSummary, hasAnyDetail } from '@/lib/ai-plan/details'
+import { regionHintFromNote } from '@/lib/ai-plan/region-hint'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { focusFirstError, hasFieldErrors } from '@/lib/form/focus-first-error'
 import { messages } from '@/lib/messages'
@@ -119,6 +120,18 @@ export function AiPlanCreateForm({
     `?from={jobId}` 로 돌아온 사람에게 자기가 넣었던 예산이 접혀 있으면 사라진 것처럼 보인다.
   */
   const [detailsOpen, setDetailsOpen] = useState(() => hasAnyDetail(details))
+
+  /*
+    **메모의 권역 낱말 → 지역 칩 제안** (#1381). 제안만 하고 바꾸지 않는다(`region-hint.ts`).
+    이미 그 지역이면, 또는 `괜찮아요` 로 물린 지역이면 내지 않는다 — 물린 뒤 메모가 다른 권역을
+    가리키면 다시 묻는다.
+  */
+  const [dismissedRegion, setDismissedRegion] = useState<string | null>(null)
+  const regionHint = regionHintFromNote(values.requestNote)
+  const regionSuggestion =
+    regionHint !== null && regionHint !== values.sigunguCode && regionHint !== dismissedRegion
+      ? regionHint
+      : null
 
   /*
     **접힌 섹션 안의 필드에서 오류가 나면 먼저 펼친다.** 안 그러면 제출이 조용히 실패한다 —
@@ -366,6 +379,40 @@ export function AiPlanCreateForm({
           maxLength={500}
         />
       </Field>
+
+      {regionSuggestion !== null && (
+        /*
+          **메모 바로 아래다** — 낱말을 적은 자리에서 묻는다. 고르면 접기를 펼쳐 바뀐 `지역` 칩을
+          보여 준다. 지역 칩이 접기 안에 있어 메모와 연결되지 않았던 것이 #1381 의 원인이다.
+        */
+        <div className="bg-band -mt-2 flex flex-col gap-2 rounded-md px-3 py-3">
+          {/* 문장 한 줄 · 버튼 한 줄 — 375 에서 버튼 하나만 다음 줄로 떨어지지 않게 둘을 묶는다 */}
+          <p className="text-body-2 text-fg break-keep">
+            {messages.aiPlan.regionSuggest.replace(
+              '{region}',
+              SIGUNGU_LABEL[regionSuggestion] ?? '',
+            )}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                onValueChange('sigunguCode', regionSuggestion)
+                setDetailsOpen(true)
+              }}
+            >
+              {messages.aiPlan.regionSuggestApply.replace(
+                '{region}',
+                SIGUNGU_LABEL[regionSuggestion] ?? '',
+              )}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setDismissedRegion(regionSuggestion)}>
+              {messages.aiPlan.regionSuggestDismiss}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/*
         **기본값이 있는 넷을 여기로 모은다** — 지역 · 예산 · 저장한 곳 우선 · 꼭 넣을 곳
