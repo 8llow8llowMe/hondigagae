@@ -42,7 +42,7 @@ import { hospitalShortcutCaption, pickNearestHospital } from '@/lib/emergency/ne
 import { getPositionIfGranted, type PositionResult } from '@/lib/geo/current-position'
 import { DEFAULT_BASIS_PLACE_ID, isDefaultBasis } from '@/lib/insight/basis-place'
 import { collectIndoorAlternatives } from '@/lib/insight/indoor'
-import { pickCardReason, placeCardsEnd } from '@/lib/insight/place-cards'
+import { pickCardReason } from '@/lib/insight/place-cards'
 import { appliedFactorsOf, resolveBasisPlaceId, splitSharedReasons } from '@/lib/insight/reasons'
 import { clearRecentPlaceId, isBasisPlaceGone, readRecentPlaceId } from '@/lib/insight/recent-place'
 import {
@@ -62,10 +62,11 @@ import { cn } from '@/lib/utils/cn'
 import type { PlanSummaryItem } from '@/types/plan'
 
 /**
- * 홈은 요약 화면이다. 3장이 적당하다 — 공통명세 S5-2 (N=3). 장소 추천의 `limit` 이 이 값이다
- * (#1380) — 서버 기본값(3)과 같지만 경로가 늘 명시한다(`recommendationsPath`).
+ * 장소 추천의 `limit` — **서버 상한(10)까지 받는다** (#1400). 예전에는 "홈은 요약 화면" 이라 3장이었는데
+ * (공통명세 S5-2), 고를 폭이 좁았다. 세로로 늘리지 않고 가로 레일로 넘기므로(`PlaceInsightCardList`) 요약의
+ * 첫 화면은 그대로다. 서버 기본값(3)과 다르므로 경로가 늘 명시한다(`recommendationsPath`).
  */
-const TOP_PLACE_COUNT = 3
+const TOP_PLACE_COUNT = 10
 
 /** 실내 대안도 같은 이유로 3곳이다 — 홈-세부명세 D1 의 "3열" */
 const INDOOR_ALTERNATIVE_COUNT = 3
@@ -328,13 +329,6 @@ export function HomeView({
   const { shared: sharedReasons, perPlace: placeReasons } = splitSharedReasons(
     loaded.map((data) => data.reasons),
   )
-
-  /*
-    끝 카드 (#1069). 카드가 칸을 다 채우지 못한 날만 선다 — 후보가 모자라거나 기준 장소가 추천에
-    들어 카드에서 빠진 날이다. 3곳이 다 차면 끝 카드 없이 머리의 `장소 찾기` 가 맡는다.
-    **수를 싣지 않는다** (#1380 · D10-4) — 추천 API 는 목록 전체 수를 주지 않는다.
-  */
-  const endCard = placeCardsEnd({ cards: cards.length, capacity: TOP_PLACE_COUNT })
 
   /*
     비 예보일 때의 실내 대안. **추가 호출이 없다** — 위 추천 항목에 이미 들어 있다.
@@ -625,33 +619,10 @@ export function HomeView({
 
             비로그인 · 소개를 본 적 없음일 때만 선다. 닫거나 `/about` 을 한 번 열면 쿠키가 남아
             다음부터 서지 않는다 — 그 뒤 모바일의 통로는 맨 아래 `/about` 링크다(지우지 않는다).
-            × 뒤 초점은 다음 형제 카드로 간다 (`about-intro-card.tsx`) — 실내 대안이 선 날은 그
-            카드, 아니면 `오늘 갈 만한 곳` 이다(#1380).
+            × 뒤 초점은 다음 형제 카드로 간다 (`about-intro-card.tsx`) — 추천 카드(`오늘 갈 만한 곳`)다.
+            실내 대안은 그 아래로 내려갔다(#1400).
           */}
           {aboutIntroShown && <AboutIntroCard onDismiss={dismissAboutIntro} />}
-
-          {/*
-            비 예보일 때의 실내 대안 — **`오늘 갈 만한 곳` 위다** (#1380 · 홈-세부명세 D10-5).
-
-            예전에는 목록 바로 아래 곁가지였다("비가 오면 이쪽"). 그런데 대안이 서는 날은 서버가 **비
-            예보로** 채운 날이고, 그날 카드는 전부 야외 감점을 단 채 섰다 — 사용자가 먼저 봐야 할 것은
-            실내다(ux-review-2026-10-11 §3-4). 특보(호우 · 태풍) 날도 대안은 비 예보를 따라 온다 —
-            특보만 있고 비 예보가 없으면 서버가 채우지 않아 섹션이 없다.
-
-            **조건을 따로 세우지 않는다.** 이 섹션은 대안이 있을 때만 서고(`IndoorAlternativesSection`
-            이 빈 배열이면 `null`), 대안은 비 예보일 때만 온다 — "비 · 특보일에는 위로" 가 곧 "서는
-            날은 늘 위" 다. 대안이 없는 날은 지금처럼 아무것도 없다.
-
-            **DOM 순서로 올린다.** `order` 로 당기면 보이는 순서와 키보드 · 스크린리더 순서가 갈린다
-            (WCAG 1.3.2, D1 "모바일 순서를 DOM 순서로"). 캡션도 `아래 장소에서` 로 바뀌었다.
-
-            **카드와 같은 응답에서 온다** — 추천이 도착하는 순간 카드와 함께 서므로, 골격이 서 있는
-            동안에는 자리가 없다가 데이터와 함께 위에 끼어든다(그 순간 카드 머리가 이 섹션 높이만큼
-            내려간다). 밴드가 없다(#428) — 없는 섹션은 간격도 없다.
-          */}
-          {indoorAlternatives.length > 0 && (
-            <IndoorAlternativesSection alternatives={indoorAlternatives} />
-          )}
 
           <Surface
             lead
@@ -781,7 +752,7 @@ export function HomeView({
                 key 가 같아 스크롤을 건드리지 않는다.
               */
               <PlaceInsightCardList
-                key={`${cards.map((card) => card.data.placeId).join(',')}|${endCard === null ? '' : 'end'}`}
+                key={cards.map((card) => card.data.placeId).join(',')}
                 busy={refetching}
               >
                 {cards.map(({ data, place }, index) => (
@@ -794,10 +765,27 @@ export function HomeView({
                     preload={index === 0}
                   />
                 ))}
-                {endCard !== null && <PlaceCardsEndCard end={endCard} />}
+                {/* 레일의 마지막 장 — 늘 선다(#1400). 수를 싣지 않는다(#1380 · D10-4) */}
+                <PlaceCardsEndCard />
               </PlaceInsightCardList>
             )}
           </Surface>
+
+          {/*
+            비 예보일 때의 실내 대안 — **추천 카드 바로 아래다** (#1400 · 홈-세부명세 D11-2, D10-5 를 뒤집었다).
+
+            #1380 은 이것을 카드 **위로** 올렸다 — 대안이 서는 날은 비 예보 날이고 카드가 전부 야외 감점을 단 채
+            섰으니 실내를 먼저 보라는 판단이었다. 사용자 평가(2026-10-12)로 되돌린다: 홈의 첫 질문은 "오늘 어디로"
+            이고 그 답이 추천 카드다. 추천이 10곳이 되며(#1400) 비 오는 날에도 카드 안에 실내가 섞이고, 이 섹션은
+            "비가 오면 이쪽도" 라는 곁가지로 읽히는 것이 맞다. 캡션도 `위 장소에서` 로 되돌렸다.
+
+            **조건을 따로 세우지 않는다.** 이 섹션은 대안이 있을 때만 선다(`IndoorAlternativesSection` 이 빈
+            배열이면 `null`). **DOM 순서로 둔다** — `order` 로 당기면 보이는 순서와 키보드 · 스크린리더 순서가
+            갈린다(WCAG 1.3.2). 밴드가 없다(#428) — 없는 섹션은 간격도 없다.
+          */}
+          {indoorAlternatives.length > 0 && (
+            <IndoorAlternativesSection alternatives={indoorAlternatives} />
+          )}
 
           {/*
             바로가기 한 줄 — AI 일정 · 제주올레 · 동물병원 (#1356). 예전 좌측 레일 끝의 배너 셋이다.
