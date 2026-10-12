@@ -188,8 +188,8 @@ describe('EmergencySection — 운영시간·전화', () => {
 
     expect(markup).toContain(messages.emergency.telMissing)
     expect(markup).not.toContain('href="tel:')
-    // 자리는 남는다 — 사라지면 "화면이 깨졌다" 로 읽힌다
-    expect(markup).toContain('size-10')
+    // 자리는 남는다 — 사라지면 "화면이 깨졌다" 로 읽힌다 (52 · 글자 붙음, #1406)
+    expect(markup).toContain('size-13')
   })
 })
 

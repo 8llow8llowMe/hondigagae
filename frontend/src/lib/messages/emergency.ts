@@ -166,6 +166,8 @@ export const emergencyMessages = {
 
   /** `{name}` 치환 — icon-only 버튼의 접근성 이름 */
   callLabel: '{name} 전화하기',
+  /** 전화 버튼 아이콘 아래 글자 (#1406) — `callLabel` 이 이 낱말을 품는다 */
+  callShort: '전화',
   /** `tel === null`. **버튼을 숨기지 않고 이유와 다음 방법을 준다** */
   telMissing: '등록된 전화번호가 없어요 — 주소로 위치를 확인해 주세요.',
 
@@ -178,6 +180,8 @@ export const emergencyMessages = {
    * 바로 옆 `callLabel` 이 같은 이유로 `{name}` 을 갖는다.
    */
   directionsLabel: '{name} 길찾기',
+  /** 길찾기 버튼 아이콘 아래 글자 (#1406) — 종이비행기 아이콘이 "보내기" 로 읽혔다 */
+  directionsShort: '길찾기',
 
   // ── 지도 ───────────────────────────────────────────────────────────────
 
