@@ -66,11 +66,12 @@ export function PlanDayRegenerateConfirm({
           {messages.plan.regenerateDayVisitReset}
         </p>
       )}
-      {hasStartTime && (
-        <p className="text-caption text-fg-muted font-medium">
-          {messages.plan.regenerateDayStartTimeReset}
-        </p>
-      )}
+      {/* 시각이 있던 날은 덮어쓰기 경고, 없던 날은 추천 시각 안내 — 둘 중 하나만 (#1383 · D24-2) */}
+      <p className="text-caption text-fg-muted font-medium">
+        {hasStartTime
+          ? messages.plan.regenerateDayStartTimeReset
+          : messages.plan.regenerateDayStartTimeFill}
+      </p>
 
       {/*
         `text-danger` 는 이 저장소의 토큰이 아니다 (DESIGN.md §2-6 은 `--danger-100/500/700/900`

@@ -325,6 +325,18 @@ body {
 }
 
 /*
+  **진행 대기 화면은 흰 한 면이다** — DESIGN.md §0 의 예외, 이슈 #1401.
+
+  AI 일정 생성을 기다리는 동안(최대 80초) 볼 것은 진행 표시 하나다. 회색 바닥 위 카드 한 장은 면 경계 ·
+  테두리만 더했다. 바닥(`Canvas`)은 서버 페이지가 그리고 대기 여부는 클라이언트가 알므로, 대기 화면이
+  표식(`.ai-plan-wait`, `ai-plan-job-view.tsx`)을 달고 이 규칙이 바닥을 칠한다 — 지도 아일랜드
+  (`body:has(.map-island)`)와 같은 축이다. 두 클래스라 `bg-bg-sunken` 유틸리티를 이긴다.
+*/
+.page-canvas:has(.ai-plan-wait) {
+  background-color: var(--bg);
+}
+
+/*
   2단 레일 레이아웃 — DESIGN.md §7-1 · §7-2.
 
   **열 구분선은 우측 열의 `border-left` 로 그린다** (사용처에서 `lg:border-l`).
@@ -765,6 +777,28 @@ body {
 }
 
 /*
+  **마우스로 잡고 끄는 레일** (#1404, `useDragScroll`). 쉴 때는 잡을 수 있다는 커서(마우스 환경만 — 터치에는 커서가
+  없다), 끄는 동안(`[data-dragging]` — 클래스면 리렌더가 지운다)은 쥔 커서 · 글자 선택 끔 · **스냅 끔**이다. 스냅을 켜 둔 채 `scrollLeft` 를
+  쓰면 브라우저가 매 프레임 가까운 칸으로 되돌려 레일이 손을 따라오지 않는다. 놓으면 훅이 칸을 골라 옮긴다.
+  자식의 링크 커서(pointer)까지 덮어야 끄는 동안 손 모양이 바뀌지 않는다.
+*/
+@media (pointer: fine) {
+  .drag-scroll {
+    cursor: grab;
+  }
+}
+
+.drag-scroll[data-dragging],
+.drag-scroll[data-dragging] * {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.drag-scroll[data-dragging] {
+  scroll-snap-type: none;
+}
+
+/*
   가로 스크롤 줄의 화살표를 앉히는 기준면 (src/components/scroll-rail.tsx).
 
   **`position: relative` 만으로는 안 된다.** 그것만 주면 안쪽 스크롤러의 **내용 폭**이
@@ -797,6 +831,30 @@ body {
 @media (pointer: coarse) {
   .scroll-rail-arrow {
     display: none;
+  }
+}
+
+/*
+  **호버로 드러나는 화살표 — 홈 추천 레일 전용** (#1404, `reveal="hover"`).
+
+  1024 이상 · 호버 가능 환경에서는 레일(`.scroll-rail`)에 마우스를 올리거나 포커스가 들어올 때만 드러난다. 카드 위에 늘
+  떠 있으면 시선을 끈다. `opacity` 로 감추고 누르기를 끈다 — `display: none` 이면 Tab 이 닿지 않아 키보드로 드러낼 수
+  없다(`:focus-within` 이 버튼 자신의 포커스로도 켜진다).
+
+  **그 아래 폭은 터치여도 늘 선다** — 위 `.scroll-rail-arrow` 의 터치 숨김을 따르지 않는다. 끝 흐림을 걷은 레일이라
+  태블릿 · 모바일에서 넘김을 말할 신호가 화살표뿐이다(사용자 결정 2026-10-12).
+*/
+@media (width >= 64rem) and (hover: hover) {
+  .scroll-rail-arrow-hover {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 150ms ease;
+  }
+
+  .scroll-rail:hover .scroll-rail-arrow-hover,
+  .scroll-rail:focus-within .scroll-rail-arrow-hover {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 
@@ -2080,6 +2138,20 @@ body {
   }
 }
 
+/*
+  탭바 바로 위에 붙는 sticky 바의 `bottom` (#1381 — AI 결과의 `내 일정에 담기`). `.pb-tabbar` 와 같은
+  계산이다. 탭바가 없는 화면은 `--tabbar-h` 가 0 이라 바닥에 붙는다. 768 이상에는 탭바가 없다.
+*/
+.bottom-tabbar {
+  inset-block-end: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+
+@media (width >= 48rem) {
+  .bottom-tabbar {
+    inset-block-end: 0;
+  }
+}
+
 /* 지도 캔버스 높이 — 헤더·탭바를 뺀 나머지를 채운다.
    아트보드 05·06 은 지도가 바탕이고 그 위에 패널·시트가 얹히는 구조다. */
 .map-canvas-height {
@@ -2273,18 +2345,25 @@ body:has(.map-canvas-height) .site-footer {
   **768 미만은 알약이 없다** (#1300 D1-1) — 검색창이 맨 위(y 8)다. 띠도 알약도 서지 않아 그 폭의
   `banner` 는 0 이다(D6 — 받아들인 결정). 숨은 쪽은 `display: none` 이라 접근성 트리에서도 빠진다.
   `:has()` 를 못 읽는 브라우저는 띠가 남고 지도가 그 아래로 넘친다 — 푸터 규칙과 같은 전제(D5).
+
+  **768–1023 은 아일랜드가 아니다 — 흰 띠(`GlobalHeader`) 그대로다** (#1409). 그 폭은 알약은 서는데 왼쪽 패널(≥1024)이
+  없어, 모바일용 검색 · 재검색 · 위치 안내가 알약 아래 네 줄로 쌓이고 넷이 각자 다른 정렬로 섰다(820 실측 "최악").
+  알약 사이 틈은 지도로 쓸 수 없어 띠로 바꿔도 잃는 것이 작고, 다른 화면과 같은 헤더가 된다. 그래서 아래 아일랜드 규칙은
+  전부 **<768 · ≥1024 두 갈래**에만 걸린다 — 그 사이는 일반 지도 규칙(`.map-canvas-height` 등)을 그대로 탄다.
 */
 .island-header {
   display: none;
-  /* 지도 왼쪽 경계 — 기본(패널 접힘 · 768–1023)은 0 이고 로고 상자(148)가 왼쪽을 막는다 */
+  /* 지도 왼쪽 경계 — 기본(패널 접힘)은 0 이고 로고 상자(148)가 왼쪽을 막는다 */
   --island-map-left: 0px;
 }
 
-body:has(.map-island) .global-header {
-  display: none;
+@media (width < 48rem), (width >= 64rem) {
+  body:has(.map-island) .global-header {
+    display: none;
+  }
 }
 
-@media (width >= 48rem) {
+@media (width >= 64rem) {
   body:has(.map-island) .island-header {
     display: block;
   }
@@ -2308,9 +2387,13 @@ body:has(.map-island) .global-header {
 }
 
 /*
-  알약의 **허용 상자** — 왼쪽 = `max(지도 왼쪽 경계, 로고 상자 오른쪽 148) + 16`, 오른쪽 = 콘텐츠 열 오른쪽 − 40
-  (목록 보기 띠 헤더의 계정 · 지도 조작 카드와 같은 x, #412). 알약은 이 안에서 오른쪽 정렬이라 도킹을 여닫아도
-  움직이지 않는다 — 상자의 왼쪽만 바뀐다. `100%` 는 `fixed` 의 기준(뷰포트) 폭이다.
+  알약의 **허용 상자** — 왼쪽 = `max(지도 왼쪽 경계, 로고 상자 오른쪽 148) + 16`, 오른쪽 = **뷰포트 끝 − 16**.
+  알약은 이 안에서 오른쪽 정렬이라 도킹을 여닫아도 움직이지 않는다 — 상자의 왼쪽만 바뀐다.
+
+  **오른쪽은 로고(왼쪽 16)와 대칭이다** (#1397). 예전에는 콘텐츠 열(1440) 오른쪽 − 40 이었다 — 목록 보기 띠 헤더의
+  계정과 같은 x 로 두려던 #412 의 근거인데, 아일랜드에는 띠 헤더가 없어 맞출 대상이 없다. 그 탓에 1912 에서 알약이
+  화면 끝에서 276 떨어져 지도 한복판에 떴다. 아래 지도 조작 기둥도 같은 16 이다(`place-map-view.tsx` ·
+  `emergency-map-view.tsx`).
 
   `148` = 로고 알약 상자 오른쪽 끝(왼쪽 16 + 좌우 12 · 테두리 1 + 락업 106). 로고 락업이 바뀌면 함께 고친다
   (`styles/map-island.test.ts` 가 소스로 묶는다).
@@ -2323,7 +2406,7 @@ body:has(.map-island) .global-header {
   top: 8px;
   container: island-bar / inline-size;
   inset-inline-start: calc(max(var(--island-map-left), 148px) + 16px);
-  inset-inline-end: max(40px, calc((100% - var(--content-max)) / 2 + 40px));
+  inset-inline-end: 16px;
 }
 
 .island-menu-collapsed {
@@ -2354,12 +2437,15 @@ body:has(.map-island) .global-header {
 /*
   헤더 몫을 빼지 않는다 — 지도 윗변이 y 0 이다. 탭바(<768)만 뺀다.
   `.map-canvas-height` 와 함께 달리므로 두 클래스로 특정도를 올려 위 규칙을 이긴다.
+  **768–1023 은 덮지 않는다** (#1409) — 띠가 서므로 `.map-canvas-height` 의 `100dvh − 헤더` 가 맞다.
 */
-.map-canvas-height.map-island {
-  height: calc(100dvh - var(--tabbar-h));
+@media (width < 48rem) {
+  .map-canvas-height.map-island {
+    height: calc(100dvh - var(--tabbar-h));
+  }
 }
 
-@media (width >= 48rem) {
+@media (width >= 64rem) {
   .map-canvas-height.map-island {
     height: 100dvh;
   }
@@ -2370,8 +2456,8 @@ body:has(.map-island) .global-header {
   읽는다(#1300 D1-2). 폭에 따라 갈리므로 JS 상수 둘을 `matchMedia` 로 고르지 않는다 — 하이드레이션 불일치 · 회전
   때 어긋난다. CSS 가 폭을 알고 JS(`place-map-view.tsx` 의 핀 보정)는 계산된 값을 읽는다.
 
-  - **60** (<768) = 위 8 + 검색 44 + 여유 8 — 알약이 없다
-  - **120** (≥768) = 위 8 + 알약 48 + 간격 12 + 검색 · 보기 전환 44 + 여유 8
+  - **60** (<1024) = 위 8 + 검색 44 + 여유 8 — 알약이 없다(<768 은 띠도 없고, 768–1023 은 띠 아래가 지도 윗변이다, #1409)
+  - **120** (≥1024) = 위 8 + 알약 48 + 간격 12 + 검색 · 보기 전환 44 + 여유 8
 
   `map-sheet.render.test.ts` 가 두 유도를 이 값과 대조한다.
 */
@@ -2379,7 +2465,7 @@ body:has(.map-island) .global-header {
   --map-island-inset: 60px;
 }
 
-@media (width >= 48rem) {
+@media (width >= 64rem) {
   .map-island {
     --map-island-inset: 120px;
   }
@@ -2390,20 +2476,10 @@ body:has(.map-island) .global-header {
 }
 
 /*
-  **로고 알약** — 768–1023 은 늘, ≥1024 는 패널이 접혔을 때(#1287 D1-2 · #1300 D2-1). 로고는 도킹 스택의 목록 칸
-  64 띠 위에 서는데, 띠가 없는 폭(768–1023)이나 패널을 접어 띠가 밀려나면 로고가 지도 위에 맨몸으로 남는다.
-  자리(왼쪽 16 · 위 8 · 높이 48)는 그대로 두고 바탕만 알약이 된다 — 메뉴 알약과 같은 면 · 테두리 · 그림자, 좌우 12.
+  **로고 알약** — ≥1024 에서 패널이 접혔을 때(#1287 D1-2 · #1300 D2-1). 로고는 도킹 스택의 목록 칸 64 띠 위에 서는데,
+  패널을 접어 띠가 밀려나면 로고가 지도 위에 맨몸으로 남는다. 자리(왼쪽 16 · 위 8 · 높이 48)는 그대로 두고 바탕만
+  알약이 된다 — 메뉴 알약과 같은 면 · 테두리 · 그림자, 좌우 12. 768–1023 의 로고 알약은 #1409 에서 걷었다(흰 띠다).
 */
-@media (width >= 48rem) and (width < 64rem) {
-  body:has(.map-island) .island-logo {
-    padding-inline: 12px;
-    background-color: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-full);
-    box-shadow: var(--shadow-md);
-  }
-}
-
 @media (width >= 64rem) {
   body:has(.map-island[data-dock='closed']) .island-logo {
     padding-inline: 12px;
@@ -2428,10 +2504,13 @@ body:has(.map-island) .global-header {
 /*
   오프라인 띠 — 아일랜드에서는 **화면 맨 위 `fixed`** 다(D1-2). 흐름 안 `sticky` 로 두면 지도를 밀어
   화면에 스크롤이 생긴다. 알약과 같은 `z-40` 이고 DOM 이 뒤라 위에 덮인다.
+  768–1023 은 흰 띠가 서는 일반 화면이라 그 화면들의 규칙을 따른다(#1409) — `fixed` 로 두면 띠를 덮는다.
 */
-body:has(.map-island) .offline-banner {
-  position: fixed;
-  inset-inline: 0;
-  top: 0;
-  z-index: 40;
+@media (width < 48rem), (width >= 64rem) {
+  body:has(.map-island) .offline-banner {
+    position: fixed;
+    inset-inline: 0;
+    top: 0;
+    z-index: 40;
+  }
 }

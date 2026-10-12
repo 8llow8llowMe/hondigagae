@@ -127,6 +127,32 @@ function renderRow(overrides: Record<string, unknown> = {}) {
   )
 }
 
+describe('PlanAddPlaceRow — 동반 불가 · 미확인의 한 번 더 확인 (#1383 · D24-4)', () => {
+  it('확인을 기다리면 이유를 행 안에 한 줄로 말하고 스크린리더 라벨이 그래도 담기다', () => {
+    const markup = renderRow({ confirmReason: 'NOT_ALLOWED' })
+
+    expect(markup).toContain(messages.plan.addPlaceConfirmNotAllowed)
+    expect(markup).toContain('role="status"')
+    expect(markup).toContain(
+      `aria-label="${messages.plan.addPlaceConfirmLabel.replace('{title}', placeSummary.title)}"`,
+    )
+    // 버튼 글자는 담기 그대로다 — 액션 열이 고정 폭이다
+    expect(markup).toContain(`>${messages.plan.addPlaceShort}<`)
+  })
+
+  it('미확인은 출입 조건을 확인하라고 말한다', () => {
+    expect(renderRow({ confirmReason: 'UNKNOWN' })).toContain(messages.plan.addPlaceConfirmUnknown)
+  })
+
+  it('기다리지 않으면 아무 줄도 없다', () => {
+    const markup = renderRow()
+
+    expect(markup).not.toContain(messages.plan.addPlaceConfirmNotAllowed)
+    expect(markup).not.toContain(messages.plan.addPlaceConfirmUnknown)
+    expect(markup).not.toContain('role="status"')
+  })
+})
+
 describe('PlanAddPlaceRow — 거리순 목록의 거리 (#1217)', () => {
   it('거리가 오면 메타 줄 끝에 붙는다', () => {
     const markup = renderRow({ place: { ...placeSummary, distanceMeters: 1234 } })
@@ -237,9 +263,13 @@ describe('담기 성공 후 화면에 남는다 (#370)', () => {
     지도에서 여러 곳을 연달아 담으려면 화면에 남아야 한다. 피드백은 토스트와
     "이미 담았어요" 이고, 돌아가기는 헤더의 BackLink 다.
   */
-  it('onAdded 콜백을 넘기지 않는다 — 담자마자 나가면 연달아 담을 수 없다', () => {
-    expect(source).toContain('usePlanAddPlace({ planId })')
-    expect(source).not.toContain('onAdded:')
+  /*
+    **onAdded 는 확인 대기만 지운다** (#1383 · D24-4) — 이동하지 않는다. 담자마자 나가면 연달아 담을 수
+    없다(#370). 예전에는 `onAdded` 를 아예 넘기지 않는 것으로 이것을 잠갔다.
+  */
+  it('onAdded 는 확인 대기를 지우는 것뿐이다 — 담자마자 나가면 연달아 담을 수 없다', () => {
+    expect(source).toContain('usePlanAddPlace({ planId, onAdded: clearConfirming })')
+    expect(source).toContain('const clearConfirming = useCallback(() => setConfirming(null), [])')
   })
 
   it('담기 경로에서 일정 상세로 replace 하지 않는다', () => {

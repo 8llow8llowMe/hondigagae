@@ -71,8 +71,15 @@ describe('PlanDayRegenerateConfirm — 시각 초기화 경고 (#623)', () => {
     expect(render({ hasStartTime: true })).toContain(messages.plan.regenerateDayStartTimeReset)
   })
 
-  it('시각 있는 항목이 없으면 경고를 내지 않는다', () => {
-    expect(render({ hasStartTime: false })).not.toContain(messages.plan.regenerateDayStartTimeReset)
+  it('시각 있는 항목이 없으면 경고를 내지 않고 추천 시각 안내를 낸다 (#1383 · D24-2)', () => {
+    const markup = render({ hasStartTime: false })
+
+    expect(markup).not.toContain(messages.plan.regenerateDayStartTimeReset)
+    expect(markup).toContain(messages.plan.regenerateDayStartTimeFill)
+  })
+
+  it('시각 있는 날은 경고 하나만 — 안내와 겹쳐 말하지 않는다', () => {
+    expect(render({ hasStartTime: true })).not.toContain(messages.plan.regenerateDayStartTimeFill)
   })
 
   it('시각 경고도 다녀옴 경고와 함께 확정 버튼보다 앞이다', () => {

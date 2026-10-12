@@ -4,6 +4,8 @@ import {
   DEFAULT_AREA_CODE,
   DEFAULT_PLACE_FILTERS,
   parsePlaceFilters,
+  placeFilterDefaults,
+  PLACES_DEFAULT_FILTERS,
   toPlaceApiQuery,
   toPlaceFilterQuery,
 } from '@/lib/url/place-filters'
@@ -219,5 +221,88 @@ describe('toPlaceApiQuery — 기준 좌표 (#1217)', () => {
 
     expect(query).toContain('lastPlaceId=42')
     expect(query).toContain('lat=33.25')
+  })
+})
+
+/**
+ * `/places` 의 기본 조건은 `동반 가능만`이다 (#1379). 빈 URL 이 그 상태라 정규 주소(#1130)가
+ * 그대로이고, 끈 상태는 화면 전용 값 `ALL` 로 적는다 — 서버 enum 이 아니므로 API 에는 싣지 않는다.
+ */
+describe('화면별 기본 조건 — /places 는 동반 가능만 (#1379)', () => {
+  it('빈 URL 은 그 화면의 기본값이다', () => {
+    expect(parsePlaceFilters(new URLSearchParams(), PLACES_DEFAULT_FILTERS)).toEqual(
+      PLACES_DEFAULT_FILTERS,
+    )
+    expect(PLACES_DEFAULT_FILTERS.petAllowanceType).toBe('ALLOWED')
+  })
+
+  it('ALL 은 미지정(전체)이다', () => {
+    const filters = parsePlaceFilters(
+      new URLSearchParams('petAllowanceType=ALL'),
+      PLACES_DEFAULT_FILTERS,
+    )
+
+    expect(filters.petAllowanceType).toBeNull()
+  })
+
+  it('명시한 동반 코드는 기본값보다 앞선다', () => {
+    const filters = parsePlaceFilters(
+      new URLSearchParams('petAllowanceType=NOT_ALLOWED'),
+      PLACES_DEFAULT_FILTERS,
+    )
+
+    expect(filters.petAllowanceType).toBe('NOT_ALLOWED')
+  })
+
+  it('모르는 값은 그 화면의 기본값으로 떨어뜨린다', () => {
+    const filters = parsePlaceFilters(
+      new URLSearchParams('petAllowanceType=MAYBE'),
+      PLACES_DEFAULT_FILTERS,
+    )
+
+    expect(filters.petAllowanceType).toBe('ALLOWED')
+  })
+
+  it('기본값은 주소에서 빠지고, 끈 상태는 ALL 로 적힌다', () => {
+    expect(toPlaceFilterQuery(PLACES_DEFAULT_FILTERS, PLACES_DEFAULT_FILTERS)).toBe('')
+    expect(toPlaceFilterQuery(DEFAULT_PLACE_FILTERS, PLACES_DEFAULT_FILTERS)).toBe(
+      'petAllowanceType=ALL',
+    )
+  })
+
+  it.each([
+    ['동반 가능만', PLACES_DEFAULT_FILTERS],
+    ['전체', { ...PLACES_DEFAULT_FILTERS, petAllowanceType: null }],
+    ['동반 불가', { ...PLACES_DEFAULT_FILTERS, petAllowanceType: 'NOT_ALLOWED' as const }],
+  ])('%s — 왕복해도 그대로다', (_label, filters) => {
+    const query = toPlaceFilterQuery(filters, PLACES_DEFAULT_FILTERS)
+
+    expect(parsePlaceFilters(new URLSearchParams(query), PLACES_DEFAULT_FILTERS)).toEqual(filters)
+  })
+
+  it('API 쿼리에 ALL 을 싣지 않는다 — 서버 enum 이 아니다', () => {
+    const filters = parsePlaceFilters(
+      new URLSearchParams('petAllowanceType=ALL'),
+      PLACES_DEFAULT_FILTERS,
+    )
+
+    expect(toPlaceApiQuery(filters)).not.toContain('petAllowanceType')
+  })
+
+  it('공용 기본값의 화면은 그대로다 — 빈 URL 은 동반 축 미지정', () => {
+    expect(parsePlaceFilters(new URLSearchParams()).petAllowanceType).toBeNull()
+    expect(toPlaceFilterQuery(DEFAULT_PLACE_FILTERS)).toBe('')
+  })
+
+  it('경로가 기본값을 고른다 — /places · 일정 담기 화면이 동반 가능만이다 (#1383)', () => {
+    expect(placeFilterDefaults('/places')).toBe(PLACES_DEFAULT_FILTERS)
+    expect(placeFilterDefaults('/plans/223456789012000001/days/2/add')).toBe(PLACES_DEFAULT_FILTERS)
+  })
+
+  it('담기와 비슷한 다른 경로는 공용 기본값 그대로다', () => {
+    expect(placeFilterDefaults('/')).toBe(DEFAULT_PLACE_FILTERS)
+    expect(placeFilterDefaults('/plans/1/days/1')).toBe(DEFAULT_PLACE_FILTERS)
+    expect(placeFilterDefaults('/plans/1/days/1/add/extra')).toBe(DEFAULT_PLACE_FILTERS)
+    expect(placeFilterDefaults('/places/1')).toBe(DEFAULT_PLACE_FILTERS)
   })
 })

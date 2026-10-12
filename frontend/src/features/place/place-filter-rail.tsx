@@ -11,7 +11,7 @@ import {
 } from '@/features/place/place-filter-fields'
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { messages } from '@/lib/messages'
-import { DEFAULT_PLACE_FILTERS, toPlaceFilterQuery } from '@/lib/url/place-filters'
+import { toPlaceFilterQuery } from '@/lib/url/place-filters'
 import type { PlaceFilters } from '@/types/place'
 
 /**
@@ -31,10 +31,10 @@ export function PlaceFilterRail({
   filters: PlaceFilters
   authed: boolean
 }) {
-  const { apply, reset } = usePlaceFilterNav()
+  const { apply, reset, defaults } = usePlaceFilterNav()
   const { pet } = useSelectedPet(authed)
 
-  const dirty = toPlaceFilterQuery(filters) !== toPlaceFilterQuery(DEFAULT_PLACE_FILTERS)
+  const dirty = toPlaceFilterQuery(filters, defaults) !== ''
 
   return (
     <div className="filter-rail pb-5">

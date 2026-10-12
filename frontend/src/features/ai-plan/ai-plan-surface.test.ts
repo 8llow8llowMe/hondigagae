@@ -250,8 +250,23 @@ describe('/ai-plans/jobs/[jobId] — 여섯 상태가 한 카드에 든다 (#473
     완료는 셋이다 — 이미 담음(#1041) · 조건 상실 · 담기.
   */
   it('여섯 상태가 껍데기를 거치고 완료 셋만 bare 다', () => {
-    expect(jobView.match(/<AiPlanJobShell>/g)).toHaveLength(6)
+    // 대기는 카드 없는 흰 한 면이다(`plain`, #1401) — 껍데기(h1)는 그대로 거친다
+    expect(jobView.match(/<AiPlanJobShell>/g)).toHaveLength(5)
+    expect(jobView.match(/<AiPlanJobShell plain>/g)).toHaveLength(1)
     expect(jobView.match(/<AiPlanJobShell bare>/g)).toHaveLength(3)
+  })
+
+  /*
+    #1401 — 대기만 흰 한 면. 바닥은 서버 페이지의 `Canvas` 라 표식을 달고 CSS 가 칠한다(DESIGN.md §0 예외).
+    `plain` 이 진행 갈래에만 있어야 한다 — 실패 · 취소까지 번지면 회색 바닥 규칙이 조용히 무너진다.
+  */
+  it('plain 은 진행 대기 갈래 하나이고 표식이 바닥 규칙과 이어진다', () => {
+    const wait = jobView.slice(jobView.indexOf('if (job === null || polling)'))
+    expect(wait.indexOf('<AiPlanJobShell plain>')).toBeLessThan(wait.indexOf('<AiPlanProgress'))
+    expect(jobView).toContain("plain && 'ai-plan-wait'")
+    expect(code('app/globals.css')).toMatch(
+      /\.page-canvas:has\(\.ai-plan-wait\)\s*\{\s*background-color:\s*var\(--bg\);/,
+    )
   })
 
   /*
@@ -374,5 +389,17 @@ describe('AiPlanCanceled 의 inset 파라미터화 (#473)', () => {
 
   it('하드코딩 인셋이 남아 있지 않다', () => {
     expect(canceled).not.toContain('md:px-10')
+  })
+})
+
+/**
+ * 작업 화면 탭 제목 — 이슈 #1381. 다른 화면은 전부 `· 혼디가개` 가 붙는데 이 화면만
+ * `AI 일정 만들기` 로 떠 탭에서 서비스 이름이 사라졌다 (`ux-review-2026-10-11.md` §3-8).
+ */
+describe('작업 화면 탭 제목 (#1381)', () => {
+  it('접미사 · 혼디가개 가 붙는다 — 만들기 화면과 같은 모양이다', () => {
+    const page = code('app/(main)/ai-plans/jobs/[jobId]/page.tsx')
+
+    expect(page).toContain('title: `${messages.aiPlan.jobTitle} · 혼디가개`')
   })
 })

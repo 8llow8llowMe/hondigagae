@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Image from 'next/image'
 
 import { PET_AVATAR_DEFAULT } from '@/components/pet-avatar'
+import { useImageFallback } from '@/lib/hooks/use-image-fallback'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -36,13 +36,8 @@ export function PetPhoto({
   size?: 48 | 80
   className?: string
 }) {
-  const [failed, setFailed] = useState(false)
-
-  // URL 이 바뀌면 실패 기록을 지운다. 안 그러면 한 번 깨진 뒤 새 사진을 올려도
-  // 계속 폴백만 보인다 — 업로드 성공이 화면에 반영되지 않는다
-  useEffect(() => {
-    setFailed(false)
-  }, [url])
+  // 서버 렌더된 사진이 하이드레이션 전에 깨진 경우까지 잡는다 (#1382)
+  const { failed, imgRef, onError } = useImageFallback(url)
 
   const shape = cn('shrink-0 rounded-full', size === 48 ? 'size-12' : 'size-20', className)
 
@@ -68,7 +63,8 @@ export function PetPhoto({
       alt=""
       width={size}
       height={size}
-      onError={() => setFailed(true)}
+      ref={imgRef}
+      onError={onError}
       className={cn('bg-band object-cover', shape)}
     />
   )

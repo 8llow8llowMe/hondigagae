@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { crowdedLabel, pickCardReason, placeCardsEnd } from '@/lib/insight/place-cards'
+import { crowdedLabel, pickCardReason } from '@/lib/insight/place-cards'
 import type { CongestionItem, SuitabilityReasonItem } from '@/types/insight'
 
 function reason(code: string, scoreDelta: number): SuitabilityReasonItem {
@@ -59,54 +59,5 @@ describe('crowdedLabel', () => {
 
   it('congestion 이 null 이면 그리지 않는다', () => {
     expect(crowdedLabel(null)).toBeNull()
-  })
-})
-
-/*
-  끝 카드 — 추천이 3곳 미만이면 빈 칸을 `장소 N곳 전체 보기` 가 채운다. 3곳이 다 차면
-  끝 카드 없이 머리의 `장소 찾기` 가 맡는다.
-*/
-describe('placeCardsEnd', () => {
-  it('카드가 다 차면 끝 카드가 없다', () => {
-    expect(placeCardsEnd({ cards: 3, unscored: 0, total: 20, capacity: 3 })).toBeNull()
-  })
-
-  it('빈 칸이 있으면 전체 수와 함께 선다', () => {
-    expect(placeCardsEnd({ cards: 2, unscored: 0, total: 20, capacity: 3 })).toEqual({
-      total: 20,
-      unscored: 0,
-      span: 1,
-    })
-  })
-
-  /* 점수를 못 낸 곳은 카드가 아니라 끝 카드 안의 한 줄이다 */
-  it('점수를 내지 못한 곳의 수를 싣는다', () => {
-    expect(placeCardsEnd({ cards: 1, unscored: 1, total: 20, capacity: 3 })).toMatchObject({
-      total: 20,
-      unscored: 1,
-    })
-  })
-
-  /*
-    전부 점수를 못 냈어도 끝 카드는 선다 — 지우면 사용자는 그 장소들이 조회되지 않았다는
-    것조차 모른다(#428). 카드도 점수 못 낸 곳도 없는 날은 호출부의 빈 상태가 맡는다.
-  */
-  it('점수를 낸 곳이 없어도 점수 못 낸 곳을 말하러 선다', () => {
-    expect(placeCardsEnd({ cards: 0, unscored: 2, total: 20, capacity: 3 })).toMatchObject({
-      total: 20,
-      unscored: 2,
-    })
-  })
-
-  /*
-    **빈 칸을 전부 채운다.** 카드가 한 장이면 그리드에 빈 칸이 둘이라, 끝 카드가 한 칸만 차지하면
-    셋째 칸이 흰 구멍으로 남는다 (1440 실측).
-  */
-  it.each([
-    [2, 1],
-    [1, 2],
-    [0, 3],
-  ])('카드 %i 장이면 끝 카드가 %i 칸을 차지한다', (cards, span) => {
-    expect(placeCardsEnd({ cards, unscored: 0, total: 20, capacity: 3 })?.span).toBe(span)
   })
 })

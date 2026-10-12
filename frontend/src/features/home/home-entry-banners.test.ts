@@ -80,15 +80,14 @@ describe('홈 → AI 일정 생성 진입점 (#905 R1 · #1356)', () => {
 */
 describe('홈 → 장소 목록 링크 문구 (#905 R7)', () => {
   /*
-    **#1069 이후 링크는 끝 카드 한 장이다** — 모바일 버튼 · 데스크톱 링크 두 벌이 걷혔다.
-    그래도 수는 **전체 수**여야 한다: 남은 수로 쓰면 같은 링크가 추천 수에 따라 다른 수를 말한다.
+    **#1069 이후 링크는 끝 카드 한 장이다** — 모바일 버튼 · 데스크톱 링크 두 벌이 걷혔다. 예전에는
+    수가 **전체 수**여야 했는데(남은 수로 쓰면 같은 링크가 추천 수에 따라 다른 수를 말한다), #1380
+    부터는 수 자체가 없다 — 추천 API 가 목록 전체 수를 주지 않는다 (홈-세부명세 D10-4).
     (끝 카드의 문구 · 꺾쇠는 `place-insight-card.test.ts` 가 잠근다)
   */
-  it('끝 카드에 넘기는 수가 전체 장소 수다', () => {
-    const end = HOME.indexOf('placeCardsEnd({')
-
-    expect(end).toBeGreaterThan(-1)
-    expect(HOME.slice(end, end + 200)).toContain('total: places.length')
+  /* #1400 부터 끝 카드는 레일의 마지막 장으로 늘 서고 받는 값이 없다 */
+  it('끝 카드에 수를 넘기지 않는다 — 목록을 따로 부르지 않는다', () => {
+    expect(HOME).toContain('<PlaceCardsEndCard />')
     expect(HOME).not.toContain('morePlaces')
   })
 

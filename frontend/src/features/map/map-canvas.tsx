@@ -32,6 +32,7 @@ import {
   framedCamera,
   framedCenterLat,
   type MapBounds,
+  type MapInsets,
   shouldRefit,
   type SpanBox,
 } from '@/lib/map/viewport'
@@ -373,6 +374,14 @@ export function MapCanvas({
      * 틀이 아니라 사용자가 보고 있는 곳이다.
      */
     refitOnResize?: boolean
+    /**
+     * **칸 위에 떠서 지도를 가리는 몫**(px)을 돌려준다 (#1379). 주면 남은 칸에 맞추고 기준점을 그 칸
+     * 한가운데에 놓는다 — `anchorRatio` 는 쓰지 않는다 (`framedCamera` 의 `insets`).
+     *
+     * **맞추는 순간 부른다** — `selectedOffset` 과 같은 이유다. 시트 · 도킹 스택은 폭마다 서고 말고가
+     * 갈려 값으로 넘기면 늘 한 박자 늦다. null 이면 덮개 없이 맞춘다.
+     */
+    insets?: (() => MapInsets | null) | undefined
   } | null
   /**
    * 핀을 고르면 이 단계까지 **확대**한다. 주지 않으면 이동만 한다.
@@ -454,6 +463,15 @@ export function MapCanvas({
   const boundsRef = useRef(onBoundsChange)
   const failureRef = useRef(onFailure)
   const cameraAppliedRef = useRef(onCameraApplied)
+  /*
+    **카메라를 놓는 동안 난 `idle` 은 하나로 합친다** (#1379). 카카오는 `setLevel` · `setCenter` 마다
+    `idle` 을 **동기로** 낸다(5174 실측) — 둘을 연달아 부르면 확대만 된 **중간 화면**의 `idle` 이 먼저
+    나간다. 바깥(`framingAfterIdle`)이 그것을 카메라 결과로 받으면 재검색 권유 기준이 중간 화면이 되어
+    조작 0회에서 버튼이 떴다. 놓는 동안은 버리고, 다 놓고 `onCameraApplied` 를 알린 뒤 지금 화면으로
+    한 번만 낸다. 애니메이션으로 늦게 오는 `idle` 은 원래대로 그때 온다.
+  */
+  const cameraMovingRef = useRef(false)
+  const idleHandlerRef = useRef<(() => void) | null>(null)
   const userMoveRef = useRef(onUserMove)
   /** 마지막 카메라 뒤에 사용자가 지도를 옮겼거나 핀을 골랐는가 (`refitOnResize`) */
   const movedSinceCameraRef = useRef(false)
@@ -511,6 +529,8 @@ export function MapCanvas({
           map.setCopyrightPosition(maps.CopyrightPosition.BOTTOMRIGHT, false)
 
         idleHandler = () => {
+          // 카메라를 놓는 중이다 — 다 놓은 뒤 한 번 낸다 (`cameraMovingRef`)
+          if (cameraMovingRef.current) return
           setLevel(map.getLevel())
           const bounds = map.getBounds()
           const userMoved = settledRef.current
@@ -518,6 +538,7 @@ export function MapCanvas({
           boundsRef.current?.(toMapBounds(bounds.getSouthWest(), bounds.getNorthEast()), userMoved)
         }
         maps.event.addListener(map, 'idle', idleHandler)
+        idleHandlerRef.current = idleHandler
 
         setStatus('ready')
         // 탭·시트 뒤에서 생성되면 컨테이너 크기가 0 이다. 노출 직후 되잡는다
@@ -539,6 +560,7 @@ export function MapCanvas({
       if (map !== null && maps !== null && idleHandler !== null) {
         maps.event.removeListener(map, 'idle', idleHandler)
       }
+      idleHandlerRef.current = null
 
       for (const overlay of overlaysRef.current) overlay.setMap(null)
       overlaysRef.current = []
@@ -879,39 +901,41 @@ export function MapCanvas({
     const apply = () => {
       fitted = { width: container.clientWidth, height: container.clientHeight }
 
+      /*
+        **`keepLevel` 이면 지금 단계로 프레이밍한다** (#873). 단계를 다시 정하지 않지만 **위도 폭
+        환산에는 단계가 필요하므로** 지금 값을 넘긴다 — 다른 배율로 잰 오프셋이 걸리면 중심이 어긋난다.
+        `anchorRatio` 가 0.5 면 어느 단계든 기준점과 같아 차이가 없지만, 0.35 갈래에서는 실제로 갈린다.
+      */
       const next = framedCamera({
         anchor: camera.anchor,
         spanMeters: camera.spanMeters,
         width: fitted.width,
         height: fitted.height,
         seaRatio: camera.anchorRatio ?? JEJU_MAP_SEA_RATIO,
+        insets: camera.insets?.() ?? null,
+        ...(camera.keepLevel === true ? { level: map.getLevel() } : {}),
       })
-
-      /*
-        **`keepLevel` 이면 지금 단계로 프레이밍한다** (#873). `framedCamera` 가 계산한
-        단계는 버리지만 **위도 폭 환산에는 단계가 필요하므로**(`framedCenterLat`) 지금
-        값을 대신 넣는다 — `next.lat` 을 그대로 쓰면 다른 배율로 잰 오프셋이 걸려 중심이
-        어긋난다. `anchorRatio` 가 0.5 면 어느 단계든 기준점과 같아 차이가 없지만,
-        0.35 갈래에서는 실제로 갈린다.
-      */
-      const level = camera.keepLevel === true ? map.getLevel() : next.level
-      const lat =
-        camera.keepLevel === true
-          ? framedCenterLat(
-              camera.anchor.lat,
-              fitted.height,
-              level,
-              camera.anchorRatio ?? JEJU_MAP_SEA_RATIO,
-            )
-          : next.lat
-
       // **단계를 먼저, 중심을 나중에.** 순서가 뒤집히면 옛 중심을 확대한 뒤 옮기게 되어
       // 한 프레임 동안 엉뚱한 곳이 보인다 (선택 핀 확대에서 같은 판단을 했다)
-      if (camera.keepLevel !== true) map.setLevel(next.level)
-      map.setCenter(new maps.LatLng(lat, next.lng))
+      // 그 사이 동기로 나는 `idle` 은 버린다 — `cameraMovingRef` 주석
+      cameraMovingRef.current = true
+      try {
+        if (camera.keepLevel !== true) map.setLevel(next.level)
+        map.setCenter(new maps.LatLng(next.lat, next.lng))
+      } finally {
+        cameraMovingRef.current = false
+      }
 
       // 놓은 자리를 알린다 — 바깥이 "사용자가 옮겼는지" 를 이 자리 기준으로 잰다 (#578)
-      cameraAppliedRef.current?.({ lat, lng: next.lng })
+      cameraAppliedRef.current?.({ lat: next.lat, lng: next.lng })
+
+      /*
+        놓은 화면으로 `idle` 을 **늘 한 번** 낸다 — **알린 뒤다.** 바깥은 알림 다음 `idle` 을 결과로 받는다.
+        놓는 동안 미룬 것이 없어도 낸다: 놓은 자리가 지금 시야와 같으면 카카오가 `idle` 을 내지 않아, 바깥이
+        결과를 영영 못 받고 사용자의 첫 이동을 결과로 삼는다(#1379 검토). `setLevel` · `setCenter` 는 애니메이션이
+        없어 지금 화면이 곧 결과다. 뒤이어 오는 `idle` 이 있어도 같은 화면이라 해가 없다.
+      */
+      idleHandlerRef.current?.()
     }
 
     movedSinceCameraRef.current = false

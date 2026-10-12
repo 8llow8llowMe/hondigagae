@@ -4,6 +4,7 @@ import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
 import { PlaceRowContent } from '@/features/place/place-row'
 import { messages } from '@/lib/messages'
+import { addPlaceConfirmNotice, type AddPlaceConfirmReason } from '@/lib/plan/add-place-confirm'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import type { PlaceSummary } from '@/types/place'
@@ -26,6 +27,7 @@ export function PlanAddPlaceRow({
   pending,
   disabled,
   error,
+  confirmReason = null,
   onAdd,
   inset = 'card',
 }: {
@@ -41,6 +43,11 @@ export function PlanAddPlaceRow({
    * 무력화된다 (F4).
    */
   error: PlanDaySaveError | null
+  /**
+   * **이 행이 한 번 더 확인을 기다린다** — 동반 불가 · 미확인 장소의 첫 누름 뒤다 (#1383 · D24-4).
+   * 이유를 행 안에 한 줄로 말하고, 같은 `담기` 를 한 번 더 누르면 담긴다.
+   */
+  confirmReason?: AddPlaceConfirmReason | null
   onAdd: (place: PlaceSummary) => void
   /**
    * 좌우 여백 축. **이 행을 담는 곳이 정한다** (`PlaceRow` 와 같은 규칙).
@@ -78,7 +85,10 @@ export function PlanAddPlaceRow({
               size="md"
               loading={pending}
               disabled={disabled && !pending}
-              aria-label={messages.plan.addPlaceLabel.replace('{title}', place.title)}
+              aria-label={(confirmReason === null
+                ? messages.plan.addPlaceLabel
+                : messages.plan.addPlaceConfirmLabel
+              ).replace('{title}', place.title)}
               onClick={() => onAdd(place)}
             >
               {messages.plan.addPlaceShort}
@@ -86,6 +96,12 @@ export function PlanAddPlaceRow({
           )}
         </div>
       </div>
+
+      {confirmReason !== null && (
+        <p role="status" className="text-body-2 text-fg mb-3 font-medium break-keep">
+          {addPlaceConfirmNotice(confirmReason)}
+        </p>
+      )}
 
       {error !== null && (
         <FormAlert

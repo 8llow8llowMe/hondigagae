@@ -1,5 +1,6 @@
 package com.hondigagae.global.properties;
 
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -32,7 +33,9 @@ public record InsightProperties(
     Double feelsLikeDangerCelsius,
     // 비 오는 날 실내 대안 검색 기본 반경(m) / 개수
     Integer alternativeRadiusMeters,
-    Integer alternativeSize
+    Integer alternativeSize,
+    // 장소 추천(홈 "오늘 가기 좋은 곳") 후보군과 결과 캐시 (#1368)
+    Recommendation recommendation
 ) {
 
     public InsightProperties {
@@ -73,6 +76,37 @@ public record InsightProperties(
         }
         if (alternativeSize == null || alternativeSize <= 0) {
             alternativeSize = 5;
+        }
+        if (recommendation == null) {
+            recommendation = new Recommendation(null, null, null);
+        }
+    }
+
+    /**
+     * 장소 추천 후보군과 결과 캐시 (#1368).
+     *
+     * <p>지역은 요청으로 받지 않는다 — 서비스 지역이 제주 하나라 화면이 고를 값이 없고, 받으면 후보 질의와 캐시 키가
+     * 지역 수만큼 갈라진다. 유형 기본값이 관광지(12) · 문화시설(14) · 레포츠(28) 인 이유: 쇼핑(38)은 운영 데이터 대부분이
+     * 면세점 · 상점이라 "가 볼 곳" 이 아니고, 음식점(39) · 숙박(32)은 하루 행선지가 아니다.
+     *
+     * @param areaCode        후보 지역 코드 (관광공사 areaCode, 제주 39)
+     * @param contentTypeIds  후보 콘텐츠 유형 코드
+     * @param cacheTtlSeconds 결과 캐시 수명(초). 특보는 키에 담기므로 이 값이 특보의 신선도를 늦추지 않는다
+     */
+    public record Recommendation(String areaCode, List<String> contentTypeIds, Integer cacheTtlSeconds) {
+
+        public Recommendation {
+            if (areaCode == null || areaCode.isBlank()) {
+                areaCode = "39";
+            }
+            if (contentTypeIds == null || contentTypeIds.isEmpty()) {
+                contentTypeIds = List.of("12", "14", "28");
+            } else {
+                contentTypeIds = List.copyOf(contentTypeIds);
+            }
+            if (cacheTtlSeconds == null || cacheTtlSeconds <= 0) {
+                cacheTtlSeconds = 600;
+            }
         }
     }
 }

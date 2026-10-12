@@ -33,7 +33,7 @@ import type { NearbyFacilityItem } from '@/types/emergency'
  * 자리를 다투느라 #598 이 `basis-[min-content]` 로 줄바꿈을 따로 설계해야 했다.
  *
  * 이제 **머리(`FacilityRowHeader`)가 전폭 343px 을 쓰고**, 그 아래 층만 좌우로 갈라
- * `[시간·주소 243px | 버튼 88px]` 이 된다. 버튼은 제목과 같은 줄에 있을 이유가 없다 —
+ * `[시간·주소 219px | 버튼 112px]` 이 된다(#1406 에서 버튼에 글자가 붙어 52 가 됐다 — 예전 243 | 88). 버튼은 제목과 같은 줄에 있을 이유가 없다 —
  * 제목은 "무엇인가" 이고 버튼은 "어떻게 갈 것인가" 라 층이 다르다. 머리가 넓어지면서
  * #598 의 줄바꿈 장치가 목적을 잃어 함께 걷혔다 (`FacilityRowHeader` 머리주석).
  *
@@ -78,19 +78,19 @@ export function FacilityRow({
     <li className={INSET_CLASS[inset]}>
       <div className="flex flex-col gap-1.5 py-3">
         {/* 머리는 전폭이다 — 버튼 칸이 제목 줄을 먹지 않는다 (#603) */}
-        <FacilityRowHeader facility={facility} />
+        <FacilityRowHeader facility={facility} showDistance={showDistance} />
 
         {/*
-          아래 층만 좌우로 갈린다. **`items-center` 다** — 버튼 둘(40px)을 세 줄 안팎의
+          아래 층만 좌우로 갈린다. **`items-center` 다** — 버튼 둘(52px, #1406)을 세 줄 안팎의
           글자 덩어리 한가운데 두는 쪽이, 위에 붙여 아래를 비우는 것보다 덩어리로 읽힌다.
 
           **전화 옆에 길찾기가 붙는다** (#537). 둘은 이 행에서 할 수 있는 두 가지 행동이고
           같은 무게라 나란히 둔다. `gap-2`(8)는 두 버튼이 오조작 없이 갈리는 최소값이다 —
-          375 에서 글자 칸에 343 − 40 − 40 − 12 − 8 = 243px 이 남는다 (예전 219px).
+          375 에서 글자 칸에 343 − 52 − 52 − 12 − 8 = 219px 이 남는다 (#1406 전 40 버튼일 때 243).
         */}
         <div className="flex items-center gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <FacilityRowBody facility={facility} showDistance={showDistance} now={now} />
+            <FacilityRowBody facility={facility} now={now} />
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
@@ -129,8 +129,8 @@ export function FacilityRowContent({
 }) {
   return (
     <>
-      <FacilityRowHeader facility={facility} />
-      <FacilityRowBody facility={facility} showDistance={showDistance} now={now} />
+      <FacilityRowHeader facility={facility} showDistance={showDistance} />
+      <FacilityRowBody facility={facility} now={now} />
     </>
   )
 }
@@ -172,7 +172,13 @@ export function FacilityRowContent({
  * `w-full` 은 지도 패널 때문이다 — 거기서는 이 줄이 `items-start` 인 세로 flex 안이라
  * 그냥 두면 내용 너비로 오그라든다.
  */
-function FacilityRowHeader({ facility }: { facility: NearbyFacilityItem }) {
+function FacilityRowHeader({
+  facility,
+  showDistance,
+}: {
+  facility: NearbyFacilityItem
+  showDistance: boolean
+}) {
   return (
     <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
       <span className="text-title-2 text-fg min-w-0 font-semibold break-words break-keep">
@@ -194,7 +200,39 @@ function FacilityRowHeader({ facility }: { facility: NearbyFacilityItem }) {
       )}
 
       <OpenStatus openNow={facility.openNow} />
+
+      {/*
+        **거리는 이름 줄 오른쪽 끝이다** (#1406). 예전에는 주소 줄 맨 앞의 회색 작은 글자(`130m · 제주특별자치도 …`)라
+        이 화면의 첫 질문 "얼마나 가까운가" 가 행에서 가장 약했다. 이름과 같은 크기 · 굵게 세우고 `ms-auto` 로 줄 끝에
+        붙인다 — 행을 위아래로 훑으면 거리가 한 세로선에 늘어선다. 배지가 많아 줄이 넘치면 `flex-wrap` 으로 아랫줄
+        오른쪽에 선다. **위치를 못 받은 날은 없다** — 제주 중심에서 잰 거리를 내 거리로 읽게 하지 않는다.
+      */}
+      {showDistance && <FacilityDistance facility={facility} className="ms-auto" />}
     </div>
+  )
+}
+
+/**
+ * 거리 한 조각 — 이름과 같은 크기 · 굵게 (#1406). **목록 행은 이름 줄 끝**(`FacilityRowHeader`), **지도 패널 행은 오른쪽
+ * 칸의 전화 위**(`EmergencyMapPanel`)에 같은 조각을 세운다 — 모양이 한 벌이어야 두 화면에서 같은 정보로 읽힌다.
+ *
+ * 패널 행이 자리를 따로 잡는 이유: 400 패널은 오른쪽에 전화 칸이 붙어 이름 줄이 좁고, 이름 줄 끝(`ms-auto`)에 두면 긴 이름의
+ * 거리가 아랫줄에 혼자 떨어지고 짧은 이름은 줄 중간에 섰다(1440 실측). 오른쪽 칸에 두면 모든 행이 한 세로선에 선다.
+ */
+export function FacilityDistance({
+  facility,
+  className,
+}: {
+  facility: NearbyFacilityItem
+  className?: string
+}) {
+  return (
+    <span
+      data-facility-distance
+      className={cn('text-title-2 text-fg shrink-0 font-bold tabular-nums', className)}
+    >
+      {formatDistance(facility.distanceMeters)}
+    </span>
   )
 }
 
@@ -204,33 +242,21 @@ function FacilityRowHeader({ facility }: { facility: NearbyFacilityItem }) {
  * 목록 행에서는 이것이 버튼과 좌우로 갈리는 층의 **왼쪽**이고, 지도 패널에서는 머리 바로
  * 아래다 (`FacilityRow` · `FacilityRowContent`).
  */
-function FacilityRowBody({
-  facility,
-  showDistance,
-  now,
-}: {
-  facility: NearbyFacilityItem
-  showDistance: boolean
-  now: Date
-}) {
+function FacilityRowBody({ facility, now }: { facility: NearbyFacilityItem; now: Date }) {
   /*
     **주소를 자르지 않는다** (#598). 예전에는 `shortAddress()` 로 `제주시` 까지만 보여
     같은 시·군의 두 병원이 메타 줄에서 구별되지 않았다 — 이 화면에서 주소는 "어디쯤인지"
     가 아니라 **찾아갈 곳**이라, 다른 목록(`/places`)과 달리 전체가 정보다. 그쪽은 축약을
     계속 쓴다 (`lib/place/address.ts` 는 이 화면을 잃어도 사용처가 넷 남는다).
   */
-  const meta = [
-    showDistance ? formatDistance(facility.distanceMeters) : null,
-    facility.addr,
-  ].filter((part): part is string => part !== null && part !== '')
+  // 거리는 머리 줄로 올라갔다 (#1406) — 이 줄은 주소만 말한다
+  const address = facility.addr === '' ? null : facility.addr
 
   return (
     <>
       <FacilityHours facility={facility} now={now} />
 
-      {meta.length > 0 && (
-        <p className="text-body-2 text-fg-muted break-keep tabular-nums">{meta.join(' · ')}</p>
-      )}
+      {address !== null && <p className="text-body-2 text-fg-muted break-keep">{address}</p>}
 
       {/* 번호가 없으면 이유와 다음 방법을 준다. 버튼만 비활성으로 두면 왜인지 알 수 없다 */}
       {facility.tel === null && (
@@ -424,26 +450,39 @@ function OpenStatus({ openNow }: { openNow: boolean | null }) {
 }
 
 /**
- * 40px 전화 버튼.
+ * 목록 행 행동 버튼(전화 · 길찾기)의 공통 모양 — **52 정사각, 아이콘 위 · 글자 아래** (#1406).
+ *
+ * 예전에는 40px 아이콘뿐이었다. 전화 수화기는 그대로 읽히지만 길찾기의 종이비행기는 "보내기" 로 오해됐다 — 급한 순간에
+ * 아이콘 뜻을 추측하게 하지 않는다. 글자(12px)가 들어가며 52 가 됐고, 375 에서 글자 칸은 343 − 52 − 52 − 12 − 8 = 219px
+ * 이다(예전 243). 행 머리가 전폭이라(#603) 이름 줄은 줄지 않는다.
+ *
+ * **테두리가 있으니 포커스 링은 offset 0 · 1px** — offset 을 주면 [테두리·흰틈·링] 세 겹이 된다(DESIGN.md 포커스 링 표).
+ */
+const ACTION_BASE =
+  'flex size-13 shrink-0 flex-col items-center justify-center gap-1 rounded-md border transition-colors'
+
+const ACTION_LIVE =
+  'border-border-strong text-fg hover:bg-band focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none'
+
+/** 아이콘 아래 글자 — 접근 이름(`○○ 전화하기`)이 이 글자를 품는다(WCAG 2.5.3) */
+const ACTION_LABEL = 'text-caption leading-none font-medium'
+
+/**
+ * 52px 전화 버튼 — 아이콘 아래 `전화` (#1406, 모양은 `ACTION_BASE`).
  *
  * **번호가 없어도 자리를 비우지 않는다.** 자리가 사라지면 "이 병원만 뭔가 다르다" 가
  * 아니라 "화면이 깨졌다" 로 읽힌다 (아트보드 주석).
  *
- * **52px 에서 40px 로 줄였다** (#603). 버튼이 제목 줄과 같은 층에 있을 때는 행 높이를
- * 버튼이 정해 52px 이 기준 노릇을 했는데, 아래 층으로 내려오면서 행 높이는 글자 덩어리가
- * 정하고 버튼은 그 안에 든다. **44 를 밑도는 값을 의도적으로 고른 자리**였고, #883 이
- * §7 의 44 하한을 지도 타깃으로 좁히면서 이제 규칙과 어긋나지도 않는다 — 근거는 그때나
- * 지금이나 같다: 지도 패널의 `DirectionsLink`(전폭 44px)가 같은 행동의 큰 과녁을 계속
- * 들고 있고, 목록 행은 40px 두 개를 8px 떼어 오조작 쪽을 막는다.
+ * **크기 내력: 52 → 40(#603) → 52(#1406).** #603 은 버튼이 아래 층으로 내려오며 행 높이를 글자 덩어리가 정하게 되자
+ * 40 으로 줄였다. #1406 은 글자를 붙이려고 52 로 되돌렸다 — 이번에는 크기가 아니라 **글자**가 이유다. 두 버튼은 8px
+ * 떨어져 오조작을 막는다.
  */
 export function CallButton({ name, tel }: { name: string; tel: string | null }) {
-  const base =
-    'flex size-10 shrink-0 items-center justify-center rounded-md border transition-colors'
-
   if (tel === null) {
     return (
-      <span aria-hidden className={cn(base, 'border-border text-fg-subtle')}>
+      <span aria-hidden className={cn(ACTION_BASE, 'border-border text-fg-subtle')}>
         <PhoneIcon size={20} />
+        <span className={ACTION_LABEL}>{messages.emergency.callShort}</span>
       </span>
     )
   }
@@ -452,21 +491,16 @@ export function CallButton({ name, tel }: { name: string; tel: string | null }) 
     <a
       href={`tel:${tel.replace(/[^\d+]/g, '')}`}
       aria-label={messages.emergency.callLabel.replace('{name}', name)}
-      className={cn(
-        base,
-        'border-border-strong text-fg hover:bg-band',
-        // 테두리가 있으니 offset 0 · 1px — offset 을 주면 [테두리·흰틈·링] 세 겹이 된다
-        // (DESIGN.md 포커스 링 표). 지운 `facility-selected-card` 의 같은 버튼이 쓰던 값이다
-        'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
-      )}
+      className={cn(ACTION_BASE, ACTION_LIVE)}
     >
       <PhoneIcon size={20} />
+      <span className={ACTION_LABEL}>{messages.emergency.callShort}</span>
     </a>
   )
 }
 
 /**
- * 40px 길찾기 버튼 — **목록 행의 전화 옆** (#537).
+ * 52px 길찾기 버튼 — **목록 행의 전화 옆** (#537), 아이콘 아래 `길찾기` (#1406).
  *
  * ── 예전에는 선택된 한 행에만 있었다
  *
@@ -487,13 +521,11 @@ export function CallButton({ name, tel }: { name: string; tel: string | null }) 
 export function DirectionsButton({ facility }: { facility: NearbyFacilityItem }) {
   const href = directionsUrl({ name: facility.name, lat: facility.lat, lng: facility.lng })
 
-  const base =
-    'flex size-10 shrink-0 items-center justify-center rounded-md border transition-colors'
-
   if (href === null) {
     return (
-      <span aria-hidden className={cn(base, 'border-border text-fg-subtle')}>
+      <span aria-hidden className={cn(ACTION_BASE, 'border-border text-fg-subtle')}>
         <DirectionsIcon size={20} />
+        <span className={ACTION_LABEL}>{messages.emergency.directionsShort}</span>
       </span>
     )
   }
@@ -504,14 +536,10 @@ export function DirectionsButton({ facility }: { facility: NearbyFacilityItem })
       target="_blank"
       rel="noopener noreferrer"
       aria-label={messages.emergency.directionsLabel.replace('{name}', facility.name)}
-      className={cn(
-        base,
-        'border-border-strong text-fg hover:bg-band',
-        // 테두리가 있으니 offset 0 · 1px — `CallButton` 과 같은 이유다 (DESIGN.md 포커스 링 표)
-        'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
-      )}
+      className={cn(ACTION_BASE, ACTION_LIVE)}
     >
       <DirectionsIcon size={20} />
+      <span className={ACTION_LABEL}>{messages.emergency.directionsShort}</span>
     </a>
   )
 }

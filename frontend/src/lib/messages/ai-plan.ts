@@ -83,6 +83,13 @@ export const aiPlanMessages = {
   fieldRegion: '지역',
   /** `sigunguCode === null`. **"선택 안 함" 이 아니라 "전체" 다** */
   fieldRegionAll: '제주 전체',
+  /**
+   * 메모의 권역 낱말을 보고 지역 칩을 제안한다 (#1381). `{region}` 은 `SIGUNGU_LABEL` 값이다 —
+   * 지금 둘 다 `…시` 라 받침이 없어 `로` 로 고정한다. 받침 있는 지역이 생기면 조사를 계산한다.
+   */
+  regionSuggest: '{region}로 좁힐까요?',
+  regionSuggestApply: '{region}로 좁히기',
+  regionSuggestDismiss: '괜찮아요',
   fieldRegionHint:
     '좁히면 그 시군구 안에서만 골라요. 조건에 맞는 곳이 없으면 만들지 못할 수 있어요.',
 
@@ -409,7 +416,13 @@ export const aiPlanMessages = {
   commitSubmit: '내 일정에 담기',
   commitAgain: '전체 다시 만들기',
   commitDiscard: '버리기',
-  commitHint: '담으면 초안으로 저장돼요. 저장한 뒤에 순서와 항목을 고칠 수 있어요.',
+  /**
+   * **추천 시각을 여기서 한 번 말한다** (#1383 · 일정상세-세부명세 D24-2). 담기가 항목에
+   * 순서 슬롯 시각(10:00 · 12:30 …)을 채우는데, 저장 뒤에는 그것이 추천값이라는 표시가
+   * 남지 않는다 — 백엔드에 출처 필드가 없다.
+   */
+  commitHint:
+    '담으면 초안으로 저장되고 항목마다 추천 시각이 들어가요. 저장한 뒤에 순서 · 항목 · 시각을 고칠 수 있어요.',
 
   /**
    * 이미 담은 작업 — 담기 버튼 대신 선다 (#1041 · 백엔드 #970).

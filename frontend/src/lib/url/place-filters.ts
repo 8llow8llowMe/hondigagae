@@ -1,4 +1,5 @@
 import type { LatLng } from '@/lib/geo/coord'
+import { PLACES_PATH } from '@/lib/place/places-return'
 import { normalizeKeyword } from '@/lib/url/keyword'
 import { PET_SIZE_CODES } from '@/types/pet'
 import {
@@ -40,6 +41,46 @@ export const DEFAULT_PLACE_FILTERS: PlaceFilters = {
   keyword: null,
 }
 
+/**
+ * **`/places` 의 기본 조건은 `동반 가능만`이다** (#1379). dev 실데이터에서 장소 72% 가 동반 여부
+ * `UNKNOWN` 이라, 조건 없는 첫 화면은 반려견 서비스의 목록으로 읽히지 않았다 — 검색 랜딩
+ * (`/jeju/[topic]`)이 이미 같은 기준이다.
+ *
+ * **공용 기본값(`DEFAULT_PLACE_FILTERS`)은 그대로 둔다.** 홈 · 코스 주변 · 일정 고르기 시트가
+ * 그것을 쓰고, 그쪽 기본값은 각자의 이슈가 정한다(홈 #1380). 일정 담기 화면은 #1383 에서 이 값으로 옮겼다. 그래서 기본값은 화면마다
+ * 다를 수 있고, 직렬화 · 파싱이 **어느 화면의 기본값인지** 를 받는다(`placeFilterDefaults`).
+ *
+ * 빈 URL 이 곧 이 상태라 정규 주소(`/places`, #1130) · sitemap · 입구 링크가 그대로다.
+ */
+export const PLACES_DEFAULT_FILTERS: PlaceFilters = {
+  ...DEFAULT_PLACE_FILTERS,
+  petAllowanceType: 'ALLOWED',
+}
+
+/**
+ * 기본값이 걸린 동반 축을 **사용자가 끈 상태**의 URL 값 — `?petAllowanceType=ALL`.
+ *
+ * 빈 URL 이 `동반 가능만`인 화면에서 "전체" 를 적을 자리가 따로 없어 두는 화면 전용 값이다.
+ * 서버 enum 이 아니므로 **API 쿼리에는 싣지 않는다** — 파싱이 `null`(미지정)로 바꾼다.
+ */
+export const PET_ALLOWANCE_ANY = 'ALL'
+
+/** 일정 일자에 장소를 담는 화면 — `/plans/{planId}/days/{day}/add` */
+const PLAN_ADD_PATH = /^\/plans\/[^/]+\/days\/[^/]+\/add$/
+
+/**
+ * 이 경로의 기본 조건. `/places` 와 **일정 담기 화면**이 `동반 가능만`이다 — `PLACES_DEFAULT_FILTERS` 주석.
+ *
+ * **담기 화면은 #1383 에서 옮겼다.** 반려견 일정에 담는 화면인데 기본이 전체라 `동반 불가` 장소에도
+ * `담기` 가 열려 있었다(mock 재현). 그래도 담으려면 필터를 끄고 한 번 더 누른다
+ * (`add-place-confirm.ts`, 일정상세-세부명세 D24-4).
+ */
+export function placeFilterDefaults(pathname: string): PlaceFilters {
+  return pathname === PLACES_PATH || PLAN_ADD_PATH.test(pathname)
+    ? PLACES_DEFAULT_FILTERS
+    : DEFAULT_PLACE_FILTERS
+}
+
 type RawParams = URLSearchParams | Record<string, string | string[] | undefined>
 
 function read(params: RawParams, key: string): string | null {
@@ -73,11 +114,27 @@ function readWeight(value: string | null): number | null {
   return weight >= 1 && weight <= 100 ? weight : null
 }
 
+/**
+ * 동반 축. 값이 없으면 그 화면의 기본값, `ALL` 이면 미지정(전체)이다.
+ * 모르는 값은 다른 축처럼 기본값으로 떨어뜨린다.
+ */
+function readPetAllowance(
+  value: string | null,
+  fallback: PetAllowanceCode | null,
+): PetAllowanceCode | null {
+  if (value === PET_ALLOWANCE_ANY) return null
+  return pickFrom(PET_ALLOWANCE_CODES, value) ?? fallback
+}
+
 function readText(value: string | null): string | null {
   return value !== null && value.trim() !== '' ? value.trim() : null
 }
 
-export function parsePlaceFilters(params: RawParams): PlaceFilters {
+/** `defaults` — 이 화면의 기본 조건(`placeFilterDefaults`). 주지 않으면 공용 기본값이다 */
+export function parsePlaceFilters(
+  params: RawParams,
+  defaults: PlaceFilters = DEFAULT_PLACE_FILTERS,
+): PlaceFilters {
   const areaCode = read(params, 'areaCode')
   const sigunguCode = read(params, 'sigunguCode')
 
@@ -85,7 +142,7 @@ export function parsePlaceFilters(params: RawParams): PlaceFilters {
     areaCode: areaCode !== null && areaCode.trim() !== '' ? areaCode : DEFAULT_AREA_CODE,
     sigunguCode: sigunguCode !== null && sigunguCode.trim() !== '' ? sigunguCode : null,
     contentType: pickFrom(CONTENT_TYPE_CODES, read(params, 'contentType')),
-    petAllowanceType: pickFrom(PET_ALLOWANCE_CODES, read(params, 'petAllowanceType')),
+    petAllowanceType: readPetAllowance(read(params, 'petAllowanceType'), defaults.petAllowanceType),
     indoor: readBoolean(read(params, 'indoor')),
     allowedPetSize: pickFrom(ALLOWED_PET_SIZE_CODES, read(params, 'allowedPetSize')),
     petSizeType: pickFrom(PET_SIZE_CODES, read(params, 'petSizeType')),
@@ -95,14 +152,23 @@ export function parsePlaceFilters(params: RawParams): PlaceFilters {
   }
 }
 
-/** 화면 URL 용 쿼리 문자열. 기본값은 생략한다 */
-export function toPlaceFilterQuery(filters: PlaceFilters): string {
+/**
+ * 화면 URL 용 쿼리 문자열. 기본값은 생략한다.
+ *
+ * `defaults` 는 `parsePlaceFilters` 에 준 것과 **같아야 한다** — 다르면 왕복이 깨진다.
+ */
+export function toPlaceFilterQuery(
+  filters: PlaceFilters,
+  defaults: PlaceFilters = DEFAULT_PLACE_FILTERS,
+): string {
   const params = new URLSearchParams()
 
   if (filters.areaCode !== DEFAULT_AREA_CODE) params.set('areaCode', filters.areaCode)
   if (filters.sigunguCode !== null) params.set('sigunguCode', filters.sigunguCode)
   if (filters.contentType !== null) params.set('contentType', filters.contentType)
-  if (filters.petAllowanceType !== null) params.set('petAllowanceType', filters.petAllowanceType)
+  if (filters.petAllowanceType !== defaults.petAllowanceType) {
+    params.set('petAllowanceType', filters.petAllowanceType ?? PET_ALLOWANCE_ANY)
+  }
   if (filters.indoor !== null) params.set('indoor', String(filters.indoor))
   if (filters.allowedPetSize !== null) params.set('allowedPetSize', filters.allowedPetSize)
   if (filters.petSizeType !== null) params.set('petSizeType', filters.petSizeType)

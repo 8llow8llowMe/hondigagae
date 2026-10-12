@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useCallback, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -11,7 +11,12 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { Surface, SurfaceStack } from '@/components/surface'
 import { AiPlanCanceled } from '@/features/ai-plan/ai-plan-canceled'
-import { AiPlanCommitPanel, AiPlanCommittedPanel } from '@/features/ai-plan/ai-plan-commit-panel'
+import { AiPlanCommitBar } from '@/features/ai-plan/ai-plan-commit-bar'
+import {
+  AI_PLAN_COMMIT_FORM_ID,
+  AiPlanCommitPanel,
+  AiPlanCommittedPanel,
+} from '@/features/ai-plan/ai-plan-commit-panel'
 import { AiPlanDraftPreview } from '@/features/ai-plan/ai-plan-draft-preview'
 import { AiPlanFailed } from '@/features/ai-plan/ai-plan-failed'
 import { AiPlanProgress } from '@/features/ai-plan/ai-plan-progress'
@@ -39,6 +44,7 @@ import { clearAiPlanRequest, readAiPlanRequest } from '@/lib/ai-plan/request-sto
 import { ApiError } from '@/lib/api/error'
 import { createPlan } from '@/lib/api/plan'
 import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
+import { focusSubmitFailure } from '@/lib/form/submit-failure-focus'
 import { useForm } from '@/lib/form/use-form'
 import type { LatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
@@ -229,7 +235,8 @@ export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolea
 
   if (job === null || polling) {
     return (
-      <AiPlanJobShell>
+      /* 흰 한 면 — 회색 바닥 · 카드 테두리 없이 진행 표시만 (#1401 · DESIGN.md §0) */
+      <AiPlanJobShell plain>
         <AiPlanProgress
           inset="card"
           status={job?.status ?? null}
@@ -395,6 +402,12 @@ const EMPTY_SET: ReadonlySet<string> = new Set()
  * 경계는 이야기 단위"). 상태마다 카드를 따로 그리면 하나를 빠뜨렸을 때 카드가 생겼다
  * 사라진다 (#440 판단). 머리가 이름을 이미 그리므로 카드는 `aria-label` 만 갖는다.
  *
+ * **대기 상태만 흰 한 면이다** (`plain`, #1401 · DESIGN.md §0). 최대 80초를 기다리는 동안 볼 것은
+ * 진행 표시 하나라, 회색 바닥 위 카드 한 장은 테두리 · 면 경계만 더해 화면을 무겁게 했다. 카드를 걷고
+ * 바닥까지 흰색으로 둔다 — 바닥은 서버 페이지의 `Canvas` 라 여기서 칠할 수 없어 표식(`ai-plan-wait`)을
+ * 달고 `.page-canvas:has(.ai-plan-wait)` 규칙이 칠한다(`app/globals.css`). 지도 아일랜드
+ * (`body:has(.map-island)`)와 같은 수법이라 서버 렌더 첫 페인트부터 맞다.
+ *
  * **폭은 옮기기 전 값(768) 그대로다.** `/ai-plans/new` 는 폼 규약(#453)을 따라 672 지만,
  * 이 화면은 완료 상태에서 일자 카드가 여럿 서는 목록형이라 좁히면 한 행에 드는 글자가
  * 준다 — 폭을 바꾸는 것은 이 이슈가 요구한 변경이 아니다.
@@ -407,13 +420,16 @@ function AiPlanJobShell({
    * 카드가 아니다. 카드 안에 카드를 넣으면 §0 의 "층마다 다른 채널" 이 깨진다.
    */
   bare = false,
+  /** 카드 없이 흰 바닥 위에 바로 선다 — 진행 대기 하나뿐이다 (#1401) */
+  plain = false,
   children,
 }: {
   bare?: boolean
+  plain?: boolean
   children: ReactNode
 }) {
   return (
-    <SurfaceStack className="mx-auto w-full max-w-screen-md">
+    <SurfaceStack className={cn('mx-auto w-full max-w-screen-md', plain && 'ai-plan-wait')}>
       {/* 데스크톱 세로 여백은 `SurfaceStack` 의 `md:p-6` 이 준다 (#451 머리와 같은 값) */}
       <header className={cn('pt-4 pb-4 md:pt-0 md:pb-0', INSET_CLASS.card)}>
         {/* 화면 제목과 탭 제목이 같은 키를 쓴다 (R7) */}
@@ -422,7 +438,14 @@ function AiPlanJobShell({
         </h1>
       </header>
 
-      {bare ? children : <Surface aria-label={messages.aiPlan.jobTitle}>{children}</Surface>}
+      {bare ? (
+        children
+      ) : plain ? (
+        // 카드와 같은 이름의 영역 — 면 · 테두리만 걷는다
+        <section aria-label={messages.aiPlan.jobTitle}>{children}</section>
+      ) : (
+        <Surface aria-label={messages.aiPlan.jobTitle}>{children}</Surface>
+      )}
     </SurfaceStack>
   )
 }
@@ -630,6 +653,17 @@ function AiPlanCommitContainer({
       router.replace(`/plans/${plan.planId}`)
     },
   })
+  /*
+    **담기가 실패하면 포커스를 그 이유로 옮긴다** (#1381). 768 미만에서는 하단 고정 바(`AiPlanCommitBar`)로
+    초안 맨 위를 읽다가도 담을 수 있는데, 실패 표시(제목 오류 · `FormAlert` · `PLAN_004` 블록)는 페이지 끝의
+    담기 패널 안에 선다 — 옮기지 않으면 스피너만 멈추고 아무 일도 없는 것처럼 보인다. 순서는
+    `focusSubmitFailure`(필드 → 알림 → 첫 입력)이고, 포커스가 그 자리로 스크롤도 옮긴다.
+    트리거는 `submitCount` 하나다 — `errors` 를 넣으면 입력 중인 칸에서 포커스를 훔친다 (`use-form.ts`).
+  */
+  useEffect(() => {
+    if (form.submitCount === 0) return
+    focusSubmitFailure(document.getElementById(AI_PLAN_COMMIT_FORM_ID), form.errors)
+  }, [form.submitCount])
 
   /*
     **셋을 `SurfaceStack` 의 직접 자식으로 내보낸다** (#473). 예전에는 담기 패널을
@@ -682,6 +716,9 @@ function AiPlanCommitContainer({
         onDiscard={() => setDiscarding(true)}
         againHref={`/ai-plans/new?from=${encodeURIComponent(jobId)}`}
       />
+
+      {/* 모바일 하단 고정 담기 (#1381) — 스택의 마지막 자식이라 sticky 가 페이지 끝까지 따라온다 */}
+      <AiPlanCommitBar submitting={form.isSubmitting} />
 
       <ConfirmModal
         open={discarding}

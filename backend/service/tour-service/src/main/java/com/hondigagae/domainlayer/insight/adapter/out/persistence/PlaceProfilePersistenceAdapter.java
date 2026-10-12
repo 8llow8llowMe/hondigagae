@@ -6,8 +6,10 @@ import com.hondigagae.domainlayer.insight.application.mapper.InsightMapper;
 import com.hondigagae.domainlayer.insight.application.model.AlternativePlaceCriteria;
 import com.hondigagae.domainlayer.insight.application.port.out.PlaceProfileQueryPort;
 import com.hondigagae.domainlayer.insight.domain.model.PlaceCondition;
+import com.hondigagae.domainlayer.insight.domain.model.RecommendationCandidate;
 import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.PlaceEntity;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -49,6 +51,14 @@ public class PlaceProfilePersistenceAdapter implements PlaceProfileQueryPort {
             .sorted(Comparator.comparingDouble(entity -> distanceMeters(entity, criteria)))
             .limit(criteria.size())
             .map(insightMapper::toPlaceConditionFromEntity)
+            .toList();
+    }
+
+    @Override
+    public List<RecommendationCandidate> findRecommendationCandidates(String areaCode, Collection<String> contentTypeIds) {
+        return placeProfileRepository.findRecommendationCandidates(
+                areaCode, contentTypeIds, PlaceProfileRepository.RECOMMENDABLE_PET_ALLOWANCE_TYPES).stream()
+            .map(insightMapper::toRecommendationCandidateFromEntity)
             .toList();
     }
 

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { centerScrollLeft, pageScrollLeft, scrollFadeSide, swipeTarget } from '@/lib/ui/scroll'
+import {
+  centerScrollLeft,
+  DRAG_SLOP_PX,
+  isDragGesture,
+  pageScrollLeft,
+  scrollFadeSide,
+  swipeTarget,
+} from '@/lib/ui/scroll'
 
 describe('centerScrollLeft', () => {
   it('선택 항목을 컨테이너 가운데로 가져온다', () => {
@@ -157,5 +164,19 @@ describe('swipeTarget — 놓을 때 갈 칸 (#1233 D3)', () => {
 
   it('끌지 않았으면 그대로다', () => {
     expect(target(0, 0)).toBe(2)
+  })
+})
+
+/* #1404 — 마우스 끌기와 클릭을 가르는 거리. 손 떨림 클릭이 카드 링크를 막지 않는다 */
+describe('isDragGesture', () => {
+  it('임계값 미만은 클릭이다', () => {
+    expect(isDragGesture(0)).toBe(false)
+    expect(isDragGesture(DRAG_SLOP_PX - 1)).toBe(false)
+    expect(isDragGesture(-(DRAG_SLOP_PX - 1))).toBe(false)
+  })
+
+  it('임계값 이상은 방향과 무관하게 끌기다', () => {
+    expect(isDragGesture(DRAG_SLOP_PX)).toBe(true)
+    expect(isDragGesture(-DRAG_SLOP_PX)).toBe(true)
   })
 })

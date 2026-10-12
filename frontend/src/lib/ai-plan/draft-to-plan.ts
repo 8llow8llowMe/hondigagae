@@ -1,3 +1,4 @@
+import { slotStartTime } from '@/lib/plan/default-start-time'
 import type { AiPlanDraft, AiPlanRequestSnapshot } from '@/types/ai-plan'
 import {
   PLAN_ITEM_TYPES,
@@ -59,7 +60,7 @@ export type DraftToPlanOptions = {
  * | `targetId`        | `placeId` — **문자열로 보낸다**    |
  * | `title`           | `title` (100자 초과면 자른다)      |
  * | `memo`            | `note` (500자 초과면 자른다)       |
- * | `startTime`       | **보내지 않는다** (초안에 없다)    |
+ * | `startTime`       | **`sequence` 의 순서 슬롯** (D24)  |
  *
  * **명세에 없던 두 가지를 여기서 막는다.** 초안의 `itemType`·`title` 은 LLM 산출물이
  * 그대로 흘러온 문자열인데 `PlanItemRequest` 는 `itemType` 을 `PlanItemType` **enum**
@@ -155,6 +156,12 @@ export function toDraftItems(
         ...(placeId === null ? {} : { targetId: placeId }),
         title: itemTitle.slice(0, ITEM_TITLE_MAX),
         ...(memo === '' ? {} : { memo }),
+        /*
+          **초안에는 시각이 없지만 비워 보내지 않는다** (#1383 · 일정상세-세부명세 D24). 비우면
+          항목 산책 위험도가 `NO_START_TIME` 으로 꺼진다. 걸러낸 뒤의 `sequence` 로 고르므로
+          화면 순서와 시각 순서가 어긋나지 않는다. 여섯 번째부터는 키를 뺀다.
+        */
+        ...withStartTime(slotStartTime(sequence)),
       })
 
       sequence += 1
@@ -162,6 +169,10 @@ export function toDraftItems(
   }
 
   return items
+}
+
+function withStartTime(startTime: string | undefined): { startTime?: string } {
+  return startTime === undefined ? {} : { startTime }
 }
 
 /**

@@ -7,6 +7,9 @@ import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
+/** 모바일 하단 바의 버튼이 이 폼을 제출한다 (`form` 속성, #1381) */
+export const AI_PLAN_COMMIT_FORM_ID = 'ai-plan-commit'
+
 export type AiPlanCommitPanelProps = {
   title: string
   errors: FormErrors
@@ -64,6 +67,7 @@ export function AiPlanCommitPanel({
 }: AiPlanCommitPanelProps) {
   return (
     <form
+      id={AI_PLAN_COMMIT_FORM_ID}
       noValidate
       onSubmit={(event) => {
         event.preventDefault()
@@ -147,7 +151,8 @@ export function AiPlanCommitPanel({
       */}
 
       <div className="flex flex-col gap-2">
-        <Button type="submit" size="lg" loading={submitting}>
+        {/* 768 미만에서는 하단 바(`AiPlanCommitBar`)가 같은 일을 한다 — 두 개를 겹쳐 두지 않는다 */}
+        <Button type="submit" size="lg" loading={submitting} className="hidden md:inline-flex">
           {messages.aiPlan.commitSubmit}
         </Button>
         <p className="text-caption text-fg-muted">{messages.aiPlan.commitHint}</p>

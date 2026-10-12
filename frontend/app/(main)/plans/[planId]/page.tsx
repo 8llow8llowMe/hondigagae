@@ -36,10 +36,9 @@ const loadPlanDetail = cache((planId: string, accessToken: string | undefined) =
 )
 
 /**
- * **탭 제목은 404 `찾을 수 없는 일정이에요` 와 그 밖 전부 `여행 일정` 둘이다** — 404 는
- * #676, 나머지는 #905 R5. 일정 이름은 싣지 않는다(프라이버시 근거는
- * `src/lib/plan/detail-title.ts` 머리주석). 5xx·무응답도 목록 제목으로 떨어진다 —
- * `architecture-guide.md` §7 의 #206 규칙이고 장소 상세와 같다.
+ * **탭 제목은 성공이면 일정 이름, 404 면 `찾을 수 없는 일정이에요`, 그 밖은 `여행 일정`** 이다 —
+ * 이름은 #1383(#905 R5 를 뒤집었다, 근거는 `src/lib/plan/detail-title.ts` 머리주석), 404 는 #676.
+ * 5xx·무응답은 목록 제목으로 떨어진다 — `architecture-guide.md` §7 의 #206 규칙이고 장소 상세와 같다.
  *
  * **`not-found.tsx` 자신의 `metadata` 로는 못 고친다.** 이 페이지가 비동기 조회 뒤
  * 조건부로 `notFound()` 를 던지는데, Next 16 은 그 경우 이 페이지가 이미 확정해 둔
@@ -55,13 +54,14 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const session = await readSession()
 
   let error: unknown = null
+  let planTitle: string | null = null
   try {
-    await loadPlanDetail(planId, session?.accessToken)
+    planTitle = (await loadPlanDetail(planId, session?.accessToken)).title
   } catch (caught) {
     error = caught
   }
 
-  return { title: `${planDetailTitle(error)} · 혼디가개` }
+  return { title: `${planDetailTitle(error, planTitle)} · 혼디가개` }
 }
 
 export default async function PlanDetailPage({ params }: { params: Params }) {

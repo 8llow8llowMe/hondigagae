@@ -169,7 +169,7 @@ class WalkTimesProcessorTest {
 
     /** 전부 null 로 넘기면 record 생성자가 기본 임계값을 채운다. */
     private InsightProperties properties() {
-        return new InsightProperties(null, null, null, null, null, null, null, null, null, null, null, null);
+        return new InsightProperties(null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
     private static WeatherForecast forecast(LocalDateTime at, Double temperature) {

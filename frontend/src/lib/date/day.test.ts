@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import {
   isDayBefore,
@@ -32,6 +32,26 @@ describe('toDayString / todayDay', () => {
   it('오늘을 로컬 달력 기준으로 읽는다 — 로컬 9월 2일은 9월 2일이다', () => {
     expect(todayDay(new Date(2026, 8, 2, 23, 30))).toBe('2026-09-02')
     expect(todayDay(new Date(2026, 8, 2, 0, 30))).toBe('2026-09-02')
+  })
+  /*
+    **#1396.** 만들기 화면이 오늘을 `toISOString().slice(0, 10)`(UTC)으로 만들어 KST 오전 9시 전에는
+    어제가 달력의 최소일이 됐다. 서울 시간대 프로세스(운영 컨테이너 `TZ: ${TIME_ZONE}` · 로컬)에서
+    `todayDay` 는 그 시각에도 오늘이다. Node 는 `process.env.TZ` 를 바꾸면 바로 반영한다.
+  */
+  describe('서울 시간대 오전 9시 전 (#1396)', () => {
+    const originalTz = process.env.TZ
+    afterEach(() => {
+      process.env.TZ = originalTz
+    })
+
+    it('todayDay 는 오늘이고, toISOString 으로 자르면 어제다', () => {
+      process.env.TZ = 'Asia/Seoul'
+      const earlyMorning = new Date('2026-10-12T08:30:00+09:00')
+
+      expect(todayDay(earlyMorning)).toBe('2026-10-12')
+      // 예전 두 만들기 화면의 계산 — 이 값이 달력의 min 이 되어 어제가 열렸다
+      expect(earlyMorning.toISOString().slice(0, 10)).toBe('2026-10-11')
+    })
   })
 })
 

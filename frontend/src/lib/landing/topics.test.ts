@@ -10,6 +10,7 @@ import {
   landingPath,
   parseLandingCursor,
 } from '@/lib/landing/topics'
+import { parsePlaceFilters, PLACES_DEFAULT_FILTERS } from '@/lib/url/place-filters'
 
 const stays = findLandingTopic('pet-friendly-stays')!
 
@@ -60,7 +61,19 @@ describe('검색어 랜딩 주제 (#1134)', () => {
 
     expect(href.startsWith('/places?')).toBe(true)
     expect(href).toContain('contentType=LODGING')
-    expect(href).toContain('petAllowanceType=ALLOWED')
     expect(href).toContain('view=list')
+  })
+
+  /* 동반 가능만은 `/places` 의 기본이라 주소에서 빠지고, 그 화면이 다시 읽으면 그대로다 (#1379) */
+  it('장소 찾기 링크의 동반 조건은 /places 기본값으로 실린다', () => {
+    const href = landingExplorerHref(stays)
+    const filters = parsePlaceFilters(
+      new URL(href, 'https://x').searchParams,
+      PLACES_DEFAULT_FILTERS,
+    )
+
+    expect(href).not.toContain('petAllowanceType=')
+    expect(filters.petAllowanceType).toBe('ALLOWED')
+    expect(filters.contentType).toBe('LODGING')
   })
 })

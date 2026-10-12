@@ -2,9 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   appliedFactorsOf,
-  orderByScore,
   partitionInformational,
-  pickTopPlaces,
   resolveBasisPlaceId,
   splitReasons,
   splitSharedReasons,
@@ -126,57 +124,6 @@ describe('resolveBasisPlaceId', () => {
     it('대표 지점이 null 이면 null 이다', () => {
       expect(resolveBasisPlaceId(null, null, null)).toBeNull()
     })
-  })
-})
-
-describe('pickTopPlaces', () => {
-  it('상한을 넘으면 앞에서 잘라낸다', () => {
-    expect(pickTopPlaces([1, 2, 3, 4, 5], 3)).toEqual([1, 2, 3])
-  })
-
-  it('상한 미만이면 전부 돌려준다', () => {
-    expect(pickTopPlaces([1, 2], 3)).toEqual([1, 2])
-  })
-
-  it('순서를 바꾸지 않는다 — 적합도로 정렬한 것이 아니다', () => {
-    expect(pickTopPlaces(['c', 'a', 'b'], 3)).toEqual(['c', 'a', 'b'])
-  })
-
-  it('빈 목록·상한 0 을 견딘다', () => {
-    expect(pickTopPlaces([], 3)).toEqual([])
-    expect(pickTopPlaces([1, 2], 0)).toEqual([])
-  })
-})
-
-describe('orderByScore (#1356)', () => {
-  const card = (id: string, score: number | null) => ({ id, score })
-
-  /* dev 실측: 40점 `주의 필요` 가 60점보다 앞에 섰다 */
-  it('점수 높은 순으로 세운다', () => {
-    const ordered = orderByScore([card('a', 40), card('b', 60), card('c', 75)])
-
-    expect(ordered.map((item) => item.id)).toEqual(['c', 'b', 'a'])
-  })
-
-  it('같은 점수는 들어온 순서를 지킨다', () => {
-    const ordered = orderByScore([card('a', 50), card('b', 70), card('c', 50)])
-
-    expect(ordered.map((item) => item.id)).toEqual(['b', 'a', 'c'])
-  })
-
-  /* null 은 0점이 아니다 — 0점보다도 뒤다 */
-  it('점수 없음은 0점보다도 뒤로 간다', () => {
-    const ordered = orderByScore([card('none', null), card('zero', 0), card('high', 80)])
-
-    expect(ordered.map((item) => item.id)).toEqual(['high', 'zero', 'none'])
-  })
-
-  it('원본 배열을 바꾸지 않는다', () => {
-    const input = [card('a', 10), card('b', 90)]
-
-    orderByScore(input)
-
-    expect(input.map((item) => item.id)).toEqual(['a', 'b'])
   })
 })
 

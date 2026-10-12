@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
-import { DEFAULT_PLACE_FILTERS, toPlaceFilterQuery } from '@/lib/url/place-filters'
+import { placeFilterDefaults, toPlaceFilterQuery } from '@/lib/url/place-filters'
 import { placePreviewHref, readPlacePreview } from '@/lib/url/place-preview'
 import {
   parseViewMode,
@@ -19,6 +19,9 @@ import type { PlaceFilters } from '@/types/place'
  * **고른 장소(`?place=`)는 기본으로 싣지 않는다** — 필터를 바꾸면 미리보기가 닫힌다(`place-preview.ts`, 결과가
  * 바뀌는 순간이라 의도). `previewId` 를 주면 남긴다: 반려견을 바꿔 체구 필터를 맞출 때는 사용자가 판정을 보러
  * 바꾼 것이라 미리보기를 닫지 않는다 (장소-반려견칩-세부명세 D1-2, #1301).
+ *
+ * **생략할 기본값은 경로가 정한다** (#1379) — `/places` 는 `동반 가능만`이 기본이라 그것을 끈 상태가
+ * `?petAllowanceType=ALL` 로 적힌다. 페이지가 같은 `placeFilterDefaults` 로 파싱한다.
  */
 export function placeFilterHref(
   pathname: string,
@@ -26,7 +29,8 @@ export function placeFilterHref(
   view: ViewMode,
   previewId: string | null = null,
 ): string {
-  const href = viewModeHref(pathname, toPlaceFilterQuery(filters), view, PLACES_DEFAULT_VIEW)
+  const query = toPlaceFilterQuery(filters, placeFilterDefaults(pathname))
+  const href = viewModeHref(pathname, query, view, PLACES_DEFAULT_VIEW)
   return previewId === null ? href : placePreviewHref(href, previewId)
 }
 
@@ -46,17 +50,22 @@ export function placeFilterHref(
  * 둘인데, 둘 다 같은 함수를 거쳐야 한쪽만 규칙이 어긋나는 일이 없다.
  *
  * **`reset` 도 `view` 를 지킨다.** 초기화가 바꾸는 것은 조건이지 보고 있는 화면이 아니다.
+ * 초기화가 돌아가는 곳은 **이 화면의 기본 조건**이다(`defaults`) — `/places` 는 `동반 가능만` (#1379).
+ * `초기화` 버튼을 띄울지(`dirty`)도 같은 값과 견준다. 둘이 다른 기본값을 보면 눌러도 안 사라지는 버튼이 선다.
  */
 export function usePlaceFilterNav(): {
   /** `keepPreview` — 열린 미리보기(`?place=`)를 닫지 않는다. 반려견 체구 필터 맞춤만 쓴다 (#1301) */
   apply: (next: PlaceFilters, options?: { keepPreview?: boolean }) => void
   reset: () => void
+  /** 이 화면의 기본 조건 — 걸린 조건이 있는지(`초기화` 노출) 판정용 */
+  defaults: PlaceFilters
 } {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
   const view = parseViewMode(searchParams, PLACES_DEFAULT_VIEW)
+  const defaults = placeFilterDefaults(pathname)
 
   function go(filters: PlaceFilters, previewId: string | null = null) {
     router.replace(placeFilterHref(pathname, filters, view, previewId), { scroll: false })
@@ -70,6 +79,7 @@ export function usePlaceFilterNav(): {
           ? readPlacePreview(new URLSearchParams(searchParams.toString()))
           : null,
       ),
-    reset: () => go(DEFAULT_PLACE_FILTERS),
+    reset: () => go(defaults),
+    defaults,
   }
 }

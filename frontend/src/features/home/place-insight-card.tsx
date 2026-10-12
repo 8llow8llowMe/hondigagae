@@ -1,3 +1,5 @@
+'use client'
+
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -5,15 +7,15 @@ import type { ReactNode } from 'react'
 
 import { ImageIcon } from '@/components/icons'
 import { METRIC_WORD_TONE, type MetricTone, MetricValue } from '@/components/metric'
+import { ScrollRailArrows, useDragScroll, useScrollRail } from '@/components/scroll-rail'
 import { imageSrc } from '@/lib/image/remote-host'
-import { crowdedLabel, type PlaceCardsEnd } from '@/lib/insight/place-cards'
+import { crowdedLabel, type PlaceCardPlace } from '@/lib/insight/place-cards'
 import { congestionTone, suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { shortAddress } from '@/lib/place/address'
 import { placeIllustration } from '@/lib/place/illustration'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceSuitabilityResponse, SuitabilityReasonItem } from '@/types/insight'
-import type { PlaceSummary } from '@/types/place'
 
 /**
  * 서버가 "판정하지 않았다" 를 말하는 코드. 동반 가능 여부도 이 값을 쓴다 — **낱말(`정보
@@ -22,34 +24,25 @@ import type { PlaceSummary } from '@/types/place'
 const UNKNOWN_CODE = 'UNKNOWN'
 
 /**
- * 끝 카드의 그리드 칸 수 (`PlaceCardsEnd.span`). 클래스 이름을 문자열로 조립하면 Tailwind 가
- * 찾지 못해 조용히 빠진다 — 완성된 이름을 표로 둔다.
- */
-const END_SPAN: Record<number, string> = {
-  1: 'lg:col-span-1',
-  2: 'lg:col-span-2',
-  3: 'lg:col-span-3',
-}
-
-/**
- * 홈 추천 장소를 담는 틀 (#1069). **담는 틀만 폭으로 가른다 — 카드는 한 벌이다.**
+ * 홈 추천 장소를 담는 틀 (#1069 → #1400). **모든 폭에서 가로 레일이다.**
  *
- * - **1024 미만 — 캐러셀.** 카드 폭 82%(`--home-place-card-w`)라 다음 카드가 비쳐 보인다.
- *   **그것이 넘김 신호라 화살표를 두지 않는다.** `scroll-snap` 으로 카드 경계에서 멈추고,
- *   1위가 항상 첫 장이다(DOM 순서 그대로).
- * - **1024 이상 — 3열 그리드.** 추천이 최대 3곳이라 한 줄에 다 선다. 캐러셀로 숨기지
- *   않는다 — 가려진 카드는 비교되지 않는다.
+ * - **카드 폭은 토큰이다**(`--home-place-card-w`) — 390 82% · 768 44% · 1024+ 30%. 어느 폭에서나 다음
+ *   카드의 가장자리가 비쳐 "옆에 더 있다" 를 말한다. `scroll-snap` 으로 카드 경계에서 멈추고, 1위가
+ *   항상 첫 장이다(DOM 순서 그대로).
+ * - **화살표는 1024 이상에서는 레일에 올릴 때만, 그 아래는 늘** 선다(`reveal="hover"`, #1404). 끝 흐림을 걷어서
+ *   태블릿 · 모바일에서 "옆으로 넘긴다" 를 말할 신호가 화살표와 비치는 카드 조각뿐이다.
+ * - **마우스로 카드를 잡고 끌어도 넘어간다** (`useDragScroll`, #1404). 끈 직후의 클릭은 링크로 가지 않는다.
+ * - **끝 흐림이 없다** (#1404) — 공용 48px 는 카드 끝이 뚝 잘린 것처럼, 넓히면 카드가 바랜 것처럼 보였다. 다른 레일은
+ *   셀이 작아 흐림이 맞고, 이 레일은 비치는 다음 카드 조각이 그 몫을 한다.
  *
- * **기준이 1024 인 이유**는 홈이 2단으로 갈라지는 폭이라서다(`.rail-layout`). 그 아래는 이
- * 카드가 한 컬럼의 전폭을 받는다. 예전 행(`place-insight-row`)은 컨테이너 쿼리로 접었는데
- * (#530), 그건 **한 행 안의 열 구성**이 받은 폭에 달려 있어서였다. 여기서 갈리는 것은
- * 틀의 종류이고, 그 틀이 바뀌는 지점이 곧 홈의 레이아웃이 바뀌는 지점이다.
+ * **예전 1024+ 는 3열 그리드였다** — 추천이 3곳뿐이라 한 줄에 다 섰다. #1400 부터 서버 상한(10)까지 받으므로
+ * 그리드로 두면 네 줄이 된다. 홈은 요약 화면이라 세로로 늘리지 않고 옆으로 넘긴다(홈-세부명세 D11).
  *
  * ### 스크롤러의 폭 누수를 막는다
  *
- * `contain-layout` 이 없으면 넘치는 카드 폭이 조상의 `scrollWidth` 로 새어 390 에서
- * `main` 이 가로로 늘어난다 — `.scroll-rail` 머리주석(`app/globals.css`)이 적어 둔 증상이다.
- * 화살표가 없어 `.scroll-rail` 을 쓰지 않고 그 한 줄만 가져온다.
+ * 바깥 `.scroll-rail`(`app/globals.css`)이 `contain: layout` 으로 넘치는 카드 폭이 조상의 `scrollWidth` 로
+ * 새지 않게 막고, 화살표의 기준면이 된다. **`<ul>` 자신이 스크롤러다** — 끝 여백(`px-4`)이 남는다
+ * (`scroll-rail.tsx` 머리주석).
  *
  * ### 세로 여백이 포커스 링의 자리다
  *
@@ -64,19 +57,38 @@ export function PlaceInsightCardList({
   /** 재조회 중 — 목록을 흐리고 `aria-busy` 를 건다 */
   busy?: boolean
 }) {
+  const rail = useScrollRail<HTMLUListElement>()
+  // 마우스로 카드를 잡고 끌어 넘긴다 (#1404) — 터치는 네이티브 스와이프 그대로
+  useDragScroll(rail.ref)
+
   return (
-    <ul
-      aria-busy={busy || undefined}
-      className={cn(
-        // 캐러셀 — 인셋과 스냅 기준을 같은 값으로 둔다 (첫 카드가 제목과 같은 세로선에 선다)
-        'flex snap-x snap-mandatory scroll-px-4 scrollbar-none gap-3 overflow-x-auto px-4 pt-1 pb-4 contain-layout md:scroll-px-5 md:px-5 md:pb-5',
-        // 그리드 — 1024 이상. 스크롤과 스냅을 끈다
-        'lg:grid lg:snap-none lg:grid-cols-3 lg:gap-4 lg:overflow-visible',
-        busy && 'opacity-55',
-      )}
-    >
-      {children}
-    </ul>
+    <div className="scroll-rail">
+      <ul
+        ref={rail.ref}
+        onScroll={rail.onScroll}
+        aria-busy={busy || undefined}
+        className={cn(
+          // 인셋과 스냅 기준을 같은 값으로 둔다 (첫 카드가 제목과 같은 세로선에 선다)
+          'flex snap-x snap-mandatory scroll-px-4 scrollbar-none gap-3 overflow-x-auto px-4 pt-1 pb-4 md:scroll-px-5 md:px-5 md:pb-5 lg:gap-4',
+          /*
+            잡을 수 있다는 커서 (#1404, `app/globals.css`). **끝 흐림(`rail.fadeClassName`)을 걸지 않는다** — 사진 카드
+            위의 마스크는 넓혀도 좁혀도 이상하게 읽혔다(사용자 평가 2026-10-12). "옆에 더 있다" 는 비치는 다음 카드와
+            화살표가 말한다.
+          */
+          'drag-scroll',
+          busy && 'opacity-55',
+        )}
+      >
+        {children}
+      </ul>
+      <ScrollRailArrows
+        rail={rail}
+        prevLabel={messages.home.placeRailPrev}
+        nextLabel={messages.home.placeRailNext}
+        /* 데스크톱은 레일에 올릴 때만, 태블릿 · 모바일은 늘 (#1404) */
+        reveal="hover"
+      />
+    </div>
   )
 }
 
@@ -106,8 +118,11 @@ export function PlaceInsightCard({
   preload = false,
 }: {
   data: PlaceSuitabilityResponse
-  /** 목록 응답의 장소. 사진·주소·실내 여부·동반 여부는 적합도 응답에 없다 */
-  place: PlaceSummary | undefined
+  /**
+   * 사진·주소·실내 여부·동반 여부. 적합도 응답에 없는 것들이다 — #1380 부터 추천 항목에서 온다
+   * (`toRecommendationCards`). 예전에는 목록 응답에서 찾아 넘겨 없을 수 있었다(`undefined`).
+   */
+  place: PlaceCardPlace | undefined
   /**
    * 이 장소만의 근거 한 줄 (`pickCardReason`). **카드가 고르지 않는다** — 무엇이 공통인지는
    * 다른 카드를 봐야 알 수 있고, 그것은 목록을 가진 쪽만 안다.
@@ -129,7 +144,7 @@ export function PlaceInsightCard({
   const meta = metaLine(place)
 
   return (
-    <li className="w-(--home-place-card-w) shrink-0 snap-start last:snap-end lg:w-auto">
+    <li className="w-(--home-place-card-w) shrink-0 snap-start last:snap-end">
       <Link
         href={`/places/${data.placeId}`}
         className="focus-visible:ring-brand-500 flex h-full flex-col rounded-md focus-visible:ring-2 focus-visible:outline-none"
@@ -175,37 +190,30 @@ export function PlaceInsightCard({
 }
 
 /**
- * 끝 카드 — 카드가 칸을 다 채우지 못한 날 빈 칸을 채운다 (`placeCardsEnd`).
+ * 끝 카드 — **레일의 마지막 장**이다 (#1069 → #1400). 끝까지 넘긴 사람에게 `장소 전체 보기` 를 준다.
+ *
+ * **늘 선다.** 3열 그리드 시절에는 카드가 칸을 다 채우지 못한 날에만 빈 칸을 채웠다(`placeCardsEnd` ·
+ * `span`). 레일에는 칸이 없고, 10장을 다 넘긴 끝이야말로 "더 보려면" 이 필요한 자리다.
  *
  * **`--band` 채움이다.** L2 항목의 채널이 채움이라(DESIGN.md §0) 테두리를 두르지 않고, 사진
- * 카드와 같은 폭·높이의 면으로 선다 — 캐러셀에서는 마지막 장이고 그리드에서는 빈 칸이다.
+ * 카드와 같은 폭·높이의 면으로 선다.
  *
- * 점수를 못 낸 곳의 안내가 **여기에 든다.** 예전에는 목록 아래 버튼 줄 둘(`점수를 내지 못한
- * 곳 N곳 ›` · `장소 N곳 전체 보기`)이 따로 섰는데, 둘 다 `/places` 로 가는 같은 링크였다.
+ * 예전에는 목록 아래 버튼 줄 둘(`점수를 내지 못한 곳 N곳 ›` · `장소 N곳 전체 보기`)이 따로 섰는데,
+ * 둘 다 `/places` 로 가는 같은 링크라 이 한 장으로 합쳤다(#1069). **#1380 부터 수와 점수 못 낸 곳의
+ * 줄이 없다** — 추천 API 가 목록 전체 수를 주지 않고, 점수를 못 낸 곳은 서버가 뺀다 (D10-4).
  */
-export function PlaceCardsEndCard({ end }: { end: PlaceCardsEnd }) {
+export function PlaceCardsEndCard() {
   return (
-    <li
-      className={cn(
-        'w-(--home-place-card-w) shrink-0 snap-start last:snap-end lg:w-auto',
-        // 그리드에서는 남은 빈 칸을 전부 채운다 — 카드가 한 장이면 셋째 칸이 구멍으로 남는다
-        END_SPAN[end.span] ?? END_SPAN[1],
-      )}
-    >
+    <li className="w-(--home-place-card-w) shrink-0 snap-start last:snap-end">
       <Link
         href="/places"
         className="group bg-band focus-visible:ring-brand-500 flex h-full min-h-40 flex-col justify-center gap-1 rounded-md px-5 py-6 focus-visible:ring-2 focus-visible:outline-none"
       >
         <span className="text-body-1 text-link group-hover:text-link-hover font-semibold break-keep tabular-nums">
-          {messages.home.allPlaces.replace('{n}', String(end.total))}
+          {messages.home.allPlaces}
           {/* 줄바꿈 없는 공백 — 1024 의 좁은 칸에서 꺾쇠만 다음 줄로 떨어졌다 */}
           <span aria-hidden>{' ›'}</span>
         </span>
-        {end.unscored > 0 && (
-          <span className="text-body-2 text-fg-muted tabular-nums">
-            {messages.home.unscoredInAllPlaces.replace('{n}', String(end.unscored))}
-          </span>
-        )}
       </Link>
     </li>
   )
@@ -266,7 +274,7 @@ function Photo({
   allowance,
   preload,
 }: {
-  place: PlaceSummary | undefined
+  place: PlaceCardPlace | undefined
   allowance: string | null
   preload: boolean
 }) {
@@ -317,7 +325,7 @@ function Photo({
  * **전체 주소를 쓰지 않는다.** `addr1` 은 길어 375px 에서 두 줄을 먹는다. 시군구·읍면까지만.
  * 거리(`2.3km`)는 **백엔드가 주지 않아 넣지 않는다** — 지어내지 않는다.
  */
-function metaLine(place: PlaceSummary | undefined): string {
+function metaLine(place: PlaceCardPlace | undefined): string {
   if (place === undefined) return ''
 
   const indoor =

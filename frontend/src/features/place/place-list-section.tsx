@@ -201,7 +201,7 @@ export function PlaceListSection({
           결과가 비었을 때 사용자가 확인하는 것은 "내가 뭘로 찾았지" 다.
 
           **설명은 검색어만 탓하지 않는다** — 필터가 함께 걸려 있을 수 있어 둘 다 짚고,
-          `초기화` 버튼은 그대로다 (그 버튼이 검색어까지 지운다 — `DEFAULT_PLACE_FILTERS`).
+          `초기화` 버튼은 그대로다 (그 버튼이 검색어까지 지우고 이 화면의 기본 조건으로 돌아간다 — `usePlaceFilterNav`).
         */
         title={keyword === null ? messages.place.emptyTitle : searchEmptyCopy(keyword).title}
         description={withNote(

@@ -2,6 +2,7 @@ import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
 import type { PlanAddTarget } from '@/features/plan/use-plan-add-place'
 import { messages } from '@/lib/messages'
+import { addPlaceConfirmNotice, type AddPlaceConfirmReason } from '@/lib/plan/add-place-confirm'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import type { PlaceSummary } from '@/types/place'
 
@@ -36,12 +37,15 @@ export function planAddPlaceAction(
   {
     addedPlaceIds,
     pendingPlaceId,
+    confirmingPlaceId = null,
     disabled,
     onAdd,
   }: {
     /** **그 일자에** 이미 담긴 장소들. 서버가 중복을 막지 않아 화면이 막는다 (F5-4) */
     addedPlaceIds: ReadonlySet<string>
     pendingPlaceId: string | null
+    /** 한 번 더 확인을 기다리는 장소 (#1383 · D24-4). 스크린리더 라벨만 바뀐다 */
+    confirmingPlaceId?: string | null
     /** 다른 담기가 진행 중 — 일괄 교체라 동시에 두 개를 보내면 하나가 진다 */
     disabled: boolean
     onAdd: (place: PlaceSummary) => void
@@ -64,7 +68,10 @@ export function planAddPlaceAction(
       size="md"
       loading={pending}
       disabled={disabled && !pending}
-      aria-label={messages.plan.addPlaceLabel.replace('{title}', place.title)}
+      aria-label={(confirmingPlaceId === place.placeId
+        ? messages.plan.addPlaceConfirmLabel
+        : messages.plan.addPlaceLabel
+      ).replace('{title}', place.title)}
       onClick={() => onAdd(place)}
     >
       {messages.plan.addPlaceShort}
@@ -78,18 +85,36 @@ export function planAddPlaceAction(
  */
 export function planAddPlaceNotice(
   place: PlaceSummary,
-  { failure }: { failure: { target: PlanAddTarget; error: PlanDaySaveError } | null },
+  {
+    failure,
+    confirming = null,
+  }: {
+    failure: { target: PlanAddTarget; error: PlanDaySaveError } | null
+    /** 한 번 더 확인을 기다리는 장소와 그 이유 (#1383 · D24-4) — `PlanAddPlaceRow` 와 같은 한 줄 */
+    confirming?: { placeId: string; reason: AddPlaceConfirmReason } | null
+  },
 ) {
-  if (failure === null || failure.target.placeId !== place.placeId) return null
+  const confirmReason =
+    confirming !== null && confirming.placeId === place.placeId ? confirming.reason : null
+  const error = failure !== null && failure.target.placeId === place.placeId ? failure.error : null
+  if (confirmReason === null && error === null) return null
 
+  /* 둘 다 그린다 — 확인한 뒤 저장이 실패하면 두 줄이 함께 선다 (`PlanAddPlaceRow` 와 같다) */
   return (
-    <FormAlert
-      className="mx-4 mb-3"
-      message={
-        failure.error.retriable
-          ? `${messages.plan.addPlaceErrorTitle} ${failure.error.message}`
-          : failure.error.message
-      }
-    />
+    <>
+      {confirmReason !== null && (
+        <p role="status" className="text-body-2 text-fg mx-4 mb-3 font-medium break-keep">
+          {addPlaceConfirmNotice(confirmReason)}
+        </p>
+      )}
+      {error !== null && (
+        <FormAlert
+          className="mx-4 mb-3"
+          message={
+            error.retriable ? `${messages.plan.addPlaceErrorTitle} ${error.message}` : error.message
+          }
+        />
+      )}
+    </>
   )
 }

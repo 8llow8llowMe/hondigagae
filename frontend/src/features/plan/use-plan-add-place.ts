@@ -9,9 +9,12 @@ import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidati
 import { planKeys } from '@/features/plan/queries'
 import { replaceDayItems } from '@/lib/api/plan'
 import { messages } from '@/lib/messages'
-import { appendPlaceItemPayload } from '@/lib/plan/day-items'
+import {
+  addPlaceToastMessage,
+  appendPlaceItemPayload,
+  insertedItemStartTime,
+} from '@/lib/plan/day-items'
 import { type PlanDaySaveError, toPlanDaySaveError } from '@/lib/plan/save-error'
-import { withObjectParticle } from '@/lib/text/korean'
 import type { PlanItemDetail } from '@/types/plan'
 
 /**
@@ -88,9 +91,7 @@ export function usePlanAddPlace({
             void invalidatePlanBriefing(queryClient, planId)
 
             showToast({
-              message: messages.plan.addPlaceToast
-                .replace('{title}', withObjectParticle(place.title))
-                .replace('{day}', String(day)),
+              message: addPlaceToastMessage(place.title, day, insertedItemStartTime(dayItems)),
             })
             onAdded?.(place, day)
           },

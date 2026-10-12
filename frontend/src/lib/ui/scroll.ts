@@ -129,3 +129,16 @@ export function swipeTarget(params: {
 
   return Math.min(count - 1, Math.max(0, index + move))
 }
+
+/**
+ * 마우스로 누른 뒤 **이만큼 움직여야 끌기다** (#1404). 그보다 작으면 클릭이다.
+ *
+ * 0 이면 손이 떨린 클릭이 끌기로 읽혀 카드 링크가 열리지 않는다. 너무 크면 끌기 시작이 늦게 붙는다.
+ * 6px 은 브라우저가 네이티브 드래그를 시작하는 거리(대략 4–5px)를 조금 넘는 값이다.
+ */
+export const DRAG_SLOP_PX = 6
+
+/** 누른 자리에서 가로로 움직인 거리(px)가 끌기인가 — 방향은 보지 않는다 */
+export function isDragGesture(dx: number): boolean {
+  return Math.abs(dx) >= DRAG_SLOP_PX
+}

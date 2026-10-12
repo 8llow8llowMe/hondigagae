@@ -9,9 +9,11 @@ import { NavLinks } from '@/features/nav/nav-links'
  *
  * **셸이 헤더 두 벌을 함께 그리고, 지도 화면이 자기 성질로 고른다** (#1287 D1-2). `/places` 의 목록 ·
  * 지도는 같은 라우트의 `?view=` 쿼리라 레이아웃 · prop 으로는 가를 수 없다. 이 헤더는 기본
- * `display: none` 이고(`.island-header`), 지도 루트가 `map-island` 를 달면 **768 이상에서**
+ * `display: none` 이고(`.island-header`), 지도 루트가 `map-island` 를 달면 **1024 이상에서**
  * `body:has(.map-island)` 규칙이 띠(`GlobalHeader`)를 걷고 이것을 세운다. 서버 렌더 첫 페인트부터 맞다.
  * **768 미만은 알약이 없다** — 검색창이 맨 위이고 이동은 탭바, 로그인은 `내 정보` 탭이 맡는다(D1-1).
+ * **768–1023 은 아일랜드가 아니다 — 흰 띠 그대로다** (#1409). 왼쪽 패널이 없는 폭이라 알약 아래 모바일용 검색 · 안내가
+ * 쌓여 정렬이 무너졌다. 다른 화면과 같은 띠를 쓰고 지도 위 조작 줄이 띠의 40 축을 따른다.
  *
  * **알약 = 메뉴 셋 + 계정 하나** (#1300 D1-1). 띠 헤더의 오른쪽 묶음(`HeaderActions` — 스위처 · 소개 ·
  * `병원 · 약국` · 회원가입)을 쓰지 않는다. 알약 안은 바깥과 동심원이다 — 높이 48 · 여백 4 · 안쪽 40 원형.
@@ -35,7 +37,7 @@ import { NavLinks } from '@/features/nav/nav-links'
 export function IslandHeader({ authed }: { authed: boolean }) {
   return (
     <header className="island-header pointer-events-none fixed inset-x-0 top-2 z-40">
-      {/* 왼쪽 16 · 위 8 · 높이 48 — 링크 44 가 세로 가운데. 768–1023 · 패널 접힘은 로고 알약이 된다(CSS) */}
+      {/* 왼쪽 16 · 위 8 · 높이 48 — 링크 44 가 세로 가운데. 패널을 접으면 로고 알약이 된다(CSS) */}
       <div className="island-logo pointer-events-auto fixed start-4 top-2 flex h-12 items-center">
         <HeaderLogo />
       </div>

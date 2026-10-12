@@ -34,12 +34,28 @@ describe('planDetailNotFoundTitle', () => {
 })
 
 /**
- * **#905 R5.** 성공하면 루트의 평문 `혼디가개` 가 아니라 `여행 일정` 을 낸다 — 일정 이름은
- * 넣지 않는다 (`detail-title.ts` 머리주석의 프라이버시 근거).
+ * **#1383 이 #905 R5 를 뒤집었다.** 성공하면 **일정 이름**을 낸다 — 이름이 같은 일정이 여럿이라
+ * (`몽과 제주 2박 3일` 이 다섯 중 넷) 탭 · 기록에서 `여행 일정` 만으로는 구분되지 않았다.
  */
 describe('planDetailTitle', () => {
-  it('성공(오류 null)이면 여행 일정 목록과 같은 이름을 돌려준다', () => {
+  it('성공이면 일정 이름이다', () => {
+    expect(planDetailTitle(null, '몽과 제주 2박 3일')).toBe('몽과 제주 2박 3일')
+  })
+
+  it('이름의 앞뒤 공백은 걷는다', () => {
+    expect(planDetailTitle(null, '  가을 서귀포  ')).toBe('가을 서귀포')
+  })
+
+  it('이름이 비었거나 없으면 여행 일정 목록과 같은 이름으로 떨어진다', () => {
+    expect(planDetailTitle(null, '   ')).toBe(messages.plan.pageTitle)
+    expect(planDetailTitle(null, null)).toBe(messages.plan.pageTitle)
     expect(planDetailTitle(null)).toBe(messages.plan.pageTitle)
+  })
+
+  it('오류가 있으면 이름을 받아도 쓰지 않는다', () => {
+    expect(planDetailTitle(new ApiError(503, null, null), '몽과 제주')).toBe(
+      messages.plan.pageTitle,
+    )
   })
 
   it('404 는 일정 상세 404 문구다 — planDetailNotFoundTitle 과 같다', () => {

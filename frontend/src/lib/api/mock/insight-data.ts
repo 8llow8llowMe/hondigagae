@@ -4,6 +4,8 @@ import type {
   CongestionItem,
   DailyCongestionItem,
   PlaceCongestionResponse,
+  PlaceRecommendationItem,
+  PlaceRecommendationResponse,
   PlaceSuitabilityResponse,
   RegionalWeatherResponse,
   ScoreMetricMetadata,
@@ -164,6 +166,93 @@ const CONGESTION_LEVELS: Record<string, CodeNameMetadata> = {
  * 동률이면 이른 날짜. mock 이 다른 날을 고르면 화면이 아니라 mock 이 틀린 것이다.
  */
 const CONGESTION_FROM_DATE = '2026-08-29'
+
+/**
+ * 추천 후보로 쓰는 유형 — BE `insight.recommendation` 기본값 12 · 14 · 28(관광지 · 문화시설 · 레포츠)을
+ * 목 장소의 유형 코드로 옮긴 것이다 (`weather-insight-integration.md` §6-5).
+ */
+const RECOMMENDATION_CONTENT_TYPES = new Set(['TOURIST_SPOT', 'CULTURE', 'LEPORTS'])
+
+/** 동반 구분 — 추천에는 이 둘만 온다. 정렬에서 `ALLOWED` 가 먼저다 */
+const RECOMMENDABLE_ALLOWANCE = ['ALLOWED', 'PARTIALLY_ALLOWED']
+
+/**
+ * `GET /places/recommendations` (#1380). 계약 근거는 `PlaceRecommendationResponse` ·
+ * `PlaceRecommendationItem` origin/develop 소스와 `weather-insight-integration.md` §6-5.
+ *
+ * **새 점수를 짓지 않는다** — 후보마다 `mockSuitability` 를 그대로 부른다. 서버도 후보마다 적합도 한 곳
+ * 판정과 같은 규칙을 부른다. 지킨 서버 규칙:
+ *  - 후보: 동반 `ALLOWED` · `PARTIALLY_ALLOWED`, 대표 사진 · 좌표 있음, 유형 12 · 14 · 28
+ *  - 점수가 null 인 곳은 뺀다
+ *  - 정렬: 점수 desc → `ALLOWED` 먼저 → `placeId` asc
+ *
+ * **흉내 내지 않는 것**: 혼잡도 동점 규칙(목 혼잡도가 둘뿐이다)과 유형 다양성(같은 유형은 `limit` 의
+ * 절반까지) — 목 후보가 적어 다양성을 걸면 limit 을 채우는 채우기 단계가 늘 이긴다. 특보는 실제로는
+ * 지역 공통 한 값인데, 목은 고른 장소의 적합도 목에서 처음 잡히는 것을 머리에 싣는다.
+ *
+ * `hasCondition` 은 반려견 조건이 요청에 실렸는가 — `petConditionApplied` 로 그대로 나간다.
+ */
+export function mockRecommendations(
+  limit: number,
+  hasCondition: boolean,
+): PlaceRecommendationResponse {
+  const scored = MOCK_PLACES.filter(
+    (place) =>
+      RECOMMENDABLE_ALLOWANCE.includes(place.petAllowanceType.code) &&
+      RECOMMENDATION_CONTENT_TYPES.has(place.contentType.code) &&
+      place.firstImage !== null &&
+      place.firstImage.trim() !== '' &&
+      place.lat !== null &&
+      place.lng !== null,
+  )
+    .map((place) => ({ place, suitability: mockSuitability(place.placeId) }))
+    .filter(({ suitability }) => suitability.score !== null)
+    .sort(
+      (a, b) =>
+        (b.suitability.score ?? 0) - (a.suitability.score ?? 0) ||
+        RECOMMENDABLE_ALLOWANCE.indexOf(a.place.petAllowanceType.code) -
+          RECOMMENDABLE_ALLOWANCE.indexOf(b.place.petAllowanceType.code) ||
+        (BigInt(a.place.placeId) < BigInt(b.place.placeId) ? -1 : 1),
+    )
+    .slice(0, limit)
+
+  const items: PlaceRecommendationItem[] = scored.map(({ place, suitability }) => ({
+    placeId: place.placeId,
+    // 목록 metadata 는 `description` 이 선택이라 계약 모양(`CodeNameDescriptionMetadata`)으로 채운다
+    contentType: { ...place.contentType, description: place.contentType.description ?? null },
+    title: place.title,
+    addr1: place.addr1,
+    sigunguCode: place.sigunguCode,
+    lat: place.lat as number,
+    lng: place.lng as number,
+    firstImage: place.firstImage as string,
+    firstImage2: place.firstImage2,
+    petAllowanceType: {
+      ...place.petAllowanceType,
+      description: place.petAllowanceType.description ?? null,
+    },
+    maxPetWeightKg: place.maxPetWeightKg,
+    indoor: place.indoor,
+    score: suitability.score as number,
+    suitabilityLevel: suitability.suitabilityLevel,
+    headline: suitability.headline ?? null,
+    reasons: suitability.reasons,
+    weather: suitability.weather,
+    congestion: suitability.congestion ?? CONGESTION_UNKNOWN,
+    indoorAlternatives: suitability.indoorAlternatives,
+    petConditionApplied: hasCondition,
+    weatherApplied: suitability.weatherApplied,
+    congestionApplied: suitability.congestionApplied,
+  }))
+
+  return {
+    targetDate: '2026-08-29',
+    weatherProviderName: '기상청 단기예보',
+    weatherWarning:
+      scored.map(({ suitability }) => suitability.weatherWarning).find((w) => w !== null) ?? null,
+    items,
+  }
+}
 
 /** 버킷별 집중률 패턴. `null` 은 데이터 없는 날짜다 — **목록에서 빼지 않는다** */
 const CONGESTION_RATES: Record<number, (number | null)[]> = {

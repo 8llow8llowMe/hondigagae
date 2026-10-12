@@ -136,6 +136,53 @@ describe('지도 패널의 담기 실패 알림', () => {
  * **소스 단언이다.** 지도 갈래는 `usePlanDetail` · `usePlaceList` 를 타는 클라이언트
  * 트리라 node 환경에서 통째로 렌더할 수 없다 (`testing-guide.md` §1).
  */
+describe('지도 패널의 한 번 더 확인 (#1383 · D24-4)', () => {
+  const confirming = { placeId: placeSummary.placeId, reason: 'UNKNOWN' as const }
+
+  it('확인을 기다리는 행에 목록 보기와 같은 한 줄이 붙는다', () => {
+    const markup = renderToStaticMarkup(
+      createElement('div', null, planAddPlaceNotice(placeSummary, { failure: null, confirming })),
+    )
+    expect(markup).toContain(messages.plan.addPlaceConfirmUnknown)
+  })
+
+  it('확인한 뒤 저장이 실패하면 확인 줄과 실패 알림이 함께 선다 — 목록 보기와 같다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        'div',
+        null,
+        planAddPlaceNotice(placeSummary, {
+          failure: {
+            target: { day: 1, placeId: placeSummary.placeId },
+            error: { retriable: true, message: '다시 시도해 주세요.' },
+          },
+          confirming,
+        }),
+      ),
+    )
+    expect(markup).toContain(messages.plan.addPlaceConfirmUnknown)
+    expect(markup).toContain('다시 시도해 주세요.')
+  })
+
+  it('다른 행에는 붙지 않는다', () => {
+    const notice = planAddPlaceNotice(placeWithoutCoordinate, { failure: null, confirming })
+    expect(notice).toBeNull()
+  })
+
+  it('담기 버튼의 스크린리더 라벨이 그래도 담기로 바뀐다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        'div',
+        null,
+        planAddPlaceAction(placeSummary, { ...BASE, confirmingPlaceId: placeSummary.placeId }),
+      ),
+    )
+    expect(markup).toContain(
+      messages.plan.addPlaceConfirmLabel.replace('{title}', placeSummary.title),
+    )
+  })
+})
+
 describe('지도 갈래의 떠 있는 머리 (#556)', () => {
   const source = readSource('src/features/plan/plan-add-place-view.tsx')
   /*

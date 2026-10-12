@@ -67,7 +67,7 @@ export function RegionalWeatherSection({
   const recommendedCode = soleRecommendedCode(data.regions, data.recommendedRegion)
   /*
     **전 권역이 같은 점수인 날은 모바일에서 칸 레일을 접는다** (#1356). 머리 문장이 이미
-    `오늘은 어느 권역이든 좋아요` 라고 말하고, 칸은 같은 숫자를 늘어놓을 뿐이라 375 에서
+    `권역별 차이가 없어요`(#1380) 라고 말하고, 칸은 같은 숫자를 늘어놓을 뿐이라 375 에서
     약 150px 이 비교할 것 없는 표가 된다. **견줄 거리가 있는 날은 접지 않는다** — 권역은
     서로 견주라고 있는 표다(D1 · #530). `md` 이상은 언제나 펼쳐 둔다.
   */

@@ -12,11 +12,14 @@ import { AiPlanCreateForm } from '@/features/ai-plan/ai-plan-create-form'
 import { AiPlanPlacePickerSheet } from '@/features/ai-plan/ai-plan-place-picker-sheet'
 import { aiPlanFormSchema } from '@/features/ai-plan/schemas'
 import { useFavoriteList } from '@/features/favorite/use-favorite-list'
+import { currentSelectedPetId } from '@/features/nav/selected-pet-store'
 import { usePetList } from '@/features/pet/use-pet-list'
+import { defaultAiPlanPetIds } from '@/lib/ai-plan/default-pets'
 import { readAiPlanRequest, saveAiPlanRequest } from '@/lib/ai-plan/request-store'
 import { MANWON, toAiPlanSubmitPayload } from '@/lib/ai-plan/submit'
 import { submitAiPlan } from '@/lib/api/ai-plan'
 import { useForm } from '@/lib/form/use-form'
+import { useHydrated } from '@/lib/hooks/use-hydrated'
 import { messages } from '@/lib/messages'
 import { petCreateHref } from '@/lib/pet/return-to'
 import { totalDaysBetween } from '@/lib/plan/date'
@@ -47,8 +50,14 @@ export function AiPlanCreateView({
 }) {
   const petsQuery = usePetList(true)
   // `/ai-plans` 는 proxy.ts `PROTECTED_PATHS` 라 미로그인이 여기 닿지 않는다 (#200)
+  /*
+    **폼은 하이드레이션 뒤에만 그린다** (#1381). 폼의 첫 값을 브라우저 저장소(헤더의 반려견 선택값 ·
+    `?from=` 조건)로 정하는데, 반려견 목록이 서버에서 프리페치돼 있어 서버도 폼을 그렸다 — 서버는
+    저장소를 못 읽어 다른 아이를 체크한 마크업을 냈다. 그동안은 같은 스켈레톤이다.
+  */
+  const hydrated = useHydrated()
 
-  if (petsQuery.isPending) {
+  if (petsQuery.isPending || !hydrated) {
     return (
       <AiPlanCreateSurface>
         {/* 스켈레톤도 카드 안이라 인셋이 `card`(16/20)다 — 폼 래퍼와 같은 세로선에 선다 */}
@@ -161,11 +170,15 @@ function AiPlanCreateFormContainer({
     **실패 화면의 `조건 바꾸기` 를 위해 조건을 되살린다** (명세 S7 — "입력 조건은
     그대로 남기고"). `?from={jobId}` 로 오면 그 작업의 조건을 읽어 폼을 채운다.
 
-    `useState` 의 지연 초기화로 읽는다 — 이 컴포넌트는 반려견 조회가 끝난 뒤에야
-    마운트되므로 하이드레이션 이후에만 실행되고, 서버·클라이언트가 다른 값을 그릴
-    일이 없다. 렌더 중에 `sessionStorage` 를 직접 보면 그 보장이 사라진다.
+    `useState` 의 지연 초기화로 읽는다. **이 컴포넌트는 하이드레이션 뒤에만 마운트된다** —
+    `AiPlanCreateView` 가 `useHydrated()` 로 막는다(#1381). 예전 주석은 "반려견 조회가 끝난 뒤에야
+    마운트되므로" 라고 했는데 틀렸다: `(main)/layout.tsx` 가 반려견 목록을 서버에서 프리페치해
+    서버 렌더에서도 이 폼이 그려졌고, 저장소를 못 읽는 서버와 값이 갈렸다(체크 · 선택 행 강조 불일치).
   */
-  const [startValues] = useState<AiPlanFormValues>(() => restoreValues(fromJobId, pets))
+  const [startValues] = useState<AiPlanFormValues>(() =>
+    // 헤더에서 고른 반려견도 여기서 읽는다 — 위 이유로 localStorage 가 안전하다 (#1381)
+    restoreValues(fromJobId, pets, currentSelectedPetId()),
+  )
 
   const form = useForm<AiPlanFormValues, AiPlanSubmitResult>({
     schema: aiPlanFormSchema,
@@ -270,11 +283,18 @@ function toBudgetManwon(budget: number | null): string {
  * 없는 아이가 선택된 채로 남으면 제출이 서버에서 막힌다. 전부 사라졌으면 기본값으로
  * 떨어진다.
  */
-function restoreValues(fromJobId: string | null, pets: Pet[]): AiPlanFormValues {
+function restoreValues(
+  fromJobId: string | null,
+  pets: Pet[],
+  selectedPetId: string | null,
+): AiPlanFormValues {
   const base: AiPlanFormValues = {
     ...EMPTY_AI_PLAN_FORM_VALUES,
-    // 한 마리뿐이면 미리 고른다 — 고를 것이 없는 그룹을 비워 두지 않는다
-    petIds: pets.length === 1 ? [pets[0]?.petId ?? ''].filter((petId) => petId !== '') : [],
+    /*
+      **한 마리를 미리 고른다** — 헤더에서 고른 아이, 없으면 대표견 (#1381). 예전에는 한 마리일
+      때만 골라 2마리 이상이면 헤더에서 `몽` 을 골라 둔 사람도 다시 골라야 했다.
+    */
+    petIds: defaultAiPlanPetIds(pets, selectedPetId),
   }
 
   if (fromJobId === null) return base

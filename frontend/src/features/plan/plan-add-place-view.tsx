@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { BackLink } from '@/components/back-link'
@@ -23,6 +23,7 @@ import { usePlanDetail } from '@/features/plan/use-plan-detail'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
 import { messages } from '@/lib/messages'
+import { type AddPlaceConfirmReason, addPlaceConfirmReason } from '@/lib/plan/add-place-confirm'
 import {
   type AddPlaceFocusBasis,
   addPlaceFocusBasis,
@@ -138,7 +139,18 @@ export function PlanAddPlaceView({
     `planKeys.detail` 을 갈아끼우므로 그 행이 곧바로 `이미 담았어요` 로 바뀐다.
     돌아가기는 헤더의 `일정으로 돌아가기` 가 맡는다.
   */
-  const addPlace = usePlanAddPlace({ planId })
+  /**
+   * 한 번 더 확인을 기다리는 장소 — 동반 불가 · 미확인의 첫 누름 뒤 (#1383 · D24-4).
+   *
+   * **저장에 성공했을 때만 지운다.** 두 번째 누름에서 지우면, 저장이 실패한 뒤 다시 시도하는
+   * 누름이 또 확인 대기가 된다 — 이미 확인한 것을 다시 묻는다.
+   */
+  const [confirming, setConfirming] = useState<{
+    placeId: string
+    reason: AddPlaceConfirmReason
+  } | null>(null)
+  const clearConfirming = useCallback(() => setConfirming(null), [])
+  const addPlace = usePlanAddPlace({ planId, onAdded: clearConfirming })
 
   const backHref = `/plans/${planId}#${planDayAnchorId(day)}`
 
@@ -267,13 +279,26 @@ export function PlanAddPlaceView({
   /** 지도 갈래 머리 카드가 그 경고만큼 커진 높이 — 모바일 시트 상한이 함께 내려간다 */
   const headExtra = visitResetNotice === null ? 0 : VISIT_NOTICE_EXTRA
 
-  const onAdd = (selected: PlaceSummary) =>
+  const onAdd = (selected: PlaceSummary) => {
+    /*
+      **동반 불가 · 미확인은 한 번 더 누르게 한다** (#1383 · 일정상세-세부명세 D24-4). 기본 필터가
+      `동반 가능만` 이라 보통은 만나지 않지만, 필터를 끄면 반려견 일정에 곧바로 들어간다. 모달이
+      아니다 — 담기는 되돌릴 수 있다 (`styling-guide.md` §3-2). 다른 장소를 누르면 확인 대기가
+      그쪽으로 옮겨 간다.
+    */
+    const reason = addPlaceConfirmReason(selected)
+    if (reason !== null && confirming?.placeId !== selected.placeId) {
+      setConfirming({ placeId: selected.placeId, reason })
+      return
+    }
+
     addPlace.add({
       day,
       // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
       dayItems: group.items,
       place: { placeId: selected.placeId, title: selected.title },
     })
+  }
 
   if (view === 'map') {
     /* 기준점과 그 출처 · 항목 — 카메라(`initialFocus`)와 마커 이름이 같은 판정에서 나온다 (#1223) */
@@ -370,11 +395,14 @@ export function PlanAddPlaceView({
               planAddPlaceAction(place, {
                 addedPlaceIds,
                 pendingPlaceId: addPlace.pending?.placeId ?? null,
+                confirmingPlaceId: confirming?.placeId ?? null,
                 disabled: addPlace.adding,
                 onAdd,
               })
             }
-            renderRowNotice={(place) => planAddPlaceNotice(place, { failure: addPlace.failure })}
+            renderRowNotice={(place) =>
+              planAddPlaceNotice(place, { failure: addPlace.failure, confirming })
+            }
           />
         </div>
       </div>
@@ -461,6 +489,7 @@ export function PlanAddPlaceView({
             error={
               addPlace.failure?.target.placeId === place.placeId ? addPlace.failure.error : null
             }
+            confirmReason={confirming?.placeId === place.placeId ? confirming.reason : null}
             onAdd={onAdd}
           />
         )}

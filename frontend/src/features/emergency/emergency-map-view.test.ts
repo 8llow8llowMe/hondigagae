@@ -197,11 +197,12 @@ describe('EmergencyMapView — 시트 최대 단계의 윗변 (#901 D2)', () => 
   )
   const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
+  /* 아일랜드라 폭으로 갈리는 CSS 변수(60 / 120)다 (#1397) — `/places` 아일랜드와 같은 값 */
   it('MapSheet 에 maxTopInset 을 넘긴다 — 기본 85dvh 로 떨어지지 않는다', () => {
     const open = code.indexOf('<MapSheet')
     const close = code.indexOf('>', open)
 
-    expect(code.slice(open, close)).toContain('maxTopInset={MAP_TOP_CONTROLS_INSET}')
+    expect(code.slice(open, close)).toContain('maxTopInset={MAP_ISLAND_INSET_VAR}')
   })
 })
 
@@ -241,7 +242,11 @@ describe('EmergencyMapView — 도킹 패널 (#1232 D10)', () => {
       옮겨도 통과한다(리뷰 지적). 스택 여는 `<div` 부터 손잡이까지 여닫는 태그 수가 같으면 닫힌 뒤다.
     */
     const between = code.slice(code.lastIndexOf('<div', stack), handle)
-    expect(between.match(/<div\b/g)?.length).toBe(between.match(/<\/div>/g)?.length)
+    // 스스로 닫는 `<div … />`(로고 띠, #1397)는 짝이 없다 — 여는 태그에서 뺀다
+    const selfClosing = between.match(/<div\b[^<>]*\/>/g)?.length ?? 0
+    expect((between.match(/<div\b/g)?.length ?? 0) - selfClosing).toBe(
+      between.match(/<\/div>/g)?.length,
+    )
     expect(code).toContain('before:w-11')
   })
 
@@ -259,5 +264,54 @@ describe('EmergencyMapView — 도킹 패널 (#1232 D10)', () => {
       code.indexOf('if (failure !== null)'),
     )
     expect(select).toContain('setPanelOpen(true)')
+  })
+})
+
+/*
+  #1397 — 지도 아일랜드 가입. `/places` 지도 보기(`place-map-view.test.ts` 의 #1287 · #1300 블록)와 같은 장치라
+  셸의 `body:has(.map-island)` 규칙이 흰 띠를 걷고 알약을 세운다 — 루트에서 `map-island` 가 빠지면 띠가 돌아온다.
+*/
+describe('EmergencyMapView — 지도 아일랜드 (#1397)', () => {
+  const source = readFileSync(
+    fileURLToPath(new URL('./emergency-map-view.tsx', import.meta.url)),
+    'utf8',
+  )
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+  it('루트가 map-island · map-canvas-height 를 함께 달고 data-dock 을 준다 — 캔버스는 루트를 채운다', () => {
+    expect(code).toContain('className="map-canvas-height map-island relative"')
+    expect(code).toContain("data-dock={panelOpen ? 'open' : 'closed'}")
+    expect(code).not.toContain('className="map-canvas-height w-full"')
+  })
+
+  /* #1409 — 768–1023 은 흰 띠 아래라 y 8, 알약은 ≥1024 만. 1024 미만은 검색 왼쪽 · 버튼 오른쪽 */
+  it('조작 줄은 <1024 y 8 · ≥1024 y 68 이고 양끝 16 이다 — 콘텐츠 열에 매달지 않는다', () => {
+    expect(code).toContain('pointer-events-none absolute inset-x-0 top-2 z-30 lg:top-17')
+    // 768–1023 은 띠 헤더와 같은 40, 그 밖은 16
+    expect(code).toContain(
+      'flex items-start justify-between gap-2 px-4 md:px-10 lg:justify-end lg:px-4',
+    )
+    expect(code).not.toContain('md:top-17')
+    expect(code).not.toContain('content-container')
+  })
+
+  it('패널 맨 앞이 로고 띠(64)다 — 검색보다 앞', () => {
+    const band = code.indexOf(
+      '<div aria-hidden className="border-border h-16 shrink-0 border-b" />',
+    )
+    expect(band).toBeGreaterThan(code.indexOf('id={stackId}'))
+    expect(band).toBeLessThan(code.indexOf('id="emergency-keyword-panel"'))
+  })
+
+  it('보기 전환은 패널이 열린 1024 이상에서 숨고, 패널 개수 줄의 크게 보기가 같은 주소로 간다', () => {
+    expect(code).toContain("className={panelOpen ? 'lg:hidden' : ''}")
+    expect(code).toContain('href={listHref}')
+    expect(code).toContain('messages.map.expandListPrefix')
+    expect(code).toContain('{messages.map.expandList}')
+  })
+
+  it('내 위치는 아이콘 묶음 카드의 칸이다', () => {
+    expect(code).toContain('<MapToolCard>')
+    expect(code).toContain('<MapLocateButton onLocate={board.locate} variant="cell" />')
   })
 })

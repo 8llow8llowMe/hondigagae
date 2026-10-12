@@ -1,13 +1,13 @@
 'use client'
 
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 
 import { clientFetch } from '@/lib/api/client'
-import { regionalWeatherPath, suitabilityPath, walkSafetyPath } from '@/lib/api/insight'
+import { recommendationsPath, regionalWeatherPath, walkSafetyPath } from '@/lib/api/insight'
 import { conditionKey, INSIGHT_QUERY_OPTIONS, insightKeys } from '@/lib/insight/queries'
 import type {
   PetCondition,
-  PlaceSuitabilityResponse,
+  PlaceRecommendationResponse,
   RegionalWeatherResponse,
   WalkSafetyResponse,
 } from '@/types/insight'
@@ -50,18 +50,35 @@ export function useRegionalWeather(condition: PetCondition | null) {
 }
 
 /**
- * 상위 N개 장소의 적합도를 **병렬로** 조회한다 (홈-세부명세 D3).
+ * 홈 `오늘 갈 만한 곳` — 장소 추천 **한 번**이다 (#1380 · 홈-세부명세 D10-1).
  *
- * 순차로 하면 3배 느리다. **하나가 실패하면 그 카드만 빠진다** — 나머지는 렌더한다.
- * 목록 단위 적합도 API 가 생기면(S6-2) 이 훅만 바꾼다.
+ * 예전에는 목록 앞 N곳(`GET /places`)을 서버가 받아 두고 그 N곳의 적합도를 하나씩 불렀다
+ * (`useSuitabilities`, N+1). 그래서 추천이 "장소 ID 앞 3곳" 이었고 동반 미확인 장소가 섰다
+ * (`docs/ux-review-2026-10-11.md` §3-2). 추천 API 가 후보 전부를 같은 적합도 규칙으로 재고 동반
+ * 미확인을 거른다.
+ *
+ * **서버 프리페치하지 않는다.** 캐시 미스 콜드 응답이 dev 실측 18초다(BE 캐시 600초) — 서버에서
+ * 기다리면 첫 HTML 이 통째로 막힌다. 클라이언트가 받고 그동안 골격(`SuitabilityListSkeleton`)이
+ * 선다. 반려견 조건도 클라이언트 스토어에서 정해져 서버는 key 를 모른다(판정과 같은 이유).
+ *
+ * 반려견을 바꾸면 조건이 바뀌어 key 가 달라진다. `placeholderData` 로 **이전 카드를 유지**한다
+ * (D4-2) — 판정 · 권역과 같은 규칙이고, 표준값은 장소 인사이트 행(`INSIGHT_QUERY_OPTIONS`)이다.
+ *
+ * **`enabled` — 조건이 정해진 뒤에만 부른다** (#1380 검토). 로그인 사용자는 반려견 목록 · 고른 반려견
+ * 복원이 끝나야 조건이 선다. 그 전에 부르면 조건 없는 추천을 한 번 받고 조건이 서는 순간 다른 key 로 또
+ * 부른다 — 콜드 18초짜리 계산 하나가 버려지고, BE 문서 §6-5 가 경고한 기상청 호출 경로를 한 번 더 탄다.
+ * 적합도 단건은 가벼워 그 비용을 받아들였지만 추천은 다르다.
  */
-export function useSuitabilities(placeIds: string[], condition: PetCondition | null) {
-  return useQueries({
-    queries: placeIds.map((placeId) => ({
-      queryKey: insightKeys.suitability(placeId, conditionKey(condition)),
-      queryFn: () => clientFetch<PlaceSuitabilityResponse>(suitabilityPath(placeId, condition)),
-      placeholderData: (previous: PlaceSuitabilityResponse | undefined) => previous,
-      ...INSIGHT_QUERY_OPTIONS,
-    })),
+export function useRecommendations(
+  condition: PetCondition | null,
+  limit: number,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: insightKeys.recommendations(conditionKey(condition), limit),
+    queryFn: () => clientFetch<PlaceRecommendationResponse>(recommendationsPath(condition, limit)),
+    placeholderData: (previous) => previous,
+    enabled,
+    ...INSIGHT_QUERY_OPTIONS,
   })
 }

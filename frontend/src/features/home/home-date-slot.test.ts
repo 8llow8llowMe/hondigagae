@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { readSourceWithoutComments as source } from '@/test/source'
+import { openingTags, readSourceWithoutComments as source } from '@/test/source'
 
 /**
  * 홈 좌측 레일의 **날짜 자리**와 적합도 목록의 **첫 구분선** — 이슈 #530.
@@ -119,13 +119,14 @@ describe('홈 추천 카드 — 목록 위 구분선 (#1069)', () => {
   })
 
   /*
-    **카드 구성이 바뀌면 틀을 새로 세운다.** 적합도 세 건이 따로 도착하면 앞쪽에 카드가
-    끼어드는데, 스냅 컨테이너는 직전에 붙어 있던 항목(먼저 선 끝 카드)을 따라 다시 스냅해
-    768 실측에서 첫 화면이 1위가 아니라 끝 카드였다. key 가 카드 id 들을 담아야 한다.
+    **카드 구성이 바뀌면 틀을 새로 세운다.** 스냅 컨테이너는 배치가 바뀌면 직전에 붙어 있던
+    항목(먼저 선 끝 카드)을 따라 다시 스냅해 768 실측에서 첫 화면이 1위가 아니라 끝 카드였다.
+    추천(#1380)은 한 번에 오지만 반려견 · 기준 장소가 바뀌면 구성이 바뀐다 — key 가 카드 id 들을
+    담아야 한다.
   */
   it('틀의 key 가 카드 구성을 담는다', () => {
-    const list = HOME.slice(HOME.indexOf('<PlaceInsightCardList'))
+    const tag = openingTags(HOME, /<PlaceInsightCardList\b/g)[0] ?? ''
 
-    expect(list.slice(0, 200)).toContain('scored.map((data) => data.placeId)')
+    expect(tag).toContain('cards.map((card) => card.data.placeId)')
   })
 })

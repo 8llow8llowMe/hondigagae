@@ -63,6 +63,12 @@ export const paths = {
      * 셋만 준다. 동반 구분으로는 거르지 않는다 — 색인할 판정은 부르는 쪽이 고른다
      */
     sitemap: '/places/sitemap',
+    /**
+     * 장소 추천 (#1368 · #1380). 반려견 조건은 적합도와 같은 파라미터이고 `limit` 은 1~10(기본 3).
+     * **`/places/{placeId}` 와 같은 깊이라 상세로 읽지 않는다** — 서버도 고정 경로가 패턴보다 먼저다
+     */
+    recommendations: (query: string) =>
+      query ? `/places/recommendations?${query}` : '/places/recommendations',
     /** 장소 인사이트 — tour-service insight 컨텍스트 */
     suitability: (placeId: string, query: string) =>
       query ? `/places/${placeId}/suitability?${query}` : `/places/${placeId}/suitability`,

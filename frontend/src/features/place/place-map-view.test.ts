@@ -50,7 +50,7 @@ describe('PlaceMapView — 기준점에서 열기 (#1177)', () => {
     expect(code).toContain('focus === null ? INITIAL_PLACE_MAP_AREA : focusedPlaceMapArea(focus)')
     expect(code).toContain('const [researched, setResearched] = useState(focus !== null)')
     expect(code).toContain('focus === null ? null : { anchor: focus,')
-    expect(code).toContain("useRef<FocusFraming | null>(focus === null ? null : 'pending')")
+    expect(code).toContain("focus !== null || fitCamera !== null ? 'pending' : null")
   })
 
   it('기준점 지도는 주변 조회가 오기 전까지 행 골격을 둔다 — 빈 상태가 먼저 깜빡이지 않는다', () => {
@@ -63,6 +63,50 @@ describe('PlaceMapView — 기준점에서 열기 (#1177)', () => {
   허락하지 않아 하이드레이션이 깨진다 — 기준점 지도가 서버 렌더 시점에 주변 조회를 기다리며
   처음 이 갈래를 서버에서 그렸을 때 실측으로 걸렸다.
 */
+/*
+  #1379 — `/places` 첫 화면을 첫 결과에 맞춘다(`fitResults`). 사각형 · 덮개 계산은 `viewport.test.ts` ·
+  `place-map-area.test.ts` 가 재고, 여기서는 **언제 맞추는지**만 잠근다.
+*/
+describe('PlaceMapView — 첫 결과에 맞추기 (#1379)', () => {
+  it('마운트 때 한 번 얼린다 — 필터가 바뀌어도 다시 맞추지 않는다', () => {
+    expect(code).toContain('const [fitCamera] = useState(() => {')
+  })
+
+  it('기준점 · 고른 장소로 열리면 맞추지 않는다 — 그쪽이 시야를 정한다', () => {
+    expect(code).toContain('if (!fitResults || focus !== null || selectedId !== null) return null')
+  })
+
+  it('기준점 카메라가 먼저다', () => {
+    expect(code).toContain('camera={focusCamera ?? (fitDropped ? null : fitCamera)}')
+  })
+
+  /* 무한 스크롤로 받은 장까지 담으면 섬 전체로 벌어진다 (#1379 검토) */
+  it('첫 장만 담는다', () => {
+    expect(code).toContain('placeResultsCamera(listQuery.data?.pages[0]?.contents ?? [])')
+  })
+
+  /*
+    SDK 로드 중에 행을 고르면 선택 확대가 먼저 돌고 카메라가 덮었다 (#1379 검토). 아직 놓지 않았을 때만
+    거두고, framing 은 `applied` 로 — `null` 이면 권유 기준이 영영 비고 `pending` 이면 모든 idle 을 버린다.
+  */
+  it('카메라를 놓기 전에 장소를 고르면 맞추기를 거둔다', () => {
+    expect(code).toContain("if (framingRef.current !== 'pending') return")
+    expect(code).toContain("framingRef.current = 'applied'")
+    expect(code).toContain('setFitDropped(true)')
+  })
+
+  /* 첫 결과 지도도 기준점 지도와 같은 함정이 있다 — 제주 기본 시야의 첫 idle 을 권유 기준으로 삼으면 버튼이 뜬다 */
+  it('카메라를 놓는 지도는 첫 idle 을 기다린다', () => {
+    expect(code).toContain("focus !== null || fitCamera !== null ? 'pending' : null")
+  })
+
+  it('가린 몫을 시트 · 도킹 스택에서 잰다', () => {
+    expect(code).toContain('ref={sheetRef}')
+    expect(code).toContain('ref={stackRef}')
+    expect(code).toContain('{ ...framed, insets: fitInsets }')
+  })
+})
+
 describe('PlaceMapView — 개수 캡션의 요소 (#1177)', () => {
   it('골격을 품을 수 있는 캡션이 p 로 열리지 않는다', () => {
     const caption = source.indexOf(
@@ -357,9 +401,19 @@ describe('PlaceMapView — 지도 아일랜드 (#1287)', () => {
     expect(code).not.toContain('absolute inset-x-0 top-0 h-16')
   })
 
-  it('조작 줄은 <768 y 8 · ≥768 y 68 이다 — 모바일에는 알약이 없다', () => {
-    expect(code).toContain("island ? 'top-2 md:top-17' : 'top-5 lg:top-6'")
+  it('조작 줄은 <1024 y 8 · ≥1024 y 68 이다 — 알약은 1024 이상에만 선다 (#1409)', () => {
+    expect(code).toContain("island ? 'top-2 lg:top-17' : 'top-5 lg:top-6'")
     expect(code.match(/\bcontrolsInset\b/g)?.length).toBeGreaterThanOrEqual(4)
+  })
+
+  /* #1397 — 알약(`.island-bar` 오른쪽 16)과 같은 x · 로고와 대칭. 담기 지도는 띠 헤더가 있어 콘텐츠 열 그대로다 */
+  it('아일랜드의 조작 줄 · 시설 안내 줄은 뷰포트 끝 16 이다 — 끄면 콘텐츠 열 − 40', () => {
+    // 조작 줄: 1024 미만은 검색 왼쪽 · 버튼 오른쪽, 1024 이상은 오른쪽 정렬 (#1409)
+    expect(code).toContain("? 'justify-between md:px-10 lg:justify-end lg:px-4'")
+    expect(code).toContain(": 'content-container justify-end md:px-10'")
+    // 시설 안내 줄 — 조작 줄과 같은 가로 축
+    expect(code).toContain("island ? 'md:px-10 lg:px-4' : 'content-container md:px-10'")
+    expect(code).not.toContain('"content-container flex items-start justify-end')
   })
 
   /* 데스크톱은 목록이 옆에 보이는데 `목록 보기` 가 떠 있었다 — 패널 `크게 보기` 가 대신한다 (D0 #4) */

@@ -80,20 +80,22 @@ describe('홈 → /about 소개 카드 (#950)', () => {
   /*
     **오늘 상태를 본 다음, 오늘 갈 만한 곳 앞이다** (소개 명세 2026-09-15 §1-1). 우측 열 머리(여행
     배너 다음)라 1024 이상은 첫 화면 안이고, 1024 미만은 좌측 레일(오늘 요약 카드) 바로 다음이다.
-    × 뒤 초점은 다음 형제를 믿는다 — 다음 형제가 `오늘 갈 만한 곳` 이어야 한다.
+    × 뒤 초점은 다음 형제를 믿는다 — 다음 형제는 늘 `오늘 갈 만한 곳` 이다. 실내 대안은 #1400 부터 그
+    카드 아래다. 링크가 있는 카드라 초점이 body 로 떨어지지 않는다.
   */
-  it('우측 열 머리 — 오늘 요약 카드 뒤, 오늘 갈 만한 곳 바로 앞 형제', () => {
+  it('우측 열 머리 — 오늘 요약 카드 뒤, 오늘 갈 만한 곳 바로 앞', () => {
     const at = HOME.indexOf(CARD)
     const rightStack = HOME.indexOf('<SurfaceStack className="lg:pl-3">')
     const next = HOME.indexOf('<Surface', at + CARD.length)
+    const between = HOME.slice(at + CARD.length, next)
+      .replace(/\{\}/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
 
     expect(at).toBeGreaterThan(rightStack)
     expect(at).toBeGreaterThan(HOME.indexOf('<WalkTimesSection'))
-    expect(
-      HOME.slice(at + CARD.length, next)
-        .replace(/\{\}/g, '')
-        .trim(),
-    ).toBe('')
+    // 사이에 아무것도 없다 — 다른 카드가 끼어들면 × 뒤 초점이 엉뚱한 곳으로 간다
+    expect(between).toBe('')
     expect(HOME.slice(next, HOME.indexOf('>', next))).toContain('titleId="suitability-heading"')
   })
 

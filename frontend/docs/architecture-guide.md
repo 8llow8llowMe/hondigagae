@@ -101,6 +101,14 @@ const MapView = dynamic(() => import('@/features/place/map-view'), { ssr: false 
 
 카카오 지도는 반드시 이 형태. 세부는 `external-api-guide.md`.
 
+### 서버 렌더된 `<img>` 의 `onError` 는 불리지 않을 수 있다 ([#1382](https://github.com/8llow8llowMe/hondigagae/issues/1382))
+
+HTML 을 받자마자 브라우저가 사진을 받기 시작해, 404 의 `error` 이벤트가 **하이드레이션 전에 지나가면**
+React 의 `onError` 가 불리지 않는다(react-dom 19.2 는 하이드레이션한 `<img>` 의 이벤트를 되살리지 않는다).
+업로드 사진처럼 열리지 않을 수 있는 `<img>` 는 `onError` 하나에 기대지 말고
+`src/lib/hooks/use-image-fallback.ts` 의 `useImageFallback(url)` 을 쓴다 — 마운트 때 `ref` 로
+`complete && naturalWidth === 0` 을 한 번 더 읽는다. `PetAvatar` · `PetPhoto` · `ProfileAvatar` 가 쓴다.
+
 ### 서버 전용 모듈 잠금
 
 토큰·세션을 다루는 모듈은 최상단에 `import 'server-only'` 를 둔다. 클라이언트에서 임포트되면 빌드가 실패해 사고를 사전에 막는다.
@@ -424,21 +432,22 @@ title  장소를 찾을 수 없어요            (catch 가 404 문구로 뭉갰
   (`loadPlaceDetail`)을 `plans`(`loadPlanDetail`) · `pets`(`loadPet`)에도 그대로 쓴다.
 - **404 가 아닌 결과(성공·5xx·무응답)는 이 이슈 전과 같게 둔다.** `pets` 는 여전히
   `pet.editTitle` 이다 — 이 이슈는 **404 탭 제목만** 고친다. **`plans` 는 후속(#905 R5)에서
-  갈렸다** — `planDetailTitle` 이 404 는 `detailNotFoundTitle`, **그 밖(성공·5xx·무응답)은
-  전부 `messages.plan.pageTitle`(`여행 일정`)** 을 낸다. 일정 이름은 프라이버시 때문에 싣지
-  않는다(`src/lib/plan/detail-title.ts` 머리주석). `pets` 는 이 갈래를 아직 안 탔다.
+  갈렸다** — `planDetailTitle` 이 404 는 `detailNotFoundTitle`, 5xx·무응답은
+  `messages.plan.pageTitle`(`여행 일정`), **성공은 일정 이름**을 낸다(#1383 이 #905 R5 의 "이름을
+  싣지 않는다" 를 뒤집었다 — `src/lib/plan/detail-title.ts` 머리주석). `pets` 는 이 갈래를 아직 안 탔다.
 - **제목 문구는 그 화면의 `h1`(또는 `EmptyState`)과 같은 상수를 쓴다.** 새 문자열을 짓지 않는다.
 - **접미사는 `` ` · 혼디가개` `` 리터럴이다.** `title.template` 이 없으므로 생략하면 그
   화면만 접미사가 빠진다.
 
 **확정 문구**
 
-| 화면                                                      | 구현 위치                                                    | 결과 문자열                             |
-| --------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------- |
-| `app/not-found.tsx`(전역 404)                             | `app/not-found.tsx` 의 `export const metadata`               | `없는 주소예요 · 혼디가개`              |
-| `(main)/plans/[planId]`(404)                              | `page.tsx` 의 `generateMetadata` + `planDetailNotFoundTitle` | `찾을 수 없는 일정이에요 · 혼디가개`    |
-| `(main)/plans/[planId]`(그 밖 — 성공·5xx·무응답, #905 R5) | `page.tsx` 의 `generateMetadata` + `planDetailTitle`         | `여행 일정 · 혼디가개`                  |
-| `(main)/pets/[petId]`(404)                                | `page.tsx` 의 `generateMetadata` + `petEditPageTitle`        | `존재하지 않는 반려견이에요 · 혼디가개` |
+| 화면                                              | 구현 위치                                                    | 결과 문자열                             |
+| ------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------- |
+| `app/not-found.tsx`(전역 404)                     | `app/not-found.tsx` 의 `export const metadata`               | `없는 주소예요 · 혼디가개`              |
+| `(main)/plans/[planId]`(404)                      | `page.tsx` 의 `generateMetadata` + `planDetailNotFoundTitle` | `찾을 수 없는 일정이에요 · 혼디가개`    |
+| `(main)/plans/[planId]`(성공, #1383)              | `page.tsx` 의 `generateMetadata` + `planDetailTitle`         | `{일정 이름} · 혼디가개`                |
+| `(main)/plans/[planId]`(그 밖 — 5xx·무응답, #206) | `page.tsx` 의 `generateMetadata` + `planDetailTitle`         | `여행 일정 · 혼디가개`                  |
+| `(main)/pets/[petId]`(404)                        | `page.tsx` 의 `generateMetadata` + `petEditPageTitle`        | `존재하지 않는 반려견이에요 · 혼디가개` |
 
 **#980 이 남은 두 화면을 같은 규칙에 넣었다.** 둘 다 `not-found.tsx` 의 `metadata` 가 아니라
 `page.tsx` 의 `generateMetadata` 가 판정 함수로 정한다 — 올레 상세는 `not-found.tsx` 자체가 없고,
@@ -575,7 +584,7 @@ export default async function Page({ searchParams }) {
 | 내 정보            | **서버 프리페치**            | client (mutation)         |                                                                                                                                                                                                                                                                                                              |
 | 반려견 목록/상세   | **서버 프리페치**            | client (mutation)         | 삭제 확인창의 동행 일정 집계(`GET /plans/companions/{petId}`)는 **확인창을 열 때** client 조회 (#1042) — 첫 화면 값이 아니다                                                                                                                                                                                 |
 | 반려견 등록 폼     | 없음                         | client (mutation)         | 폼만. 채울 초기값이 없다                                                                                                                                                                                                                                                                                     |
-| 홈                 | **서버 프리페치** (3종 병렬) | client                    | 인사이트는 client. 판정이 반려견 조건에 딸린다. **골든타임만 서버도 제주 중심 · 조건 없음으로 받는다** — LCP 문장 (#1142)                                                                                                                                                                                    |
+| 홈                 | **서버 프리페치** (2종 병렬) | client                    | 일정 · 골든타임. 인사이트는 client. 판정이 반려견 조건에 딸린다. **골든타임만 서버도 제주 중심 · 조건 없음으로 받는다** — LCP 문장 (#1142). **장소 추천(`/places/recommendations`)은 프리페치 금지** — 콜드 18초가 첫 HTML 을 막는다. 장소 목록은 받지 않는다 (#1380)                                        |
 | 일정 목록          | **서버 프리페치** (1페이지)  | client `useInfiniteQuery` | 필터를 query key 에 넣지 않는다 — 서버 파라미터가 없다                                                                                                                                                                                                                                                       |
 | 일정 상세          | **서버 프리페치**            | client                    |                                                                                                                                                                                                                                                                                                              |
 | 일정에 장소 담기   | **서버 프리페치** (2종)      | client `useInfiniteQuery` | 일정 상세는 `fetchQuery`+404 판별, 장소는 1페이지                                                                                                                                                                                                                                                            |

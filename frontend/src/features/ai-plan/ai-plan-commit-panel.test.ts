@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import {
+  AI_PLAN_COMMIT_FORM_ID,
   AiPlanCommitPanel,
   type AiPlanCommitPanelProps,
   AiPlanCommittedPanel,
@@ -201,5 +202,16 @@ describe('AiPlanCommitPanel — 항목 수 상한 PLAN_136 (#1251)', () => {
     expect(html).toContain('role="alert"')
     expect(html).toContain(messages.aiPlan.commitItemLimitError)
     expect(html).not.toContain(messages.plan.saveStaleError)
+  })
+})
+
+/** 하단 바(`AiPlanCommitBar`)와 짝 — 이슈 #1381 */
+describe('AiPlanCommitPanel — 모바일 하단 바와 버튼을 겹치지 않는다 (#1381)', () => {
+  it('폼에 하단 바가 가리킬 id 가 있다', () => {
+    expect(render()).toContain(`id="${AI_PLAN_COMMIT_FORM_ID}"`)
+  })
+
+  it('패널의 담기 버튼은 768 이상에서만 보인다', () => {
+    expect(render()).toMatch(/type="submit"[^>]*class="[^"]*\bhidden md:inline-flex/)
   })
 })

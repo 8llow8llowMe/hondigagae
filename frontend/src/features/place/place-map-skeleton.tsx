@@ -89,8 +89,9 @@ export function PlaceMapSkeleton() {
       <div aria-hidden className="bg-bg-sunken size-full" />
 
       {/* 우상단 — `PlaceMapView` 의 떠 있는 컨트롤 줄과 같은 칸 */}
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-2 z-30 md:top-17">
-        <div className="content-container flex items-start justify-end gap-2 px-4 md:px-10">
+      {/* 자리 규칙은 `PlaceMapView` 아일랜드와 같다 — y 8 · ≥1024 y 68, 양끝 16, 1024 미만은 좌우 갈림 (#1397 · #1409) */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-2 z-30 lg:top-17">
+        <div className="flex items-start justify-between gap-2 px-4 md:px-10 lg:justify-end lg:px-4">
           <div className="flex max-w-md min-w-0 flex-1 gap-2 lg:hidden">
             <Skeleton className="h-11 min-w-0 flex-1 rounded-md" />
             <Skeleton className="size-11 shrink-0 rounded-md" />

@@ -124,18 +124,17 @@ describe('콘텐츠 컨테이너 — 헤더 (#376)', () => {
 })
 
 /*
-  #1287 → #1300 — 지도 아일랜드 알약은 **콘텐츠 열의 오른쪽 끝 − 40** 에 매단다. 지도 조작 카드(#412)와 같은 기준이라
-  1920 에서 알약 · 카드 오른쪽 끝이 같은 x(1640)에 선다. 뷰포트 끝을 잡으면 243px 벌어진다. #1300 부터 그 자리는
-  JSX 열(`content-container`)이 아니라 허용 상자(`.island-bar`, `fixed`)의 CSS 가 갖는다 — 왼쪽도 지도 경계로 잡아야 해서다.
+  #1287 → #1300 → #1397 — 지도 아일랜드 알약은 **콘텐츠 열에 매달지 않는다**. #1300 까지는 콘텐츠 열 끝 − 40 이라
+  지도 조작 카드(#412)와 x 를 맞췄는데, 1912 에서 알약이 화면 끝에서 276 떨어져 지도 한복판에 떴다. 아일랜드에는 맞출
+  띠 헤더가 없으므로 뷰포트 끝 − 16(왼쪽 로고와 대칭)으로 옮겼고, 지도 조작 줄도 같은 16 이다(#1397).
 */
-describe('콘텐츠 컨테이너 — 지도 아일랜드 알약 (#1287 · #1300)', () => {
+describe('콘텐츠 컨테이너 — 지도 아일랜드 알약 (#1287 · #1300 · #1397)', () => {
   const island = repoSource('src/features/nav/island-header.tsx')
   const bar = /(?:^|\n)\.island-bar\s*\{[^}]*\}/.exec(globals)?.[0] ?? ''
 
-  it('허용 상자 오른쪽이 --content-max 로 콘텐츠 열 끝 − 40 이다', () => {
-    expect(bar).toContain(
-      'inset-inline-end: max(40px, calc((100% - var(--content-max)) / 2 + 40px))',
-    )
+  it('허용 상자 오른쪽은 --content-max 를 쓰지 않고 뷰포트 끝 − 16 이다', () => {
+    expect(bar).toContain('inset-inline-end: 16px;')
+    expect(bar).not.toContain('--content-max')
   })
 
   it('바(<header>)는 캡하지 않는다 — 전폭 fixed 줄이다', () => {

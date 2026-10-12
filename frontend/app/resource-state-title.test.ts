@@ -109,7 +109,7 @@ describe('없는 대상 화면 — h1 과 탭 제목이 같은 말을 한다 (#9
 */
 const METADATA_CALLS: Array<{ page: string; call: string }> = [
   { page: 'app/(main)/places/[placeId]/page.tsx', call: 'placeDetailFallbackTitle(error)' },
-  { page: 'app/(main)/plans/[planId]/page.tsx', call: 'planDetailTitle(error)' },
+  { page: 'app/(main)/plans/[planId]/page.tsx', call: 'planDetailTitle(error, planTitle)' },
   { page: 'app/(main)/pets/[petId]/page.tsx', call: 'petEditPageTitle(error)' },
   {
     page: 'app/(main)/olle/[walkCourseId]/page.tsx',
