@@ -737,15 +737,14 @@ describe('FacilityRow — 2층 배치 (#603)', () => {
   })
 
   /*
-    **40px 이다** — 버튼이 제목 줄과 같은 층일 때는 행 높이를 버튼이 정해 52px 이 기준
-    노릇을 했는데, 아래 층으로 내려오면서 행 높이는 글자 덩어리가 정한다. DESIGN.md 의
-    모바일 최소 터치 영역 44×44 를 **의도적으로 밑도는** 값이다 (`CallButton` 머리주석).
+    **52px 이다** (#1406, #603 의 40 을 바꿨다). 아이콘 아래 글자(`전화` · `길찾기`)가 들어가며 커졌다 — 종이비행기가
+    "보내기" 로 읽혀 급한 순간에 뜻을 추측하게 했다. 머리가 전폭이라 이름 줄은 줄지 않는다.
   */
-  it('버튼 둘 다 40px 이다', () => {
+  it('버튼 둘 다 52px 이다', () => {
     const markup = row()
 
-    expect(markup).not.toContain('size-13')
-    expect(markup.match(/size-10/g)?.length).toBe(2)
+    expect(markup).not.toContain('size-10')
+    expect(markup.match(/size-13/g)?.length).toBe(2)
   })
 
   /* 골격도 같은 2층이어야 데이터가 오는 순간 행이 튀지 않는다 (#443) */
@@ -753,5 +752,57 @@ describe('FacilityRow — 2층 배치 (#603)', () => {
     const markup = row()
 
     expect(markup.indexOf('제주24시동물병원')).toBeLessThan(markup.indexOf('href="tel:'))
+  })
+})
+
+/*
+  #1406 — "얼마나 가까운가" 가 행에서 가장 약했다(맨 아래 회색 글자, 긴 주소 앞). 거리를 이름 줄 오른쪽으로 올리고,
+  아이콘뿐이던 전화 · 길찾기에 글자를 붙인다(종이비행기가 "보내기" 로 읽혔다).
+*/
+describe('FacilityRow — 거리는 이름 줄 · 버튼은 글자 (#1406)', () => {
+  const row = (showDistance: boolean) =>
+    renderToStaticMarkup(createElement(FacilityRow, { facility: facility(), showDistance }))
+
+  it('거리가 이름 줄에 굵게 서고 주소 줄에는 주소만 남는다', () => {
+    const markup = row(true)
+    const distance = markup.indexOf('data-facility-distance')
+    const address = markup.indexOf(facility().addr)
+
+    expect(distance).toBeGreaterThan(-1)
+    expect(distance).toBeLessThan(address)
+    expect(markup).not.toContain(`480m · ${facility().addr}`)
+    expect(markup).toMatch(/data-facility-distance[^>]*class="[^"]*font-bold/)
+  })
+
+  it('위치를 못 받은 날(showDistance=false)은 이름 줄에도 거리가 없다', () => {
+    expect(row(false)).not.toContain('data-facility-distance')
+    expect(row(false)).not.toContain('480m')
+  })
+
+  it('지도 패널 행(FacilityRowContent)도 같은 머리를 쓴다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(FacilityRowContent, { facility: facility(), showDistance: true }),
+    )
+    expect(markup).toContain('data-facility-distance')
+  })
+
+  /* 보이는 글자가 접근 이름 안에 든다 — `○○ 전화하기` ⊃ `전화`, `○○ 길찾기` ⊃ `길찾기` (WCAG 2.5.3) */
+  it('전화 · 길찾기 버튼에 보이는 글자가 붙는다', () => {
+    const markup = row(true)
+    expect(markup).toContain(`>${messages.emergency.callShort}</span>`)
+    expect(markup).toContain(`>${messages.emergency.directionsShort}</span>`)
+    expect(messages.emergency.callLabel.replace('{name}', 'x')).toContain(
+      messages.emergency.callShort,
+    )
+    expect(messages.emergency.directionsLabel.replace('{name}', 'x')).toContain(
+      messages.emergency.directionsShort,
+    )
+  })
+
+  it('번호가 없어 비활성인 전화 자리에도 글자가 있다 — 자리 모양이 행마다 같다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(FacilityRow, { facility: facility({ tel: null }), showDistance: true }),
+    )
+    expect(markup).toContain(`>${messages.emergency.callShort}</span>`)
   })
 })

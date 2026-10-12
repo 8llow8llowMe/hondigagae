@@ -43,10 +43,10 @@ export function EmergencySkeleton({ inset = 'card' }: { inset?: Inset }) {
                   <Skeleton variant="text" className="h-4 w-2/5" />
                 </div>
 
-                {/* 행의 버튼이 둘이다 — 하나만 두면 폭이 88 대신 40 으로 잡힌다 */}
+                {/* 행의 버튼이 둘이다(52 · 글자 붙음, #1406) — 하나만 두면 폭이 112 대신 52 로 잡힌다 */}
                 <div className="flex shrink-0 items-center gap-2">
-                  <Skeleton variant="card" className="size-10 rounded-md" />
-                  <Skeleton variant="card" className="size-10 rounded-md" />
+                  <Skeleton variant="card" className="size-13 rounded-md" />
+                  <Skeleton variant="card" className="size-13 rounded-md" />
                 </div>
               </div>
             </div>
