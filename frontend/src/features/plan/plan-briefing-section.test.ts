@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
+import type { BriefingDayPlan } from '@/features/plan/briefing-day-timeline'
 import type { PlanBriefingCurve } from '@/features/plan/plan-briefing-section'
 import { PlanBriefingHeader, PlanBriefingSection } from '@/features/plan/plan-briefing-section'
 import { mockWalkTimes } from '@/lib/api/mock/insight-data'
@@ -16,6 +17,7 @@ import {
   planBriefingSchedule,
   planBriefingWalkTimes,
   planBriefingWarning,
+  planItem,
   planVerdict,
 } from '@/test/fixtures/plan'
 import type { PlanBriefingResponse, PlanDayWeatherItem } from '@/types/plan'
@@ -54,6 +56,31 @@ function render(
       basisPetName,
       curve,
       onRetry: () => undefined,
+      // 상세 캐시가 없는 갈래 — 예전 요약 카드(`ScheduleCard`)를 잠근다 (#1415 D15-6)
+      dayPlan: null,
+    }),
+  )
+}
+
+/**
+ * 뷰가 상세에서 고른 그날을 넘기는 갈래 (#1415). 기본 일정 요약은 `사이 2곳` 이 서는
+ * 4개짜리라, `dayPlan: null` 이면 폴백 카드가 그 줄을 낸다.
+ */
+function renderSection({
+  dayPlan,
+  overrides = {},
+}: {
+  dayPlan: BriefingDayPlan | null
+  overrides?: Partial<PlanBriefingResponse>
+}) {
+  return renderToStaticMarkup(
+    createElement(PlanBriefingSection, {
+      briefing: planBriefing({ schedule: planBriefingSchedule({ itemCount: 4 }), ...overrides }),
+      kind: 'TODAY',
+      basisPetName: null,
+      curve: NO_CURVE,
+      onRetry: () => undefined,
+      dayPlan,
     }),
   )
 }
@@ -81,6 +108,7 @@ function renderEve(overrides: Partial<PlanBriefingResponse> = {}) {
       basisPetName: null,
       curve: NO_CURVE,
       onRetry: () => undefined,
+      dayPlan: null,
     }),
   )
 }
@@ -702,6 +730,28 @@ describe('PlanBriefingSection — 그날 일정 (명세 D5-1)', () => {
 
   it('그 일차 앵커로 돌아가는 링크를 준다', () => {
     expect(render()).toContain('#day2')
+  })
+})
+
+describe('PlanBriefingSection — 그날 일정 전체 (#1415 D15)', () => {
+  it('dayPlan 이 있으면 그날 전부 타임라인 — 사이 N곳이 없다 (#1415)', () => {
+    const markup = renderSection({
+      dayPlan: {
+        items: [
+          planItem({ planItemId: 'x', day: 1, sequence: 0 }),
+          planItem({ planItemId: 'y', day: 1, sequence: 1 }),
+          planItem({ planItemId: 'z', day: 1, sequence: 2 }),
+        ],
+        lodgingBasis: null,
+      },
+    })
+
+    expect(markup).not.toContain('사이 ')
+    expect(markup.match(/data-route-order=/g)?.length).toBe(3)
+  })
+
+  it('dayPlan 이 null 이면 예전 요약 카드다 — 폴백 (#1415 D15-6)', () => {
+    expect(renderSection({ dayPlan: null })).toContain('사이 ')
   })
 })
 

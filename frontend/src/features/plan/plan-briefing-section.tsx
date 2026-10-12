@@ -5,11 +5,15 @@ import type { ReactNode } from 'react'
 import { BackLink } from '@/components/back-link'
 import { Badge } from '@/components/badge'
 import { ButtonLink } from '@/components/button'
-import { EmptyState } from '@/components/empty-state'
 import { Surface, SurfaceStack } from '@/components/surface'
 import { WalkTimesCurve } from '@/components/walk-times-curve'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { PlaceMiniMap } from '@/features/place/place-mini-map'
+import {
+  type BriefingDayPlan,
+  BriefingDayTimeline,
+  BriefingScheduleEmpty,
+} from '@/features/plan/briefing-day-timeline'
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { PlanDayVerdict, planDayVerdictIsBlank } from '@/features/plan/plan-day-verdict'
 import { toLatLng } from '@/lib/geo/coord'
@@ -184,6 +188,7 @@ export function PlanBriefingSection({
   basisPetName,
   curve,
   onRetry,
+  dayPlan,
 }: {
   briefing: PlanBriefingResponse
   /**
@@ -199,6 +204,8 @@ export function PlanBriefingSection({
    * `LOOKUP_FAILED` 는 브리핑이 원격 조회에 실패한 것이라 곡선을 다시 불러도 풀리지 않는다.
    */
   onRetry: () => void
+  /** #1415 — 뷰가 상세에서 고른 그날. 없으면 예전 요약 카드(D15-6) */
+  dayPlan: BriefingDayPlan | null
 }) {
   const deferred = isDeferredDay(briefing, kind)
   const blankWeather = isBlankWeatherCard(briefing)
@@ -320,11 +327,22 @@ export function PlanBriefingSection({
                 : messages.plan.briefingScheduleTodayHeading
             }
           >
-            <ScheduleCard
-              planId={briefing.planId}
-              day={briefing.day}
-              schedule={briefing.schedule}
-            />
+            {dayPlan === null ? (
+              <ScheduleCard
+                planId={briefing.planId}
+                day={briefing.day}
+                schedule={briefing.schedule}
+              />
+            ) : (
+              <BriefingDayTimeline
+                planId={briefing.planId}
+                day={briefing.day}
+                kind={kind}
+                plan={dayPlan}
+                representativePlaceId={briefing.schedule.representativePlaceId}
+                representativePlaceTitle={briefing.schedule.representativePlaceTitle}
+              />
+            )}
           </Surface>
         </>
       }
@@ -404,6 +422,9 @@ function isDeferredDay(briefing: PlanBriefingResponse, kind: BriefingTarget['kin
  * 내리면서 그 제약이 사라졌고, 이제 `name` 을 그대로 쓴다.
  *
  * **대표 장소 지도도 여기 있다** (명세 D12-3) — 좌표가 `schedule` 에 오면서 열린 자리다.
+ *
+ * **#1415 부터 폴백 갈래 — 상세 캐시가 없을 때만 선다** (D15-6). 평소에는 뷰가 상세에서
+ * 고른 그날을 `BriefingDayTimeline` 이 전부 그린다.
  */
 function ScheduleCard({
   planId,
@@ -415,18 +436,7 @@ function ScheduleCard({
   schedule: PlanBriefingSchedule
 }) {
   if (schedule.itemCount === 0 || schedule.firstItem === null) {
-    return (
-      <EmptyState
-        title={messages.plan.briefingScheduleEmptyTitle}
-        inset="card"
-        headingLevel={3}
-        action={
-          <ButtonLink href={`/plans/${planId}/days/${day}/add`} variant="secondary" size="sm">
-            {messages.plan.briefingScheduleEmptyAction}
-          </ButtonLink>
-        }
-      />
-    )
+    return <BriefingScheduleEmpty planId={planId} day={day} />
   }
 
   const basisTitle = schedule.representativePlaceTitle

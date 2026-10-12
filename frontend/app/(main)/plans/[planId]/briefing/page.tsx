@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
 
+import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
+
 import { Canvas } from '@/components/surface'
 import { PlanBriefingOutOfRange, PlanBriefingView } from '@/features/plan/plan-briefing-view'
 import { planKeys } from '@/features/plan/queries'
@@ -92,7 +94,13 @@ export default async function PlanBriefingPage({ params }: { params: Params }) {
       {target === null ? (
         <PlanBriefingOutOfRange planId={planId} />
       ) : (
-        <PlanBriefingView planId={planId} target={target} />
+        /*
+          **상세를 넘긴다** (#1415 D15-2) — 404 판정용으로 이미 받은 것을 버리고 있었다. 그날
+          일정 전체 카드가 이 캐시로 선다. 브리핑 응답은 여전히 프리페치하지 않는다.
+        */
+        <HydrationBoundary state={dehydrate(queryClient)}>
+          <PlanBriefingView planId={planId} target={target} />
+        </HydrationBoundary>
       )}
     </Canvas>
   )

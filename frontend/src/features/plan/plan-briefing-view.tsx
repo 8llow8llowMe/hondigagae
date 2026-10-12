@@ -1,7 +1,8 @@
 'use client'
 
+import { type ReactNode, useMemo } from 'react'
+
 import { useQuery } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
 
 import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
@@ -9,6 +10,7 @@ import { ErrorState } from '@/components/error-state'
 import { Skeleton } from '@/components/skeleton'
 import { Surface, SurfaceStack } from '@/components/surface'
 import { usePetList } from '@/features/pet/use-pet-list'
+import type { BriefingDayPlan } from '@/features/plan/briefing-day-timeline'
 import {
   briefingHeadingOf,
   PlanBriefingHeader,
@@ -16,6 +18,7 @@ import {
   PlanBriefingSection,
 } from '@/features/plan/plan-briefing-section'
 import { planKeys } from '@/features/plan/queries'
+import { usePlanDetail } from '@/features/plan/use-plan-detail'
 import { clientFetch } from '@/lib/api/client'
 import { ApiError } from '@/lib/api/error'
 import { toPetCondition, walkTimesPath } from '@/lib/api/insight'
@@ -25,6 +28,7 @@ import { conditionKey, INSIGHT_QUERY_OPTIONS, insightKeys } from '@/lib/insight/
 import { messages } from '@/lib/messages'
 import { basisPetNameOf } from '@/lib/plan/basis-pet'
 import { BRIEFING_REASON_LOOKUP_FAILED, type BriefingTarget } from '@/lib/plan/briefing'
+import { groupItemsByDay, lodgingBasisFor } from '@/lib/plan/detail'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { WalkTimesResponse } from '@/types/insight'
@@ -36,6 +40,9 @@ import type { WalkTimesResponse } from '@/types/insight'
  * 요약 1 + 특보 1 + 골든타임 1 의 원격 호출을 묶는다(`PlanBriefingProcessor` 머리주석) —
  * 서버 렌더가 그만큼 붙잡힌다. **응급 브리핑이 같은 이유로 자기 응답을 프리페치하지 않는다.**
  * 404 가드에 필요한 것은 일정 상세뿐이고 그것은 페이지가 이미 데웠다.
+ *
+ * **상세는 page 가 하이드레이트한다 — 새 요청이 나가지 않는다** (#1415 D15-2). 그날 일정
+ * 전체 카드는 그 캐시에서 브리핑 응답의 `day` 를 골라 그린다.
  *
  * **배치까지 이 뷰가 그린다** (D14-2). 대기 · 정상은 두 열(`PlanBriefingLayout`)이고 머리
  * 카드가 좌측 맨 위에 선다 — 정상 갈래의 머리는 `PlanBriefingSection` 이 응답 값으로 그린다.
@@ -54,6 +61,28 @@ export function PlanBriefingView({ planId, target }: { planId: string; target: B
   const pets = usePetList(true)
 
   const data = briefing.data
+
+  const detail = usePlanDetail(planId)
+
+  /*
+    **그날을 상세 캐시에서 고른다** (#1415 D15-2). 일정 상세 화면과 같은 `groupItemsByDay` ·
+    `lodgingBasisFor` 를 쓴다 — 같은 날을 두 화면이 다르게 묶지 않는다.
+
+    **메모한다** — `BriefingDayTimeline` 이 동선 모델을 이 객체의 동일성으로 메모하므로,
+    렌더마다 새로 만들면 지도 핀이 매번 다시 계산된다. 상세가 없으면(캐시 부재) `null` 이고
+    섹션은 예전 요약 카드로 선다 (D15-6). 날은 **응답의 `day`** 다 — 화면이 고른 날짜와
+    자정 전후에 갈릴 수 있다 (`tripOf` 주석).
+  */
+  const detailData = detail.data
+  const dayPlan = useMemo<BriefingDayPlan | null>(() => {
+    if (detailData === undefined || data === undefined) return null
+    const { days } = groupItemsByDay(detailData.items, detailData.totalDays)
+    const group = days.find((candidate) => candidate.day === data.day)
+    return {
+      items: group?.items ?? [],
+      lodgingBasis: lodgingBasisFor(data.day, days),
+    }
+  }, [detailData, data])
 
   /*
     **곡선을 부를 좌표** (#716 · 명세 D9-3).
@@ -177,6 +206,7 @@ export function PlanBriefingView({ planId, target }: { planId: string; target: B
         것이라 곡선만 다시 불러도 특보·골든타임은 비어 있다 (#716 · 명세 D9-2).
       */
       onRetry={() => void briefing.refetch()}
+      dayPlan={dayPlan}
     />
   )
 }
