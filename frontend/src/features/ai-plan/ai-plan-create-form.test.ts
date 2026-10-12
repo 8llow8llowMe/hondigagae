@@ -332,3 +332,42 @@ describe('AiPlanCreateForm — 선택 항목을 접는다', () => {
     expect(render()).toContain(messages.aiPlan.fieldNote)
   })
 })
+
+/** 메모의 권역 낱말 → 지역 칩 제안 — 이슈 #1381 */
+describe('AiPlanCreateForm — 메모의 권역으로 지역을 제안한다 (#1381)', () => {
+  const suggest = messages.aiPlan.regionSuggest.replace('{region}', '서귀포시')
+
+  it('메모가 서귀포를 말하고 지역이 전체면 서귀포시로 좁힐지 묻는다', () => {
+    const html = render({
+      values: { ...EMPTY_AI_PLAN_FORM_VALUES, requestNote: '서귀포 위주로 이동은 짧게' },
+    })
+
+    expect(html).toContain(suggest)
+    expect(html).toContain(messages.aiPlan.regionSuggestApply.replace('{region}', '서귀포시'))
+    expect(html).toContain(messages.aiPlan.regionSuggestDismiss)
+  })
+
+  it('이미 그 지역이면 묻지 않는다', () => {
+    const html = render({
+      values: {
+        ...EMPTY_AI_PLAN_FORM_VALUES,
+        requestNote: '서귀포 위주로',
+        sigunguCode: '3',
+      },
+    })
+
+    expect(html).not.toContain(suggest)
+  })
+
+  it('다른 지역을 골라 뒀으면 메모 쪽으로 바꿀지 묻는다 — 바꾸지는 않는다', () => {
+    const html = render({
+      values: { ...EMPTY_AI_PLAN_FORM_VALUES, requestNote: '중문 근처', sigunguCode: '4' },
+    })
+
+    expect(html).toContain(suggest)
+  })
+
+  it('권역 낱말이 없으면 묻지 않는다', () => {
+    expect(render()).not.toContain(messages.aiPlan.regionSuggestDismiss)
+  })
+})
