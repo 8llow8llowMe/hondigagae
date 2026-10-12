@@ -121,17 +121,17 @@ describe('알약 허용 상자 (#1300 D1-2 · D3-2)', () => {
     ).toBe(true)
   })
 
-  /* 로고 상자(16–148) · 지도 경계에서 16 떨어지고, 오른쪽은 콘텐츠 열 오른쪽 − 40 (#412) */
-  it('.island-bar 는 fixed 컨테이너이고 왼쪽 = max(경계, 148) + 16 · 오른쪽 = 열 끝 − 40 이다', () => {
+  /* 로고 상자(16–148) · 지도 경계에서 16 떨어지고, 오른쪽은 뷰포트 끝 − 16 — 로고와 대칭 (#1397) */
+  it('.island-bar 는 fixed 컨테이너이고 왼쪽 = max(경계, 148) + 16 · 오른쪽 = 뷰포트 끝 − 16 이다', () => {
     const bar = rule('.island-bar')
 
     expect(bar).toMatch(/position:\s*fixed/)
     expect(bar).toMatch(/top:\s*8px/)
     expect(bar).toMatch(/container:\s*island-bar \/ inline-size/)
     expect(bar).toContain('inset-inline-start: calc(max(var(--island-map-left), 148px) + 16px)')
-    expect(bar).toContain(
-      'inset-inline-end: max(40px, calc((100% - var(--content-max)) / 2 + 40px))',
-    )
+    expect(bar).toMatch(/inset-inline-end:\s*16px;/)
+    // 콘텐츠 열(1440)에 매달면 1440 위에서 알약이 화면 끝에서 떨어져 뜬다 (#1397)
+    expect(bar).not.toContain('--content-max')
   })
 
   it('허용 상자가 비로그인 알약 실측 폭보다 좁으면 메뉴 셋을 ≡ 로 접는다', () => {

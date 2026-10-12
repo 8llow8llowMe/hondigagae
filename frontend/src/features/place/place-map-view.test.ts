@@ -406,6 +406,14 @@ describe('PlaceMapView — 지도 아일랜드 (#1287)', () => {
     expect(code.match(/\bcontrolsInset\b/g)?.length).toBeGreaterThanOrEqual(4)
   })
 
+  /* #1397 — 알약(`.island-bar` 오른쪽 16)과 같은 x · 로고와 대칭. 담기 지도는 띠 헤더가 있어 콘텐츠 열 그대로다 */
+  it('아일랜드의 조작 줄 · 시설 안내 줄은 뷰포트 끝 16 이다 — 끄면 콘텐츠 열 − 40', () => {
+    const rows = code.match(/island \? null : 'content-container md:px-10'/g) ?? []
+
+    expect(rows).toHaveLength(2)
+    expect(code).not.toContain('"content-container flex items-start justify-end')
+  })
+
   /* 데스크톱은 목록이 옆에 보이는데 `목록 보기` 가 떠 있었다 — 패널 `크게 보기` 가 대신한다 (D0 #4) */
   it('아일랜드의 보기 전환은 1024 이상에서 숨는다 — 끄면 className 이 비어 예전 그대로다', () => {
     const tag = code.slice(
