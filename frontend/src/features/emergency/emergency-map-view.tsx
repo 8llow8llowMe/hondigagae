@@ -601,10 +601,15 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
             />
 
             {/*
-              **아이콘 묶음 카드다** (#1397) — `/places` 의 우측 조작(#1300 D1-2)과 같은 표면. 이 화면은 층 토글이
-              없어 `내 위치` 칸 하나다. 제주 밖이면 렌더하지 않는다 — 눌러도 갈 곳이 없다
+              **아이콘 묶음 카드다** (#1397) — `/places` 의 우측 조작(#1300 D1-2)과 같은 표면 · 같은 자리. 이 화면은 층
+              토글이 없어 `내 위치` 칸 하나다.
+
+              **다시 찾기도 이 칸이 맡는다** (#1413). 예전에는 위치를 못 받으면 이 칸을 숨기고 지도 위에 안내 카드(`위치
+              권한이 없어 …` + `현재 위치로 다시 찾기`)를 따로 세워, 지도 위 모양이 `/places` 와 갈렸다. 누르면 하는 일이 같다
+              (`board.locate`). 다시 시도해도 답이 같은 갈래(제주 밖 · 미지원)는 그리지 않는다 — `PositionNotice` 가 링크를
+              빼는 규칙과 같다. 기준이 제주 중심이라는 사실은 시트 · 패널 개수 줄의 기준 문구가 말한다.
             */}
-            {board.inJeju && (
+            {(board.inJeju || board.fallback === 'denied' || board.fallback === 'timeout') && (
               <MapToolCard>
                 <MapLocateButton onLocate={board.locate} variant="cell" />
               </MapToolCard>
@@ -613,25 +618,10 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         </div>
 
         {/*
-          **위치 안내는 지도 위 · 검색 줄 아래다** (#883). 시트 본문 맨 위에 있던 동안에는
-          `현재 위치로 다시 찾기` 를 보려면 **시트를 올려야 했다** — 위치를 못 받아 거리
-          기준이 흔들린 바로 그 상태에서, 그것을 되돌리는 손잡이가 한 단계 뒤에 접혀 있었다.
-          여기로 올리면 시트 본문은 통째로 목록에 돌아간다.
-
-          **`lg:hidden` 이다.** 데스크톱은 좌측 패널이 같은 안내를 검색·필터 아래에 이미
-          세운다(아래) — 둘 다 그리면 같은 문장이 한 화면에 두 번 뜬다.
-
-          바깥 컨테이너가 `pointer-events-none` 이라 **면에 다시 켜 준다** — 안 켜면 안내
-          안의 다시 찾기 버튼이 눌리지 않는다. 지도 타일 위에 뜨는 글이라 면과 테두리를
-          함께 둔다(`.map-research-offset` 알약과 같은 판단).
+          **지도 위 위치 안내 카드를 걷었다** (#1413, #883 이 지도 위로 올렸던 것). 다시 찾기는 위 `내 위치` 칸이 맡고, 제주
+          중심 기준이라는 사실은 시트 개수 줄이 말한다 — 그 줄은 시트 머리라 어느 단계에서도 보여 #883 의 "시트를 올리지
+          않아도 보인다" 가 그대로 선다. 1024 이상 패널은 안내 문장을 그대로 둔다(아래).
         */}
-        {board.fallback !== null && (
-          <div className="px-4 pt-2 md:px-10 lg:hidden">
-            <div className="bg-bg border-border pointer-events-auto max-w-md rounded-lg border px-3 py-2 shadow-md">
-              <PositionNotice reason={board.fallback} onRetry={board.locate} />
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ── 데스크톱: 왼쪽에 붙은 목록 패널 (#1232 D10) ──────────────────── */}
