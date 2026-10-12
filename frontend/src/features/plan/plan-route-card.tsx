@@ -1,39 +1,22 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 
 import { ChipGroup } from '@/components/chip'
 import { Surface } from '@/components/surface'
-import type { MapPin } from '@/features/map/map-canvas'
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
+import { PlanRouteMap } from '@/features/plan/plan-route-map'
 import { formatDistance } from '@/lib/format/distance'
-import {
-  routeCamera,
-  routeCameraKey,
-  type RouteItemInput,
-  type RouteSelection,
-  selectedIdForDay,
-  toRouteModel,
-  toRouteSegments,
-} from '@/lib/map/route'
+import { routeCamera, type RouteSelection, selectedIdForDay } from '@/lib/map/route'
 import type { MapSdkFailure } from '@/lib/map/sdk'
 import { messages } from '@/lib/messages'
-import { lodgingBasisFor, type PlanDayGroup, planItemMapCoord } from '@/lib/plan/detail'
+import { toPlanRouteModel } from '@/lib/plan/briefing-day'
+import { lodgingBasisFor, type PlanDayGroup } from '@/lib/plan/detail'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { PlanItemDetail } from '@/types/plan'
-
-/**
- * **`ssr: false` 가 필수다.** SDK 가 `window` 를 읽어 서버 렌더에서 깨진다
- * (docs/external-api-guide.md §1).
- */
-const MapCanvas = dynamic(
-  () => import('@/features/map/map-canvas').then((module) => module.MapCanvas),
-  { ssr: false },
-)
 
 /**
  * 동선 카드 — 일자 열의 맨 위 (#743 · 명세 D1-1).
@@ -84,69 +67,12 @@ export function PlanRouteCard({
 
     **이 memo 만으로는 카메라를 지키지 못한다** (#982 리뷰 H-1). `days` 가 부모
     (`plan-detail-section`)에서 렌더마다 `groupItemsByDay` 로 새로 만들어져 이 memo 도
-    매번 다시 돈다 — 그래서 카메라는 아래에서 **값 서명**에 따로 건다.
+    매번 다시 돈다 — 그래서 카메라는 `PlanRouteMap` 안에서 **값 서명**에 따로 건다.
   */
-  const model = useMemo(() => {
-    const items: RouteItemInput[] = (group?.items ?? []).map((item) => ({
-      id: item.planItemId,
-      itemTypeCode: item.itemType.code,
-      title: item.title,
-      coord: planItemMapCoord(item),
-    }))
-
-    const lodging = lodgingBasisFor(selectedDay, days)
-
-    return toRouteModel({
-      items,
-      lodgingBasis:
-        lodging === null
-          ? null
-          : {
-              id: lodging.planItemId,
-              itemTypeCode: lodging.itemType.code,
-              title: lodging.title,
-              coord: planItemMapCoord(lodging),
-            },
-    })
-  }, [group, days, selectedDay])
-
-  /*
-    **카메라 memo 는 배열이 아니라 값 서명에 건다** (#982 리뷰 H-1). `model.stops` 는 위
-    이유로 렌더마다 새 참조라, 거기 걸면 날씨 · 위험도 쿼리가 늦게 도착하거나 일자 편집에
-    들어갈 때마다 새 카메라가 된다. `MapCanvas` 는 새 카메라를 새 틀로 읽어 "사용자가
-    옮겼다" 표시를 지우고 다시 맞추므로, **끌어 둔 지도가 그날 사각형으로 되돌아간다.**
-
-    서명은 일자와 정류점의 `id` · 좌표뿐이다 (`routeCameraKey`) — 카메라가 읽는 값이 그것뿐이라
-    서명이 같으면 `routeCamera` 결과도 같다. 그래서 의존성에서 `model.stops` 를 뺀다.
-  */
-  const cameraKey = routeCameraKey(selectedDay, model.stops)
-
-  const camera = useMemo(() => {
-    const frame = routeCamera(model.stops)
-    /*
-      주인공이 여럿인 지도라 정중앙이다 — 기본 0.35 는 제주 전체를 담는 화면의 값이다.
-
-      **크기가 바뀌면 다시 맞춘다** (#982). 단계를 칸의 **폭**으로 정하므로(`SpanBox`) 창을
-      줄이거나 기기를 돌리면 처음 맞춘 단계가 틀린다. 사용자가 지도를 만졌으면 되잡지
-      않는다(`MapCanvas` 의 `refitOnResize`).
-    */
-    return frame === null ? null : { ...frame, anchorRatio: 0.5, refitOnResize: true }
-    // 서명이 `model.stops` 의 카메라 입력을 전부 담는다 (위 주석)
-  }, [cameraKey])
-
-  const pins: MapPin[] = useMemo(
-    () =>
-      model.stops.map((stop) => ({
-        id: stop.id,
-        title: stop.title,
-        lat: stop.coord.lat,
-        lng: stop.coord.lng,
-        order: stop.order,
-      })),
-    [model.stops],
+  const model = useMemo(
+    () => toPlanRouteModel(group?.items ?? [], lodgingBasisFor(selectedDay, days)),
+    [group, days, selectedDay],
   )
-
-  const route = useMemo(() => toRouteSegments(model.legs), [model.legs])
 
   /*
     **찍을 것이 없으면 카드가 통째로 없다.** 항목이 없는 일자, 좌표가 하나도 없는 일자,
@@ -156,7 +82,7 @@ export function PlanRouteCard({
     따로 없고, 거리 줄은 원래 자리(항목 행)에 그대로 남아 정보가 사라지지 않는다.
     `PlaceMiniMap` 과 같은 판단이다.
   */
-  if (camera === null || failure !== null) return null
+  if (routeCamera(model.stops) === null || failure !== null) return null
 
   const summary = messages.map.routeSummary
     .replace('{day}', String(selectedDay))
@@ -188,14 +114,12 @@ export function PlanRouteCard({
       }
     >
       <div className={cn('flex flex-col gap-3 pb-5', INSET_CLASS.card)}>
-        <MapCanvas
-          pins={pins}
-          route={route}
+        <PlanRouteMap
+          model={model}
+          day={selectedDay}
           selectedId={selectedId}
           onSelect={(id) => setSelection({ day: selectedDay, id })}
-          camera={camera}
           onFailure={setFailure}
-          className="h-56 w-full overflow-hidden rounded-md md:h-64"
         />
 
         <div className="flex flex-col gap-1">
