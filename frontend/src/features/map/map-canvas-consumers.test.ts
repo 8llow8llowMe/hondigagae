@@ -24,7 +24,6 @@ import { openingTags, readSourceWithoutComments } from '@/test/source'
 const INTERACTIVE = [
   'src/features/place/place-map-view.tsx',
   'src/features/emergency/emergency-map-view.tsx',
-  'src/features/plan/plan-route-card.tsx',
 ]
 
 /** 고를 것이 없는 지도. 핀이 하나뿐이고 옮겨도 보여 줄 다른 것이 없다 */
@@ -48,6 +47,30 @@ describe('MapCanvas 소비처 — 목록형 3종은 그대로다', () => {
       expect(mapCanvasTag(path)).toContain('onSelect=')
     })
   }
+})
+
+/*
+  동선 카드의 지도는 `PlanRouteMap` 으로 옮겼다 (#1415). 선택 배선이 두 겹이 됐다 — 카드가
+  `PlanRouteMap` 에 `onSelect=` 를 넘기고, `PlanRouteMap` 이 그것을 `MapCanvas` 에 그대로 건넨다
+  (`exactOptionalPropertyTypes` 때문에 `onSelect={onSelect}` 가 아니라 정의됐을 때만 펼친다).
+*/
+describe('MapCanvas 소비처 — 동선 카드(PlanRouteMap)는 onSelect 를 넘긴다', () => {
+  it('src/features/plan/plan-route-card.tsx 가 PlanRouteMap 에 onSelect 를 넘긴다', () => {
+    const tags = openingTags(
+      readSourceWithoutComments('src/features/plan/plan-route-card.tsx'),
+      /<PlanRouteMap\b/g,
+    )
+
+    expect(tags).toHaveLength(1)
+    expect(tags[0]).toContain('onSelect=')
+  })
+
+  it('src/features/plan/plan-route-map.tsx 가 MapCanvas 에 onSelect 를 건넨다', () => {
+    const tag = mapCanvasTag('src/features/plan/plan-route-map.tsx')
+
+    expect(tag).toContain('onSelect')
+    expect(tag).not.toContain('() => undefined')
+  })
 })
 
 describe('MapCanvas 소비처 — 단일 핀 지도는 onSelect 를 넘기지 않는다', () => {
