@@ -1298,8 +1298,12 @@ export const planMessages = {
    * 온다) 항목 사이 거리를 낼 수 없다 — 지어내지 않고 셀 수 있는 것을 센다.
    */
   briefingScheduleBetween: '사이 {count}곳',
-  /** 동선 항목에 붙는 태그. 별도 줄(`briefingScheduleBasisPlace`)을 없앤 자리다 (#733) */
-  briefingScheduleBasisTag: '기준 장소',
+  /** 날씨 · 골든타임 판정이 걸린 행의 배지 (#1415 D15-1) — 무엇의 기준인지 말한다 */
+  briefingScheduleBasisTag: '날씨 기준',
+  /** 다녀온 행의 배지 (#1415 D15-4) — 흐림(색)만으로 말하지 않는다 */
+  briefingScheduleVisited: '다녀옴',
+  /** 다음 갈 곳 길찾기 (#1415 D15-6) */
+  briefingScheduleDirections: '{title} 길찾기',
   /** `{title}` 치환 — 기준 장소가 처음·마지막 **어느 쪽도 아닐 때만** 쓰는 줄이다 */
   briefingScheduleBasisPlace: '이 날 기준 장소 · {title}',
   briefingScheduleOpenDay: '이 날 일정 보기',
