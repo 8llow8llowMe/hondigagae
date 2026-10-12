@@ -93,6 +93,26 @@ describe('BriefingDayTimeline (#1415)', () => {
     })
     expect(markup).toContain(messages.plan.briefingScheduleBasisPlace.replace('{title}', '다른곳'))
   })
+  it('기준이 식사 행이면 그 행에 배지가 붙고 기준 한 줄은 없다', () => {
+    const meal = planItem({
+      planItemId: 'meal',
+      day: 1,
+      sequence: 4,
+      itemType: { code: 'MEAL', name: '식사', description: null },
+      targetId: 'P7',
+      title: '흑돼지집',
+    })
+    const markup = render({
+      plan: { items: [...items, meal], lodgingBasis: null },
+      representativePlaceId: 'P7',
+      representativePlaceTitle: '흑돼지집',
+    })
+    expect(markup.match(new RegExp(messages.plan.briefingScheduleBasisTag, 'g'))).toHaveLength(1)
+    expect(markup.indexOf(messages.plan.briefingScheduleBasisTag)).toBeGreaterThan(
+      markup.indexOf('메모장소'),
+    )
+    expect(markup).not.toContain(messages.plan.briefingScheduleBasisPlace.replace('{title}', ''))
+  })
   it('다녀온 행은 흐리고 다녀옴 배지가 붙는다', () => {
     const markup = render()
     expect(markup).toContain(messages.plan.briefingScheduleVisited)

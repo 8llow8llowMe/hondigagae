@@ -4,6 +4,8 @@ import { basisItemId, nextDestination, toPlanRouteModel } from '@/lib/plan/brief
 import { planItem, planItemPlace } from '@/test/fixtures/plan'
 
 const LODGING = { code: 'LODGING', name: '숙박', description: null }
+const MEAL = { code: 'MEAL', name: '식사', description: null }
+const WALK = { code: 'WALK', name: '산책', description: null }
 const MOVE = { code: 'MOVE', name: '이동', description: null }
 
 const a = planItem({ planItemId: 'a', day: 1, sequence: 0, targetId: 'P1', title: '중문' })
@@ -17,13 +19,6 @@ const move = planItem({
   targetId: null,
   place: null,
 })
-const lodging = planItem({
-  planItemId: 'l',
-  day: 1,
-  sequence: 4,
-  itemType: LODGING,
-  targetId: 'P1',
-})
 
 describe('basisItemId', () => {
   it('PLACE 항목의 targetId 가 대표 장소 id 와 같은 첫 항목', () => {
@@ -33,8 +28,25 @@ describe('basisItemId', () => {
     const again = planItem({ planItemId: 'a2', day: 1, sequence: 5, targetId: 'P1' })
     expect(basisItemId([a, again], 'P1')).toBe('a')
   })
-  it('PLACE 가 아닌 항목(숙박)의 targetId 는 보지 않는다', () => {
-    expect(basisItemId([lodging], 'P1')).toBeNull()
+  it('식사 항목도 장소성이라 기준이 된다 — 백엔드 PLACE_TARGETS 와 같은 집합', () => {
+    const meal = planItem({
+      planItemId: 'meal',
+      day: 1,
+      sequence: 5,
+      itemType: MEAL,
+      targetId: 'P9',
+    })
+    expect(basisItemId([a, meal], 'P9')).toBe('meal')
+  })
+  it('산책 항목의 targetId 는 다른 종류의 id 라 보지 않는다', () => {
+    const walk = planItem({
+      planItemId: 'walk',
+      day: 1,
+      sequence: 5,
+      itemType: WALK,
+      targetId: 'P1',
+    })
+    expect(basisItemId([walk], 'P1')).toBeNull()
   })
   it('대표 장소가 없거나 맞는 항목이 없으면 null', () => {
     expect(basisItemId([a], null)).toBeNull()
