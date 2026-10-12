@@ -97,3 +97,29 @@ describe('EmergencyMapPanel', () => {
     expect(render({ showDistance: true })).toContain(distanceStr)
   })
 })
+
+/*
+  #1406 후속 — 400 패널 행은 오른쪽에 전화 칸이 따로 있어, 거리를 이름 줄에 두면 줄이 좁아 긴 이름(`365건강온누리약국`)의
+  거리가 아랫줄에 혼자 떨어지고 짧은 이름은 줄 중간에 섰다(1440 실측). 거리를 **전화 버튼 위** 오른쪽 칸으로 옮긴다.
+*/
+describe('EmergencyMapPanel — 거리는 오른쪽 칸, 전화 위 (#1406)', () => {
+  it('거리가 선택 버튼(이름 줄) 밖, 전화 버튼 앞에 하나씩 선다', () => {
+    const markup = render({ facilities: [target] })
+    const buttonClose = markup.indexOf('</button>')
+    const distance = markup.indexOf('data-facility-distance')
+    const call = markup.indexOf('href="tel:')
+
+    expect(markup.match(/data-facility-distance/g)).toHaveLength(1)
+    expect(distance).toBeGreaterThan(buttonClose)
+    expect(distance).toBeLessThan(call)
+  })
+
+  /* 가운데에 붙이면 진료시간이 두 줄인 행에서 거리가 이름보다 35px 내려갔다 — 칸을 위에 붙여 이름 줄과 같은 높이 */
+  it('오른쪽 칸은 위에 붙는다(self-start)', () => {
+    expect(render()).toContain('flex shrink-0 flex-col items-end gap-2 self-start')
+  })
+
+  it('위치 폴백(showDistance=false)이면 오른쪽 칸에도 거리가 없다', () => {
+    expect(render({ showDistance: false })).not.toContain('data-facility-distance')
+  })
+})
