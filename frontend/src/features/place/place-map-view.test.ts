@@ -401,16 +401,18 @@ describe('PlaceMapView — 지도 아일랜드 (#1287)', () => {
     expect(code).not.toContain('absolute inset-x-0 top-0 h-16')
   })
 
-  it('조작 줄은 <768 y 8 · ≥768 y 68 이다 — 모바일에는 알약이 없다', () => {
-    expect(code).toContain("island ? 'top-2 md:top-17' : 'top-5 lg:top-6'")
+  it('조작 줄은 <1024 y 8 · ≥1024 y 68 이다 — 알약은 1024 이상에만 선다 (#1409)', () => {
+    expect(code).toContain("island ? 'top-2 lg:top-17' : 'top-5 lg:top-6'")
     expect(code.match(/\bcontrolsInset\b/g)?.length).toBeGreaterThanOrEqual(4)
   })
 
   /* #1397 — 알약(`.island-bar` 오른쪽 16)과 같은 x · 로고와 대칭. 담기 지도는 띠 헤더가 있어 콘텐츠 열 그대로다 */
   it('아일랜드의 조작 줄 · 시설 안내 줄은 뷰포트 끝 16 이다 — 끄면 콘텐츠 열 − 40', () => {
-    const rows = code.match(/island \? null : 'content-container md:px-10'/g) ?? []
-
-    expect(rows).toHaveLength(2)
+    // 조작 줄: 1024 미만은 검색 왼쪽 · 버튼 오른쪽, 1024 이상은 오른쪽 정렬 (#1409)
+    expect(code).toContain("? 'justify-between md:px-10 lg:justify-end lg:px-4'")
+    expect(code).toContain(": 'content-container justify-end md:px-10'")
+    // 시설 안내 줄 — 조작 줄과 같은 가로 축
+    expect(code).toContain("island ? 'md:px-10 lg:px-4' : 'content-container md:px-10'")
     expect(code).not.toContain('"content-container flex items-start justify-end')
   })
 

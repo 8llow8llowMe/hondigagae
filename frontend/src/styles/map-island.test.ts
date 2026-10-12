@@ -32,16 +32,25 @@ describe('헤더 스위치 (#1287 D3-2)', () => {
   })
 
   /* #1300 D1-1 — 768 미만은 알약이 없다(검색이 맨 위). 띠는 모든 폭에서 걷힌다 */
-  it('지도 아일랜드가 있으면 띠를 걷고, 알약은 768 이상에서만 세운다', () => {
-    expect(rule('body:has(.map-island) .global-header')).toMatch(/display:\s*none/)
-    // 표시 규칙은 딱 하나이고 그것이 768 미디어 안이다 — 밖에 있으면 모바일에도 알약이 선다
+  /*
+    #1409 — **768–1023 은 아일랜드가 아니다.** 띠는 <768 · ≥1024 에서만 걷고(그 사이는 흰 띠 그대로), 알약은 ≥1024 에서만
+    선다. 820 실측에서 알약 아래 모바일용 검색 · 재검색 · 안내가 네 줄로 쌓여 각자 다른 정렬로 섰다.
+  */
+  it('띠는 <768 · ≥1024 에서만 걷고, 알약은 1024 이상에서만 세운다 — 768–1023 은 흰 띠', () => {
+    const hide = /body:has\(\.map-island\) \.global-header\s*\{\s*display:\s*none;/g
+    expect(css.match(hide)).toHaveLength(1)
+    expect(mediaBlocks('(width < 48rem), (width >= 64rem)').join('\n').match(hide)).toHaveLength(1)
+
     const show = /body:has\(\.map-island\) \.island-header\s*\{\s*display:\s*block;/g
     expect(css.match(show)).toHaveLength(1)
-    expect(mediaBlocks('(width >= 48rem)').join('\n').match(show)).toHaveLength(1)
+    expect(mediaBlocks('(width >= 64rem)').join('\n').match(show)).toHaveLength(1)
   })
 
-  it('오프라인 띠는 아일랜드에서 화면 맨 위 fixed · 전폭 · 알약과 같은 z-40 이다', () => {
-    const banner = rule('body:has(.map-island) .offline-banner')
+  /* 768–1023 은 띠가 서는 일반 화면이라 fixed 로 두면 띠를 덮는다 (#1409) */
+  it('오프라인 띠는 아일랜드(<768 · ≥1024)에서 화면 맨 위 fixed · 전폭 · 알약과 같은 z-40 이다', () => {
+    const banner = mediaBlocks('(width < 48rem), (width >= 64rem)').find((block) =>
+      block.includes('.offline-banner'),
+    )
 
     expect(banner).toMatch(/position:\s*fixed/)
     expect(banner).toMatch(/inset-inline:\s*0/)
@@ -51,15 +60,26 @@ describe('헤더 스위치 (#1287 D3-2)', () => {
 })
 
 describe('지도 높이 (#1287 D2-1)', () => {
-  it('아일랜드는 헤더 몫을 빼지 않는다 — 모바일은 탭바만, 768 이상은 100dvh', () => {
-    expect(rule('.map-canvas-height.map-island')).toMatch(
-      /height:\s*calc\(100dvh - var\(--tabbar-h\)\)/,
-    )
+  /* 768–1023 은 덮지 않는다 — 띠가 서므로 `.map-canvas-height` 의 100dvh − 헤더가 맞다 (#1409) */
+  it('아일랜드는 헤더 몫을 빼지 않는다 — <768 탭바만, ≥1024 100dvh, 그 사이는 일반 규칙', () => {
     expect(
-      mediaBlocks('(width >= 48rem)').some((block) =>
+      mediaBlocks('(width < 48rem)').some((block) =>
+        /\.map-canvas-height\.map-island\s*\{\s*height:\s*calc\(100dvh - var\(--tabbar-h\)\);/.test(
+          block,
+        ),
+      ),
+    ).toBe(true)
+    expect(
+      mediaBlocks('(width >= 64rem)').some((block) =>
         /\.map-canvas-height\.map-island\s*\{\s*height:\s*100dvh;/.test(block),
       ),
     ).toBe(true)
+    // 768 미디어 안에는 덮는 규칙이 없다 — 768–1023 에 새면 지도가 띠 아래로 넘친다
+    expect(
+      mediaBlocks('(width >= 48rem)').some((block) =>
+        block.includes('.map-canvas-height.map-island'),
+      ),
+    ).toBe(false)
   })
 
   /* `/emergency` · 담기 지도는 후속(D7-3)이라 기존 규칙이 그대로 남아야 한다 */
@@ -83,10 +103,10 @@ describe('지도 높이 (#1287 D2-1)', () => {
 })
 
 describe('시트 상한 · 핀 보정 인셋 (#1300 D1-2 · D3-2)', () => {
-  it('--map-island-inset 은 기본 60 · 768 이상 120 이다', () => {
+  it('--map-island-inset 은 기본 60 · 1024 이상 120 이다 (#1409)', () => {
     expect(rule('.map-island')).toMatch(/--map-island-inset:\s*60px/)
     expect(
-      mediaBlocks('(width >= 48rem)').some((block) =>
+      mediaBlocks('(width >= 64rem)').some((block) =>
         /(?:^|\n)\s*\.map-island\s*\{\s*--map-island-inset:\s*120px;/.test(block),
       ),
     ).toBe(true)
@@ -170,10 +190,9 @@ describe('로고 알약 (#1287 · #1300 D2-1)', () => {
   })
 
   /* 768–1023 은 도킹 패널 · 로고 띠가 없다 — 로고가 늘 알약이다 */
-  it('768–1023 은 로고가 늘 알약이다', () => {
-    const block =
-      /@media \(width >= 48rem\) and \(width < 64rem\) \{((?:[^{}]*\{[^}]*\})*)\s*\}/.exec(css)?.[1]
-    expectPill(/body:has\(\.map-island\) \.island-logo\s*\{[^}]*\}/.exec(block ?? '')?.[0])
+  /* 768–1023 의 로고 알약은 걷었다 — 그 폭은 흰 띠다 (#1409) */
+  it('768–1023 로고 알약 규칙이 없다', () => {
+    expect(css).not.toMatch(/@media \(width >= 48rem\) and \(width < 64rem\) \{[^{}]*\.island-logo/)
   })
 })
 

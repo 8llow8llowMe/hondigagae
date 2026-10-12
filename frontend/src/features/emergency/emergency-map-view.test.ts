@@ -284,8 +284,14 @@ describe('EmergencyMapView — 지도 아일랜드 (#1397)', () => {
     expect(code).not.toContain('className="map-canvas-height w-full"')
   })
 
-  it('조작 줄은 <768 y 8 · ≥768 y 68 이고 뷰포트 끝 16 이다 — 콘텐츠 열에 매달지 않는다', () => {
-    expect(code).toContain('pointer-events-none absolute inset-x-0 top-2 z-30 md:top-17')
+  /* #1409 — 768–1023 은 흰 띠 아래라 y 8, 알약은 ≥1024 만. 1024 미만은 검색 왼쪽 · 버튼 오른쪽 */
+  it('조작 줄은 <1024 y 8 · ≥1024 y 68 이고 양끝 16 이다 — 콘텐츠 열에 매달지 않는다', () => {
+    expect(code).toContain('pointer-events-none absolute inset-x-0 top-2 z-30 lg:top-17')
+    // 768–1023 은 띠 헤더와 같은 40, 그 밖은 16
+    expect(code).toContain(
+      'flex items-start justify-between gap-2 px-4 md:px-10 lg:justify-end lg:px-4',
+    )
+    expect(code).not.toContain('md:top-17')
     expect(code).not.toContain('content-container')
   })
 

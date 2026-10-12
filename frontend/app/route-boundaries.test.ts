@@ -254,10 +254,10 @@ describe('로딩 골격 — 완료 화면과 같은 자리', () => {
     // 미리보기가 없다 — 알약 허용 상자가 목록 폭(400)만 비킨다 (#1300)
     expect(root).toContain('data-dock="open"')
     expect(root).not.toContain('data-preview')
-    // 조작 줄은 <768 y 8 · ≥768 알약 아래 y 68 (#1300 D3-4) — 헤더 띠가 있는 지도의 top-5 가 아니다
+    // 조작 줄은 <1024 y 8 · ≥1024 알약 아래 y 68 (#1300 D3-4 → #1409) — 헤더 띠가 있는 지도의 top-5 가 아니다
     const controls =
       /<div [^>]*class="(pointer-events-none absolute inset-x-0[^"]*)"/.exec(markup)?.[1] ?? ''
-    expect(controls.split(/\s+/)).toEqual(expect.arrayContaining(['top-2', 'md:top-17']))
+    expect(controls.split(/\s+/)).toEqual(expect.arrayContaining(['top-2', 'lg:top-17']))
     expect(markup).not.toMatch(/class="[^"]*\btop-5\b/)
     // 지도 도구 카드 자리 — 칸 하나(1 + 48 + 1). 첫 페인트에는 병원·약국 칸만 선다
     expect(markup).toMatch(/class="[^"]*\bh-12\.5 w-12 rounded-lg\b/)

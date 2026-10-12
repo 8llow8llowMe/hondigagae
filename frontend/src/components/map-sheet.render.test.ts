@@ -209,9 +209,10 @@ describe('MAP_ISLAND_INSET_VAR — 아일랜드 지도 위 컨트롤을 비켜 �
     expect(render('mid', { maxTopInset: MAP_ISLAND_INSET_VAR })).not.toContain('--map-island-inset')
   })
 
-  it('<768 = 위 8 + 검색 44 + 여유 8 = 60 · ≥768 = 위 8 + 알약 48 + 간격 12 + 검색 44 + 여유 8 = 120 이 CSS 값이다', () => {
+  /* 768–1023 은 흰 띠 아래가 지도 윗변이라 알약 몫이 없다 — 60 이다 (#1409) */
+  it('<1024 = 위 8 + 검색 44 + 여유 8 = 60 · ≥1024 = 위 8 + 알약 48 + 간격 12 + 검색 44 + 여유 8 = 120 이 CSS 값이다', () => {
     const base = /(?:^|\n)\.map-island\s*\{[^}]*\}/.exec(css)?.[0] ?? ''
-    const wide = /@media \(width >= 48rem\) \{\s*\.map-island\s*\{[^}]*\}/.exec(css)?.[0] ?? ''
+    const wide = /@media \(width >= 64rem\) \{\s*\.map-island\s*\{[^}]*\}/.exec(css)?.[0] ?? ''
 
     expect(base).toContain(`--map-island-inset: ${String(8 + 44 + 8)}px`)
     expect(wide).toContain(`--map-island-inset: ${String(8 + 48 + 12 + 44 + 8)}px`)
