@@ -1055,20 +1055,29 @@ export function PlaceMapView({
         className={cn(
           'pointer-events-none absolute inset-x-0 z-30',
           /*
-            **아일랜드는 768 이상 알약(위 8 · 높이 48) 아래 12 = y 68, 그 아래는 알약이 없어 y 8** (#1300 D2-1).
-            헤더 띠가 있는 지도는 띠 아래 20 · 24 다.
+            **아일랜드는 1024 이상 알약(위 8 · 높이 48) 아래 12 = y 68, 그 아래는 알약이 없어 y 8** (#1300 D2-1 →
+            #1409). 768–1023 은 흰 띠가 서고 지도가 그 아래부터라 지도 윗변에서 8 이다. 헤더 띠가 있는 담기 지도는 띠 아래 20 · 24 다.
           */
-          island ? 'top-2 md:top-17' : 'top-5 lg:top-6',
+          island ? 'top-2 lg:top-17' : 'top-5 lg:top-6',
         )}
       >
         {/*
-          **아일랜드는 뷰포트 오른쪽 끝 16 이다** (#1397) — 알약(`.island-bar`)과 같은 x, 왼쪽 로고와 대칭. 위 설명의
+          **아일랜드는 뷰포트 양끝 16 이다** (#1397) — 알약(`.island-bar`)과 같은 x, 왼쪽 로고와 대칭. 위 설명의
           콘텐츠 열 정렬은 목록 보기 띠 헤더와 맞추려던 것인데 아일랜드에는 띠가 없다. 담기 지도는 띠가 있어 그대로다.
+
+          **1024 미만은 검색 묶음 왼쪽 · 버튼 오른쪽으로 가른다** (#1409). 예전에는 전 폭이 오른쪽 정렬이라 768–1023 에서
+          검색(최대 448)이 오른쪽에 붙어 왼쪽이 비고 로고 · 위치 안내와 왼쪽 끝이 어긋났다. 1024 이상은 검색이 패널에 있어
+          버튼만 남으므로 오른쪽 정렬 그대로다(`justify-between` 이면 혼자 남은 버튼 기둥이 왼쪽으로 간다).
         */}
         <div
           className={cn(
-            'flex items-start justify-end gap-2 px-4',
-            island ? null : 'content-container md:px-10',
+            'flex items-start gap-2 px-4',
+            /*
+              768–1023 은 흰 띠 아래라 **띠 헤더와 같은 40**(`md:px-10` — 로고 x 40)이다. ≥1024 는 알약 로고와 같은 16 (#1409)
+            */
+            island
+              ? 'justify-between md:px-10 lg:justify-end lg:px-4'
+              : 'content-container justify-end md:px-10',
           )}
         >
           {/*
@@ -1155,7 +1164,8 @@ export function PlaceMapView({
           <div
             className={cn(
               'flex justify-end px-4 pt-2',
-              island ? null : 'content-container md:px-10',
+              // 조작 줄과 같은 가로 축 — 768–1023 은 띠 헤더의 40, 그 밖은 16 (#1409)
+              island ? 'md:px-10 lg:px-4' : 'content-container md:px-10',
             )}
           >
             <PlaceMapFacilityNotice
@@ -1170,7 +1180,7 @@ export function PlaceMapView({
           (#1278). 하단에 두면 시트 중간 · 최대 단계에 가려졌다. 검색창이 있으면 그 바로 아래에 선다(위, #1313).
         */}
         {offerResearch && !(searchable && !hasHead) && (
-          <div className="flex justify-center px-4 pt-2 lg:hidden">
+          <div className="flex justify-center px-4 pt-2 md:px-10 lg:hidden">
             <ResearchHereButton onClick={researchHere} />
           </div>
         )}

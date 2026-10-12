@@ -551,10 +551,13 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         여백이 `/places` 지도 보기와 정확히 같다 — 같은 컨트롤이면 같은 자리에 있어야 한다.
         **아일랜드라 뷰포트 오른쪽 끝 16 이다** (#1397) — 알약(`.island-bar`)과 같은 x, 왼쪽 로고와 대칭. 예전의
         콘텐츠 열 정렬(#412)은 목록 보기 띠 헤더와 맞추려던 것인데 이제 이 화면에 띠가 없다.
-        세로는 768 이상 알약(위 8 · 높이 48) 아래 12 = y 68, 그 아래는 알약이 없어 y 8 이다(#1300 D2-1).
+        세로는 1024 이상 알약(위 8 · 높이 48) 아래 12 = y 68, 그 아래는 y 8 이다(#1300 D2-1 → #1409 — 768–1023 은 흰 띠가
+        서고 지도가 그 아래부터다). **1024 미만은 검색 묶음 왼쪽 · 버튼 오른쪽**, 1024 이상은 검색이 패널에 있어 오른쪽 정렬이다
+        (`/places` 와 같은 갈림, 근거는 `place-map-view.tsx` 같은 자리).
       */}
-      <div className="pointer-events-none absolute inset-x-0 top-2 z-30 md:top-17">
-        <div className="flex items-start justify-end gap-2 px-4">
+      <div className="pointer-events-none absolute inset-x-0 top-2 z-30 lg:top-17">
+        {/* 768–1023 은 띠 헤더와 같은 40(로고 x 40), 그 밖은 16 (#1409) */}
+        <div className="flex items-start justify-between gap-2 px-4 md:px-10 lg:justify-end lg:px-4">
           {/*
             **검색은 토글 **왼쪽**, 1024 미만에서만** (#584). 그 위는 좌측 패널 머리가
             같은 일을 하고(아래), 둘 다 그리면 데스크톱 지도에 검색창이 둘이 된다.
@@ -623,7 +626,7 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
           함께 둔다(`.map-research-offset` 알약과 같은 판단).
         */}
         {board.fallback !== null && (
-          <div className="px-4 pt-2 lg:hidden">
+          <div className="px-4 pt-2 md:px-10 lg:hidden">
             <div className="bg-bg border-border pointer-events-auto max-w-md rounded-lg border px-3 py-2 shadow-md">
               <PositionNotice reason={board.fallback} onRetry={board.locate} />
             </div>
