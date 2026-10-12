@@ -12,7 +12,9 @@ import { AiPlanCreateForm } from '@/features/ai-plan/ai-plan-create-form'
 import { AiPlanPlacePickerSheet } from '@/features/ai-plan/ai-plan-place-picker-sheet'
 import { aiPlanFormSchema } from '@/features/ai-plan/schemas'
 import { useFavoriteList } from '@/features/favorite/use-favorite-list'
+import { currentSelectedPetId } from '@/features/nav/selected-pet-store'
 import { usePetList } from '@/features/pet/use-pet-list'
+import { defaultAiPlanPetIds } from '@/lib/ai-plan/default-pets'
 import { readAiPlanRequest, saveAiPlanRequest } from '@/lib/ai-plan/request-store'
 import { MANWON, toAiPlanSubmitPayload } from '@/lib/ai-plan/submit'
 import { submitAiPlan } from '@/lib/api/ai-plan'
@@ -165,7 +167,10 @@ function AiPlanCreateFormContainer({
     마운트되므로 하이드레이션 이후에만 실행되고, 서버·클라이언트가 다른 값을 그릴
     일이 없다. 렌더 중에 `sessionStorage` 를 직접 보면 그 보장이 사라진다.
   */
-  const [startValues] = useState<AiPlanFormValues>(() => restoreValues(fromJobId, pets))
+  const [startValues] = useState<AiPlanFormValues>(() =>
+    // 헤더에서 고른 반려견도 같은 이유로 여기서 읽는다 — 마운트 뒤라 localStorage 가 안전하다 (#1381)
+    restoreValues(fromJobId, pets, currentSelectedPetId()),
+  )
 
   const form = useForm<AiPlanFormValues, AiPlanSubmitResult>({
     schema: aiPlanFormSchema,
@@ -270,11 +275,18 @@ function toBudgetManwon(budget: number | null): string {
  * 없는 아이가 선택된 채로 남으면 제출이 서버에서 막힌다. 전부 사라졌으면 기본값으로
  * 떨어진다.
  */
-function restoreValues(fromJobId: string | null, pets: Pet[]): AiPlanFormValues {
+function restoreValues(
+  fromJobId: string | null,
+  pets: Pet[],
+  selectedPetId: string | null,
+): AiPlanFormValues {
   const base: AiPlanFormValues = {
     ...EMPTY_AI_PLAN_FORM_VALUES,
-    // 한 마리뿐이면 미리 고른다 — 고를 것이 없는 그룹을 비워 두지 않는다
-    petIds: pets.length === 1 ? [pets[0]?.petId ?? ''].filter((petId) => petId !== '') : [],
+    /*
+      **한 마리를 미리 고른다** — 헤더에서 고른 아이, 없으면 대표견 (#1381). 예전에는 한 마리일
+      때만 골라 2마리 이상이면 헤더에서 `몽` 을 골라 둔 사람도 다시 골라야 했다.
+    */
+    petIds: defaultAiPlanPetIds(pets, selectedPetId),
   }
 
   if (fromJobId === null) return base
