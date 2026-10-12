@@ -33,8 +33,20 @@ describe('regionHintFromNote', () => {
     expect(regionHintFromNote('애월에서 시작해 중문까지')).toBeNull()
   })
 
-  it('다른 낱말 속 글자에 걸리지 않는다 — 사계절은 사계(안덕면)가 아니다', () => {
-    expect(regionHintFromNote('사계절 내내 걷기 좋은 곳')).toBeNull()
+  it('다른 낱말 속 글자에 걸리지 않는다 (리뷰에서 실측한 오탐)', () => {
+    for (const note of [
+      '사계절 내내 걷기 좋은 곳',
+      '아이 체력을 키우도록 많이 걷고 싶어요',
+      '10월정도라 쌀쌀할 것 같아요',
+      '이동이 편한경로로',
+    ]) {
+      expect(regionHintFromNote(note)).toBeNull()
+    }
+  })
+
+  it('앞뒤를 보는 이름도 제 뜻으로 쓰면 잡는다', () => {
+    expect(regionHintFromNote('우도 들어가는 배')).toBe('4')
+    expect(regionHintFromNote('월정리 해변 카페')).toBe('4')
   })
 
   it('권역 낱말이 없으면 제안하지 않는다', () => {

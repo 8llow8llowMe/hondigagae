@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useCallback, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -12,7 +12,11 @@ import { ErrorState } from '@/components/error-state'
 import { Surface, SurfaceStack } from '@/components/surface'
 import { AiPlanCanceled } from '@/features/ai-plan/ai-plan-canceled'
 import { AiPlanCommitBar } from '@/features/ai-plan/ai-plan-commit-bar'
-import { AiPlanCommitPanel, AiPlanCommittedPanel } from '@/features/ai-plan/ai-plan-commit-panel'
+import {
+  AI_PLAN_COMMIT_FORM_ID,
+  AiPlanCommitPanel,
+  AiPlanCommittedPanel,
+} from '@/features/ai-plan/ai-plan-commit-panel'
 import { AiPlanDraftPreview } from '@/features/ai-plan/ai-plan-draft-preview'
 import { AiPlanFailed } from '@/features/ai-plan/ai-plan-failed'
 import { AiPlanProgress } from '@/features/ai-plan/ai-plan-progress'
@@ -40,6 +44,7 @@ import { clearAiPlanRequest, readAiPlanRequest } from '@/lib/ai-plan/request-sto
 import { ApiError } from '@/lib/api/error'
 import { createPlan } from '@/lib/api/plan'
 import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
+import { focusSubmitFailure } from '@/lib/form/submit-failure-focus'
 import { useForm } from '@/lib/form/use-form'
 import type { LatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
@@ -631,6 +636,17 @@ function AiPlanCommitContainer({
       router.replace(`/plans/${plan.planId}`)
     },
   })
+  /*
+    **담기가 실패하면 포커스를 그 이유로 옮긴다** (#1381). 768 미만에서는 하단 고정 바(`AiPlanCommitBar`)로
+    초안 맨 위를 읽다가도 담을 수 있는데, 실패 표시(제목 오류 · `FormAlert` · `PLAN_004` 블록)는 페이지 끝의
+    담기 패널 안에 선다 — 옮기지 않으면 스피너만 멈추고 아무 일도 없는 것처럼 보인다. 순서는
+    `focusSubmitFailure`(필드 → 알림 → 첫 입력)이고, 포커스가 그 자리로 스크롤도 옮긴다.
+    트리거는 `submitCount` 하나다 — `errors` 를 넣으면 입력 중인 칸에서 포커스를 훔친다 (`use-form.ts`).
+  */
+  useEffect(() => {
+    if (form.submitCount === 0) return
+    focusSubmitFailure(document.getElementById(AI_PLAN_COMMIT_FORM_ID), form.errors)
+  }, [form.submitCount])
 
   /*
     **셋을 `SurfaceStack` 의 직접 자식으로 내보낸다** (#473). 예전에는 담기 패널을

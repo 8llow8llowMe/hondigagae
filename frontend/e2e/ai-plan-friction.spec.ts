@@ -24,22 +24,31 @@ async function petList(page: Page): Promise<{ petId: string; name: string }[]> {
 }
 
 /** 폼을 거치지 않고 2일짜리 작업을 낸다 (`ai-plan-empty-days.spec.ts` 와 같은 방법) */
-async function submitTwoDays(page: Page, petId: string): Promise<string> {
-  return page.evaluate(async (id) => {
-    const day = (offset: number) => {
-      const now = new Date()
-      const target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
-      return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`
-    }
+async function submitTwoDays(page: Page, petId: string, requestNote = ''): Promise<string> {
+  return page.evaluate(
+    async ({ id, note }) => {
+      const day = (offset: number) => {
+        const now = new Date()
+        const target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
+        return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`
+      }
 
-    const response = await fetch('/api/bff/ai-plans', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ areaCode: '39', startDate: day(30), endDate: day(31), petIds: [id] }),
-    })
-    const submitted = (await response.json()) as { dataBody: { jobId: string } }
-    return submitted.dataBody.jobId
-  }, petId)
+      const response = await fetch('/api/bff/ai-plans', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          areaCode: '39',
+          startDate: day(30),
+          endDate: day(31),
+          petIds: [id],
+          ...(note === '' ? {} : { requestNote: note }),
+        }),
+      })
+      const submitted = (await response.json()) as { dataBody: { jobId: string } }
+      return submitted.dataBody.jobId
+    },
+    { id: petId, note: requestNote },
+  )
 }
 
 test.describe('AI 일정 마찰 줄이기 (#1381)', () => {
@@ -59,9 +68,19 @@ test.describe('AI 일정 마찰 줄이기 (#1381)', () => {
       { key: SELECTED_PET_KEY, id: chosen.petId },
     )
 
+    // 서버가 다른 아이를 체크한 마크업을 내면 React 가 하이드레이션 경고를 낸다 (리뷰 지적)
+    const hydrationErrors: string[] = []
+    page.on('console', (message) => {
+      if (/hydrat/i.test(message.text())) hydrationErrors.push(message.text())
+    })
+
     await page.goto('/ai-plans/new')
 
-    await expect(page.getByRole('checkbox', { name: chosen.name, exact: false })).toBeChecked()
+    const chosenBox = page.getByRole('checkbox', { name: chosen.name, exact: false })
+    await expect(chosenBox).toBeChecked()
+    // 선택 행 강조(테두리 · 배경)도 체크와 같은 행이다 — 서버 값에 남지 않는다
+    await expect(page.locator('label').filter({ has: chosenBox })).toHaveClass(/bg-row-selected/)
+    expect(hydrationErrors).toEqual([])
     for (const other of pets.filter((pet) => pet.petId !== chosen.petId)) {
       await expect(page.getByRole('checkbox', { name: other.name, exact: false })).not.toBeChecked()
     }
@@ -82,6 +101,8 @@ test.describe('AI 일정 마찰 줄이기 (#1381)', () => {
       .click()
 
     await expect(suggest).toHaveCount(0)
+    // 누른 버튼이 사라져도 포커스가 BODY 로 떨어지지 않고 메모로 돌아간다
+    await expect(page.getByLabel(messages.aiPlan.fieldNote)).toBeFocused()
     await expect(page.getByRole('radio', { name: '서귀포시' })).toHaveAttribute(
       'aria-checked',
       'true',
@@ -121,5 +142,29 @@ test.describe('AI 일정 마찰 줄이기 (#1381)', () => {
 
     await submit.click()
     await expect(page).toHaveURL(/\/plans\/\d+$/, { timeout: 20_000 })
+  })
+
+  test('하단 바로 담다 실패하면 포커스와 화면이 담기 패널의 실패 이유로 간다', async ({ page }) => {
+    await page.goto('/plans')
+    const [first] = await petList(page)
+    if (first === undefined) throw new Error('목 반려견이 없다')
+    // mock: 메모에 '사라진' 이 있으면 첫 항목이 없는 장소라 담기가 PLAN_004 로 막힌다
+    const jobId = await submitTwoDays(page, first.petId, '사라진 장소 확인')
+
+    await page.goto(`/ai-plans/jobs/${jobId}`)
+    const submit = page.getByRole('button', { name: messages.aiPlan.commitSubmit })
+    await expect(submit).toBeVisible({ timeout: 20_000 })
+
+    await submit.click()
+
+    const reason = page.getByText(messages.aiPlan.commitDelistedTitle)
+    await expect(reason).toBeVisible()
+    await expect(reason).toBeInViewport()
+    expect(
+      await page.evaluate(
+        (id) => document.getElementById(id)?.contains(document.activeElement) ?? false,
+        'ai-plan-commit',
+      ),
+    ).toBe(true)
   })
 })
