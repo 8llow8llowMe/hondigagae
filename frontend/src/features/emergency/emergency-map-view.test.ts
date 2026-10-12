@@ -169,20 +169,22 @@ describe('EmergencyMapView — 위치 안내의 자리 (#883)', () => {
     expect(code.slice(open, close)).not.toContain('PositionNotice')
   })
 
-  /** 데스크톱 좌측 패널이 같은 안내를 이미 세운다 — 둘 다 그리면 한 화면에 두 번 뜬다 */
-  it('지도 위 안내는 lg 미만에서만 그린다', () => {
-    const at = code.indexOf('PositionNotice reason={board.fallback}')
-    const block = code.slice(Math.max(0, at - 400), at)
-
-    expect(block).toContain('lg:hidden')
+  /*
+    #1413 — **지도 위 안내 카드를 걷었다.** `/places` 지도 위에는 없는 카드라 두 화면의 지도 위 모양이 갈렸다. 안내 문장은
+    1024 이상 패널 한 곳에만 남고, 다시 찾기는 `내 위치` 칸이 맡는다.
+  */
+  it('안내 문장(PositionNotice)은 데스크톱 패널 한 곳뿐이다 — 지도 위에는 없다', () => {
+    expect(code.match(/<PositionNotice reason=\{board\.fallback\}/g)).toHaveLength(1)
+    const at = code.indexOf('<PositionNotice reason={board.fallback}')
+    expect(code.lastIndexOf('map-panel-width', at)).toBeGreaterThan(-1)
   })
 
-  /** 바깥 플로팅 컨테이너가 `pointer-events-none` 이라 면에서 다시 켜지 않으면 안 눌린다 */
-  it('지도 위 안내 면은 포인터 이벤트를 다시 켠다', () => {
-    const at = code.indexOf('PositionNotice reason={board.fallback}')
-    const block = code.slice(Math.max(0, at - 400), at)
-
-    expect(block).toContain('pointer-events-auto')
+  /* 다시 찾기 = `내 위치` 칸. 다시 해도 답이 같은 제주 밖 · 미지원은 그리지 않는다 (`PositionNotice` 와 같은 규칙) */
+  it('내 위치 칸은 제주 안 · 권한 거부 · 시간 초과에 선다', () => {
+    expect(code).toContain(
+      "(board.inJeju || board.fallback === 'denied' || board.fallback === 'timeout') && (",
+    )
+    expect(code).toContain('<MapLocateButton onLocate={board.locate} variant="cell" />')
   })
 })
 
