@@ -29,7 +29,8 @@ const UNKNOWN_CODE = 'UNKNOWN'
  * - **카드 폭은 토큰이다**(`--home-place-card-w`) — 390 82% · 768 44% · 1024+ 30%. 어느 폭에서나 다음
  *   카드의 가장자리가 비쳐 "옆에 더 있다" 를 말한다. `scroll-snap` 으로 카드 경계에서 멈추고, 1위가
  *   항상 첫 장이다(DOM 순서 그대로).
- * - **화살표는 마우스 환경에만** 선다(`ScrollRailArrows` overlay, `.scroll-rail-arrow`). 터치는 밀어서 넘긴다.
+ * - **화살표는 1024 이상에서는 레일에 올릴 때만, 그 아래는 늘** 선다(`reveal="hover"`, #1404). 끝 흐림을 걷어서
+ *   태블릿 · 모바일에서 "옆으로 넘긴다" 를 말할 신호가 화살표와 비치는 카드 조각뿐이다.
  * - **마우스로 카드를 잡고 끌어도 넘어간다** (`useDragScroll`, #1404). 끈 직후의 클릭은 링크로 가지 않는다.
  * - **끝 흐림이 없다** (#1404) — 공용 48px 는 카드 끝이 뚝 잘린 것처럼, 넓히면 카드가 바랜 것처럼 보였다. 다른 레일은
  *   셀이 작아 흐림이 맞고, 이 레일은 비치는 다음 카드 조각이 그 몫을 한다.
@@ -84,6 +85,8 @@ export function PlaceInsightCardList({
         rail={rail}
         prevLabel={messages.home.placeRailPrev}
         nextLabel={messages.home.placeRailNext}
+        /* 데스크톱은 레일에 올릴 때만, 태블릿 · 모바일은 늘 (#1404) */
+        reveal="hover"
       />
     </div>
   )

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { readSourceWithoutComments as code } from '@/test/source'
 
 /**
- * #1404 — 홈 추천 레일의 끌기 · 끝 흐림 없음 (`app/globals.css`).
+ * #1404 — 홈 추천 레일의 끌기 · 끝 흐림 없음 · 화살표 표시 (`app/globals.css`).
  *
  * 레이아웃 · 마스크는 node 환경에서 그릴 수 없어 규칙을 소스로 잠근다. 실측(헤드리스 Chromium 1440 · 390)은 PR 에 있다.
  */
@@ -34,5 +34,38 @@ describe('홈 레일 끝 흐림 없음 (#1404)', () => {
   it('scroll-fade-wide 규칙이 없고 공용 48px 는 그대로다', () => {
     expect(css).not.toContain('scroll-fade-wide')
     expect(css).toMatch(/--scroll-fade-w:\s*48px;/)
+  })
+})
+
+/* #1404 — 홈 레일 화살표: 데스크톱은 호버 · 포커스에만, 태블릿 · 모바일은 늘. 꺾쇠는 굵게 */
+describe('홈 레일 화살표 (#1404)', () => {
+  const card = code('src/features/home/place-insight-card.tsx')
+
+  it('홈 레일만 reveal="hover" 이고 기본은 mouse 다', () => {
+    expect(card).toContain('reveal="hover"')
+    expect(rail).toContain("reveal = 'mouse'")
+    expect(rail).toContain("reveal === 'hover' ? 'scroll-rail-arrow-hover' : 'scroll-rail-arrow'")
+  })
+
+  /* display:none 이면 Tab 이 닿지 않는다 — opacity 로 감추고 focus-within 으로 드러낸다 */
+  it('1024+ 호버 환경에서만 감추고, 레일 호버 · 포커스로 드러난다', () => {
+    expect(css).toMatch(
+      /@media \(width >= 64rem\) and \(hover: hover\)\s*\{\s*\.scroll-rail-arrow-hover\s*\{\s*opacity:\s*0;\s*pointer-events:\s*none;/,
+    )
+    expect(css).toContain('.scroll-rail:hover .scroll-rail-arrow-hover')
+    expect(css).toContain('.scroll-rail:focus-within .scroll-rail-arrow-hover')
+  })
+
+  /* 터치 숨김(.scroll-rail-arrow)을 따르지 않는다 — 태블릿 · 모바일에서 늘 선다 */
+  it('hover 화살표는 터치 숨김 규칙에 걸리지 않는다', () => {
+    const coarse = /@media \(pointer: coarse\)\s*\{([^}]*\})\s*\}/.exec(css)?.[1] ?? ''
+    expect(coarse).toContain('.scroll-rail-arrow {')
+    expect(coarse).not.toContain('scroll-rail-arrow-hover')
+  })
+
+  it('꺾쇠는 사용처가 굵기 2.25 를 넘긴다 — 아이콘 기본값은 그대로다', () => {
+    expect(rail).toContain('const ARROW_STROKE = 2.25')
+    expect(rail.match(/strokeWidth=\{ARROW_STROKE\}/g)).toHaveLength(2)
+    expect(code('src/components/icons/index.tsx')).toContain('strokeWidth={1.5}')
   })
 })
