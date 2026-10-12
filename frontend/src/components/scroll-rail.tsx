@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
-import { centerScrollLeft, pageScrollLeft, type ScrollFade, scrollFadeSide } from '@/lib/ui/scroll'
+import {
+  centerScrollLeft,
+  isDragGesture,
+  pageScrollLeft,
+  type ScrollFade,
+  scrollFadeSide,
+  swipeTarget,
+} from '@/lib/ui/scroll'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -204,6 +211,154 @@ export function useScrollRail<T extends HTMLElement>(options?: {
   }, [])
 
   return { ref, fade, fadeClassName: FADE_CLASS[fade], onScroll: measure, page }
+}
+
+/** 놓기 직전 이만큼(ms) 멈춰 있었으면 튕긴 것이 아니다 — 속도를 버린다 */
+const DRAG_FLING_IDLE_MS = 80
+
+/** `scrollend` 를 못 내는 브라우저에서 스냅을 되돌리는 안전망(ms) — 부드러운 스크롤 한 번보다 길다 */
+const DRAG_SETTLE_FALLBACK_MS = 600
+
+/**
+ * **마우스로 항목을 잡고 끌어 레일을 넘긴다** (#1404). 터치 · 펜은 건드리지 않는다 — 네이티브 스와이프가 이미 한다.
+ *
+ * - **끌기와 클릭을 거리로 가른다**(`isDragGesture`, 6px). 그 아래면 아무것도 하지 않아 카드 링크가 그대로 열린다.
+ * - **끄는 동안 스냅을 끈다**(`[data-dragging]`, `app/globals.css`). 켜 둔 채 `scrollLeft` 를 쓰면 브라우저가
+ *   매 프레임 가장 가까운 칸으로 되돌려 레일이 손을 따라오지 않는다. **클래스가 아니라 data 속성이다** — 끌면
+ *   fade 방향이 바뀌어 리렌더되고, React 가 `className` 을 통째로 다시 써 붙인 클래스가 사라졌다(스냅이 돌아와 0 으로
+ *   튕겼다, 헤드리스 실측). React 가 모르는 속성은 건드리지 않는다.
+ * - **놓으면 칸을 직접 고른다** — `swipeTarget`(갤러리와 같은 규칙: 지나친 칸 · 튕긴 방향 · 15%). 스냅을 다시 켜는
+ *   것만으로는 브라우저마다 다시 스냅하는 시점이 달라 놓은 자리에 멈추기도 한다.
+ * - **끈 직후의 클릭을 삼킨다.** 카드 위에서 누르고 끌다 놓으면 브라우저가 그 카드에 `click` 을 낸다 — 그대로 두면
+ *   넘기려다 상세로 간다. 캡처 단계에서 한 번만 막고, 다음 누르기에서 푼다.
+ * - **네이티브 드래그(`dragstart`)를 막는다** — 링크 · 사진은 기본으로 끌려 나가 레일 대신 유령 이미지가 따라온다.
+ *
+ * 칸 폭은 첫 두 항목의 `offsetLeft` 차로 잰다 — 폭 토큰(82% · 44% · 30%)과 간격이 폭마다 달라 상수로 둘 수 없다.
+ */
+export function useDragScroll<T extends HTMLElement>(ref: React.RefObject<T | null>) {
+  useEffect(() => {
+    const el = ref.current
+    if (el === null) return
+
+    let start: { x: number; scrollLeft: number; pointerId: number } | null = null
+    let dragging = false
+    let suppressClick = false
+    let lastX = 0
+    let lastT = 0
+    let velocity = 0
+    let settleTimer: ReturnType<typeof setTimeout> | null = null
+
+    /*
+      **스냅은 옮기기가 끝난 뒤에 되돌린다.** 놓자마자 켜면 브라우저가 그 순간 가장 가까운 칸으로 먼저 붙어, 이어 보낸
+      `scrollTo` 가 덮였다 — 1.3 칸을 끌고 놓았는데 한 칸에 멈췄다(헤드리스 실측). `scrollend` 를 기다리고, 그 이벤트가
+      없는 브라우저를 위해 시간 안전망을 둔다. 다시 누르면 즉시 푼다.
+    */
+    const releaseSnap = () => {
+      if (settleTimer !== null) clearTimeout(settleTimer)
+      settleTimer = null
+      el.removeEventListener('scrollend', releaseSnap)
+      delete el.dataset.dragging
+    }
+
+    const finish = (event: PointerEvent, settle: boolean) => {
+      if (start === null || event.pointerId !== start.pointerId) return
+      const from = start
+      start = null
+      if (!dragging) return
+
+      dragging = false
+      if (el.hasPointerCapture(event.pointerId)) el.releasePointerCapture(event.pointerId)
+      if (!settle) {
+        releaseSnap()
+        return
+      }
+
+      suppressClick = true
+      const items = el.children
+      const first = items[0] as HTMLElement | undefined
+      const second = items[1] as HTMLElement | undefined
+      if (first === undefined) {
+        releaseSnap()
+        return
+      }
+
+      const step = second === undefined ? first.offsetWidth : second.offsetLeft - first.offsetLeft
+      const fling = event.timeStamp - lastT > DRAG_FLING_IDLE_MS ? 0 : velocity
+      const index = swipeTarget({
+        dragPx: el.scrollLeft - from.scrollLeft,
+        velocity: fling,
+        step,
+        index: Math.round(from.scrollLeft / step),
+        count: items.length,
+      })
+      const left = Math.min(index * step, el.scrollWidth - el.clientWidth)
+      if (Math.abs(left - el.scrollLeft) < 1) {
+        releaseSnap()
+        return
+      }
+
+      el.addEventListener('scrollend', releaseSnap)
+      settleTimer = setTimeout(releaseSnap, DRAG_SETTLE_FALLBACK_MS)
+      el.scrollTo({ left, behavior: 'smooth' })
+    }
+
+    const onDown = (event: PointerEvent) => {
+      suppressClick = false
+      // 옮기던 중에 다시 잡으면 그 자리에서 이어 끈다 — 남은 스냅 되돌리기를 정리한다
+      if (settleTimer !== null) releaseSnap()
+      if (event.pointerType !== 'mouse' || event.button !== 0) return
+      start = { x: event.clientX, scrollLeft: el.scrollLeft, pointerId: event.pointerId }
+      lastX = event.clientX
+      lastT = event.timeStamp
+      velocity = 0
+    }
+
+    const onMove = (event: PointerEvent) => {
+      if (start === null || event.pointerId !== start.pointerId) return
+      const dx = event.clientX - start.x
+      if (!dragging) {
+        if (!isDragGesture(dx)) return
+        dragging = true
+        el.setPointerCapture(event.pointerId)
+        el.dataset.dragging = ''
+      }
+
+      const dt = event.timeStamp - lastT
+      // 스크롤 방향 속도 — 포인터가 왼쪽으로 가면 양수(다음 칸 쪽)다 (`swipeTarget` 부호)
+      if (dt > 0) velocity = (lastX - event.clientX) / dt
+      lastX = event.clientX
+      lastT = event.timeStamp
+      el.scrollLeft = start.scrollLeft - dx
+    }
+
+    const onUp = (event: PointerEvent) => finish(event, true)
+    const onCancel = (event: PointerEvent) => finish(event, false)
+
+    const onClick = (event: MouseEvent) => {
+      if (!suppressClick) return
+      suppressClick = false
+      event.preventDefault()
+      event.stopPropagation()
+    }
+
+    const onDragStart = (event: DragEvent) => event.preventDefault()
+
+    el.addEventListener('pointerdown', onDown)
+    el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerup', onUp)
+    el.addEventListener('pointercancel', onCancel)
+    el.addEventListener('click', onClick, true)
+    el.addEventListener('dragstart', onDragStart)
+    return () => {
+      releaseSnap()
+      el.removeEventListener('pointerdown', onDown)
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerup', onUp)
+      el.removeEventListener('pointercancel', onCancel)
+      el.removeEventListener('click', onClick, true)
+      el.removeEventListener('dragstart', onDragStart)
+    }
+  }, [ref])
 }
 
 /**
