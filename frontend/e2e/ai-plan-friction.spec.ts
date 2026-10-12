@@ -1,0 +1,125 @@
+import { expect, type Page, test } from '@playwright/test'
+
+import { messages } from '../src/lib/messages'
+
+/**
+ * AI 일정 조건 · 결과 화면의 마찰 — 이슈 #1381 (`docs/ux-review-2026-10-11.md` §3-3 · §3-8).
+ *
+ * ### 왜 e2e 인가
+ *
+ * - 반려견 미리 선택은 **헤더 스위처의 저장값(localStorage)** 을 폼이 마운트 뒤에 읽는지에 달렸다.
+ *   단위 테스트는 판정(`defaultAiPlanPetIds`)만 잰다.
+ * - 하단 고정 담기는 `sticky` · 탭바 위 오프셋(`.bottom-tabbar`) · `form` 속성 제출이 실제 레이아웃과
+ *   브라우저에서만 맞물린다.
+ */
+const SELECTED_PET_KEY = 'hdg_selected_pet'
+
+async function petList(page: Page): Promise<{ petId: string; name: string }[]> {
+  return page.evaluate(async () => {
+    const body = (await (await fetch('/api/bff/members/me/pets')).json()) as {
+      dataBody: { pets: { petId: string; name: string }[] }
+    }
+    return body.dataBody.pets
+  })
+}
+
+/** 폼을 거치지 않고 2일짜리 작업을 낸다 (`ai-plan-empty-days.spec.ts` 와 같은 방법) */
+async function submitTwoDays(page: Page, petId: string): Promise<string> {
+  return page.evaluate(async (id) => {
+    const day = (offset: number) => {
+      const now = new Date()
+      const target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
+      return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`
+    }
+
+    const response = await fetch('/api/bff/ai-plans', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ areaCode: '39', startDate: day(30), endDate: day(31), petIds: [id] }),
+    })
+    const submitted = (await response.json()) as { dataBody: { jobId: string } }
+    return submitted.dataBody.jobId
+  }, petId)
+}
+
+test.describe('AI 일정 마찰 줄이기 (#1381)', () => {
+  test.use({ viewport: { width: 375, height: 812 } })
+
+  test('반려견이 여럿이면 헤더에서 고른 아이를 미리 체크한다', async ({ page }) => {
+    await page.goto('/plans')
+    const pets = await petList(page)
+    expect(pets.length).toBeGreaterThan(1)
+
+    const chosen = pets[1]
+    if (chosen === undefined) throw new Error('두 번째 목 반려견이 없다')
+    // 헤더 스위처의 선택값이다 — 토큰이 아니다 (`selected-pet-store.ts`, auth-guide 는 토큰만 금지)
+    await page.evaluate(
+      // eslint-disable-next-line no-restricted-globals -- 위 주석: 반려견 선택값이지 토큰이 아니다
+      ({ key, id }) => localStorage.setItem(key, id),
+      { key: SELECTED_PET_KEY, id: chosen.petId },
+    )
+
+    await page.goto('/ai-plans/new')
+
+    await expect(page.getByRole('checkbox', { name: chosen.name, exact: false })).toBeChecked()
+    for (const other of pets.filter((pet) => pet.petId !== chosen.petId)) {
+      await expect(page.getByRole('checkbox', { name: other.name, exact: false })).not.toBeChecked()
+    }
+  })
+
+  test('메모가 서귀포를 말하면 지역 칩을 제안하고, 고르면 서귀포시가 켜진다', async ({ page }) => {
+    await page.goto('/ai-plans/new')
+
+    await page.getByLabel(messages.aiPlan.fieldNote).fill('서귀포 위주로 이동은 짧게')
+
+    const suggest = page.getByText(messages.aiPlan.regionSuggest.replace('{region}', '서귀포시'))
+    await expect(suggest).toBeVisible()
+
+    await page
+      .getByRole('button', {
+        name: messages.aiPlan.regionSuggestApply.replace('{region}', '서귀포시'),
+      })
+      .click()
+
+    await expect(suggest).toHaveCount(0)
+    await expect(page.getByRole('radio', { name: '서귀포시' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+  })
+
+  test('괜찮아요 로 물리면 제안이 사라지고 지역은 그대로다', async ({ page }) => {
+    await page.goto('/ai-plans/new')
+
+    await page.getByLabel(messages.aiPlan.fieldNote).fill('애월 카페 위주')
+    await page.getByRole('button', { name: messages.aiPlan.regionSuggestDismiss }).click()
+
+    await expect(
+      page.getByText(messages.aiPlan.regionSuggest.replace('{region}', '제주시')),
+    ).toHaveCount(0)
+  })
+
+  test('모바일 결과 화면은 담기 버튼이 탭바 위에 고정돼 있고, 누르면 담긴다', async ({ page }) => {
+    await page.goto('/plans')
+    const [first] = await petList(page)
+    if (first === undefined) throw new Error('목 반려견이 없다')
+    const jobId = await submitTwoDays(page, first.petId)
+
+    await page.goto(`/ai-plans/jobs/${jobId}`)
+
+    // 하단 바의 버튼 하나만 보인다 — 패널의 버튼은 768 미만에서 숨는다
+    const submit = page.getByRole('button', { name: messages.aiPlan.commitSubmit })
+    await expect(submit).toHaveCount(1, { timeout: 20_000 })
+    await expect(submit).toBeVisible()
+
+    // 스크롤하지 않아도 화면 안, 탭바(64) 위에 있다
+    const box = await submit.boundingBox()
+    if (box === null) throw new Error('담기 버튼의 상자를 못 쟀다')
+    expect(box.y + box.height).toBeLessThanOrEqual(812 - 64)
+
+    await expect(page).toHaveTitle(`${messages.aiPlan.jobTitle} · 혼디가개`)
+
+    await submit.click()
+    await expect(page).toHaveURL(/\/plans\/\d+$/, { timeout: 20_000 })
+  })
+})

@@ -376,3 +376,15 @@ describe('AiPlanCanceled 의 inset 파라미터화 (#473)', () => {
     expect(canceled).not.toContain('md:px-10')
   })
 })
+
+/**
+ * 작업 화면 탭 제목 — 이슈 #1381. 다른 화면은 전부 `· 혼디가개` 가 붙는데 이 화면만
+ * `AI 일정 만들기` 로 떠 탭에서 서비스 이름이 사라졌다 (`ux-review-2026-10-11.md` §3-8).
+ */
+describe('작업 화면 탭 제목 (#1381)', () => {
+  it('접미사 · 혼디가개 가 붙는다 — 만들기 화면과 같은 모양이다', () => {
+    const page = code('app/(main)/ai-plans/jobs/[jobId]/page.tsx')
+
+    expect(page).toContain('title: `${messages.aiPlan.jobTitle} · 혼디가개`')
+  })
+})
