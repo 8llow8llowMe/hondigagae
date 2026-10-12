@@ -373,15 +373,32 @@ export function useDragScroll<T extends HTMLElement>(ref: React.RefObject<T | nu
  * 둘, 실제로 눌리는 것이 하나가 되어 어느 쪽이 끝인지 흐려진다. 나타나고 사라지는 것
  * 자체가 "여기가 끝" 이라는 신호다.
  */
+/**
+ * 화살표 꺾쇠의 선 굵기 (#1404). 아이콘 세트 기본(1.5)은 24px 마크 기준이라 32px 원 안의 16px 꺾쇠에서는 가늘어
+ * 보였다("너무 얇다"). `CheckIcon` 처럼 **사용처가 넘긴다** — `Svg` 의 기본값을 바꾸지 않는다.
+ */
+const ARROW_STROKE = 2.25
+
 export function ScrollRailArrows({
   rail,
   prevLabel,
   nextLabel,
   placement = 'overlay',
+  reveal = 'mouse',
 }: {
   rail: ScrollRail
   prevLabel: string
   nextLabel: string
+  /**
+   * 오버레이 화살표를 **언제 보이나** (#1404).
+   *
+   * - `mouse`(기본) — 마우스 환경에만 늘 선다. 터치에서는 숨는다(`.scroll-rail-arrow`) — 셀이 작은 레일(골든타임 ·
+   *   칩)에서 32px 버튼이 칸을 가린다.
+   * - `hover` — **1024 이상 · 호버 가능 환경에서는 레일에 올리거나 포커스가 들어올 때만**, 그 아래 폭은 **터치여도
+   *   늘** 선다(`.scroll-rail-arrow-hover`). 카드가 큰 홈 추천 레일 전용이다 — 데스크톱에서는 카드 위에 늘 떠 있는
+   *   버튼이 시선을 끌고, 태블릿 · 모바일에서는 "옆으로 넘긴다" 를 알려 줄 신호가 화살표뿐이다(끝 흐림을 걷었다).
+   */
+  reveal?: 'mouse' | 'hover'
   /**
    * `overlay`(기본) — 스크롤러 위에 떠서 좌우 끝에 앉는다. `.scroll-rail` 인 부모가 필요하다.
    *
@@ -401,20 +418,22 @@ export function ScrollRailArrows({
         <Arrow
           side="left"
           placement={placement}
+          reveal={reveal}
           label={prevLabel}
           onClick={() => rail.page('left')}
         >
-          <ChevronLeftIcon size={16} />
+          <ChevronLeftIcon size={16} strokeWidth={ARROW_STROKE} />
         </Arrow>
       )}
       {canNext && (
         <Arrow
           side="right"
           placement={placement}
+          reveal={reveal}
           label={nextLabel}
           onClick={() => rail.page('right')}
         >
-          <ChevronRightIcon size={16} />
+          <ChevronRightIcon size={16} strokeWidth={ARROW_STROKE} />
         </Arrow>
       )}
     </>
@@ -449,12 +468,14 @@ export function ScrollRailArrows({
 function Arrow({
   side,
   placement,
+  reveal,
   label,
   onClick,
   children,
 }: {
   side: 'left' | 'right'
   placement: 'overlay' | 'inline'
+  reveal: 'mouse' | 'hover'
   label: string
   onClick: () => void
   children: React.ReactNode
@@ -469,7 +490,8 @@ function Arrow({
         'border-border bg-bg text-fg-muted hover:text-fg hover:border-border-strong focus-visible:ring-brand-500 flex items-center justify-center border transition-colors focus-visible:ring-2 focus-visible:outline-none',
         placement === 'overlay'
           ? cn(
-              'scroll-rail-arrow absolute top-1/2 size-8 -translate-y-1/2 rounded-full',
+              reveal === 'hover' ? 'scroll-rail-arrow-hover' : 'scroll-rail-arrow',
+              'absolute top-1/2 size-8 -translate-y-1/2 rounded-full',
               side === 'left' ? 'left-0' : 'right-0',
             )
           : 'size-11 rounded-md',

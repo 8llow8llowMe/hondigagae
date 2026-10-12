@@ -834,6 +834,30 @@ body {
   }
 }
 
+/*
+  **호버로 드러나는 화살표 — 홈 추천 레일 전용** (#1404, `reveal="hover"`).
+
+  1024 이상 · 호버 가능 환경에서는 레일(`.scroll-rail`)에 마우스를 올리거나 포커스가 들어올 때만 드러난다. 카드 위에 늘
+  떠 있으면 시선을 끈다. `opacity` 로 감추고 누르기를 끈다 — `display: none` 이면 Tab 이 닿지 않아 키보드로 드러낼 수
+  없다(`:focus-within` 이 버튼 자신의 포커스로도 켜진다).
+
+  **그 아래 폭은 터치여도 늘 선다** — 위 `.scroll-rail-arrow` 의 터치 숨김을 따르지 않는다. 끝 흐림을 걷은 레일이라
+  태블릿 · 모바일에서 넘김을 말할 신호가 화살표뿐이다(사용자 결정 2026-10-12).
+*/
+@media (width >= 64rem) and (hover: hover) {
+  .scroll-rail-arrow-hover {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 150ms ease;
+  }
+
+  .scroll-rail:hover .scroll-rail-arrow-hover,
+  .scroll-rail:focus-within .scroll-rail-arrow-hover {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 /* md 이상은 flex-wrap 이라 스크롤이 없다 — mask 를 해제한다 */
 @media (width >= 48rem) {
   .md\:mask-none {
