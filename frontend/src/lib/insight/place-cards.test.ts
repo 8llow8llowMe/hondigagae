@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { crowdedLabel, pickCardReason, placeCardsEnd } from '@/lib/insight/place-cards'
+import { crowdedLabel, pickCardReason } from '@/lib/insight/place-cards'
 import type { CongestionItem, SuitabilityReasonItem } from '@/types/insight'
 
 function reason(code: string, scoreDelta: number): SuitabilityReasonItem {
@@ -59,34 +59,5 @@ describe('crowdedLabel', () => {
 
   it('congestion 이 null 이면 그리지 않는다', () => {
     expect(crowdedLabel(null)).toBeNull()
-  })
-})
-
-/*
-  끝 카드 — 카드가 3장 미만이면 빈 칸을 `장소 전체 보기` 가 채운다. 3곳이 다 차면 끝 카드 없이
-  머리의 `장소 찾기` 가 맡는다.
-
-  **수와 `점수 못 낸 곳` 줄을 걷었다** (#1380 · 홈-세부명세 D10-4). 추천 API 는 목록 전체 수를 주지
-  않고, 점수를 못 낸 곳은 서버가 추천에서 뺀다 — 둘 다 홈이 더는 알 수 없는 값이다.
-*/
-describe('placeCardsEnd', () => {
-  it('카드가 다 차면 끝 카드가 없다', () => {
-    expect(placeCardsEnd({ cards: 3, capacity: 3 })).toBeNull()
-  })
-
-  it('빈 칸이 있으면 선다', () => {
-    expect(placeCardsEnd({ cards: 2, capacity: 3 })).toEqual({ span: 1 })
-  })
-
-  /*
-    **빈 칸을 전부 채운다.** 카드가 한 장이면 그리드에 빈 칸이 둘이라, 끝 카드가 한 칸만 차지하면
-    셋째 칸이 흰 구멍으로 남는다 (1440 실측). 기준 장소가 추천에 들면 카드가 2장이 된다.
-  */
-  it.each([
-    [2, 1],
-    [1, 2],
-    [0, 3],
-  ])('카드 %i 장이면 끝 카드가 %i 칸을 차지한다', (cards, span) => {
-    expect(placeCardsEnd({ cards, capacity: 3 })?.span).toBe(span)
   })
 })

@@ -8,7 +8,6 @@ import {
   PlaceInsightCard,
   PlaceInsightCardList,
 } from '@/features/home/place-insight-card'
-import { placeCardsEnd } from '@/lib/insight/place-cards'
 import { toRecommendationCards } from '@/lib/insight/recommendation'
 import { messages } from '@/lib/messages'
 import { recommendations, suitability, suitabilityInsufficient } from '@/test/fixtures/insight'
@@ -264,11 +263,8 @@ describe('PlaceInsightCard — 추천 항목에서 온 카드 (#1380)', () => {
 })
 
 describe('PlaceCardsEndCard — 끝 카드', () => {
-  function end(cards: number) {
-    const value = placeCardsEnd({ cards, capacity: 3 })
-
-    if (value === null) throw new Error('끝 카드가 서야 하는 입력이다')
-    return renderToStaticMarkup(createElement(PlaceCardsEndCard, { end: value }))
+  function end() {
+    return renderToStaticMarkup(createElement(PlaceCardsEndCard))
   }
 
   /*
@@ -276,7 +272,7 @@ describe('PlaceCardsEndCard — 끝 카드', () => {
     수였는데(#905 R7), 추천 API 는 그 수를 주지 않는다 — 수를 위해 목록을 따로 부르지 않는다.
   */
   it('수 없이 장소 목록에 간다', () => {
-    const markup = end(2)
+    const markup = end()
 
     expect(markup).toContain('href="/places"')
     expect(markup).toContain(messages.home.allPlaces)
@@ -286,26 +282,27 @@ describe('PlaceCardsEndCard — 끝 카드', () => {
   /* 꺾쇠는 문구가 아니라 장식 조각이다 — 줄바꿈 없는 공백으로 앞 낱말에 붙는다 */
   it('꺾쇠는 aria-hidden 조각이고 앞 낱말과 떨어지지 않는다', () => {
     expect(messages.home.allPlaces).not.toContain('›')
-    expect(end(2)).toContain('<span aria-hidden="true">\u00a0›</span>')
+    expect(end()).toContain('<span aria-hidden="true">\u00a0›</span>')
   })
 
   /* 점수를 못 낸 곳은 서버가 추천에서 뺀다 — 셀 것이 없다 (#1380) */
   it('점수를 못 낸 곳의 줄이 없다', () => {
-    expect(end(1)).not.toContain('점수를 내지 못한')
+    expect(end()).not.toContain('점수를 내지 못한')
     expect(Object.keys(messages.home)).not.toContain('unscoredInAllPlaces')
   })
 
   /* L2 항목의 채널은 채움이다 — 테두리를 두르지 않는다 (DESIGN.md §0) */
   it('--band 채움이고 테두리가 없다', () => {
-    const markup = end(2)
+    const markup = end()
 
     expect(markup).toContain('bg-band')
     expect(markup).not.toMatch(/class="[^"]*\bborder\b/)
   })
 
-  it('그리드의 남은 빈 칸을 전부 차지한다', () => {
-    expect(end(2)).toContain('lg:col-span-1')
-    expect(end(1)).toContain('lg:col-span-2')
+  /* 레일에는 칸이 없다 (#1400) — 사진 카드와 같은 폭의 마지막 장이다 */
+  it('사진 카드와 같은 폭 토큰이고 그리드 칸을 차지하지 않는다', () => {
+    expect(end()).toContain('w-(--home-place-card-w)')
+    expect(end()).not.toContain('col-span')
   })
 })
 
@@ -330,22 +327,23 @@ describe('PlaceInsightCardList — 틀', () => {
     expect(markup).toContain('snap-start')
   })
 
-  /* 다음 카드가 비쳐 보이는 폭 — 그것이 넘김 신호라 화살표가 없다 */
-  it('카드 폭은 토큰이고 화살표가 없다', () => {
+  /* 다음 카드가 비쳐 보이는 폭 — 1024+ 도 30% 라 넷째 가장자리가 보인다 (#1400) */
+  it('카드 폭은 토큰이다', () => {
     expect(markup).toContain('w-(--home-place-card-w)')
-    expect(markup).not.toContain('scroll-rail-arrow')
   })
 
-  /* 캐러셀로 숨기지 않는다 — 1024 이상은 한 줄에 셋 */
-  it('1024 이상은 3열 그리드이고 스크롤을 끈다', () => {
-    expect(markup).toContain('lg:grid lg:snap-none lg:grid-cols-3')
-    expect(markup).toContain('lg:overflow-visible')
-    expect(markup).toContain('lg:w-auto')
+  /* #1400 — 추천이 10곳이라 1024+ 도 레일이다. 그리드로 두면 네 줄이 된다 */
+  it('1024 이상도 그리드로 바뀌지 않는다 — 스크롤 · 스냅을 끄지 않는다', () => {
+    expect(markup).not.toContain('lg:grid')
+    expect(markup).not.toContain('lg:overflow-visible')
+    expect(markup).not.toContain('lg:w-auto')
   })
 
   /* 넘치는 카드 폭이 조상 `scrollWidth` 로 새면 390 에서 `main` 이 가로로 늘어난다 */
-  it('스크롤러가 레이아웃을 가둔다', () => {
-    expect(markup).toContain('contain-layout')
+  /* `.scroll-rail` 이 `contain: layout` 을 갖는다(app/globals.css) — 화살표의 기준면이기도 하다 (#1400) */
+  it('스크롤러를 .scroll-rail 이 감싼다', () => {
+    expect(markup.indexOf('class="scroll-rail"')).toBeGreaterThan(-1)
+    expect(markup.indexOf('class="scroll-rail"')).toBeLessThan(markup.indexOf('<ul'))
   })
 
   it('재조회 중에는 흐리고 aria-busy 를 건다', () => {

@@ -22,6 +22,11 @@ describe('홈 → 장소 추천 (#1380)', () => {
     expect(HOOKS).toContain('recommendationsPath(condition, limit)')
   })
 
+  /* #1400 — 서버 상한(10)까지 받아 가로 레일로 넘긴다. 예전 3(공통명세 S5-2)을 뒤집었다 */
+  it('카드 수는 서버 상한 10 이다', () => {
+    expect(HOME).toContain('const TOP_PLACE_COUNT = 10')
+  })
+
   /*
     로그인 사용자는 반려견 목록 · 고른 반려견 복원 뒤에야 조건이 선다. 그 전에 부르면 조건 없는 콜드 계산
     하나가 버려진다(#1380 검토). 게스트는 기다리지 않는다.
@@ -80,28 +85,30 @@ describe('홈 → 섹션 제목 낮추기 (#1380)', () => {
   })
 
   it('문구가 권하지 않는다', () => {
-    expect(messages.home.suitabilityCautiousHeading).toBe('오늘 장소 상황')
+    // `장소 상황` 은 무엇인지 말하지 못했다 (#1400 · D11-3)
+    expect(messages.home.suitabilityCautiousHeading).toBe('오늘 추천 장소')
     expect(messages.home.suitabilityCautiousHeading).not.toContain('갈 만한')
   })
 })
 
 /*
-  **실내 대안은 추천 카드 위다** (D10-5). DOM 순서로 올린다 — `order` 로 당기면 보이는 순서와
-  키보드 · 스크린리더 순서가 갈린다(WCAG 1.3.2). `order-*` 금지는 `home-about-link.test.ts` 가 잠근다.
+  **실내 대안은 추천 카드 바로 아래다** (#1400 · D11-2 — #1380 D10-5 의 "위" 를 뒤집었다). DOM 순서로 둔다 —
+  `order` 로 당기면 보이는 순서와 키보드 · 스크린리더 순서가 갈린다(WCAG 1.3.2). `order-*` 금지는
+  `home-about-link.test.ts` 가 잠근다.
 */
-describe('홈 → 실내 대안 자리 (#1380)', () => {
-  it('실내 대안이 오늘 갈 만한 곳보다 먼저 선다', () => {
+describe('홈 → 실내 대안 자리 (#1400)', () => {
+  it('실내 대안이 오늘 갈 만한 곳 다음 · 바로가기 앞에 선다', () => {
     const indoor = HOME.indexOf('<IndoorAlternativesSection')
     const suitability = HOME.indexOf('titleId="suitability-heading"')
 
-    expect(indoor).toBeGreaterThan(-1)
-    expect(indoor).toBeLessThan(suitability)
+    expect(indoor).toBeGreaterThan(suitability)
+    expect(indoor).toBeLessThan(HOME.indexOf('<HomeShortcuts'))
     expect(HOME.split('<IndoorAlternativesSection').length - 1).toBe(1)
   })
 
-  it('캡션이 카드를 아래에서 가리킨다', () => {
-    expect(messages.home.indoorNote).toContain('아래')
-    expect(messages.home.indoorNote).not.toContain('위 목록')
+  it('캡션이 카드를 위에서 가리킨다', () => {
+    expect(messages.home.indoorNote).toContain('위 장소')
+    expect(messages.home.indoorNote).not.toContain('아래')
   })
 })
 

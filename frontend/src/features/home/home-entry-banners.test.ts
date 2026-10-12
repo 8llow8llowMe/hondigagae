@@ -85,13 +85,9 @@ describe('홈 → 장소 목록 링크 문구 (#905 R7)', () => {
     부터는 수 자체가 없다 — 추천 API 가 목록 전체 수를 주지 않는다 (홈-세부명세 D10-4).
     (끝 카드의 문구 · 꺾쇠는 `place-insight-card.test.ts` 가 잠근다)
   */
+  /* #1400 부터 끝 카드는 레일의 마지막 장으로 늘 서고 받는 값이 없다 */
   it('끝 카드에 수를 넘기지 않는다 — 목록을 따로 부르지 않는다', () => {
-    const end = HOME.indexOf('placeCardsEnd({')
-    const call = HOME.slice(end, HOME.indexOf('})', end))
-
-    expect(end).toBeGreaterThan(-1)
-    expect(call).not.toContain('total')
-    expect(call).not.toContain('unscored')
+    expect(HOME).toContain('<PlaceCardsEndCard />')
     expect(HOME).not.toContain('morePlaces')
   })
 
