@@ -146,6 +146,24 @@ describe('지도 패널의 한 번 더 확인 (#1383 · D24-4)', () => {
     expect(markup).toContain(messages.plan.addPlaceConfirmUnknown)
   })
 
+  it('확인한 뒤 저장이 실패하면 확인 줄과 실패 알림이 함께 선다 — 목록 보기와 같다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        'div',
+        null,
+        planAddPlaceNotice(placeSummary, {
+          failure: {
+            target: { day: 1, placeId: placeSummary.placeId },
+            error: { retriable: true, message: '다시 시도해 주세요.' },
+          },
+          confirming,
+        }),
+      ),
+    )
+    expect(markup).toContain(messages.plan.addPlaceConfirmUnknown)
+    expect(markup).toContain('다시 시도해 주세요.')
+  })
+
   it('다른 행에는 붙지 않는다', () => {
     const notice = planAddPlaceNotice(placeWithoutCoordinate, { failure: null, confirming })
     expect(notice).toBeNull()

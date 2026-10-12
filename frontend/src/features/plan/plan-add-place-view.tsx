@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { BackLink } from '@/components/back-link'
@@ -139,12 +139,18 @@ export function PlanAddPlaceView({
     `planKeys.detail` 을 갈아끼우므로 그 행이 곧바로 `이미 담았어요` 로 바뀐다.
     돌아가기는 헤더의 `일정으로 돌아가기` 가 맡는다.
   */
-  const addPlace = usePlanAddPlace({ planId })
-  /** 한 번 더 확인을 기다리는 장소 — 동반 불가 · 미확인의 첫 누름 뒤 (#1383 · D24-4) */
+  /**
+   * 한 번 더 확인을 기다리는 장소 — 동반 불가 · 미확인의 첫 누름 뒤 (#1383 · D24-4).
+   *
+   * **저장에 성공했을 때만 지운다.** 두 번째 누름에서 지우면, 저장이 실패한 뒤 다시 시도하는
+   * 누름이 또 확인 대기가 된다 — 이미 확인한 것을 다시 묻는다.
+   */
   const [confirming, setConfirming] = useState<{
     placeId: string
     reason: AddPlaceConfirmReason
   } | null>(null)
+  const clearConfirming = useCallback(() => setConfirming(null), [])
+  const addPlace = usePlanAddPlace({ planId, onAdded: clearConfirming })
 
   const backHref = `/plans/${planId}#${planDayAnchorId(day)}`
 
@@ -286,7 +292,6 @@ export function PlanAddPlaceView({
       return
     }
 
-    setConfirming(null)
     addPlace.add({
       day,
       // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)

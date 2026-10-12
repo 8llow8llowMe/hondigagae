@@ -94,24 +94,27 @@ export function planAddPlaceNotice(
     confirming?: { placeId: string; reason: AddPlaceConfirmReason } | null
   },
 ) {
-  if (confirming !== null && confirming.placeId === place.placeId) {
-    return (
-      <p role="status" className="text-body-2 text-fg mx-4 mb-3 font-medium break-keep">
-        {addPlaceConfirmNotice(confirming.reason)}
-      </p>
-    )
-  }
+  const confirmReason =
+    confirming !== null && confirming.placeId === place.placeId ? confirming.reason : null
+  const error = failure !== null && failure.target.placeId === place.placeId ? failure.error : null
+  if (confirmReason === null && error === null) return null
 
-  if (failure === null || failure.target.placeId !== place.placeId) return null
-
+  /* 둘 다 그린다 — 확인한 뒤 저장이 실패하면 두 줄이 함께 선다 (`PlanAddPlaceRow` 와 같다) */
   return (
-    <FormAlert
-      className="mx-4 mb-3"
-      message={
-        failure.error.retriable
-          ? `${messages.plan.addPlaceErrorTitle} ${failure.error.message}`
-          : failure.error.message
-      }
-    />
+    <>
+      {confirmReason !== null && (
+        <p role="status" className="text-body-2 text-fg mx-4 mb-3 font-medium break-keep">
+          {addPlaceConfirmNotice(confirmReason)}
+        </p>
+      )}
+      {error !== null && (
+        <FormAlert
+          className="mx-4 mb-3"
+          message={
+            error.retriable ? `${messages.plan.addPlaceErrorTitle} ${error.message}` : error.message
+          }
+        />
+      )}
+    </>
   )
 }
