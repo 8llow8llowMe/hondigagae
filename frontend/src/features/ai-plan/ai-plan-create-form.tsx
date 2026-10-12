@@ -132,6 +132,12 @@ export function AiPlanCreateForm({
     regionHint !== null && regionHint !== values.sigunguCode && regionHint !== dismissedRegion
       ? regionHint
       : null
+  /*
+    **고르든 물리든 누른 버튼이 사라진다** — 그대로 두면 키보드 · 스크린리더 포커스가 `BODY` 로
+    떨어진다. 낱말을 적던 메모로 돌려보낸다 (제안을 부른 자리이고, 늘 마운트돼 있다).
+  */
+  const focusRequestNote = () =>
+    formRef.current?.querySelector<HTMLTextAreaElement>('#requestNote')?.focus()
 
   /*
     **접힌 섹션 안의 필드에서 오류가 나면 먼저 펼친다.** 안 그러면 제출이 조용히 실패한다 —
@@ -387,7 +393,7 @@ export function AiPlanCreateForm({
         */
         <div className="bg-band -mt-2 flex flex-col gap-2 rounded-md px-3 py-3">
           {/* 문장 한 줄 · 버튼 한 줄 — 375 에서 버튼 하나만 다음 줄로 떨어지지 않게 둘을 묶는다 */}
-          <p className="text-body-2 text-fg break-keep">
+          <p role="status" className="text-body-2 text-fg break-keep">
             {messages.aiPlan.regionSuggest.replace(
               '{region}',
               SIGUNGU_LABEL[regionSuggestion] ?? '',
@@ -400,6 +406,7 @@ export function AiPlanCreateForm({
               onClick={() => {
                 onValueChange('sigunguCode', regionSuggestion)
                 setDetailsOpen(true)
+                focusRequestNote()
               }}
             >
               {messages.aiPlan.regionSuggestApply.replace(
@@ -407,7 +414,14 @@ export function AiPlanCreateForm({
                 SIGUNGU_LABEL[regionSuggestion] ?? '',
               )}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setDismissedRegion(regionSuggestion)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setDismissedRegion(regionSuggestion)
+                focusRequestNote()
+              }}
+            >
               {messages.aiPlan.regionSuggestDismiss}
             </Button>
           </div>
