@@ -56,8 +56,23 @@ export function toInsightQuery(
   return params.toString()
 }
 
-export function suitabilityPath(placeId: string, condition: PetCondition | null): string {
-  return paths.places.suitability(placeId, toInsightQuery(condition))
+/**
+ * 적합도.
+ *
+ * **`targetDate` 는 일정에서 들어왔을 때만 싣는다** (#1450 · 장소상세-세부명세 D1-5-4). 산책
+ * 위험도(`walkSafetyPath`)와 같은 규칙이다 — 그 밖의 진입에서 FE 가 오늘을 만들면 브라우저
+ * 타임존이 KST 가 아닌 사용자에게 어제가 나간다. 계약: `GET /places/{placeId}/suitability` 의
+ * `targetDate`(query, `date`, 선택) — `docs/api/openapi/tour-service.json`.
+ */
+export function suitabilityPath(
+  placeId: string,
+  condition: PetCondition | null,
+  targetDate: string | null = null,
+): string {
+  return paths.places.suitability(
+    placeId,
+    toInsightQuery(condition, targetDate === null ? {} : { targetDate }),
+  )
 }
 
 /**

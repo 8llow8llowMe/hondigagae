@@ -43,33 +43,27 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
    * 반려견이 없다.
    */
   const { pet } = useSelectedPet(authed)
-  const condition = toPetCondition(pet)
-  const suitability = usePlaceSuitability(placeId, condition)
 
   /*
-    산책 위험도 (#197). **적합도와 같은 조건을 쓰되 별도 query 다** — 엔드포인트가 다르고
-    한쪽만 실패할 수 있다. 조건을 한 번만 만들어 둘에 넘기는 이유는 두 key 가 같은
-    `conditionKey` 로 갈려야 반려견 전환이 두 판정에 동시에 반영되기 때문이다.
-  */
-  /*
-    **일정에서 들어왔으면 그 일정의 반려견 · 날짜로 판정한다** (#1429 · 장소상세-세부명세 D1-5).
-    `?plan=&day=` 가 없거나 틀렸거나 일정을 못 읽으면 `none` 이라 위의 지금 동작 그대로다.
+    **일정에서 들어왔으면 그 일정의 반려견 · 날짜로 판정한다** (#1429 · #1450 · 장소상세-세부명세 D1-5).
+    `?plan=&day=` 가 없거나 틀렸거나 일정을 못 읽으면 `none` 이라 헤더의 반려견 · 오늘 그대로다.
 
-    **산책 위험도만 바꾼다.** 적합도는 헤더의 반려견 · 오늘 그대로 둔다 — 범위 결정은 명세
-    D1-5-4 에 있다. 기준이 정해지는 동안(`pending`)은 조회를 켜지 않는다: 헤더 반려견으로
-    먼저 부르면 요청이 두 번 나가고 판정이 한 번 뒤바뀐다.
+    **적합도와 산책 위험도가 같은 기준을 쓴다** (#1450). 한 화면의 두 판정이 다른 아이 · 다른 날을
+    말하면 사용자는 어느 쪽이 그 여행일의 답인지 알 수 없다. 기준이 정해지는 동안(`pending`)은
+    둘 다 조회를 켜지 않는다: 헤더 반려견으로 먼저 부르면 요청이 두 번 나가고 판정이 한 번 뒤바뀐다.
   */
   const planBasis = usePlacePlanBasis(authed)
   const trip = planBasis.status === 'ready' ? planBasis.basis : null
-  const walkPet = trip?.pet ?? pet
-  const walkSafety = usePlaceWalkSafety(
-    placeId,
-    trip === null ? condition : toPetCondition(trip.pet),
-    {
-      targetDate: trip?.date ?? null,
-      ready: planBasis.status !== 'pending',
-    },
-  )
+  const basisPet = trip?.pet ?? pet
+  /*
+    조건을 한 번만 만들어 두 판정에 넘긴다 — 두 key 가 같은 `conditionKey` 로 갈려야 반려견
+    전환이 두 판정에 동시에 반영된다. 산책 위험도(#197)는 **적합도와 별도 query 다** —
+    엔드포인트가 다르고 한쪽만 실패할 수 있다.
+  */
+  const condition = toPetCondition(basisPet)
+  const basisOptions = { targetDate: trip?.date ?? null, ready: planBasis.status !== 'pending' }
+  const suitability = usePlaceSuitability(placeId, condition, basisOptions)
+  const walkSafety = usePlaceWalkSafety(placeId, condition, basisOptions)
 
   /*
     기간 혼잡도 (#430). **반려견 조건을 넘기지 않는다** — 붐빔은 장소와 날짜의 속성이라
@@ -117,8 +111,9 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
           loading: suitability.isPending,
           failed: suitability.isError,
           onRetry: () => void suitability.refetch(),
-          petName: pet?.name ?? null,
+          petName: basisPet?.name ?? null,
           authed,
+          trip: trip !== null,
         }}
         /*
           산책 위험도는 **게스트에게도 그린다** — 적합도가 `GuestBlock` 으로 갈리는 것과
@@ -130,7 +125,7 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
           loading: walkSafety.isPending,
           failed: walkSafety.isError,
           onRetry: () => void walkSafety.refetch(),
-          petName: walkPet?.name ?? null,
+          petName: basisPet?.name ?? null,
           tripDate: trip?.date ?? null,
         }}
         /*
