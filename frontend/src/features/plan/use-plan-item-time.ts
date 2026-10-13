@@ -9,14 +9,15 @@ import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidati
 import { planKeys } from '@/features/plan/queries'
 import { changeItemStartTime } from '@/lib/api/plan'
 import { messages } from '@/lib/messages'
-import { toItemStartTimeError } from '@/lib/plan/item-time-error'
+import { runItemTimeSave } from '@/lib/plan/item-time-save'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { fillTemplate } from '@/lib/text/template'
 import type { PlanItemDetail } from '@/types/plan'
 
 /**
- * 저장 뒤 상세 재조회를 기다리는 상한 (ms). 보통의 재조회는 이 안에 끝나 칩이 새 시각으로
- * 바뀐 뒤 닫히고, 재시도 · 오프라인으로 늘어지면 이만큼만 잠근다 (아래 성공 갈래 주석).
+ * 저장 뒤 **모달이** 상세 재조회를 기다리는 상한 (ms). 보통의 재조회는 이 안에 끝나 칩이 새 시각으로
+ * 바뀐 뒤 닫히고, 재시도 · 오프라인으로 늘어지면 이만큼만 모달을 잡는다 (아래 저장 주석). 일괄 교체
+ * 잠금(`refetchingDays`)은 이 상한과 무관하게 재조회가 끝날 때까지 남는다 (#1501).
  */
 const DETAIL_REFETCH_WAIT_MS = 1500
 
@@ -30,6 +31,10 @@ const DETAIL_REFETCH_WAIT_MS = 1500
  *
  * **낙관적 업데이트를 하지 않는다** (`api-integration-guide.md` §7). `PLAN_005` 처럼 재시도로
  * 풀리지 않는 실패가 있어 롤백이 잦다 — 방문 체크(`use-plan-visit.ts`)와 같은 판단이다.
+ *
+ * **잠금 상태가 둘이다 (#1501).** `saving` 은 모달(PUT → 상한 안의 재조회)이고, `refetchingDays` 는
+ * 모달이 닫힌 뒤에도 재조회가 끝나지 않은 일자다. 호출부는 둘 다 일괄 교체 잠금에 넣는다
+ * (`itemTimeLocks`) — 재조회 전 캐시는 옛 `startTime` 이라 그 틈의 교체가 새 시각을 덮는다.
  */
 export function usePlanItemTime({
   planId,
@@ -47,15 +52,20 @@ export function usePlanItemTime({
   const [failure, setFailure] = useState<{ planItemId: string; error: PlanDaySaveError } | null>(
     null,
   )
+  /** 상한에서 모달이 닫힌 뒤에도 재조회가 끝나지 않은 일자. 같은 일자가 여러 번 들 수 있다 */
+  const [refetchingDays, setRefetchingDays] = useState<readonly number[]>([])
   // disabled 반영 전 빠른 연속 제출(Enter 두 번)을 막는다 (form-guide.md §6)
   const savingRef = useRef(false)
 
   const save = useCallback(
     ({
+      day,
       dayItems,
       planItemId,
       startTime,
     }: {
+      /** 그 항목의 일자. 재조회가 끝날 때까지 이 일자를 잠근다 (#1501) */
+      day: number
       /** 그 일자의 현재 항목. 저장은 한 항목뿐이고, 여기서는 **들고 있는 상세에 있는지**만 본다 */
       dayItems: PlanItemDetail[]
       planItemId: string
@@ -82,53 +92,64 @@ export function usePlanItemTime({
       setFailure(null)
 
       /*
-        **`.then(onSuccess, onError)` 2인자 형태다** (`use-plan-add-move.ts` 와 같다).
-        `.then().catch()` 면 성공 후처리에서 던진 예외가 저장 실패로 분류돼 **저장은 됐는데
-        "저장하지 못했어요" 가 뜬다.**
+        흐름은 `runItemTimeSave` 가 소유한다 (#1501). 후처리 예외를 저장 실패로 말하지 않는 것(옛
+        2인자 `.then`)도 그 함수가 지킨다.
+
+        **상세는 무효화로만 이어받는다.** 응답이 `Response<Void>` 라 갈아끼울 상세가 없고, 시각을
+        `setQueryData` 로 지어 넣지 않는다 — 정본은 plan-service 다(서버가 `HH:mm` 을 `HH:mm:ss` 로
+        고쳐 들기도 한다). 방문 체크(`use-plan-visit.ts`)와 같은 경로다.
+
+        **재조회를 기다린 뒤 닫는다.** 먼저 닫으면 "저장했어요" 토스트 아래 칩이 한동안 옛 시각을
+        보여 준다. 그동안 `saving` 이 남아 저장 · 닫기가 잠긴다.
+
+        **다만 모달은 오래 기다리지 않는다** (`DETAIL_REFETCH_WAIT_MS`). 재조회가 5xx 면 전역 retry 가
+        끝날 때까지(1초 · 2초 backoff) 잠기고, 저장 직후 오프라인이 되면 재조회가 재연결 전까지 멈춰
+        **저장은 됐는데 모달을 닫을 방법이 없어진다.** 상한을 넘기면 닫는다 — 칩이 잠깐 옛 시각인 것은
+        감수한다. **잠금은 감수하지 않는다** (#1501): 재조회가 끝날 때까지 그 일자를
+        `refetchingDays` 에 두어, 옛 시각 캐시로 일괄 교체(메모 저장 등)가 나가지 못하게 한다.
       */
-      void changeItemStartTime(planId, planItemId, startTime)
-        .then(
-          async () => {
-            /*
-              **상세는 무효화로만 이어받는다.** 응답이 `Response<Void>` 라 갈아끼울 상세가 없고,
-              시각을 `setQueryData` 로 지어 넣지 않는다 — 정본은 plan-service 다(서버가 `HH:mm`
-              을 `HH:mm:ss` 로 고쳐 들기도 한다). 방문 체크(`use-plan-visit.ts`)와 같은 경로다.
-
-              **재조회를 기다린 뒤 닫는다.** 먼저 닫으면 "저장했어요" 토스트 아래 칩이 한동안
-              옛 시각을 보여 준다. 그동안 `saving` 이 남아 저장 · 닫기가 잠긴다. 재조회가
-              실패해도 `invalidateQueries` 는 던지지 않는다 — 저장은 됐으므로 그대로 닫는다.
-
-              **다만 오래 기다리지 않는다** (`DETAIL_REFETCH_WAIT_MS`). 재조회가 5xx 면 전역
-              retry 가 끝날 때까지(1초 · 2초 backoff) 잠기고, 저장 직후 오프라인이 되면 재조회가
-              재연결 전까지 멈춰 **저장은 됐는데 모달을 닫을 방법이 없어진다.** 상한을 넘기면
-              재조회는 뒤에서 계속 돌게 두고 닫는다 — 그 사이 칩이 잠깐 옛 시각인 것은 감수한다.
-            */
-            // 바뀐 시각이 곧 그 항목의 판정 입력이다 (D15-6). 따로 받는 절이라 기다리지 않는다
-            void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(planId) })
-            // 브리핑의 첫/마지막 항목 시각이 이 값이다 (#1055). 별도 화면이라 기다리지 않는다
-            void invalidatePlanBriefing(queryClient, planId)
-            /*
-              **판정(`planKeys.weather`)은 무효화하지 않는다.** 일자 판정은 항목 구성·순서(첫 장소
-              항목)로 계산되고 시각을 읽지 않는다(`PlanWeatherProcessor` 실측) — 방문 체크와
-              같은 판단이다. 일괄 교체 시절에는 교체라서 무효화했다.
-            */
-            await Promise.race([
-              queryClient.invalidateQueries({ queryKey: planKeys.detail(planId) }),
-              new Promise<void>((resolve) => setTimeout(resolve, DETAIL_REFETCH_WAIT_MS)),
-            ])
-
-            showToast({
-              message: fillTemplate(
-                startTime === null
-                  ? messages.plan.itemTimeClearedToast
-                  : messages.plan.itemTimeSavedToast,
-                { title: target.title },
-              ),
-            })
-            onSaved?.()
-          },
-          (cause: unknown) => setFailure({ planItemId, error: toItemStartTimeError(cause) }),
-        )
+      void runItemTimeSave({
+        change: () => changeItemStartTime(planId, planItemId, startTime),
+        afterChanged: () => {
+          // 바뀐 시각이 곧 그 항목의 판정 입력이다 (D15-6). 따로 받는 절이라 기다리지 않는다
+          void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(planId) })
+          // 브리핑의 첫/마지막 항목 시각이 이 값이다 (#1055). 별도 화면이라 기다리지 않는다
+          void invalidatePlanBriefing(queryClient, planId)
+          /*
+            **판정(`planKeys.weather`)은 무효화하지 않는다.** 일자 판정은 항목 구성·순서(첫 장소
+            항목)로 계산되고 시각을 읽지 않는다(`PlanWeatherProcessor` 실측) — 방문 체크와
+            같은 판단이다. 일괄 교체 시절에는 교체라서 무효화했다.
+          */
+        },
+        refetchDetail: () => queryClient.invalidateQueries({ queryKey: planKeys.detail(planId) }),
+        waitCap: () => new Promise<void>((resolve) => setTimeout(resolve, DETAIL_REFETCH_WAIT_MS)),
+      })
+        .then((result) => {
+          if (result.kind === 'failed') {
+            setFailure({ planItemId, error: result.error })
+            return
+          }
+          /*
+            `saving` 이 풀리기(아래 `finally`) **전에** 넣는다 — 둘 사이에 잠금이 비는 렌더가 없게.
+            재조회가 이미 끝났어도 넣고 곧바로 뺀다. 같은 일자가 여러 번 들 수 있어 하나씩 뺀다.
+          */
+          setRefetchingDays((current) => [...current, day])
+          void result.refetched.then(() =>
+            setRefetchingDays((current) => {
+              const index = current.indexOf(day)
+              return index === -1 ? current : current.filter((_, at) => at !== index)
+            }),
+          )
+          showToast({
+            message: fillTemplate(
+              startTime === null
+                ? messages.plan.itemTimeClearedToast
+                : messages.plan.itemTimeSavedToast,
+              { title: target.title },
+            ),
+          })
+          onSaved?.()
+        })
         .finally(() => {
           savingRef.current = false
           setSaving(false)
@@ -140,5 +161,5 @@ export function usePlanItemTime({
   /** 모달을 닫거나 다른 항목으로 열 때 지난 실패를 걷는다 */
   const clearFailure = useCallback(() => setFailure(null), [])
 
-  return { save, saving, failure, clearFailure }
+  return { save, saving, refetchingDays, failure, clearFailure }
 }
