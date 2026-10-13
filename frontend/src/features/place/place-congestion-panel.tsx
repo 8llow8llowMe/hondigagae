@@ -16,6 +16,7 @@ import {
 } from '@/lib/insight/congestion'
 import { congestionTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
+import { pickTripCongestions } from '@/lib/place/plan-context'
 import { INSET_BLEED_END_CLASS, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { DailyCongestionItem, PlaceCongestionResponse } from '@/types/insight'
@@ -35,6 +36,11 @@ export type PlaceCongestionPanelProps = {
   /** 지금 보고 있는 기간 */
   days: CongestionDays
   onDaysChange: (days: CongestionDays) => void
+  /**
+   * 일정에서 들어왔을 때의 여행 날짜 (#1429 · 장소상세-세부명세 D1-5). 있으면 **받아 둔
+   * 기간에서 여행일만 골라** `가장 덜 붐비는 날` 보다 먼저 보여 준다. 없으면 지금 동작이다.
+   */
+  tripDates?: string[] | null
 }
 
 /**
@@ -69,6 +75,7 @@ export function PlaceCongestionPanel({
   onRetry,
   days,
   onDaysChange,
+  tripDates = null,
 }: PlaceCongestionPanelProps) {
   /*
     **자료가 0건이면 기간을 제시하지 않는다** (#731). `8.29 – 9.27` 이 남으면 카드가
@@ -134,6 +141,7 @@ export function PlaceCongestionPanel({
         onRetry={onRetry}
         days={days}
         onDaysChange={onDaysChange}
+        tripDates={tripDates}
       />
     </div>
   )
@@ -147,6 +155,7 @@ function PanelBody({
   onRetry,
   days,
   onDaysChange,
+  tripDates = null,
 }: PlaceCongestionPanelProps) {
   if (loading) return <BodySkeleton />
 
@@ -188,6 +197,10 @@ function PanelBody({
 
   return (
     <>
+      {tripDates !== null && (
+        <TripDays items={pickTripCongestions(data.dailyCongestions, tripDates)} />
+      )}
+
       <LeastCrowded item={data.leastCrowded} items={data.dailyCongestions} />
 
       <Chart items={data.dailyCongestions} pickedDate={data.leastCrowded.date} days={days} />
@@ -392,6 +405,53 @@ function LeastCrowded({
       {item.concentrationRate !== null && (
         <RateLine concentrationRate={item.concentrationRate} items={items} />
       )}
+    </div>
+  )
+}
+
+/**
+ * 내 여행일 — 일정에서 들어왔을 때만 선다 (#1429 · 장소상세-세부명세 D1-5).
+ *
+ * **받아 둔 날짜별 혼잡도에서 고를 뿐이다** — 새로 조회하지 않고, FE 가 날을 추천하지도 않는다.
+ * 서버가 고른 `가장 덜 붐비는 날` 은 그대로 아래에 남는다: 여행일이 붐비면 다른 날을 볼
+ * 근거가 되고, 둘을 나란히 두면 사용자가 스스로 견준다.
+ *
+ * **받은 기간과 겹치는 여행일이 없으면 자리를 만들지 않는다.** 예측 범위(30일) 밖이거나
+ * 이미 지난 여행이다 — "모른다" 를 빈 상자로 말하면 한산하다고 읽힌다.
+ *
+ * **`UNKNOWN` 날도 빼지 않는다** — 막대 차트가 모르는 날을 남기는 이유와 같다. 등급은 서버
+ * `level.name` 그대로다.
+ *
+ * `LeastCrowded` 와 **같은 면(`--band`)** 이다 — 둘 다 "갈 날" 이야기라 같은 그릇에 담는다.
+ */
+function TripDays({ items }: { items: DailyCongestionItem[] }) {
+  if (items.length === 0) return null
+
+  return (
+    <div className="bg-band flex flex-col gap-2 rounded-md p-3">
+      <span className="text-caption text-fg-muted font-semibold">
+        {messages.place.detailCongestionTripLabel}
+      </span>
+      <ul className="flex flex-col gap-2">
+        {items.map((item) => {
+          const parts = splitDay(item.date)
+          if (parts === null) return null
+
+          return (
+            <li key={item.date} className="flex items-center justify-between gap-3">
+              <span className="text-body-2 text-fg font-semibold tabular-nums">
+                {messages.place.detailCongestionLeastDay
+                  .replace('{month}', parts.month)
+                  .replace('{day}', parts.day)
+                  .replace('{weekday}', parts.weekday)}
+              </span>
+              <MetricBadge tone={congestionTone(item.level.code)} size="sm" axis="congestion">
+                {item.level.name}
+              </MetricBadge>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }
@@ -649,6 +709,11 @@ function DaysToggle({
 }: {
   days: CongestionDays
   onDaysChange: (days: CongestionDays) => void
+  /**
+   * 일정에서 들어왔을 때의 여행 날짜 (#1429 · 장소상세-세부명세 D1-5). 있으면 **받아 둔
+   * 기간에서 여행일만 골라** `가장 덜 붐비는 날` 보다 먼저 보여 준다. 없으면 지금 동작이다.
+   */
+  tripDates?: string[] | null
 }) {
   const isMonth = days === CONGESTION_DAYS.month
 

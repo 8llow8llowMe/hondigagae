@@ -17,8 +17,18 @@ import type { PlaceDetail } from '@/types/place'
  * 정본: `docs/features/place/장소상세-판정요약-세부명세.md` D4 · D7.
  */
 
-type WalkSource = { data: WalkSafetyResponse | null; loading: boolean; failed: boolean }
-type CongestionSource = { data: PlaceCongestionResponse | null; loading: boolean; failed: boolean }
+type WalkSource = {
+  data: WalkSafetyResponse | null
+  loading: boolean
+  failed: boolean
+  tripDate?: string | null
+}
+type CongestionSource = {
+  data: PlaceCongestionResponse | null
+  loading: boolean
+  failed: boolean
+  tripDate?: string | null
+}
 
 const walkOk: WalkSource = { data: walkSafetyFixture, loading: false, failed: false }
 const walkLoading: WalkSource = { data: null, loading: true, failed: false }
@@ -258,5 +268,44 @@ describe('verdictSummaryLines — 순서와 앵커', () => {
       VERDICT_ANCHOR.walk,
       VERDICT_ANCHOR.congestion,
     ])
+  })
+})
+
+/**
+ * 일정에서 들어왔을 때 (#1429 · 장소상세-세부명세 D1-5).
+ */
+describe('verdictSummaryLines — 일정 기준 (#1429)', () => {
+  it('산책 줄 라벨이 `여행일 산책` 이다', () => {
+    const labels = labelsOf(placeDetail, { ...walkOk, tripDate: '2026-09-06' })
+
+    expect(labels).toContain(messages.place.detailSummaryWalkTripLabel)
+    expect(labels).not.toContain(messages.place.detailSummaryWalkLabel)
+  })
+
+  it('그 여행일의 붐빔을 `덜 붐비는 날` 대신 말한다', () => {
+    const congestion = { ...congestionOk, tripDate: '2026-09-06' }
+
+    expect(labelsOf(placeDetail, walkOk, congestion)).not.toContain(
+      messages.place.detailSummaryCongestionLabel,
+    )
+    expect(
+      valueOf(messages.place.detailSummaryCongestionTripLabel, placeDetail, walkOk, congestion),
+    ).toBe('9월 6일 (일) · 보통')
+  })
+
+  it('여행일을 모르면(UNKNOWN) `덜 붐비는 날` 로 물러선다', () => {
+    const congestion = { ...congestionOk, tripDate: '2026-09-04' }
+
+    expect(labelsOf(placeDetail, walkOk, congestion)).toContain(
+      messages.place.detailSummaryCongestionLabel,
+    )
+  })
+
+  it('여행일이 받은 기간 밖이면 `덜 붐비는 날` 로 물러선다', () => {
+    const congestion = { ...congestionOk, tripDate: '2026-11-06' }
+
+    expect(labelsOf(placeDetail, walkOk, congestion)).toContain(
+      messages.place.detailSummaryCongestionLabel,
+    )
   })
 })

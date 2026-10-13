@@ -488,6 +488,7 @@ export function PlanDetailSection({
           <PlanDaySection
             key={group.day}
             day={group.day}
+            planId={plan.planId}
             date={addPlanDays(plan.startDate, group.day - 1)}
             rows={toItemRows(group.items, lodgingBasisFor(group.day, days))}
             places={places}

@@ -643,6 +643,35 @@ describe('PlanItemRow — WALK 항목 (#620)', () => {
 })
 
 /**
+ * 장소 링크의 일정 맥락 (#1429 · 장소상세-세부명세 D1-5).
+ *
+ * 장소 상세가 이 일정의 반려견 · 여행일로 판정하려면 링크가 일정과 일차를 실어야 한다.
+ */
+describe('PlanItemRow — 장소 링크의 일정 맥락 (#1429)', () => {
+  const model: PlanItemRowModel = {
+    item: planDetail.items[0]!,
+    distanceMeters: null,
+    distanceKind: null,
+  }
+
+  it('planId 를 받으면 ?plan=&day= 를 싣는다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(PlanItemRow, { model, planId: planDetail.planId }),
+    )
+
+    expect(markup).toContain(
+      `/places/${planDetail.items[0]!.targetId}?plan=${planDetail.planId}&amp;day=${planDetail.items[0]!.day}`,
+    )
+  })
+
+  it('planId 가 없으면 맨 주소다 — 기간 밖 항목 섹션', () => {
+    const markup = renderToStaticMarkup(createElement(PlanItemRow, { model }))
+
+    expect(markup).toContain(`href="/places/${planDetail.items[0]!.targetId}"`)
+  })
+})
+
+/**
  * 반려견 특성이 이 항목 판정에만 빠진 경우 (#717 · #758).
  *
  * **행은 일자와 어긋날 때만 말한다.** 일자 판정 자리(`PlanDayVerdict`)가 이미 기준을

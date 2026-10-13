@@ -60,8 +60,23 @@ export function suitabilityPath(placeId: string, condition: PetCondition | null)
   return paths.places.suitability(placeId, toInsightQuery(condition))
 }
 
-export function walkSafetyPath(placeId: string, condition: PetCondition | null): string {
-  return paths.places.walkSafety(placeId, toInsightQuery(condition))
+/**
+ * 산책 위험도 (#197).
+ *
+ * **`targetDate` 는 일정에서 들어왔을 때만 싣는다** (#1429 · 장소상세-세부명세 D1-5). 서버는
+ * 오늘이면 지금, 다른 날이면 14시 기준으로 판정한다(`PlaceInsightWebController` 실측). 그 밖의
+ * 진입에서는 보내지 않는다 — FE 가 오늘을 만들면 브라우저 타임존이 KST 가 아닌 사용자에게
+ * 어제가 나간다(권역 비교와 같은 판단).
+ */
+export function walkSafetyPath(
+  placeId: string,
+  condition: PetCondition | null,
+  targetDate: string | null = null,
+): string {
+  return paths.places.walkSafety(
+    placeId,
+    toInsightQuery(condition, targetDate === null ? {} : { targetDate }),
+  )
 }
 
 /**

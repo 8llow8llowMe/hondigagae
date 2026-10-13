@@ -26,17 +26,30 @@ import type { PetCondition, WalkSafetyResponse } from '@/types/insight'
  * 반영하지 않은 일반 판정이 온다 — 노면 온도·열지수는 장소와 시각의 속성이라 반려견이
  * 없어도 값 자체가 참이다 (적합도의 점수와 다른 점이다).
  */
-export function usePlaceWalkSafety(placeId: string, condition: PetCondition | null) {
+export function usePlaceWalkSafety(
+  placeId: string,
+  condition: PetCondition | null,
+  options: {
+    /** 일정에서 들어왔을 때의 날짜 (#1429). `null` 이면 서버가 오늘 · 지금으로 잡는다 */
+    targetDate?: string | null
+    /**
+     * 기준이 아직 정해지지 않았으면 끈다 (#1429) — 일정 · 반려견 목록을 읽는 동안 헤더의
+     * 반려견으로 먼저 부르면 요청이 두 번 나가고 판정이 한 번 뒤바뀐다.
+     */
+    ready?: boolean
+  } = {},
+) {
+  const targetDate = options.targetDate ?? null
   /*
     **형식이 틀린 `placeId` 면 켜지 않는다** (#496). 컨트롤러가 `@PathVariable long` 이라
     답이 400 으로 정해져 있다. 라우트가 이미 그런 주소를 가르지만, **이 훅이 다른 곳에서도
     불릴 수 있어** 여기서도 잠근다 — 가드가 한쪽에만 있으면 새 진입로가 조용히 400 을 낸다.
   */
-  const enabled = isPlaceId(placeId)
+  const enabled = isPlaceId(placeId) && (options.ready ?? true)
 
   return useQuery({
-    queryKey: insightKeys.walkSafety(placeId, conditionKey(condition)),
-    queryFn: () => clientFetch<WalkSafetyResponse>(walkSafetyPath(placeId, condition)),
+    queryKey: insightKeys.walkSafety(placeId, conditionKey(condition), targetDate),
+    queryFn: () => clientFetch<WalkSafetyResponse>(walkSafetyPath(placeId, condition, targetDate)),
     placeholderData: (previous) => previous,
     enabled,
     ...INSIGHT_QUERY_OPTIONS,

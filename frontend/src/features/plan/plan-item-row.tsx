@@ -12,6 +12,7 @@ import { isLongTrip } from '@/lib/geo/distance'
 import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
+import { placeHrefFromPlan } from '@/lib/place/plan-context'
 import { isPlaceTarget, type PlanItemRowModel } from '@/lib/plan/detail'
 import { planItemIllustration } from '@/lib/plan/illustration'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
@@ -151,8 +152,14 @@ export function PlanItemRow({
   dayPetConditionApplied = false,
   time,
   timeIssue = null,
+  planId,
 }: {
   model: PlanItemRowModel
+  /**
+   * 이 항목이 속한 일정 (#1429). 있으면 장소 링크에 `?plan=&day=` 가 실린다 — 장소 상세가
+   * 그 일정의 반려견 · 여행일로 판정한다 (장소상세-세부명세 D1-5).
+   */
+  planId?: string | undefined
   /** 없으면 토글이 렌더되지 않는다 — 기간 밖 항목 섹션이 그 경로다 */
   visit?: PlanItemVisit
   /** 없으면 칩 대신 시각 캡션이다 — 기간 밖 항목 섹션이 그 경로다 (#1028) */
@@ -230,7 +237,16 @@ export function PlanItemRow({
     **`targetId` 가 있다고 링크하지 않는다.** `WALK` 의 `targetId` 는 `walk_course.id`
     라 `/places/{id}` 로 보내면 남의 id 로 404 를 만든다 — 보강 대상과 같은 판정을 쓴다.
   */
-  const href = isPlaceTarget(item) ? `/places/${item.targetId as string}` : null
+  /*
+    **일정 맥락(`?plan=&day=`)을 싣는다** (#1429) — 장소 상세가 이 일정의 반려견 · 여행일로
+    판정한다. `planId` 를 받지 않은 사용처(기간 밖 항목 섹션)는 맨 주소다.
+  */
+  const href = isPlaceTarget(item)
+    ? placeHrefFromPlan(
+        item.targetId as string,
+        planId === undefined ? null : { planId, day: item.day },
+      )
+    : null
 
   /*
     **산책 위험도 · 체감온도 조각** (D15-5). 시각 캡션과 시간 칩 줄(#1028) 두 갈래가 같은

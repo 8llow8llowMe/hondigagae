@@ -31,8 +31,22 @@ export type VerdictSummaryLine = {
   anchorId: string
 }
 
-type WalkSource = { data: WalkSafetyResponse | null; loading: boolean; failed: boolean }
-type CongestionSource = { data: PlaceCongestionResponse | null; loading: boolean; failed: boolean }
+/**
+ * `tripDate` 는 일정에서 들어왔을 때의 날짜다 (#1429 · 장소상세-세부명세 D1-5). 없으면 지금
+ * 동작 그대로다 — 기존 호출부는 넘기지 않아도 된다.
+ */
+type WalkSource = {
+  data: WalkSafetyResponse | null
+  loading: boolean
+  failed: boolean
+  tripDate?: string | null
+}
+type CongestionSource = {
+  data: PlaceCongestionResponse | null
+  loading: boolean
+  failed: boolean
+  tripDate?: string | null
+}
 
 /**
  * 동반 줄 — **언제나 선다.** `place` 가 없으면 이 화면 자체가 렌더되지 않는다.
@@ -64,7 +78,11 @@ function petLine(place: PlaceDetail): VerdictSummaryLine {
  * (`PlaceWalkSafetyPanel` 이 hero 자리를 비우는 것과 같은 근거).
  */
 function walkLine(walk: WalkSource): VerdictSummaryLine | null {
-  const label = messages.place.detailSummaryWalkLabel
+  // 일정에서 들어왔으면 판정이 "지금" 이 아니라 그 여행일의 것이다 — 패널 라벨과 같은 말을 쓴다
+  const label =
+    (walk.tripDate ?? null) === null
+      ? messages.place.detailSummaryWalkLabel
+      : messages.place.detailSummaryWalkTripLabel
 
   if (walk.loading) return { label, value: null, anchorId: VERDICT_ANCHOR.walk }
   if (walk.failed || walk.data === null) return null
@@ -100,6 +118,9 @@ function congestionLine(congestion: CongestionSource): VerdictSummaryLine | null
 
   if (congestion.loading) return { label, value: null, anchorId: VERDICT_ANCHOR.congestion }
 
+  const trip = tripCongestionLine(congestion)
+  if (trip !== null) return trip
+
   const least = congestion.data?.leastCrowded ?? null
   if (congestion.failed || least === null) return null
 
@@ -116,6 +137,35 @@ function congestionLine(congestion: CongestionSource): VerdictSummaryLine | null
     .replace('{grade}', least.level.name)
 
   return { label, value, anchorId: VERDICT_ANCHOR.congestion }
+}
+
+/**
+ * 여행일 붐빔 줄 (#1429). **그 여행일을 알 때만 선다** — 받은 기간에 그날이 없거나 `UNKNOWN`
+ * 이면 `null` 이고, 호출부는 지금 동작(`덜 붐비는 날`)으로 물러선다. 모르는 날을 이 줄에
+ * 세우면 "여행일 붐빔 · 모름" 이 한눈 요약을 차지하고 서버가 고른 날을 밀어낸다.
+ */
+function tripCongestionLine(congestion: CongestionSource): VerdictSummaryLine | null {
+  const tripDate = congestion.tripDate ?? null
+  if (tripDate === null || congestion.failed || congestion.data === null) return null
+
+  const item = congestion.data.dailyCongestions.find((entry) => entry.date === tripDate)
+  if (item === undefined || item.level.code === 'UNKNOWN') return null
+
+  const parts = splitDay(item.date)
+  if (parts === null) return null
+
+  const day = messages.place.detailCongestionLeastDay
+    .replace('{month}', parts.month)
+    .replace('{day}', parts.day)
+    .replace('{weekday}', parts.weekday)
+
+  return {
+    label: messages.place.detailSummaryCongestionTripLabel,
+    value: messages.place.detailSummaryCongestionValue
+      .replace('{day}', day)
+      .replace('{grade}', item.level.name),
+    anchorId: VERDICT_ANCHOR.congestion,
+  }
 }
 
 /** 세 줄을 순서대로. 만들지 않기로 한 줄은 빠진다 — **동반 줄은 언제나 남는다** */
