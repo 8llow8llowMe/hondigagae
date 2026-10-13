@@ -8,7 +8,7 @@ import { PlanStatusBadge } from '@/features/plan/plan-status-badge'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { deletedCompanionLabel, type PlanCompanions } from '@/lib/plan/companion-pets'
-import { formatPlanDateRangeCompact, planPhaseOf } from '@/lib/plan/date'
+import { formatPlanDateRangeCompact, tripPhaseOf } from '@/lib/plan/date'
 import { planPhaseLabel, planPhaseNote } from '@/lib/plan/phase-text'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -103,8 +103,13 @@ export function PlanOverviewPanel({
     **여기만 `여행 중` 이 아니라 `오늘 4일차` 를 쓴다.** 이 줄은 배지 기둥이 아니라 설명
     줄이고, 바로 아래에 `총 4일` 이 서 있어 며칠째인지가 붙어야 두 값이 서로를 설명한다.
     목록·홈과 어긋난 말이 아니라 **같은 판정에서 나온 더 자세한 말**이다.
+
+    **출발 당일도 `오늘 1일차` 다** (#1446 · 명세 D28). 목록(#1433)과 같은 `tripPhaseOf` 를
+    쓴다 — 예전에는 여기만 `planPhaseOf` 라 같은 날을 목록은 `여행 중`, 상세는 `D-DAY` 로 불렀다.
+    **이 자리는 표기만 바꾼다.** `여행 완료하기` 자리 · `다녀옴` 토글 · 준비물 승격은 부모
+    (`plan-detail-section.tsx`)가 `planPhaseOf` 로 따로 셈하고, 그 판정은 그대로다.
   */
-  const phase = planPhaseOf(plan.startDate, plan.endDate, today)
+  const phase = tripPhaseOf(plan.startDate, plan.endDate, today)
   const phaseText = planPhaseNote(phase) ?? planPhaseLabel(phase)
 
   return (

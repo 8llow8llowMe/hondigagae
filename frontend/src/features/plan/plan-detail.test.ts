@@ -652,6 +652,37 @@ describe('PlanOverviewPanel', () => {
     expect(markup).not.toMatch(/D-\d/)
   })
 
+  /*
+    #1446 · 명세 D28. 목록(#1433)은 출발 당일을 `여행 중 · 오늘 1일차` 라 부르는데 상세만
+    `D-DAY` 였다. 개요의 표기는 `tripPhaseOf` 를 따른다 — 액션 자리 판정(`planPhaseOf`)은 그대로다.
+  */
+  it('출발 당일은 D-DAY 가 아니라 오늘 1일차다 — 목록과 같은 날을 같은 말로 부른다', () => {
+    const markup = renderOverview({
+      plan: { ...planDetail, startDate: '2026-09-01', endDate: '2026-09-03' },
+    })
+
+    expect(markup).toContain('오늘 1일차')
+    expect(markup).not.toContain(messages.plan.ddayToday)
+  })
+
+  it('당일치기도 그날은 오늘 1일차다', () => {
+    const markup = renderOverview({
+      plan: { ...planDetail, startDate: '2026-09-01', endDate: '2026-09-01', totalDays: 1 },
+    })
+
+    expect(markup).toContain('오늘 1일차')
+    expect(markup).not.toContain(messages.plan.ddayToday)
+  })
+
+  it('출발 전날은 여전히 D-1 이다', () => {
+    const markup = renderOverview({
+      plan: { ...planDetail, startDate: '2026-09-02', endDate: '2026-09-04' },
+    })
+
+    expect(markup).toContain('D-1')
+    expect(markup).not.toContain('오늘 ')
+  })
+
   it('서버가 모르는 상태 코드를 내려도 이름 그대로 초안처럼 그린다 (공통명세 S7)', () => {
     const markup = renderOverview({
       plan: {

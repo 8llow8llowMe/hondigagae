@@ -294,8 +294,9 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     /*
       ── 완료로 민다 ───────────────────────────────────────────────────────
 
-      **출발 당일의 `여행 완료하기` 는 메뉴 안이다** (#732 · #971). `planPhaseOf` 가 D-DAY 를
+      **출발 당일의 `여행 완료하기` 는 메뉴 안이다** (#732 · #971). `planPhaseOf` 가 출발 당일을
       아직 upcoming 에 두므로 전폭 버튼으로는 올리지 않고, 서버가 허용하므로 메뉴에는 있다.
+      개요 표기만 그날을 `오늘 1일차` 로 부른다 (#1446 · `tripPhaseOf`) — 액션 자리는 그대로다.
     */
     await page.getByRole('button', { name: '일정 확정하기' }).click()
     await expect(page.getByRole('button', { name: '여행 완료하기' })).toHaveCount(0)
