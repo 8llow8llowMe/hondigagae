@@ -6,6 +6,7 @@ import { formatDistance } from '@/lib/format/distance'
 import { isLongTrip } from '@/lib/geo/distance'
 import { messages } from '@/lib/messages'
 import { planItemIllustration } from '@/lib/plan/illustration'
+import { travelDurationLabel } from '@/lib/plan/travel-time'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { AiPlanScheduleItem } from '@/types/ai-plan'
@@ -192,6 +193,9 @@ export function AiPlanDraftItemRow({
  *
  * **기준 문구가 `숙소에서` 로 갈리지 않는다** — 초안은 직전 항목만 기준으로 삼는다
  * (`draft-distance.ts` 주석).
+ *
+ * **`{duration}` 도 치환한다** (#1471). 문구가 이동 시간을 함께 말하게 바뀐 뒤(#1426) 여기만
+ * `{distance}` 를 치환해 자리표시자가 그대로 보였다. 값은 담기 시각을 잇는 근사와 같은 함수다.
  */
 function DraftItemDistance({ meters }: { meters: number | null }) {
   if (meters === null) return null
@@ -205,7 +209,9 @@ function DraftItemDistance({ meters }: { meters: number | null }) {
         long ? 'text-metric-low-700' : 'text-fg-muted',
       )}
     >
-      {messages.plan.distanceFromPrevious.replace('{distance}', formatDistance(meters))}
+      {messages.plan.distanceFromPrevious
+        .replace('{distance}', formatDistance(meters))
+        .replace('{duration}', travelDurationLabel(meters))}
       {long && messages.plan.longTripSuffix}
     </p>
   )

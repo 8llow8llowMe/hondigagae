@@ -164,6 +164,14 @@ describe('AiPlanDraftPreview — 직선거리 (이슈 #100)', () => {
     expect(withCoords()).toMatch(/직선 \d+m 이동/)
   })
 
+  it('이동 시간까지 치환한다 — 자리표시자가 그대로 보이지 않는다 (#1471)', () => {
+    const html = withCoords()
+
+    // 앞부분만 보는 단언은 `· 약 {duration}` 이 남아도 통과했다 — 문장 끝까지 맞춘다
+    expect(html).toMatch(/직선 \d+m 이동 · 약 10분/)
+    expect(html).not.toMatch(/\{(distance|duration)\}/)
+  })
+
   it('"직선" 이라고 말한다 — 주행거리로 읽히면 안 된다 (일정 상세와 같은 문구)', () => {
     const html = withCoords()
 
