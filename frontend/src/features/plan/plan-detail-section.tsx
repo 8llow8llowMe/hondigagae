@@ -318,8 +318,12 @@ export function PlanDetailSection({
     **상태 전이 액션의 자리를 한 번만 셈한다** (#732). 전폭 버튼과 `⋮` 메뉴가 같은 결과를
     나눠 받는다 — 각자 판정하면 같은 액션이 둘 다에 서거나 어느 쪽에도 없는 날이 생긴다.
 
-    시점 축은 `planPhaseOf` 하나다. 개요 배지·일자 배지·준비물 자리가 전부 같은 `PlanPhase`
-    에서 나오므로, 여기만 다른 셈을 쓰면 배지는 `D-1` 인데 버튼은 여행이 시작된 것처럼 군다.
+    시점 축은 `planPhaseOf` 하나다. 일자 배지·준비물 자리가 전부 같은 `PlanPhase` 에서
+    나오므로, 여기만 다른 셈을 쓰면 배지는 `D-1` 인데 버튼은 여행이 시작된 것처럼 군다.
+
+    **개요의 표기만 출발 당일을 `오늘 1일차` 로 접는다** (`tripPhaseOf`, #1446 · 명세 D28).
+    그것은 `planPhaseOf` 결과를 한 번 접은 값이라 D-1 이전 · 여행 중 · 지난 일정에서는 이
+    셈과 같은 답이고, 갈리는 날은 출발 당일 하나다 — 그날 `여행 완료하기` 는 여전히 메뉴다.
   */
   const phase = planPhaseOf(plan.startDate, plan.endDate, today)
   const statusLayout = planStatusActionLayout(plan.status.code, phase)
