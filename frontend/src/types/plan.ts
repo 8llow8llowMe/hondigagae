@@ -203,6 +203,9 @@ export const PAST_DATE_REASON_CODE = 'PAST_DATE'
  * 예보 범위 밖의 날 (#1426). **일자 카드가 문장을 말하지 않는다** — 날마다 같은 문장이라
  * 일정 상단에서 한 번만 말하고(`planForecastNotice`) 일자에는 `예보 전` 칩만 붙는다.
  * 문장 자체는 서버 것을 쓴다 — 예보 범위(11일)는 서버 상수다.
+ *
+ * **항목 산책 위험도(`lib/plan/walk-safety.ts`)도 이 상수를 쓴다** (#1491) — 같은 문자열을
+ * 두 곳에 두지 않는다. 타입 계층에 두는 이유는 `lib` 가 `types` 를 읽고 그 반대는 없어서다.
  */
 export const BEYOND_FORECAST_RANGE_REASON_CODE = 'BEYOND_FORECAST_RANGE'
 
