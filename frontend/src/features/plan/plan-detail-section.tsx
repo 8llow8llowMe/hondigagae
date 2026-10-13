@@ -33,6 +33,7 @@ import { messages } from '@/lib/messages'
 import { basisPetNameOf } from '@/lib/plan/basis-pet'
 import { initialClockTime, toClockTime } from '@/lib/plan/clock-time'
 import type { PlanCompanions } from '@/lib/plan/companion-pets'
+import { planConfirmCheck } from '@/lib/plan/confirm-check'
 import { addPlanDays, planPhaseOf } from '@/lib/plan/date'
 import { placeIdsOf } from '@/lib/plan/day-items'
 import {
@@ -423,6 +424,8 @@ export function PlanDetailSection({
               saving={status.saving}
               failure={status.failure}
               result={status.result}
+              // 확정 전 점검 (#1425 · D26) — 기간 밖 항목은 고치러 갈 일자가 없어 넣지 않는다
+              confirmCheck={planConfirmCheck(days)}
               onAction={status.run}
             />
           }
