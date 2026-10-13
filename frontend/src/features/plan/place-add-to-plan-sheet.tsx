@@ -30,6 +30,7 @@ import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
 import { addPlanDays } from '@/lib/plan/date'
 import {
+  type AddedPlace,
   addPlaceToastMessage,
   appendPlaceItemPayload,
   insertedItemStartTime,
@@ -63,7 +64,7 @@ export function PlaceAddToPlanSheet({
 }: {
   open: boolean
   onClose: () => void
-  place: { placeId: string; title: string }
+  place: AddedPlace
   /** 담기에 성공했다. 호출부가 하단 바 라벨을 `다른 일정에도 담기` 로 바꾼다 */
   onAdded: () => void
 }) {
@@ -119,7 +120,7 @@ function SelectPlanStep({
 }: {
   open: boolean
   onClose: () => void
-  place: { placeId: string; title: string }
+  place: AddedPlace
   onAdded: () => void
   onCreate: () => void
 }) {
@@ -223,7 +224,7 @@ function CreatePlanStep({
   onAdded,
   onClose,
 }: {
-  place: { placeId: string; title: string }
+  place: AddedPlace
   onAdded: () => void
   onClose: () => void
 }) {
@@ -265,7 +266,7 @@ function CreatePlanForm({
   onClose,
 }: {
   pets: NonNullable<ReturnType<typeof usePetList>['data']>['pets']
-  place: { placeId: string; title: string }
+  place: AddedPlace
   onAdded: () => void
   onClose: () => void
 }) {
@@ -335,7 +336,7 @@ function useAddPlaceToPlan({
   onAdded,
   onClose,
 }: {
-  place: { placeId: string; title: string }
+  place: AddedPlace
   onAdded: () => void
   onClose: () => void
 }) {

@@ -31,7 +31,7 @@ import {
   addPlaceListBasis,
   addPlaceNearbyCaption,
 } from '@/lib/plan/add-place-focus'
-import { itemInsertIndex, placeIdsOf } from '@/lib/plan/day-items'
+import { itemInsertIndex, placeIdsOf, placeItemTypeOf } from '@/lib/plan/day-items'
 import { groupItemsByDay } from '@/lib/plan/detail'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { PLAN_ADD_DEFAULT_VIEW, type ViewMode, viewModeHref } from '@/lib/url/view-mode'
@@ -296,7 +296,12 @@ export function PlanAddPlaceView({
       day,
       // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
       dayItems: group.items,
-      place: { placeId: selected.placeId, title: selected.title },
+      // 음식점은 식사(`MEAL`)로 담는다 — 확정 전 점검이 끼니로 센다 (#1447 · 일정상세 D26-5)
+      place: {
+        placeId: selected.placeId,
+        title: selected.title,
+        itemType: placeItemTypeOf(selected),
+      },
     })
   }
 

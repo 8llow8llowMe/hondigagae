@@ -43,9 +43,9 @@ const OUTING_TYPES: ReadonlySet<string> = new Set(['PLACE', 'MEAL', 'WALK'])
 /**
  * 식사 판정은 **`itemType.code` 하나**다. 한국어 `name` 으로 가르지 않는다 (api-integration-guide §6).
  *
- * 알려진 한계: `장소 추가` 로 담은 음식점은 `PLACE` 로 저장되고(`appendPlaceItemPayload`) 상세의
- * `place` 에는 `contentType` 이 없어 음식점인지 알 수 없다 — 그런 날은 식사가 있어도 시트에 선다.
- * 시트는 막지 않고 묻기만 하므로 값은 한 번 더 누르는 것이다 (명세 D26-5).
+ * 상세의 `place` 에는 `contentType` 이 없어 여기서 음식점을 가를 수 없다 — 그래서 **담는 쪽이 음식점을
+ * `MEAL` 로 싣는다** (`placeItemTypeOf` · `appendPlaceItemPayload`, #1447 · 명세 D26-5). 실내 대안 담기만
+ * 장소 유형을 몰라 `PLACE` 로 남는다.
  */
 const MEAL_TYPE = 'MEAL'
 

@@ -13,6 +13,7 @@ import {
   itemInsertIndex,
   moveEditItem,
   placeIdsOf,
+  placeItemTypeOf,
   planDayItemsPayload,
   survivingItems,
   toEditItems,
@@ -312,7 +313,11 @@ describe('placeIdsOf — 같은 일자 중복 담기 판정 (#82)', () => {
 })
 
 describe('appendPlaceItemPayload — 장소 담기 (#82)', () => {
-  const place = { placeId: '212481712381923350', title: '오설록 티뮤지엄' }
+  const place = {
+    placeId: '212481712381923350',
+    title: '오설록 티뮤지엄',
+    itemType: 'PLACE',
+  } as const
 
   it('기존 항목을 전부 되싣고 새 항목을 맨 끝에 붙인다 — 일괄 교체다', () => {
     const payload = appendPlaceItemPayload(ITEMS, 2, place)
@@ -405,8 +410,16 @@ describe('appendPlaceItemPayload — 장소 담기 (#82)', () => {
     expect(JSON.stringify(added)).toContain(`"targetId":"${place.placeId}"`)
   })
 
-  it('itemType 이 PLACE 고정이다 — 유형 선택 UI 가 없다 (F3)', () => {
+  it('itemType 은 호출부가 판정해 넘긴 값 그대로다 — 장소는 PLACE (#1447)', () => {
     expect(appendPlaceItemPayload([], 1, place).items[0]?.itemType).toBe('PLACE')
+  })
+
+  it('음식점은 MEAL 로 싣는다 — targetId 계약은 PLACE 와 같다 (#1447)', () => {
+    const meal = { placeId: BIG_ID, title: '오롬마르', itemType: 'MEAL' } as const
+    const added = appendPlaceItemPayload(ITEMS, 2, meal).items.at(-1)
+
+    expect(added?.itemType).toBe('MEAL')
+    expect(added?.targetId).toBe(BIG_ID)
   })
 
   it('day 를 경로값 그대로 싣는다 — @Min(1) 이 덮어쓰기보다 먼저 돈다', () => {
@@ -417,7 +430,7 @@ describe('appendPlaceItemPayload — 장소 담기 (#82)', () => {
 
   it('title 이 100자를 넘으면 잘라서 보낸다 — 서버는 자르지 않고 PLAN_100 을 낸다', () => {
     const long = 'ㄱ'.repeat(150)
-    const added = appendPlaceItemPayload([], 1, { placeId: place.placeId, title: long }).items[0]
+    const added = appendPlaceItemPayload([], 1, { ...place, title: long }).items[0]
 
     expect(added?.title).toHaveLength(ITEM_TITLE_MAX)
   })
@@ -711,7 +724,11 @@ describe('itemInsertIndex · 담기 자리 — 끝에 붙은 숙박 앞 (#1175)'
       targetId: '212481712381923399',
       itemType: { code: 'LODGING', name: '숙박', description: null },
     })
-  const place = { placeId: '212481712381923350', title: '오설록 티뮤지엄' }
+  const place = {
+    placeId: '212481712381923350',
+    title: '오설록 티뮤지엄',
+    itemType: 'PLACE',
+  } as const
 
   it('숙박이 없으면 맨 끝이다 — 예전 동작 그대로', () => {
     expect(itemInsertIndex(ITEMS)).toBe(ITEMS.length)
@@ -767,5 +784,25 @@ describe('itemInsertIndex · 담기 자리 — 끝에 붙은 숙박 앞 (#1175)'
     const payload = appendMoveItemPayload([...ITEMS, lodging('l', '숙소')], 2, { title: '휴식' })
 
     expect(payload.items.at(-1)?.title).toBe('휴식')
+  })
+})
+
+describe('placeItemTypeOf — 담을 장소의 일정 항목 유형 (#1447 · 일정상세 D26-5)', () => {
+  const of = (code: string, sourceCategory: string | null = null) =>
+    placeItemTypeOf({ contentType: { code }, sourceCategory })
+
+  it('음식점(RESTAURANT)은 MEAL 이다 — 확정 전 점검이 식사로 센다', () => {
+    expect(of('RESTAURANT')).toBe('MEAL')
+    expect(of('RESTAURANT', '한식')).toBe('MEAL')
+  })
+
+  it('카페는 음식점 분류여도 PLACE 다 — 끼니로 세지 않는다', () => {
+    expect(of('RESTAURANT', '카페')).toBe('PLACE')
+  })
+
+  it('음식점이 아니면 PLACE 다 — 숙박 장소도 담기는 PLACE 그대로다', () => {
+    expect(of('TOURIST_SPOT')).toBe('PLACE')
+    expect(of('CULTURE', '카페')).toBe('PLACE')
+    expect(of('LODGING')).toBe('PLACE')
   })
 })
