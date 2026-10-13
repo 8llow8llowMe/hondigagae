@@ -51,6 +51,7 @@ import {
   type ItemMemoTarget,
   itemMemoTargetOf,
 } from '@/lib/plan/item-memo-edit'
+import { timeModalKey } from '@/lib/plan/item-modal-key'
 import { packingPlacement } from '@/lib/plan/packing-promotion'
 import { isReviewSectionVisible } from '@/lib/plan/review'
 import { routeReorderAllowed, routeReorderSuggestion } from '@/lib/plan/route-reorder'
@@ -845,8 +846,9 @@ export function PlanDetailSection({
       />
 
       <PlanItemTimeModal
-        // 여는 항목마다 새로 마운트한다 — 입력이 그 항목 값에서 시작한다 (모달 주석)
-        key={timeItem?.planItemId ?? 'closed'}
+        // 여는 항목마다 새로 마운트한다 — 입력이 그 항목 값에서 시작한다 (모달 주석). 형제인 메모 모달과
+        // key 가 겹치지 않게 종류를 앞에 붙인다 (#1485)
+        key={timeModalKey(timeItem?.planItemId)}
         open={timeItem !== undefined}
         title={timeItem?.title ?? ''}
         initial={initialClockTime(timeGroup?.items ?? [], timeItem?.planItemId ?? '')}
