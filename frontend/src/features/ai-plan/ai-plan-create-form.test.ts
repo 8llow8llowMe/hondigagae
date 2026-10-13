@@ -28,6 +28,8 @@ const SEOGWIPO_SI = SIGUNGU_LABEL['3'] ?? ''
 */
 const OPEN_BY_BUDGET = { budgetManwon: '30' } as const
 const OPEN_BY_REGION = { sigunguCode: '4' } as const
+// 접힌 줄 요약 span — `AiPlanDetailsDisclosure` 가 접혔을 때만 낸다
+const SUMMARY_LINE = /<span class="[^"]*ms-auto truncate">([^<]*)<\/span>/
 
 function pet(petId: string, name: string): Pet {
   return {
@@ -212,9 +214,29 @@ describe('AiPlanCreateForm — 예산은 칩 + 직접 입력', () => {
       expect(checked).toContain(`${preset}${messages.aiPlan.fieldBudgetUnit}`)
       expect(checked).not.toContain(messages.aiPlan.budgetAny)
       expect(html).toMatch(new RegExp(`id="budgetManwon"[^>]*value="${preset}"`))
-      expect(html).toContain(`${preset}${messages.aiPlan.fieldBudgetUnit}`)
     },
   )
+
+  /*
+    **접힌 줄 요약은 접혔을 때만 선다** (`AiPlanDetailsDisclosure`). 칩은 펼친 패널 안에 있어 둘이 한
+    렌더에 함께 서는 일이 없다 — 예전 단언 `toContain('30만원')` 은 칩 글자만으로 늘 맞았다.
+    그래서 요약이 말하는 값은 여기서 요소를 좁혀 잠근다. 예산이 있으면 펼쳐 열리므로 요약 줄이
+    없어야 하고(칩이 말하는 값과 갈라질 자리 자체가 없다), 요약 문구의 조합은 `details.test.ts` 가 맡는다.
+  */
+  it.each(['20', '30', '50'])('%s만원이면 펼쳐 열려 접힌 줄 요약이 서지 않는다', (preset) => {
+    const html = render({
+      values: { ...EMPTY_AI_PLAN_FORM_VALUES, budgetManwon: preset },
+    })
+
+    expect(html).toContain('aria-expanded="true"')
+    expect(html).not.toMatch(SUMMARY_LINE)
+  })
+
+  it('예산이 비어 접혀 있으면 접힌 줄 요약이 상관없음을 말한다', () => {
+    const html = render({ values: EMPTY_AI_PLAN_FORM_VALUES })
+
+    expect(html.match(SUMMARY_LINE)?.[1]).toContain(messages.aiPlan.detailsBudgetAny)
+  })
 
   it('칸을 비우면 상관없음만 골라진다', () => {
     const html = render({
