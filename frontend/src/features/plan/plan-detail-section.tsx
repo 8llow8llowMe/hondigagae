@@ -53,6 +53,7 @@ import {
   itemMemoTargetOf,
 } from '@/lib/plan/item-memo-edit'
 import { timeModalKey } from '@/lib/plan/item-modal-key'
+import { itemTimeLocks } from '@/lib/plan/item-time-save'
 import { packingPlacement } from '@/lib/plan/packing-promotion'
 import { isReviewSectionVisible } from '@/lib/plan/review'
 import { routeReorderAllowed, routeReorderSuggestion } from '@/lib/plan/route-reorder'
@@ -316,10 +317,22 @@ export function PlanDetailSection({
     일정 상세 전체라 저장 둘이 겹치면 늦게 온 옛 스냅숏이 다른 일자의 변경을 캐시에서 되돌린다. 진입은
     읽기라 다른 일자의 교체와 겹쳐도 그 일자 목록이 낡지 않는다(E0) — 근거는 `dayItemsLock` 주석.
   */
+  /*
+    **시각 저장은 모달이 닫힌 뒤에도 재조회가 끝날 때까지 잠금에 남는다** (#1501 · D30-2). 모달은 상한
+    (`DETAIL_REFETCH_WAIT_MS`)에서 닫히지만 그때 캐시는 옛 `startTime` 이라, 그 틈의 교체가 서버의 새
+    시각을 덮는다.
+  */
+  const timeLocks = itemTimeLocks({
+    saving: itemTime.saving,
+    day: timeTarget?.day ?? null,
+    refetchingDays: itemTime.refetchingDays,
+  })
+  /** 시각 저장이 모달 · 재조회 중 하나라도 진행 중인가 — 모달인 다른 교체(메모 · 이동 추가)의 `blocked` */
+  const itemTimeBusy = dayItemsLock(timeLocks).busy
   const dayItemsLockState = dayItemsLock([
     { saving: addPlace.adding, day: addPlace.pending?.day ?? null },
     { saving: addMove.adding, day: addMove.pendingDay },
-    { saving: itemTime.saving, day: timeTarget?.day ?? null },
+    ...timeLocks,
     { saving: itemMemo.saving, day: memoTarget?.day ?? null },
   ])
   const dayItemsBusy = dayItemsLockState.busy
@@ -838,7 +851,7 @@ export function PlanDetailSection({
         day={moveDay ?? 1}
         saving={addMove.adding}
         // 이 모달 자신의 저장은 `saving` 이 말한다. 여기는 **다른** 일괄 교체가 도는 중인지다
-        blocked={addPlace.adding || itemTime.saving || itemMemo.saving}
+        blocked={addPlace.adding || itemTimeBusy || itemMemo.saving}
         resetsVisits={
           moveDay !== null && (days[moveDay - 1]?.items.some((item) => item.visited) ?? false)
         }
@@ -887,6 +900,7 @@ export function PlanDetailSection({
           )
           // 단건 API 다 (#1053) — 그 항목의 시각만 보낸다. 일자 항목은 낡은 상세 판정에만 쓴다
           itemTime.save({
+            day: timeTarget.day,
             dayItems: timeGroup.items,
             planItemId: timeItem.planItemId,
             startTime,
@@ -907,7 +921,7 @@ export function PlanDetailSection({
             : null
         }
         saving={itemMemo.saving}
-        blocked={addPlace.adding || addMove.adding || itemTime.saving || memoDayVisitPending}
+        blocked={addPlace.adding || addMove.adding || itemTimeBusy || memoDayVisitPending}
         onSave={(memo) => {
           if (memoTarget === null) return
           memoFocusKeyRef.current = memoEditFocusKey(memoTarget.day, memoTarget.index)
