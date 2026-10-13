@@ -140,6 +140,25 @@ export function planPhaseOf(startDate: string, endDate: string, today: Date): Pl
   return days >= 0 ? { kind: 'upcoming', days } : { kind: 'ongoing', day: 1 - days }
 }
 
+/**
+ * 일정 **목록**이 말할 시점 — 출발 당일부터 `여행 중 · 1일차` 다 (#1433).
+ *
+ * `planPhaseOf` 는 출발 당일을 `upcoming`(`D-DAY`)에 남긴다. 그 판정에는 상세의 `여행 완료하기`
+ * 자리 · `다녀옴` 토글 · 준비물 승격이 걸려 있어(`status-action.ts` · `visit-toggle.ts` ·
+ * `packing-promotion.ts`) **판정 축은 건드리지 않는다.** 여기는 그 결과를 목록 표기용으로
+ * 한 번 접을 뿐이다 — 날짜 축의 셈은 여전히 `planPhaseOf` 하나다.
+ *
+ * 목록이 당일을 `D-DAY` 로 부르면 같은 날 홈 배너(`pickTripBanner` 의 `TODAY`, `day: 1`)와
+ * 정면으로 어긋났다 — 10/13 에 시작한 10/13–15 여행이 홈에서는 1일차, 목록에서는 `D-DAY` 였다.
+ * 그래서 이 함수의 `ongoing.day` 는 **1 부터** 이고, 하루짜리 일정도 그날은 `여행 중` 이다.
+ */
+export function tripPhaseOf(startDate: string, endDate: string, today: Date): PlanPhase | null {
+  const phase = planPhaseOf(startDate, endDate, today)
+  if (phase?.kind === 'upcoming' && phase.days === 0) return { kind: 'ongoing', day: 1 }
+
+  return phase
+}
+
 /** 종료일이 오늘보다 이전이면 지난 일정이다. **상태(`COMPLETED`)와는 다른 축이다** */
 export function isPastPlan(endDate: string, today: Date): boolean {
   const end = parseDay(endDate)

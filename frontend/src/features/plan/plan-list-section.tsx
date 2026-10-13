@@ -7,7 +7,7 @@ import { PlanRow } from '@/features/plan/plan-row'
 import { messages } from '@/lib/messages'
 import { petCreateHref } from '@/lib/pet/return-to'
 import { planCompanionsOf } from '@/lib/plan/companion-pets'
-import { groupPlans } from '@/lib/plan/list'
+import { duplicatedPlanTitles, groupPlans } from '@/lib/plan/list'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
@@ -98,6 +98,8 @@ export function PlanListSection({
   }
 
   const { ongoing, upcoming, past } = groupPlans(plans, today)
+  // 묶음을 건너서 센다 — 같은 제목이 `여행 중` 과 `지난 일정` 에 하나씩 있어도 헷갈린다 (#1433)
+  const duplicatedTitles = duplicatedPlanTitles(plans)
 
   return (
     <div className="pb-5">
@@ -106,7 +108,13 @@ export function PlanListSection({
         묶음이 각각 앞·뒤를 맡으므로 시간순으로도 이 자리가 맞다.
       */}
       {ongoing.length > 0 && (
-        <PlanGroup title={messages.plan.sectionOngoing} plans={ongoing} pets={pets} today={today} />
+        <PlanGroup
+          title={messages.plan.sectionOngoing}
+          plans={ongoing}
+          pets={pets}
+          today={today}
+          duplicatedTitles={duplicatedTitles}
+        />
       )}
 
       {upcoming.length > 0 && (
@@ -115,6 +123,7 @@ export function PlanListSection({
           plans={upcoming}
           pets={pets}
           today={today}
+          duplicatedTitles={duplicatedTitles}
           divided={ongoing.length > 0}
         />
       )}
@@ -132,6 +141,7 @@ export function PlanListSection({
           plans={past}
           pets={pets}
           today={today}
+          duplicatedTitles={duplicatedTitles}
           divided={ongoing.length > 0 || upcoming.length > 0}
         />
       )}
@@ -156,12 +166,15 @@ function PlanGroup({
   plans,
   pets,
   today,
+  duplicatedTitles,
   divided = false,
 }: {
   title: string
   plans: PlanSummaryItem[]
   pets: readonly Pet[] | null
   today: Date
+  /** 목록 전체에서 겹치는 제목 (`duplicatedPlanTitles`) */
+  duplicatedTitles: ReadonlySet<string>
   /** 앞 묶음이 있으면 위에 1px 선을 긋는다 */
   divided?: boolean
 }) {
@@ -181,6 +194,7 @@ function PlanGroup({
             */
             companions={planCompanionsOf(plan.petIds, pets, plan.status.code)}
             today={today}
+            periodEmphasized={duplicatedTitles.has(plan.title.trim())}
           />
         ))}
       </SurfaceList>

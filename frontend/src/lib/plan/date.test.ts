@@ -4,7 +4,9 @@ import {
   formatPlanDateRange,
   formatPlanDateRangeCompact,
   planItemTimeLabel,
+  planPhaseOf,
   totalDaysBetween,
+  tripPhaseOf,
 } from '@/lib/plan/date'
 
 describe('totalDaysBetween — 담기 전에는 서버가 totalDays 를 주지 않는다', () => {
@@ -96,5 +98,47 @@ describe('formatPlanDateRangeCompact — 올해 일정은 연도를 뗀다 (#841
     expect(formatPlanDateRangeCompact('깨짐', '2026-09-27', TODAY)).toBe(
       formatPlanDateRange('깨짐', '2026-09-27'),
     )
+  })
+})
+
+/*
+  목록 표기의 시점 (#1433). 오늘(10/13) 시작한 10/13–15 여행이 `D-DAY` 로 서던 것을
+  `여행 중 · 1일차` 로 읽게 한다 — 홈 배너(`pickTripBanner` 의 `TODAY`)가 그날을 1일차로
+  부르는 것과 같은 셈이다. 판정 축(`planPhaseOf`)은 그대로 둔다.
+*/
+describe('tripPhaseOf — 목록은 출발 당일부터 여행 중이다 (#1433)', () => {
+  const OCT_13 = new Date(2026, 9, 13)
+
+  it('시작일 당일은 여행 중 1일차다', () => {
+    expect(tripPhaseOf('2026-10-13', '2026-10-15', OCT_13)).toEqual({ kind: 'ongoing', day: 1 })
+  })
+
+  it('중간일은 며칠째인지 센다', () => {
+    expect(tripPhaseOf('2026-10-12', '2026-10-15', OCT_13)).toEqual({ kind: 'ongoing', day: 2 })
+  })
+
+  it('종료일 당일도 여행 중이다 — 마지막 날이 N일차다', () => {
+    expect(tripPhaseOf('2026-10-11', '2026-10-13', OCT_13)).toEqual({ kind: 'ongoing', day: 3 })
+  })
+
+  it('종료일 다음 날부터는 지난 일정이다', () => {
+    expect(tripPhaseOf('2026-10-10', '2026-10-12', OCT_13)).toEqual({ kind: 'past' })
+  })
+
+  it('하루짜리 당일치기도 그날은 여행 중 1일차다', () => {
+    expect(tripPhaseOf('2026-10-13', '2026-10-13', OCT_13)).toEqual({ kind: 'ongoing', day: 1 })
+  })
+
+  it('출발 전은 남은 일수 그대로다', () => {
+    expect(tripPhaseOf('2026-10-14', '2026-10-16', OCT_13)).toEqual({ kind: 'upcoming', days: 1 })
+  })
+
+  it('날짜를 못 읽으면 null 이다', () => {
+    expect(tripPhaseOf('2026-13-01', '2026-10-16', OCT_13)).toBeNull()
+  })
+
+  /* 버튼·토글·준비물 자리는 여전히 출발 당일을 `upcoming` 으로 본다 — 판정 축은 바꾸지 않는다 */
+  it('planPhaseOf 는 출발 당일을 여전히 D-DAY(upcoming 0)로 둔다', () => {
+    expect(planPhaseOf('2026-10-13', '2026-10-15', OCT_13)).toEqual({ kind: 'upcoming', days: 0 })
   })
 })
