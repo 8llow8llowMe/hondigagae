@@ -63,3 +63,24 @@ export function stepElapsedMsOf(
 
   return nowMs - startedMs
 }
+
+/**
+ * 대기 화면이 보여 주는 **하나의** 경과(ms) — 이슈 #1431.
+ *
+ * 예전에는 단계 이름 옆 `1분 6초째`(단계 경과, #1176)와 아래 `1분 8초 지남`(구독 경과, #710)이 함께
+ * 섰다. `일정 구성` 이 전체의 90% 이상이라 두 값이 거의 같은데 2초씩 어긋나, 시계가 둘인 화면이 됐다.
+ *
+ * **둘 중 큰 값이다.** 구독 경과는 이 화면이 열린 때부터, 단계 경과는 서버가 그 단계에 들어간
+ * 때부터 센다 — 둘 다 작업이 실제로 지난 시간의 **하한**이라 큰 쪽도 여전히 관측값이다(지어낸
+ * 진행률이 아니다). 새로고침 직후 구독 경과가 0 으로 돌아가도 단계 경과가 이어 준다(#1057 이 단계
+ * 경과를 둔 이유).
+ *
+ * 새로고침한 뒤 **단계가 바뀌는 순간** 단계 경과가 0 으로 돌아가 값이 한 번 줄 수 있다. 앞 단계
+ * 셋은 1초 안팎이고 사람이 보는 거의 모든 시간이 마지막 단계라 그 창은 좁다 — 감수한다.
+ *
+ * 음수(기기 시계가 서버보다 늦다)인 단계 경과는 `max` 가 거른다 — 구독 경과는 0 이상이다.
+ */
+export function waitElapsedMs(elapsedMs: number, stepElapsedMs: number | null): number {
+  if (stepElapsedMs === null || !Number.isFinite(stepElapsedMs)) return elapsedMs
+  return Math.max(elapsedMs, stepElapsedMs)
+}

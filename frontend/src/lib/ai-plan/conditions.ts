@@ -56,3 +56,14 @@ export function snapshotFromConditions(
     sigunguCode: conditions.sigunguCode,
   }
 }
+
+/**
+ * 대기 화면 `만드는 조건` 에 덧붙일 요청 문구 — 이슈 #1431.
+ *
+ * **작업 조회 응답(`conditions.requestNote`)에 있을 때만 준다.** 비었거나 공백뿐이면 null 이고
+ * 화면은 그 줄을 그리지 않는다 — 화면이 문구를 지어내거나 "요청 없음" 을 채워 넣지 않는다.
+ */
+export function requestNoteOf(conditions: AiPlanJobConditions | null): string | null {
+  const note = conditions?.requestNote?.trim() ?? ''
+  return note === '' ? null : note
+}

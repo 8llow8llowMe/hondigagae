@@ -16,6 +16,7 @@ import { AiPlanOptionsSection } from '@/features/ai-plan/ai-plan-options-section
 import { SIGUNGU_CODES, SIGUNGU_LABEL } from '@/features/place/filter-labels'
 import { BUDGET_PRESETS_MANWON } from '@/lib/ai-plan/budget'
 import { type DetailsInput, detailsSummary, hasAnyDetail } from '@/lib/ai-plan/details'
+import { periodSummaryText } from '@/lib/ai-plan/period-label'
 import { regionHintFromNote } from '@/lib/ai-plan/region-hint'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { focusFirstError, hasFieldErrors } from '@/lib/form/focus-first-error'
@@ -332,7 +333,8 @@ export function AiPlanCreateForm({
 
         {totalDays !== null && (
           <p className="text-caption text-fg-muted tabular-nums">
-            {messages.aiPlan.periodSummary.replace('{days}', String(totalDays))}
+            {/* `N박 M일` · 당일치기 (#1431) — 일수만 주면 숙박이 몇 번인지 다시 세야 한다 */}
+            {periodSummaryText(totalDays)}
           </p>
         )}
       </div>

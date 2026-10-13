@@ -42,10 +42,13 @@ import type { Pet } from '@/types/pet'
  */
 export function AiPlanCreateView({
   fromJobId,
+  requestedPetId,
   /** `'YYYY-MM-DD'`. 서버가 만들어 내려보낸 오늘 — 달력의 오늘 표시에 쓴다 */
   today,
 }: {
   fromJobId: string | null
+  /** 진입 URL 의 `?pet=<id>` (#1431). 없으면 null */
+  requestedPetId: string | null
   today: string
 }) {
   const petsQuery = usePetList(true)
@@ -112,7 +115,12 @@ export function AiPlanCreateView({
 
   return (
     <AiPlanCreateSurface>
-      <AiPlanCreateFormContainer pets={pets} fromJobId={fromJobId} today={today} />
+      <AiPlanCreateFormContainer
+        pets={pets}
+        fromJobId={fromJobId}
+        requestedPetId={requestedPetId}
+        today={today}
+      />
     </AiPlanCreateSurface>
   )
 }
@@ -145,10 +153,12 @@ function AiPlanCreateSurface({ children }: { children: ReactNode }) {
 function AiPlanCreateFormContainer({
   pets,
   fromJobId,
+  requestedPetId,
   today,
 }: {
   pets: Pet[]
   fromJobId: string | null
+  requestedPetId: string | null
   today: string
 }) {
   const router = useRouter()
@@ -177,7 +187,7 @@ function AiPlanCreateFormContainer({
   */
   const [startValues] = useState<AiPlanFormValues>(() =>
     // 헤더에서 고른 반려견도 여기서 읽는다 — 위 이유로 localStorage 가 안전하다 (#1381)
-    restoreValues(fromJobId, pets, currentSelectedPetId()),
+    restoreValues(fromJobId, pets, currentSelectedPetId(), requestedPetId),
   )
 
   const form = useForm<AiPlanFormValues, AiPlanSubmitResult>({
@@ -287,14 +297,16 @@ function restoreValues(
   fromJobId: string | null,
   pets: Pet[],
   selectedPetId: string | null,
+  requestedPetId: string | null,
 ): AiPlanFormValues {
   const base: AiPlanFormValues = {
     ...EMPTY_AI_PLAN_FORM_VALUES,
     /*
-      **한 마리를 미리 고른다** — 헤더에서 고른 아이, 없으면 대표견 (#1381). 예전에는 한 마리일
-      때만 골라 2마리 이상이면 헤더에서 `몽` 을 골라 둔 사람도 다시 골라야 했다.
+      **한 마리를 미리 고른다** — 링크가 지목한 아이(`?pet=`, #1431), 헤더에서 고른 아이, 없으면
+      대표견 (#1381). 예전에는 한 마리일 때만 골라 2마리 이상이면 헤더에서 `몽` 을 골라 둔 사람도
+      다시 골라야 했다. `?from=` 조건을 되살리면 그 조건의 반려견이 이긴다 — 아래 분기.
     */
-    petIds: defaultAiPlanPetIds(pets, selectedPetId),
+    petIds: defaultAiPlanPetIds(pets, selectedPetId, requestedPetId),
   }
 
   if (fromJobId === null) return base

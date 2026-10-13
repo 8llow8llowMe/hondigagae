@@ -5,7 +5,7 @@ import {
   AiPlanJobCondition,
   AiPlanJobFrame,
 } from '@/features/ai-plan/ai-plan-job-frame'
-import { formatElapsed } from '@/lib/ai-plan/elapsed'
+import { formatElapsed, waitElapsedMs } from '@/lib/ai-plan/elapsed'
 import type { JobPollPhase, JobStepProgress } from '@/lib/ai-plan/job'
 import { messages } from '@/lib/messages'
 import type { Inset } from '@/lib/ui/inset'
@@ -36,8 +36,10 @@ export type AiPlanProgressProps = {
    */
   elapsedMs?: number
   /**
-   * 현재 단계에서 지난 시간 (#1057, `lib/ai-plan/elapsed.ts` 의 `stepElapsedMsOf`). 경과 줄 아래
-   * `이 단계 n초째` 로 선다. **null(생략)이면 그 줄이 없고, 1초 미만 · 음수면 자리만 남긴다.**
+   * 현재 단계에서 지난 시간 (#1057, `lib/ai-plan/elapsed.ts` 의 `stepElapsedMsOf`).
+   *
+   * **따로 그리지 않는다** (#1431). 경과 줄 하나가 `elapsedMs` 와 이 값 중 큰 쪽을 쓴다
+   * (`waitElapsedMs`) — 새로고침 직후에도 0 으로 돌아가지 않게 하는 데만 쓰인다.
    */
   stepElapsedMs?: number | null
   /**
@@ -47,6 +49,11 @@ export type AiPlanProgressProps = {
    * `RegenerateShell` 의 머리가 이미 그것을 말한다.
    */
   conditionSummary?: string | null
+  /**
+   * 사용자가 쓴 요청 문구 (#1431, `lib/ai-plan/conditions.ts` 의 `requestNoteOf`). **작업 조회 응답에
+   * 있을 때만** 값이고, 없으면 그 줄이 없다 — 화면이 지어내지 않는다.
+   */
+  requestNote?: string | null
   /**
    * 좌우 여백 축 (`EmptyState` · `ErrorState` 와 같은 계약). 기본은 페이지 위 `main`
    * (16/40)이고 `/ai-plans/jobs/[jobId]` 가 그것을 쓴다.
@@ -96,6 +103,7 @@ export function AiPlanProgress({
   elapsedMs,
   stepElapsedMs = null,
   conditionSummary = null,
+  requestNote = null,
   inset = 'main',
 }: AiPlanProgressProps) {
   /*
@@ -106,8 +114,13 @@ export function AiPlanProgress({
   const description =
     step?.description ?? status?.description ?? messages.aiPlan.jobProgressFallback
 
-  const elapsed = elapsedMs === undefined ? null : formatElapsed(elapsedMs)
-  const stepElapsed = stepElapsedMs === null ? null : formatElapsed(stepElapsedMs)
+  /*
+    **시계는 하나다** (#1431). 예전에는 단계 이름 옆 `1분 6초째` 와 아래 `1분 8초 지남` 이 함께 섰다 —
+    마지막 단계가 전체의 90% 이상이라 거의 같은 두 값이 2초씩 어긋났다. 아래 줄만 남기고, 값은 단계
+    경과와 견줘 큰 쪽을 쓴다(새로고침해도 0 으로 돌아가지 않는다 — #1057 이 단계 경과를 둔 이유).
+  */
+  const elapsed =
+    elapsedMs === undefined ? null : formatElapsed(waitElapsedMs(elapsedMs, stepElapsedMs))
 
   /*
     **테두리 있는 `secondary` · 기본 높이(44)다** (#1180). 예전에는 `ghost` · `sm`(32) 이라 배경도
@@ -141,13 +154,14 @@ export function AiPlanProgress({
         <AiPlanJobBlock inset={inset}>
           <h2 className="text-title-2 text-fg font-semibold">{messages.aiPlan.jobExceededTitle}</h2>
           <p className="text-body-2 text-fg-muted">{messages.aiPlan.jobExceededDescription}</p>
-          {elapsed !== null && <ElapsedCaption elapsed={elapsed} stepElapsedMs={stepElapsedMs} />}
+          {elapsed !== null && <ElapsedCaption elapsed={elapsed} />}
         </AiPlanJobBlock>
 
         <AiPlanJobCondition
           inset={inset}
           label={messages.aiPlan.jobConditionLabel}
           summary={conditionSummary}
+          note={requestNote}
         />
 
         <AiPlanJobBlock inset={inset}>
@@ -221,26 +235,6 @@ export function AiPlanProgress({
                       : messages.aiPlan.jobStepProgress
                           .replace('{order}', String(stepProgress.order))
                           .replace('{total}', String(stepProgress.total))}
-                    {/*
-                      **단계 경과가 이름 옆이다** (#1176). 예전에는 전체 경과 아래 둘째 줄(#1057)이라
-                      `4 / 4단계` 와 멀었다 — "이 단계가 오래 걸리고 있다" 는 이름 옆에서 읽혀야 한다.
-                      **낭독 영역 안이지만 `aria-hidden` 이다** — 1초마다 바뀌는 값이라 읽히면 소음이다
-                      (#710). 서버 시각 기준이라 새로고침해도 0 으로 돌아가지 않는다.
-                    */}
-                    {/*
-                      **단계에 들어가 있는 동안 자리를 늘 차지한다** (#1057 의 규칙 그대로). 320 실측에서
-                      이 꼬리가 붙으면 줄이 둘이 되는데(375 · 390 은 늘 한 줄, 최대 228px), 새 단계 첫
-                      1초 · 음수처럼 표기할 수 없는 순간에 빠지면 한 줄로 돌아와 아래가 튄다 — 그때는
-                      **글자만 숨긴다**(`invisible`). 꼬리는 한 덩어리로 넘어간다(`whitespace-nowrap`).
-                    */}
-                    {stepElapsedMs !== null && (
-                      <span
-                        aria-hidden
-                        className={cn('whitespace-nowrap', stepElapsed === null && 'invisible')}
-                      >
-                        {` · ${messages.aiPlan.jobStepElapsedInline.replace('{stepElapsed}', stepElapsed ?? '0초')}`}
-                      </span>
-                    )}
                   </span>
                 </p>
               )}
@@ -257,8 +251,8 @@ export function AiPlanProgress({
           쓸모가 있다.
         */}
             {elapsed !== null && (
-              /* 단계 경과는 위 단계 줄로 올라갔다 (#1176) — 여기는 전체 경과 한 줄이다 */
-              <ElapsedCaption elapsed={elapsed} stepElapsedMs={null} hidden />
+              /* 이 화면의 유일한 시계다 (#1431) — 단계 이름 옆의 `n초째` 를 걷었다 */
+              <ElapsedCaption elapsed={elapsed} hidden />
             )}
           </div>
           <StateCharacter pose="leash" className="-mb-5" />
@@ -269,6 +263,7 @@ export function AiPlanProgress({
         inset={inset}
         label={messages.aiPlan.jobConditionLabel}
         summary={conditionSummary}
+        note={requestNote}
       />
 
       <AiPlanJobBlock inset={inset}>
@@ -294,38 +289,16 @@ export function AiPlanProgress({
 }
 
 /**
- * 경과 줄 (#710) + 단계 경과 둘째 줄 (#1057).
- *
- * **둘째 줄은 단계에 들어가 있는 동안 자리를 늘 차지한다.** `stepElapsedMs` 가 null 이 아니면(서버가
- * 단계 시작 시각을 줬으면) 줄을 세우고, 표기할 수 없는 순간(1초 미만 · 기기 시계가 늦어 음수)에는
- * **글자만 비운다.** 새 단계에 들어갈 때마다 줄이 빠졌다 돌아오면 그 아래 `그만두기` 가 튄다.
- * null 이 되는 것은 PENDING → 첫 단계 · 종결처럼 화면 모양이 어차피 바뀌는 순간뿐이다.
+ * 경과 줄 (#710). **이 화면의 유일한 시계다** (#1431) — 단계 경과 둘째 줄(#1057)을 걷었다.
  *
  * `hidden` 이면 **값을 담은 요소 자체가** `aria-hidden` 이다 — 1초마다 바뀌는 값이라 낭독 영역 밖에
  * 두는 것만으로는 부족하다(누가 `role="status"` 안으로 옮기면 그날부터 매 초 읽힌다). 상한 초과
  * 화면은 시계가 멈춰 값이 바뀌지 않으므로 숨기지 않는다.
  */
-function ElapsedCaption({
-  elapsed,
-  stepElapsedMs,
-  hidden = false,
-}: {
-  elapsed: string
-  stepElapsedMs: number | null
-  hidden?: boolean
-}) {
-  const stepElapsed = stepElapsedMs === null ? null : formatElapsed(stepElapsedMs)
-
+function ElapsedCaption({ elapsed, hidden = false }: { elapsed: string; hidden?: boolean }) {
   return (
     <div aria-hidden={hidden || undefined} className="text-caption text-fg-muted tabular-nums">
       <p>{messages.aiPlan.jobElapsed.replace('{elapsed}', elapsed)}</p>
-      {stepElapsedMs !== null && (
-        <p>
-          {stepElapsed === null
-            ? '\u00a0'
-            : messages.aiPlan.jobStepElapsed.replace('{stepElapsed}', stepElapsed)}
-        </p>
-      )}
     </div>
   )
 }

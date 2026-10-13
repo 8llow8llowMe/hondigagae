@@ -35,4 +35,17 @@ describe('defaultAiPlanPetIds', () => {
   it('반려견이 없으면 비운다', () => {
     expect(defaultAiPlanPetIds([], 'x')).toEqual([])
   })
+
+  /* `?pet=<id>` — 들어온 링크가 아이를 지목했다 (#1431) */
+  it('링크가 지목한 아이가 헤더에서 고른 아이보다 먼저다', () => {
+    expect(defaultAiPlanPetIds([pet, secondPet, third], secondPet.petId, third.petId)).toEqual([
+      third.petId,
+    ])
+  })
+
+  it('링크가 지목한 아이가 목록에 없으면 지금 규칙(헤더 → 대표견)으로 떨어진다', () => {
+    expect(defaultAiPlanPetIds([pet, secondPet, third], third.petId, 'gone')).toEqual([third.petId])
+    const representative = { ...secondPet, representative: true }
+    expect(defaultAiPlanPetIds([pet, representative], null, 'gone')).toEqual([representative.petId])
+  })
 })

@@ -30,7 +30,7 @@ import { SIGUNGU_LABEL } from '@/features/place/filter-labels'
 import { planKeys } from '@/features/plan/queries'
 import { formatBudget } from '@/lib/ai-plan/budget'
 import { toAiPlanCommitErrors } from '@/lib/ai-plan/commit-error'
-import { snapshotFromConditions } from '@/lib/ai-plan/conditions'
+import { requestNoteOf, snapshotFromConditions } from '@/lib/ai-plan/conditions'
 import { defaultPlanTitle } from '@/lib/ai-plan/draft-title'
 import { draftToPlanPayload } from '@/lib/ai-plan/draft-to-plan'
 import {
@@ -136,6 +136,11 @@ export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolea
   const { metaLines, coords, thumbnails, delistedPlaceIds } = useDraftPlaces(draft)
 
   const conditionSummary = useMemo(() => summarize(snapshot), [snapshot])
+  /*
+    **요청 문구는 작업 조회 응답에서만 읽는다** (#1431). 이 탭의 보관본(`stored`)에도 문구가 있지만
+    대기 화면이 말하는 것은 "서버가 지금 이 조건으로 만들고 있다" 다 — 응답에 없으면 줄째 없다.
+  */
+  const requestNote = requestNoteOf(job?.conditions ?? null)
 
   // ── 1·2. 조회 실패 ─────────────────────────────────────────────────────
 
@@ -248,6 +253,7 @@ export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolea
             넘기고 있었다 — 정작 "지금 뭘 만들고 있나" 가 가장 궁금한 것은 이 화면이다.
           */
           conditionSummary={conditionSummary}
+          requestNote={requestNote}
           elapsedMs={elapsedMs}
           stepElapsedMs={stepElapsedMs}
           onRecheck={recheck}

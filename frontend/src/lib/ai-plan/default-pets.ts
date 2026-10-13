@@ -10,10 +10,20 @@ import type { Pet } from '@/types/pet'
  * 스위처가 보여 주는 아이와 같다(`resolveSelectedPet`). 한 마리만 고른다 — 여럿을 데려가는지는 화면이
  * 알 수 없다.
  *
+ * **링크가 아이를 지목하면(`?pet=<id>`, #1431) 그 아이가 맨 앞이다.** 방금 등록한 아이나 반려견
+ * 상세에서 넘어온 사람에게 헤더 선택값 · 대표견을 체크해 두면 다른 아이로 일정이 나간다. 목록에 없는
+ * id(지운 아이 · 잘못 붙은 값)는 무시하고 지금 순서로 떨어진다.
+ *
  * @param selectedPetId 헤더 스위처의 저장값(`hdg_selected_pet`). 없거나 지운 아이면 무시한다
+ * @param requestedPetId 진입 URL 의 `?pet=`. 없으면 생략한다
  */
-export function defaultAiPlanPetIds(pets: Pet[], selectedPetId: string | null): string[] {
+export function defaultAiPlanPetIds(
+  pets: Pet[],
+  selectedPetId: string | null,
+  requestedPetId: string | null = null,
+): string[] {
   const chosen =
+    pets.find((pet) => pet.petId === requestedPetId) ??
     pets.find((pet) => pet.petId === selectedPetId) ??
     pets.find((pet) => pet.representative) ??
     pets[0]

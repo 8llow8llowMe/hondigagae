@@ -144,6 +144,20 @@ describe('AiPlanCreateForm — 반려견은 체크박스 여러 마리 (#128)', 
     expect(html).not.toContain('type="radio"')
   })
 
+  /*
+    **체크박스의 이름은 반려견 이름이다** (#1431). 값(`value`)은 Snowflake 숫자 id 라, 이름이 그것으로
+    읽히면 스크린리더가 `765037894317510656 체크박스` 를 듣는다. 크기 · 민감도 설명은 이름이 아니라
+    설명(`aria-describedby`)이다.
+  */
+  it('체크박스 이름은 반려견 이름을 가리키고, 설명은 따로 잇는다', () => {
+    const html = render()
+    const box = /<input type="checkbox" id="petIds-1"[^>]*>/.exec(html)?.[0] ?? ''
+
+    expect(box).toContain('aria-labelledby="petIds-1-label"')
+    expect(box).toContain('aria-describedby="petIds-1-description"')
+    expect(html).toMatch(/<span id="petIds-1-label"[^>]*>몽실이<\/span>/)
+  })
+
   it('여러 마리가 동시에 선택된 상태로 렌더된다', () => {
     const html = render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, petIds: ['1', '2'] } })
 
@@ -179,6 +193,37 @@ describe('AiPlanCreateForm — 예산은 칩 + 직접 입력', () => {
     })
     // exclusive 칩은 role="radio" + aria-checked 다
     expect(html).toContain('aria-checked="true"')
+  })
+
+  /*
+    **칩 · 입력칸 · 접힌 줄 요약이 한 값(`budgetManwon`)에서 나온다** (#1431). `30만원` 을 눌렀는데 칸은
+    30 이고 `상관없음` 이 골라진 채였다는 재현이 있었다 — 셋이 같은 값을 읽는 한 그 조합은 그릴 수
+    없다. 칸만 값과 갈라지는 길(하이드레이션 전에 친 값을 React 가 덮지 않고 남겨 두는 것)은 #1381
+    의 하이드레이션 게이트가 닫았다. 여기서는 세 표시가 같은 값을 말하는 것을 잠근다.
+  */
+  it.each(['20', '30', '50'])(
+    '%s만원을 고르면 그 칩만 골라지고 칸 · 요약도 같은 값이다',
+    (preset) => {
+      const html = render({
+        values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_REGION, budgetManwon: preset },
+      })
+      const checked = [...html.matchAll(/aria-checked="true"[^>]*>([^<]*)</g)].map((m) => m[1])
+
+      expect(checked).toContain(`${preset}${messages.aiPlan.fieldBudgetUnit}`)
+      expect(checked).not.toContain(messages.aiPlan.budgetAny)
+      expect(html).toMatch(new RegExp(`id="budgetManwon"[^>]*value="${preset}"`))
+      expect(html).toContain(`${preset}${messages.aiPlan.fieldBudgetUnit}`)
+    },
+  )
+
+  it('칸을 비우면 상관없음만 골라진다', () => {
+    const html = render({
+      values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_REGION, budgetManwon: '' },
+    })
+    const checked = [...html.matchAll(/aria-checked="true"[^>]*>([^<]*)</g)].map((m) => m[1])
+
+    expect(checked).toContain(messages.aiPlan.budgetAny)
+    expect(checked.filter((label) => label?.endsWith(messages.aiPlan.fieldBudgetUnit))).toEqual([])
   })
 
   it('만원 단위임을 라벨로 밝힌다', () => {
@@ -228,12 +273,19 @@ describe('AiPlanCreateForm — 기대를 미리 맞춘다', () => {
     expect(render()).toContain(messages.aiPlan.createSubmitHint)
   })
 
-  it('기간을 다 고르면 일수를 말한다', () => {
-    expect(render({ totalDays: 3 })).toContain('3일 일정이에요.')
+  /* `3일 일정이에요` 는 숙박이 몇 번인지 다시 세게 했다 (#1431) */
+  it('기간을 다 고르면 N박 M일로 말한다', () => {
+    expect(render({ totalDays: 3 })).toContain('2박 3일이에요.')
   })
 
-  it('기간이 덜 채워졌으면 일수를 말하지 않는다', () => {
-    expect(render({ totalDays: null })).not.toContain('일정이에요.')
+  it('하루면 당일치기라고 말한다', () => {
+    expect(render({ totalDays: 1 })).toContain('당일치기예요.')
+  })
+
+  it('기간이 덜 채워졌으면 기간을 말하지 않는다', () => {
+    const html = render({ totalDays: null })
+    expect(html).not.toContain('일이에요.')
+    expect(html).not.toContain('당일치기')
   })
 
   it('제출 중에는 버튼을 잠근다', () => {

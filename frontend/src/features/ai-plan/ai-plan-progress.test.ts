@@ -231,11 +231,11 @@ describe('AiPlanProgress — 경과 시간 (#710)', () => {
 })
 
 /*
-  **단계 경과는 단계 이름 옆이다** (#1176). #1057 은 전체 경과 아래 둘째 줄에 뒀는데, `4 / 4단계` 와
-  멀어 "이 단계가 오래 걸린다" 가 단계 표시에서 읽히지 않았다. 숫자를 걷으면서 이름 옆으로 올렸다 —
-  `일정 구성 · 1분 12초째`. 상한 초과 화면은 단계 줄이 없어 예전 두 줄 그대로다.
+  **시계는 하나다** (#1431). #1176 은 단계 경과를 이름 옆(`일정 구성 · 1분 6초째`)에, 전체 경과를 아래
+  (`1분 8초 지남`)에 두었다 — 마지막 단계가 전체의 90% 이상이라 두 값이 거의 같은데 2초씩 어긋나
+  시계가 둘인 화면이 됐다. 이제 아래 한 줄만 서고, 값은 둘 중 큰 쪽이다(`waitElapsedMs`).
 */
-describe('AiPlanProgress — 단계 경과 (#1057 → #1176)', () => {
+describe('AiPlanProgress — 경과 시계 하나 (#1057 → #1176 → #1431)', () => {
   const DRAFTING = { code: 'DRAFTING', name: '일정 구성', description: '일정을 구성합니다.' }
 
   /** 경과 묶음(`aria-hidden` div) 안의 줄 — 순서대로 */
@@ -244,60 +244,35 @@ describe('AiPlanProgress — 단계 경과 (#1057 → #1176)', () => {
     return [...block.matchAll(/<p>([^<]*)<\/p>/g)].map((match) => match[1] ?? '')
   }
 
-  it('단계 이름 옆에 이 단계의 경과가 서고, 경과 묶음은 전체 경과 한 줄이다', () => {
+  it('단계 이름 옆에 경과가 붙지 않고, 경과는 한 줄이다', () => {
     const html = render({
-      elapsedMs: 72_000,
-      stepElapsedMs: 65_000,
+      elapsedMs: 68_000,
+      stepElapsedMs: 66_000,
       step: DRAFTING,
       stepProgress: { order: 4, total: 4 },
     })
 
-    expect(html).toMatch(
-      new RegExp(
-        `${DRAFTING.name}<span aria-hidden="true" class="whitespace-nowrap"> · 1분 5초째</span>`,
-      ),
-    )
-    expect(captionLines(html)).toEqual(['1분 12초 지남 · 보통 1~2분쯤 걸려요'])
+    expect(html).not.toContain('초째')
+    expect(html).toContain(`${DRAFTING.name}</span>`)
+    expect(captionLines(html)).toEqual(['1분 8초 지남 · 보통 1~2분쯤 걸려요'])
   })
 
-  it('단계 경과는 낭독 영역 안이지만 aria-hidden 이다 — 1초마다 읽히지 않는다', () => {
+  /* 새로고침 직후 — 구독 경과는 0 부터, 단계 경과는 서버 시각이라 이어진다 */
+  it('단계 경과가 더 크면 그 값을 쓴다 — 새로고침해도 0 으로 돌아가지 않는다', () => {
     const html = render({
-      elapsedMs: 72_000,
-      stepElapsedMs: 45_000,
+      elapsedMs: 3_000,
+      stepElapsedMs: 66_000,
       step: DRAFTING,
       stepProgress: { order: 4, total: 4 },
     })
 
-    const live = /<div role="status"[^>]*>(.*?)<\/div><div aria-hidden/.exec(html)?.[1] ?? ''
-    // 잡은 영역이 실제 낭독 영역인지부터 — 비어 있으면 아래 단언이 공짜로 통과한다
-    expect(live).toContain(DRAFTING.name)
-    // 낭독 영역 안의 `초째` 는 전부 aria-hidden 안이다
-    expect(live.replace(/<span aria-hidden="true"[^>]*>[^<]*<\/span>/g, '')).not.toContain('초째')
-  })
-
-  /*
-    **표기할 수 없는 순간에도 자리는 남긴다** (#1057 규칙). 새 단계 첫 1초 · 기기 시계가 서버보다 늦어
-    음수인 동안이다. 320 에서는 이 꼬리가 둘째 줄이라, 빠졌다 돌아오면 아래가 튄다(실측).
-  */
-  it.each([
-    ['1초 전이면', 400],
-    ['음수면', -3_000],
-  ])('%s 꼬리 글자만 숨기고 자리는 남긴다', (_, stepElapsedMs) => {
-    const html = render({
-      elapsedMs: 72_000,
-      stepElapsedMs,
-      step: DRAFTING,
-      stepProgress: { order: 4, total: 4 },
-    })
-
-    expect(html).toContain('class="whitespace-nowrap invisible"')
-    expect(captionLines(html)).toEqual(['1분 12초 지남 · 보통 1~2분쯤 걸려요'])
+    expect(captionLines(html)).toEqual(['1분 6초 지남 · 보통 1~2분쯤 걸려요'])
   })
 
   it.each([
     ['값이 없으면', undefined],
     ['null 이면', null],
-  ])('%s 둘째 줄이 없다', (_, stepElapsedMs) => {
+  ])('단계 경과 %s 구독 경과다', (_, stepElapsedMs) => {
     // 생략은 키를 빼서 만든다 (`exactOptionalPropertyTypes`)
     const html = render(
       stepElapsedMs === undefined ? { elapsedMs: 72_000 } : { elapsedMs: 72_000, stepElapsedMs },
@@ -306,17 +281,18 @@ describe('AiPlanProgress — 단계 경과 (#1057 → #1176)', () => {
     expect(captionLines(html)).toEqual(['1분 12초 지남 · 보통 1~2분쯤 걸려요'])
   })
 
-  it('단계 줄이 없으면 단계 경과도 없다 — 경과 묶음에 홀로 서지 않는다', () => {
+  it('구독 경과를 받지 못하면 그 줄이 없다', () => {
     const html = render({ stepElapsedMs: 45_000 })
 
     expect(html).not.toContain('초째')
     expect(html).not.toContain('지남')
   })
 
-  it('상한 초과 화면도 같은 두 줄을 쓴다', () => {
+  it('상한 초과 화면도 한 줄이다', () => {
     const html = render({ phase: 'exceeded', elapsedMs: 330_000, stepElapsedMs: 320_000 })
 
-    expect(html).toContain('<p>5분 30초 지남 · 보통 1~2분쯤 걸려요</p><p>이 단계 5분 20초째</p>')
+    expect(html).toContain('<p>5분 30초 지남 · 보통 1~2분쯤 걸려요</p>')
+    expect(html).not.toContain('이 단계')
   })
 })
 
@@ -380,6 +356,31 @@ describe('AiPlanProgress — 조건 블록 (#710)', () => {
   /* 다른 기기에서 같은 주소를 열면 실제로 이 상태가 된다 (명세 S5 함정 1) */
   it('조건을 잃으면 라벨째 그리지 않는다', () => {
     expect(render()).not.toContain(messages.aiPlan.jobConditionLabel)
+  })
+
+  /* 작업 조회 응답에 요청 문구가 있으면 조건 아래에 함께 선다 (#1431) */
+  it('요청 문구를 조건 아래에 보여 준다', () => {
+    const html = render({ conditionSummary: SUMMARY, requestNote: '바다 산책 위주로' })
+
+    expect(html).toContain(messages.aiPlan.jobConditionNote.replace('{note}', '바다 산책 위주로'))
+    expect(html.indexOf(SUMMARY)).toBeLessThan(html.indexOf('바다 산책 위주로'))
+  })
+
+  it('상한 초과 화면에도 요청 문구가 선다', () => {
+    const html = render({
+      phase: 'exceeded',
+      conditionSummary: SUMMARY,
+      requestNote: '바다 산책 위주로',
+    })
+
+    expect(html).toContain('바다 산책 위주로')
+  })
+
+  /* 응답에 없으면 지어내지 않는다 — "요청 없음" 같은 빈 줄도 없다 */
+  it('요청 문구가 없으면 그 줄이 없다', () => {
+    const html = render({ conditionSummary: SUMMARY })
+
+    expect(html).not.toContain(messages.aiPlan.jobConditionNote.split('{note}')[0] ?? '')
   })
 })
 

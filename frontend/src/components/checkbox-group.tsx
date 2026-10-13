@@ -95,6 +95,15 @@ export function CheckboxGroup({
         {options.map((option) => {
           const optionId = `${id}-${option.value}`
           const checked = values.includes(option.value)
+          const hasDescription = option.description !== undefined && option.description !== null
+          /*
+            **이름은 라벨 글자, 설명은 설명이다** (#1431). `<label>` 이 감싸기만 하면 이름이
+            라벨 글자 + 설명 전부가 되고, 접근성 트리를 읽는 도구에 따라서는 `value`(반려견의
+            Snowflake 숫자 id)가 이름처럼 드러났다 — `765037894317510656 체크박스`. 이름을
+            라벨 글자 하나로 못박고 크기 · 민감도 같은 근거는 `aria-describedby` 로 잇는다.
+          */
+          const labelTextId = `${optionId}-label`
+          const descriptionId = `${optionId}-description`
 
           return (
             <label
@@ -120,12 +129,18 @@ export function CheckboxGroup({
                 value={option.value}
                 checked={checked}
                 onChange={() => toggle(option.value)}
+                aria-labelledby={labelTextId}
+                aria-describedby={hasDescription ? descriptionId : undefined}
                 className="accent-brand-500 mt-1 size-4 shrink-0"
               />
               <span className="flex flex-col gap-1">
-                <span className="text-body-2 text-fg font-medium">{option.label}</span>
-                {option.description !== undefined && option.description !== null && (
-                  <span className="text-caption text-fg-muted">{option.description}</span>
+                <span id={labelTextId} className="text-body-2 text-fg font-medium">
+                  {option.label}
+                </span>
+                {hasDescription && (
+                  <span id={descriptionId} className="text-caption text-fg-muted">
+                    {option.description}
+                  </span>
                 )}
               </span>
             </label>
