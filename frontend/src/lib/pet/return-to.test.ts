@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { petCreateHref, petCreateReturnTo } from '@/lib/pet/return-to'
+import { petCreatedReturnHref, petCreateHref, petCreateReturnTo } from '@/lib/pet/return-to'
 
 describe('petCreateHref — 돌아갈 곳을 실은 등록 경로 (#1153)', () => {
   it('돌아갈 경로를 인코딩해 싣는다', () => {
@@ -63,5 +63,44 @@ describe('petCreateReturnTo — 등록 뒤 돌아갈 곳 (#1153)', () => {
 
   it('쿼리 · 해시는 지킨다', () => {
     expect(petCreateReturnTo('/olle/12?activity=LOW#top')).toBe('/olle/12?activity=LOW#top')
+  })
+})
+
+describe('petCreatedReturnHref — 등록한 아이를 싣고 돌아간다 (#1449)', () => {
+  const PET_ID = '212481712381923328'
+
+  it('AI 일정 만들기로 돌아가면 `?pet=<새 id>` 를 붙인다 — 폼이 그 아이를 미리 고른다', () => {
+    expect(petCreatedReturnHref('/ai-plans/new', PET_ID)).toBe(`/ai-plans/new?pet=${PET_ID}`)
+  })
+
+  it('기존 쿼리 · 해시는 지키고 합친다', () => {
+    expect(petCreatedReturnHref('/ai-plans/new?from=job-1#top', PET_ID)).toBe(
+      `/ai-plans/new?from=job-1&pet=${PET_ID}#top`,
+    )
+  })
+
+  it('이미 붙은 `?pet=` 은 새 아이로 바꾼다 — 두 번 붙으면 폼이 없는 것으로 읽는다', () => {
+    expect(petCreatedReturnHref('/ai-plans/new?pet=old&pet=older', PET_ID)).toBe(
+      `/ai-plans/new?pet=${PET_ID}`,
+    )
+  })
+
+  it('끝 슬래시가 붙은 같은 화면도 싣는다', () => {
+    expect(petCreatedReturnHref('/ai-plans/new/', PET_ID)).toBe(`/ai-plans/new/?pet=${PET_ID}`)
+  })
+
+  it('id 는 인코딩만 한다 — 숫자로 바꾸지 않는다', () => {
+    expect(petCreatedReturnHref('/ai-plans/new', 'a b&c')).toBe('/ai-plans/new?pet=a+b%26c')
+  })
+
+  it.each([
+    '/plans/new',
+    '/plans',
+    '/places/1?tab=a',
+    '/olle/12?activity=LOW#top',
+    '/ai-plans',
+    '/',
+  ])('다른 화면(%s)은 그대로 돌려준다 — `?pet=` 을 읽지 않는 화면이다', (returnTo) => {
+    expect(petCreatedReturnHref(returnTo, PET_ID)).toBe(returnTo)
   })
 })

@@ -55,3 +55,38 @@ export function petCreateReturnTo(raw: string | string[] | undefined): string | 
 
   return `${url.pathname}${url.search}${url.hash}`
 }
+
+/** `?pet=<id>` 를 읽어 그 아이를 미리 고르는 화면 (#1431) */
+const AI_PLAN_CREATE_PATH = '/ai-plans/new'
+const AI_PLAN_PET_PARAM = 'pet'
+
+/**
+ * 등록을 마친 뒤 실제로 `replace` 할 주소 (#1449).
+ *
+ * AI 일정 만들기는 `?pet=<id>` 로 들어오면 그 아이를 미리 고른다(#1431). 그런데 등록 뒤 돌아가는
+ * 주소에 새 아이가 실리지 않아, **방금 등록한 아이가 아니라 헤더 선택 · 대표견이 체크돼** 있었다.
+ * 그래서 돌아갈 곳이 AI 일정 만들기면 `?pet=<새 id>` 를 붙인다.
+ *
+ * - **`returnTo` 는 `petCreateReturnTo` 를 통과한 값이다** — 여기서 다시 판정하지 않고, 경로를
+ *   바꾸지도 않는다. 쿼리 하나만 더한다
+ * - 기존 쿼리 · 해시는 지킨다(`?from=` 조건 되살리기 등). 이미 `pet` 이 붙어 있으면 새 아이로
+ *   **바꾼다** — 두 번 붙은 키는 폼이 없는 것으로 읽는다
+ * - 다른 화면(일정 만들기 · 장소 · 올레)은 `?pet=` 을 읽지 않으므로 그대로 둔다
+ * - `petId` 는 문자열이다 (Snowflake) — 인코딩만 한다
+ */
+export function petCreatedReturnHref(returnTo: string, petId: string): string {
+  let url: URL
+  try {
+    url = new URL(returnTo, PARSE_BASE)
+  } catch {
+    return returnTo
+  }
+  // 상대 경로가 아닌 값이면 손대지 않는다 — 검증은 `petCreateReturnTo` 의 일이다
+  if (url.origin !== PARSE_BASE) return returnTo
+
+  const bare = url.pathname.replace(/\/+$/, '') || HOME_PATH
+  if (bare !== AI_PLAN_CREATE_PATH) return returnTo
+
+  url.searchParams.set(AI_PLAN_PET_PARAM, petId)
+  return `${url.pathname}${url.search}${url.hash}`
+}
