@@ -54,7 +54,7 @@ import { walkTimesBasis, walkTimesQueryPosition } from '@/lib/insight/walk-times
 import { pickWeatherWarning } from '@/lib/insight/weather-warning'
 import { messages } from '@/lib/messages'
 import { resolveSelectedPet } from '@/lib/nav/selected-pet'
-import { planPhaseOf } from '@/lib/plan/date'
+import { tripPhaseOf } from '@/lib/plan/date'
 import { pickHomePlans } from '@/lib/plan/trip-banner'
 import { withCompanionParticle } from '@/lib/text/korean'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -381,11 +381,16 @@ export function HomeView({
 
     **여러 건을 세우게 되면 이 규칙을 다시 봐야 한다** — 여행 중과 다가오는 것이 한 섹션에
     섞이면 어느 쪽도 제목이 될 수 없다. 그때는 일정 목록처럼 묶음을 갈라야 한다.
+
+    **판정은 행과 같은 `tripPhaseOf` 다** (#1458) — 출발 당일을 여행 중(1일차)으로 접는다. 행이
+    그날을 `여행 중` 으로 부르는데 제목이 `planPhaseOf`(당일 = 다가옴)를 보면 `다가오는 일정` 아래
+    `여행 중` 이 서 #561 의 모순이 출발 당일에 되살아난다. 출발 당일 일정이 이 섹션에 오는 것은
+    배너가 더 이른 여행 중 일정을 가져간 날뿐이고, 그날 두 일정은 모두 진행 중이다.
   */
   const showsOngoingPlan =
     today !== null &&
     upcomingPlans.some(
-      (plan) => planPhaseOf(plan.startDate, plan.endDate, today)?.kind === 'ongoing',
+      (plan) => tripPhaseOf(plan.startDate, plan.endDate, today)?.kind === 'ongoing',
     )
 
   return (

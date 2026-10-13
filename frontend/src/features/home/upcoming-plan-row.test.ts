@@ -50,6 +50,34 @@ describe('홈의 다가오는 일정 행', () => {
   })
 
   /*
+    #1458. 출발 당일은 목록(#1433) · 상세 개요(#1446) · 홈 배너가 모두 `1일차` 로 부른다 —
+    이 행만 `D-DAY` 였다. 표기는 `tripPhaseOf` 로 맞추고, 판정 축(`planPhaseOf`)은 그대로다.
+  */
+  describe('출발 당일은 D-DAY 가 아니라 오늘 1일차다 (#1458)', () => {
+    it('출발 당일은 기둥이 여행 중이고 날짜 줄이 오늘 1일차다', () => {
+      const markup = render({ startDate: '2026-08-27', endDate: '2026-08-29' })
+
+      expect(markup).toContain(messages.plan.ongoing)
+      expect(markup).toContain('오늘 1일차')
+      expect(markup).not.toContain(messages.plan.ddayToday)
+    })
+
+    it('당일치기도 그날은 오늘 1일차다', () => {
+      const markup = render({ startDate: '2026-08-27', endDate: '2026-08-27' })
+
+      expect(markup).toContain('오늘 1일차')
+      expect(markup).not.toContain(messages.plan.ddayToday)
+    })
+
+    it('출발 전날은 그대로 D-1 이다', () => {
+      const markup = render({ startDate: '2026-08-28', endDate: '2026-08-30' })
+
+      expect(markup).toContain('D-1')
+      expect(markup).not.toContain(messages.plan.ongoing)
+    })
+  })
+
+  /*
     #998. 예전에는 `{startDate} – {endDate.slice(5)}` 로 `2026-09-12 – 09-14` 를 썼다 —
     목록 행(`plan-row`)은 같은 일정을 `2026년 9월 12일 (토) – 9월 14일 (월)` 로 부른다.
     **목록 행과 같은 함수(`formatPlanDateRange`)** 라 올해 일정에도 연도가 선다.
