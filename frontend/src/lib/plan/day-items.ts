@@ -141,7 +141,15 @@ export function editStartTimesRegress(items: PlanDayEditItem[]): boolean {
   return hasBackwardTime(survivingItems(items).map((item) => item.startTime))
 }
 
-function toPayloadItem(item: PlanItemDetail, day: number, sequence: number): PlanItemPayload {
+/**
+ * 항목 하나를 일괄 교체 본문의 한 줄로 되싣는다. 메모 고치기(`item-memo-edit.ts`, #1460)도 이것을
+ * 쓴다 — 되싣는 규칙(E1)이 두 벌이 되면 한쪽만 고쳐졌을 때 다른 쪽 저장이 필드를 잃는다.
+ */
+export function toPayloadItem(
+  item: PlanItemDetail,
+  day: number,
+  sequence: number,
+): PlanItemPayload {
   return {
     day,
     sequence,
