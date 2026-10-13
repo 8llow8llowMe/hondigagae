@@ -37,10 +37,20 @@ export function PlaceVerdictSummary({
   congestion,
 }: {
   place: PlaceDetail
-  walkSafety: { data: WalkSafetyResponse | null; loading: boolean; failed: boolean }
+  walkSafety: {
+    data: WalkSafetyResponse | null
+    loading: boolean
+    failed: boolean
+    /** 일정에서 들어왔을 때의 날짜 (#1429) */
+    tripDate?: string | null
+  }
   congestion: { data: PlaceCongestionResponse | null; loading: boolean; failed: boolean }
 }) {
-  const lines = verdictSummaryLines(place, walkSafety, congestion)
+  // 요약 줄은 여행 기간 전체가 아니라 **들어온 일차 하루**의 붐빔만 말한다 (#1429)
+  const lines = verdictSummaryLines(place, walkSafety, {
+    ...congestion,
+    tripDate: walkSafety.tripDate ?? null,
+  })
 
   return (
     /*

@@ -437,3 +437,44 @@ describe('PlaceWalkSafetyPanel — 기상특보', () => {
     expect(render()).not.toContain('폭염 경보')
   })
 })
+
+/**
+ * 일정에서 들어왔을 때 (#1429 · 장소상세-세부명세 D1-5).
+ *
+ * 보리 일정에서 들어와도 "몽 기준" 이 나오던 것이 이 이슈다 — 기준 줄이 **그 일정의 아이와
+ * 여행일**을 말해야 한다. 날짜는 요청값이 아니라 응답의 `targetDateTime` 에서 읽는다.
+ */
+describe('PlaceWalkSafetyPanel — 일정 기준 (#1429)', () => {
+  const tripData = { ...walkSafety, targetDateTime: '2026-11-06T14:00:00' }
+
+  it('라벨이 `지금 산책` 이 아니라 `여행일 산책` 이다', () => {
+    const markup = render({ data: tripData, tripDate: '2026-11-06', petName: '보리' })
+
+    expect(markup).toContain(messages.place.detailWalkSafetyTripLabel)
+    expect(markup).not.toContain(messages.place.detailWalkSafetyLabel)
+  })
+
+  it('기준 줄이 반려견과 여행일을 말한다 — `보리 기준 · 11/6 14:00`', () => {
+    const markup = render({ data: tripData, tripDate: '2026-11-06', petName: '보리' })
+
+    expect(markup).toContain('보리 기준 · 11/6 14:00')
+  })
+
+  it('특성을 반영하지 못했으면 반려견을 빼고 날짜만 말한다', () => {
+    const markup = render({
+      data: { ...tripData, petConditionApplied: false },
+      tripDate: '2026-11-06',
+      petName: '보리',
+    })
+
+    expect(markup).toContain('11/6 14:00 기준')
+    expect(markup).not.toContain('보리')
+  })
+
+  it('tripDate 가 없으면 지금 동작 그대로다', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.place.detailWalkSafetyLabel)
+    expect(markup).toContain('14:00 기준 · 몽실이 기준')
+  })
+})

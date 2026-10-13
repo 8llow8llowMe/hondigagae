@@ -264,6 +264,11 @@ export const placeMessages = {
    * 오늘을 말하고, 여기는 **보고 있는 이 장소의 지금**이다.
    */
   detailWalkSafetyLabel: '지금 산책',
+  /**
+   * 일정에서 들어왔을 때 (#1429 · 장소상세-세부명세 D1-5). **`지금` 이라 쓰지 않는다** —
+   * 판정이 오늘 지금이 아니라 그 여행일(다른 날이면 14시)의 것이다.
+   */
+  detailWalkSafetyTripLabel: '여행일 산책',
 
   /** 등급 문구는 없다 — 서버 `walkSafetyLevel.name` 을 그대로 넣는다 */
   detailWalkSafetyErrorTitle: '산책 위험도를 불러오지 못했어요',
@@ -316,6 +321,13 @@ export const placeMessages = {
    */
   detailWalkSafetyBasis: '{time} 기준',
   detailWalkSafetyBasisWithPet: '{time} 기준 · {name} 기준',
+  /**
+   * 일정에서 들어왔을 때 (#1429). `{date}` 는 `11/6` 모양이다(`shortDateLabel`). **반려견을
+   * 앞에 둔다** — 이 진입에서 사용자가 확인하려는 것은 "헤더의 아이가 아니라 이 일정의 아이로
+   * 판정했나" 다.
+   */
+  detailWalkSafetyTripBasis: '{date} {time} 기준',
+  detailWalkSafetyTripBasisWithPet: '{name} 기준 · {date} {time}',
 
   /** `{start}` · `{end}` 치환. **없으면 줄 자체를 렌더하지 않는다** — 지어내지 않는다 */
   detailSaferWindow: '더 안전한 시간대는 {start} – {end}',
@@ -405,6 +417,8 @@ export const placeMessages = {
    */
   detailSummaryPetUnknown: '정보 없음 · 방문 전 확인해요',
   detailSummaryWalkLabel: '지금 산책',
+  /** 일정에서 들어왔을 때 (#1429). 패널 라벨 `detailWalkSafetyTripLabel` 과 같은 말이다 */
+  detailSummaryWalkTripLabel: '여행일 산책',
   /** `{feelsLike}` 가 `null` 이면 등급만 쓴다 — `0.0℃` 는 영하로 읽힌다 */
   detailSummaryWalkValue: '{grade} · 체감 {feelsLike}℃',
   detailSummaryCongestionLabel: '덜 붐비는 날',
@@ -414,6 +428,11 @@ export const placeMessages = {
    * 거절하고 등급 배지를 반드시 붙인다 (`place-congestion-panel.tsx` `LeastCrowded`).
    */
   detailSummaryCongestionValue: '{day} · {grade}',
+  /**
+   * 일정에서 들어왔을 때 그 여행일의 붐빔 (#1429). 값은 `detailSummaryCongestionValue` 를
+   * 그대로 쓴다. **그날을 모르면(받은 기간 밖 · `UNKNOWN`) 이 줄 대신 `덜 붐비는 날` 이 선다.**
+   */
+  detailSummaryCongestionTripLabel: '여행일 붐빔',
 
   // ── 장소 상세 · 기간 혼잡도 (#430) ──────────────────────────────────────
 
@@ -427,6 +446,11 @@ export const placeMessages = {
    * 하나도 없다는 뜻이라, 빈 자리는 "한산한 날이 없다" 로 읽힌다.
    */
   detailCongestionLeastLabel: '가장 덜 붐비는 날',
+  /**
+   * 일정에서 들어왔을 때 여행일 혼잡도 줄 (#1429). **`가장 덜 붐비는 날` 보다 먼저 선다** —
+   * 날짜를 이미 정한 사람에게 다른 날 추천만 내밀면 정한 날을 무시하는 화면이 된다.
+   */
+  detailCongestionTripLabel: '내 여행일',
   detailCongestionLeastDay: '{month}월 {day}일 ({weekday})',
   /** 집중률은 단위가 없는 지표(0~100)다. **숫자는 이 줄에만 적는다.** `%` 를 붙이지 않는다 */
   detailCongestionRateLabel: '집중률',

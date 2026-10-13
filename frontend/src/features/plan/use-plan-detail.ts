@@ -33,10 +33,12 @@ export function usePlanDetail(planId: string, options?: { enabled?: boolean }) {
  * 일자별 판정. **상세와 별도 query 다** — 판정만 실패해도 일정 본문은 살아 있어야 하고
  * (아트보드 06 ③) 그 섹션만 따로 재시도할 수 있어야 한다.
  */
-export function usePlanWeather(planId: string) {
+export function usePlanWeather(planId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: planKeys.weather(planId),
     queryFn: () => fetchPlanWeather(planId),
+    // 장소 상세가 일정에서 들어왔을 때만 부른다 (#1429). 기본값은 켜짐이라 기존 호출부는 그대로다
+    enabled: options?.enabled ?? true,
     staleTime: PLAN_QUERY_OPTIONS.staleTime,
     gcTime: PLAN_QUERY_OPTIONS.gcTime,
   })

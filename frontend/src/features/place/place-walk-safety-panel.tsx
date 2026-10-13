@@ -20,6 +20,7 @@ import { VERDICT_ANCHOR } from '@/features/place/place-verdict-summary-lines'
 import { formatStandaloneCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
+import { shortDateLabel } from '@/lib/place/plan-context'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { WalkSafetyResponse } from '@/types/insight'
@@ -36,8 +37,14 @@ export type PlaceWalkSafetyPanelProps = {
   loading: boolean
   failed: boolean
   onRetry: () => void
-  /** 선택된 반려견. null 이면 기준 줄에서 반려견을 빼고 값만 말한다 */
+  /** 판정 기준 반려견. null 이면 기준 줄에서 반려견을 빼고 값만 말한다 */
   petName: string | null
+  /**
+   * 일정에서 들어왔을 때의 날짜 (#1429 · 장소상세-세부명세 D1-5). **있으면 이 판정은
+   * "지금" 이 아니라 그 여행일의 판정이다** — 라벨이 `여행일 산책` 이 되고 기준 줄이 날짜를
+   * 말한다. 없으면(기본) 지금 동작 그대로다.
+   */
+  tripDate?: string | null
 }
 
 /**
@@ -68,6 +75,7 @@ export function PlaceWalkSafetyPanel({
   failed,
   onRetry,
   petName,
+  tripDate = null,
 }: PlaceWalkSafetyPanelProps) {
   if (loading) return <PanelSkeleton />
 
@@ -113,7 +121,9 @@ export function PlaceWalkSafetyPanel({
             쓴다 (`legal-document-view.tsx`).
           */}
           <span id={VERDICT_ANCHOR.walk} className="text-fg-muted scroll-mt-20">
-            {messages.place.detailWalkSafetyLabel}
+            {tripDate === null
+              ? messages.place.detailWalkSafetyLabel
+              : messages.place.detailWalkSafetyTripLabel}
           </span>
           <MetricWord tone={tone}>{data.walkSafetyLevel.name}</MetricWord>
           <WeatherWarningBadge warning={data.weatherWarning} />
@@ -195,7 +205,7 @@ export function PlaceWalkSafetyPanel({
       */}
       <ReasonList reasons={data.reasons.map((reason) => ({ description: reason.description }))} />
 
-      <BasisLine data={data} petName={petName} />
+      <BasisLine data={data} petName={petName} trip={tripDate !== null} />
 
       <SaferWindow data={data} />
     </div>
@@ -268,9 +278,38 @@ export function FeelsLikeBasisContent({ data }: { data: WalkSafetyResponse }) {
  * 같은 문제를 푸는 것과 같은 방향이고, 이 저장소가 `weatherApplied`·`congestionApplied` 를
  * 감추지 않는 이유도 같다.
  */
-function BasisLine({ data, petName }: { data: WalkSafetyResponse; petName: string | null }) {
+function BasisLine({
+  data,
+  petName,
+  trip,
+}: {
+  data: WalkSafetyResponse
+  petName: string | null
+  /** 일정에서 들어왔다 (#1429) — 시각만으로는 어느 날인지 말하지 못한다 */
+  trip: boolean
+}) {
   const time = toTimeLabel(data.targetDateTime)
   const withPet = petName !== null && data.petConditionApplied
+  /*
+    **날짜는 응답의 `targetDateTime` 에서 읽는다** — 요청한 날짜가 아니라 서버가 실제로 판정한
+    날짜다. 둘이 갈리면 화면이 서버 답을 말해야 한다. 못 읽으면 지금 동작의 문장으로 물러선다.
+  */
+  const date = trip ? shortDateLabel(data.targetDateTime) : null
+
+  if (date !== null) {
+    return (
+      <p className="text-caption text-fg-muted font-medium tabular-nums">
+        {withPet
+          ? messages.place.detailWalkSafetyTripBasisWithPet
+              .replace('{name}', petName)
+              .replace('{date}', date)
+              .replace('{time}', time)
+          : messages.place.detailWalkSafetyTripBasis
+              .replace('{date}', date)
+              .replace('{time}', time)}
+      </p>
+    )
+  }
 
   return (
     <p className="text-caption text-fg-muted font-medium tabular-nums">

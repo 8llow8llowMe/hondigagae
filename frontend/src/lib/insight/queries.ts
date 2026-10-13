@@ -13,8 +13,14 @@ import { isRetriable } from '@/lib/api/error'
 export const insightKeys = {
   all: ['insight'] as const,
   /** 조건이 달라지면 다른 판정이므로 key 에 포함한다 — 반려견을 바꾸면 재조회된다 */
-  walkSafety: (placeId: string, conditionKey: string) =>
-    [...insightKeys.all, 'walk-safety', placeId, conditionKey] as const,
+  /**
+   * **일정 기준 날짜(#1429)가 있으면 key 끝에 붙는다.** 없을 때 모양은 그대로라 홈과 캐시를
+   * 계속 공유한다 — 날짜가 붙은 판정은 다른 날의 답이라 섞이면 안 된다.
+   */
+  walkSafety: (placeId: string, conditionKey: string, targetDate: string | null = null) =>
+    targetDate === null
+      ? ([...insightKeys.all, 'walk-safety', placeId, conditionKey] as const)
+      : ([...insightKeys.all, 'walk-safety', placeId, conditionKey, targetDate] as const),
   suitability: (placeId: string, conditionKey: string) =>
     [...insightKeys.all, 'suitability', placeId, conditionKey] as const,
   /**

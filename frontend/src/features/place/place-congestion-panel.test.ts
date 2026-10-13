@@ -652,3 +652,33 @@ describe('PlaceCongestionPanel — 집중률 표현 (#651)', () => {
     expect(rateLine(render())).not.toContain('%')
   })
 })
+
+/**
+ * 일정에서 들어왔을 때 여행일 혼잡도 (#1429 · 장소상세-세부명세 D1-5).
+ *
+ * "가장 덜 붐비는 날" 이 이미 정한 여행일을 무시하던 것이 이 이슈다. 받아 둔 기간에서 여행일만
+ * 골라 **먼저** 보여 주고, 서버가 고른 날은 그 아래에 그대로 남는다.
+ */
+describe('PlaceCongestionPanel — 내 여행일 (#1429)', () => {
+  it('여행일을 `가장 덜 붐비는 날` 보다 먼저 보여 준다', () => {
+    const markup = render({ tripDates: ['2026-09-06', '2026-09-07'] })
+
+    const trip = markup.indexOf(messages.place.detailCongestionTripLabel)
+    const least = markup.indexOf(messages.place.detailCongestionLeastLabel)
+    expect(trip).toBeGreaterThan(-1)
+    expect(least).toBeGreaterThan(trip)
+    expect(markup).toContain('9월 6일 (일)')
+    expect(markup).toContain('9월 7일 (월)')
+  })
+
+  it('받은 기간과 겹치는 여행일이 없으면 자리를 만들지 않는다', () => {
+    const markup = render({ tripDates: ['2026-11-06'] })
+
+    expect(markup).not.toContain(messages.place.detailCongestionTripLabel)
+    expect(markup).toContain(messages.place.detailCongestionLeastLabel)
+  })
+
+  it('tripDates 가 없으면 지금 동작 그대로다', () => {
+    expect(render()).not.toContain(messages.place.detailCongestionTripLabel)
+  })
+})

@@ -9,6 +9,7 @@ import { PlaceDetailSection } from '@/features/place/place-detail-section'
 import { PlaceLoginPromptSheet } from '@/features/place/place-login-prompt-sheet'
 import { usePlaceCongestion } from '@/features/place/use-place-congestion'
 import { usePlaceDetail } from '@/features/place/use-place-detail'
+import { usePlacePlanBasis } from '@/features/place/use-place-plan-basis'
 import { usePlaceSuitability } from '@/features/place/use-place-suitability'
 import { usePlaceWalkSafety } from '@/features/place/use-place-walk-safety'
 import { PlaceAddToPlanSheet } from '@/features/plan/place-add-to-plan-sheet'
@@ -49,7 +50,25 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
     한쪽만 실패할 수 있다. 조건을 한 번만 만들어 둘에 넘기는 이유는 두 key 가 같은
     `conditionKey` 로 갈려야 반려견 전환이 두 판정에 동시에 반영되기 때문이다.
   */
-  const walkSafety = usePlaceWalkSafety(placeId, condition)
+  /*
+    **일정에서 들어왔으면 그 일정의 반려견 · 날짜로 판정한다** (#1429 · 장소상세-세부명세 D1-5).
+    `?plan=&day=` 가 없거나 틀렸거나 일정을 못 읽으면 `none` 이라 위의 지금 동작 그대로다.
+
+    **산책 위험도만 바꾼다.** 적합도는 헤더의 반려견 · 오늘 그대로 둔다 — 범위 결정은 명세
+    D1-5-4 에 있다. 기준이 정해지는 동안(`pending`)은 조회를 켜지 않는다: 헤더 반려견으로
+    먼저 부르면 요청이 두 번 나가고 판정이 한 번 뒤바뀐다.
+  */
+  const planBasis = usePlacePlanBasis(authed)
+  const trip = planBasis.status === 'ready' ? planBasis.basis : null
+  const walkPet = trip?.pet ?? pet
+  const walkSafety = usePlaceWalkSafety(
+    placeId,
+    trip === null ? condition : toPetCondition(trip.pet),
+    {
+      targetDate: trip?.date ?? null,
+      ready: planBasis.status !== 'pending',
+    },
+  )
 
   /*
     기간 혼잡도 (#430). **반려견 조건을 넘기지 않는다** — 붐빔은 장소와 날짜의 속성이라
@@ -110,7 +129,8 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
           loading: walkSafety.isPending,
           failed: walkSafety.isError,
           onRetry: () => void walkSafety.refetch(),
-          petName: pet?.name ?? null,
+          petName: walkPet?.name ?? null,
+          tripDate: trip?.date ?? null,
         }}
         /*
           기간 혼잡도는 **게스트에게도 그린다** — 산책 위험도와 같다. 붐빔은 장소와 날짜의
@@ -123,6 +143,7 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
           onRetry: () => void congestion.refetch(),
           days: congestionDays,
           onDaysChange: setCongestionDays,
+          tripDates: trip?.tripDates ?? null,
         }}
         petName={pet?.name ?? null}
         petSizeCode={pet?.sizeType.code ?? null}

@@ -131,8 +131,11 @@ export function PlanDaySection({
   walkSafety,
   itemTime,
   regenerateHref,
+  planId,
 }: {
   day: number
+  /** 항목 장소 링크에 일정 맥락(`?plan=&day=`)을 싣는다 (#1429). 없으면 맨 주소다 */
+  planId?: string
   /** `YYYY-MM-DD`. 서버 판정의 날짜가 아니라 일정 기간에서 계산한 값이다 */
   date: string | null
   rows: PlanItemRowModel[]
@@ -338,6 +341,7 @@ export function PlanDaySection({
                 focusKey: timeChipFocusKey(day, index),
               }}
               timeIssue={timeIssues[index] ?? null}
+              planId={planId}
             />
           ))}
         </SurfaceList>

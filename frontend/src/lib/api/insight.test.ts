@@ -108,6 +108,17 @@ describe('경로 조립', () => {
     expect(suitabilityPath('123', toPetCondition(pet))).toContain('/places/123/suitability?')
   })
 
+  /* 일정에서 들어왔을 때만 날짜가 실린다 (#1429) — 그 밖에는 서버가 오늘로 잡는다 */
+  it('산책 위험도는 일정 날짜를 targetDate 로 싣는다', () => {
+    expect(walkSafetyPath('123', null, '2026-11-06')).toBe(
+      '/places/123/walk-safety?targetDate=2026-11-06',
+    )
+    expect(walkSafetyPath('123', toPetCondition(pet), '2026-11-06')).toContain(
+      'targetDate=2026-11-06',
+    )
+    expect(walkSafetyPath('123', toPetCondition(pet))).not.toContain('targetDate')
+  })
+
   /* 적합도가 실제로 이 값을 달고 나가는지 — 조립 단계만 보면 경로에서 빠져도 모른다 */
   it('적합도 경로에 사회성이 실린다', () => {
     expect(suitabilityPath('123', toPetCondition(pet))).toContain('petSociality=HIGH')
