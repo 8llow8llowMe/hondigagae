@@ -12,7 +12,23 @@
 export const petMessages = {
   // 화면
   listTitle: '내 반려견',
+  /**
+   * 목록 머리 안내. **반려견 수에 따라 갈린다** (#1430) — 0마리 · 셀 수 없음(로딩·오류)에만
+   * 이 문장이다. 이미 3마리를 등록한 사람에게 "등록해 보세요" 는 맞지 않는다.
+   * 고르는 규칙은 `lib/pet/next-step.ts` 의 `petListDescription`. 페이지 metadata 도 이 문장을 쓴다.
+   */
   listDescription: '내 반려견을 등록해 여행 계획을 완성해 보세요.',
+  /** 1~4마리 — 더 등록할 수 있다 */
+  listDescriptionSome: '반려견을 눌러 정보를 고치거나, 함께할 아이를 더 등록할 수 있어요.',
+  /** 상한(5마리) — 더 등록하라고 말하지 않는다. 이유는 머리의 `limitReached` 가 말한다 */
+  listDescriptionFull: '반려견을 눌러 정보를 고칠 수 있어요.',
+
+  /**
+   * 등록 직후 목록의 다음 행동 (#1430). 등록하면 목록으로만 돌아가 할 일이 끊겼다.
+   * `{name}` 은 동반격 조사를 붙여 치환한다 (`withCompanionParticle`) — `몽실이와` / `곰과`.
+   */
+  nextStepDescription: '방금 등록한 정보를 기준으로 여행 일정을 짜 드려요.',
+  nextStepAction: '{name} 여행 만들기',
   newTitle: '반려견 등록',
   editTitle: '반려견 정보 수정',
   /**

@@ -5,7 +5,7 @@ import { ChevronRightIcon } from '@/components/icons'
 import { PetPhoto } from '@/features/pet/pet-photo'
 import { PetTraitBadges } from '@/features/pet/pet-trait-badges'
 import { messages } from '@/lib/messages'
-import { petAgeText } from '@/lib/pet/describe'
+import { petAgeText, petWeightText } from '@/lib/pet/describe'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import type { Pet } from '@/types/pet'
 
@@ -28,6 +28,17 @@ import type { Pet } from '@/types/pet'
  * **행 안에 별도 링크·버튼을 두지 않는다.** 중첩 링크가 된다. 수정·삭제는 이동한 화면에서 한다.
  */
 export function PetRow({ pet, inset = 'card' }: { pet: Pet; inset?: Inset }) {
+  /*
+    **생년월·나이와 체중을 한 줄에 둔다** (#1430). 체중은 입력하고도 어디에도 보이지 않아
+    저장됐는지 알 수 없었다. 둘 다 모르면(`null`) 줄째 뺀다 — "정보 없음" 을 그리지 않는다.
+  */
+  const meta = [
+    pet.age !== null
+      ? `${messages.pet.labels.birthYm} ${pet.birthYm} · ${petAgeText(pet.age)}`
+      : null,
+    pet.weightKg !== null ? `${messages.pet.weightLabel} ${petWeightText(pet.weightKg)}` : null,
+  ].filter((part): part is string => part !== null)
+
   return (
     <li className={INSET_CLASS[inset]}>
       <Link
@@ -67,10 +78,8 @@ export function PetRow({ pet, inset = 'card' }: { pet: Pet; inset?: Inset }) {
             </div>
           </div>
 
-          {pet.age !== null && (
-            <p className="text-caption text-fg-muted tabular-nums">
-              {messages.pet.labels.birthYm} {pet.birthYm} · {petAgeText(pet.age)}
-            </p>
+          {meta.length > 0 && (
+            <p className="text-caption text-fg-muted tabular-nums">{meta.join(' · ')}</p>
           )}
 
           <PetTraitBadges pet={pet} />

@@ -242,3 +242,75 @@ describe('PetListSection — 등록 버튼은 셀 수 있을 때만 머리에 (#
     expect(markup).toContain('몽실이')
   })
 })
+
+describe('PetListSection — 머리 안내 (#1430)', () => {
+  it('반려견이 있으면 등록을 처음부터 권하지 않는다', () => {
+    const markup = render({
+      pets: [pet(), pet({ petId: '2' }), pet({ petId: '3' })],
+      totalCount: 3,
+    })
+
+    expect(markup).not.toContain(messages.pet.listDescription)
+    expect(markup).toContain(messages.pet.listDescriptionSome)
+  })
+
+  it('0건이면 등록을 권한다', () => {
+    expect(render({ pets: [], totalCount: 0 })).toContain(messages.pet.listDescription)
+  })
+
+  it('상한이면 더 등록하라고 말하지 않는다', () => {
+    const pets = ['1', '2', '3', '4', '5'].map((petId) => pet({ petId }))
+    expect(render({ pets, totalCount: 5 })).toContain(messages.pet.listDescriptionFull)
+  })
+
+  it('로딩 중에는 기본 문장이다 — 0 을 센 것으로 읽지 않는다', () => {
+    expect(render({ loading: true, pets: [], totalCount: 0 })).toContain(
+      messages.pet.listDescription,
+    )
+  })
+})
+
+describe('PetListSection — 등록 뒤 다음 행동 (#1430)', () => {
+  it('방금 등록한 아이로 AI 일정 만들기를 권한다', () => {
+    const markup = render({ registeredPetId: '123456789012000001' })
+
+    expect(markup).toContain('href="/ai-plans/new?pet=123456789012000001"')
+    expect(markup).toContain('몽실이와 여행 만들기')
+    expect(markup).toContain(messages.pet.nextStepDescription)
+  })
+
+  it('받침 있는 이름에는 "과" 를 붙인다', () => {
+    const markup = render({
+      pets: [pet({ name: '곰' })],
+      registeredPetId: '123456789012000001',
+    })
+
+    expect(markup).toContain('곰과 여행 만들기')
+  })
+
+  it('id 가 없거나 목록에 없으면 권하지 않는다', () => {
+    expect(render()).not.toContain('/ai-plans/new')
+    expect(render({ registeredPetId: '999' })).not.toContain('/ai-plans/new')
+  })
+})
+
+describe('PetRow — 체중 (#1430)', () => {
+  it('체중이 있으면 행에 보인다', () => {
+    const markup = render({ pets: [pet({ weightKg: 3.5 })] })
+
+    expect(markup).toContain(`${messages.pet.weightLabel} 3.5kg`)
+  })
+
+  it('체중을 모르면 그리지 않는다 — 0kg 로 채우지 않는다', () => {
+    const markup = render({ pets: [pet({ weightKg: null })] })
+
+    expect(markup).not.toContain(`${messages.pet.weightLabel} `)
+  })
+
+  it('나이를 몰라도 체중은 보인다', () => {
+    const markup = render({ pets: [pet({ age: null, birthYm: null, weightKg: 12 })] })
+
+    expect(markup).toContain(`${messages.pet.weightLabel} 12kg`)
+    expect(markup).not.toContain(`${messages.pet.labels.birthYm} `)
+  })
+})

@@ -5,7 +5,12 @@ import { usePetList } from '@/features/pet/use-pet-list'
 import { toErrorStatus } from '@/lib/api/error'
 
 /** 조회 상태를 presentational 컴포넌트가 쓰는 props 로 변환한다 */
-export function PetListView() {
+export function PetListView({
+  registeredPetId = null,
+}: {
+  /** 방금 등록한 반려견 id — 페이지가 `?registered=` 에서 읽어 넘긴다 (#1430) */
+  registeredPetId?: string | null
+}) {
   const query = usePetList(true)
   // `/pets` 는 proxy.ts `PROTECTED_PATHS` 라 미로그인이 여기 닿지 않는다 (#200)
 
@@ -16,6 +21,7 @@ export function PetListView() {
       loading={query.isPending}
       errorStatus={toErrorStatus(query.error)}
       onRetry={() => void query.refetch()}
+      registeredPetId={registeredPetId}
     />
   )
 }

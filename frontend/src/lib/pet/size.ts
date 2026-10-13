@@ -1,4 +1,4 @@
-import { toWeightPayload } from '@/lib/pet/weight'
+import { isValidWeightInput, toWeightPayload } from '@/lib/pet/weight'
 import type { PetSizeCode } from '@/types/pet'
 
 /**
@@ -64,6 +64,13 @@ export function sizeChangeForWeight(
   // 아직 고르지 않았으면(`''`, #1185) 체중이 정한 크기로 채운다
   currentSize: PetSizeCode | '',
 ): PetSizeCode | null {
+  /*
+    **저장할 수 있는 체중일 때만 옮긴다** (#1430). 형식만 맞고 범위 밖인 값(`0` · `0.0`)도
+    크기를 낼 수 있어, 체중 칸이 오류를 말하는 동안 라디오가 그 거짓 값을 따라갔다.
+    범위 판정은 `isValidWeightInput` 한 곳이 갖는다 — 빈 값은 유효하지만 위에서 `null` 이 된다.
+  */
+  if (!isValidWeightInput(weightInput)) return null
+
   const derived = sizeFromWeightInput(weightInput)
 
   return derived === null || derived === currentSize ? null : derived

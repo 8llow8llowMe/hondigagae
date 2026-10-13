@@ -103,6 +103,9 @@ export function RadioGroup<T extends string>({
       <div className={cn(grid ? 'grid grid-cols-3 gap-2' : 'flex flex-col gap-2')}>
         {options.map((option) => {
           const optionId = `${id}-${option.value}`
+          const labelId = `${optionId}-label`
+          const descriptionId = `${optionId}-description`
+          const hasDescription = option.description !== undefined && option.description !== null
           /*
             **입력은 한 번만 적는다.** 두 갈래가 각자 `<input>` 을 그리면 `name` · `checked` ·
             `onChange` 배선이 두 벌이 되고, 한쪽만 고친 채로 남는다.
@@ -114,15 +117,24 @@ export function RadioGroup<T extends string>({
               name={id}
               value={option.value}
               checked={value === option.value}
+              /*
+                **접근 이름을 보이는 라벨에 못박는다** (#1430). `<label>` 이 입력을 감싸고 있어
+                이름 계산이 감싼 내용 전체(입력 자신 포함)를 훑는데, 도구에 따라 `value`(코드
+                `SMALL`)가 이름으로 들렸다. 코드는 서버에 보내는 값이지 사람이 듣는 말이 아니다.
+                설명(`체중 10kg 미만`)은 이름이 아니라 설명으로 건다 — 이름에 섞이면 매번 길게 읽힌다.
+              */
+              aria-labelledby={labelId}
+              aria-describedby={hasDescription ? descriptionId : undefined}
               disabled={disabled}
               onChange={() => onValueChange(option.value)}
               className={cn('accent-brand-500 size-4 shrink-0', !grid && 'mt-1')}
             />
           )
-          const description =
-            option.description !== undefined && option.description !== null ? (
-              <span className="text-caption text-fg-muted break-keep">{option.description}</span>
-            ) : null
+          const description = hasDescription ? (
+            <span id={descriptionId} className="text-caption text-fg-muted break-keep">
+              {option.description}
+            </span>
+          ) : null
 
           return (
             <label
@@ -154,7 +166,7 @@ export function RadioGroup<T extends string>({
                 <>
                   <span className="flex items-center gap-2">
                     {input}
-                    <span className="text-body-2 text-fg font-medium break-keep">
+                    <span id={labelId} className="text-body-2 text-fg font-medium break-keep">
                       {option.label}
                     </span>
                   </span>
@@ -164,7 +176,9 @@ export function RadioGroup<T extends string>({
                 <>
                   {input}
                   <span className="flex flex-col gap-1">
-                    <span className="text-body-2 text-fg font-medium">{option.label}</span>
+                    <span id={labelId} className="text-body-2 text-fg font-medium">
+                      {option.label}
+                    </span>
                     {description}
                   </span>
                 </>

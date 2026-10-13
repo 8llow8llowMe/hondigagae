@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { describePet, petAgeText } from '@/lib/pet/describe'
+import { describePet, petAgeText, petWeightText } from '@/lib/pet/describe'
 import type { Pet } from '@/types/pet'
 
 const pet: Pet = {
@@ -57,5 +57,16 @@ describe('describePet — 조각이 없으면 null 이다', () => {
 
   it('조각이 하나도 없으면 빈 문자열이 아니라 null 이다', () => {
     expect(describePet({ ...pet, breed: null, age: null })).toBe(null)
+  })
+})
+
+describe('petWeightText — 체중 한 조각 (#1430)', () => {
+  it('kg 를 붙인다', () => {
+    expect(petWeightText(3.5)).toBe('3.5kg')
+    expect(petWeightText(12)).toBe('12kg')
+  })
+
+  it('모르면 null 이다 — 0kg 로 그리지 않는다', () => {
+    expect(petWeightText(null)).toBeNull()
   })
 })

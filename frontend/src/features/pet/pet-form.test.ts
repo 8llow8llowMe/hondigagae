@@ -565,3 +565,52 @@ describe('petFormSchema', () => {
     }
   })
 })
+
+describe('PetFormFields — 체중 blur 검증 (#1430)', () => {
+  it('칸을 떠날 때 잡은 오류를 체중 칸에 붙인다', () => {
+    const markup = render({
+      values: { ...EMPTY_PET_FORM_VALUES, weightKg: '20220312' },
+      weightBlurError: messages.pet.weightInvalid,
+    })
+
+    expect(markup).toContain(messages.pet.weightInvalid)
+    expect(markup).toContain(`id="${fieldErrorId('weightKg')}"`)
+    expect(markup).toMatch(/<input[^>]*id="weightKg"[^>]*aria-invalid="true"/)
+  })
+
+  /*
+    **blur 오류는 제출 실패가 아니다.** 요약 알림(`확인이 필요한 항목이 N개`)은 `errors.fields` 만
+    센다 — 칸을 떠난 것만으로 "실패했다" 고 말하지 않는다.
+  */
+  it('blur 오류만으로는 제출 실패 요약을 띄우지 않는다', () => {
+    const markup = render({ weightBlurError: messages.pet.weightInvalid })
+
+    expect(markup).not.toContain(messages.pet.submitInvalidSummary.replace('{count}', '1'))
+  })
+
+  it('blur 오류가 없으면 체중 칸은 정상이다', () => {
+    const markup = render({ values: { ...EMPTY_PET_FORM_VALUES, weightKg: '3.5' } })
+
+    expect(markup).not.toContain(messages.pet.weightInvalid)
+  })
+})
+
+describe('PetFormFields — 라디오 접근 이름 (#1430)', () => {
+  it('크기 라디오의 이름은 코드가 아니라 한글 라벨이다', () => {
+    const markup = render()
+
+    for (const option of messages.pet.options.sizeType) {
+      const labelId = `sizeType-${option.code}-label`
+      expect(markup).toContain(`aria-labelledby="${labelId}"`)
+      // 라벨 요소가 담는 글자가 한글 이름이다
+      expect(markup).toMatch(new RegExp(`id="${labelId}"[^>]*>${option.name}<`))
+    }
+  })
+
+  it('설명은 이름이 아니라 설명으로 건다', () => {
+    const markup = render()
+
+    expect(markup).toContain('aria-describedby="sizeType-SMALL-description"')
+    expect(markup).toMatch(/id="sizeType-SMALL-description"[^>]*>체중 10kg 미만</)
+  })
+})
