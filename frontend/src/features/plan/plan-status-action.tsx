@@ -96,6 +96,15 @@ export function PlanStatusAction({
   const [checkOpen, setCheckOpen] = useState(false)
   const [fixDay, setFixDay] = useState<number | null>(null)
 
+  // 그사이 상태가 바뀌어 버튼이 `확정하기` 가 아니면 시트를 세우지 않는다 — `그대로 확정` 이 다른 전이를 부르지 않게
+  const checkAvailable = confirmCheck.length > 0 && action?.kind === 'confirm'
+  /*
+    **시트를 세울 근거가 사라지면 열림도 내린다** (#1478). 상세가 다시 조회돼 문제가 다 사라지면 시트가
+    닫혀 보이는데, 열림만 남아 있으면 나중에 새 문제가 생기는 순간 **누르지 않았는데** 시트가 다시
+    선다. 렌더 중에 맞춘다 — effect 로 내리면 한 커밋 동안 열린 채 그려진다.
+  */
+  if (checkOpen && !checkAvailable) setCheckOpen(false)
+
   /*
     **일자로의 이동은 시트가 닫힌 뒤다** (D26-2). 시트가 닫힐 때 `useOverlay` 가 포커스를 확정
     버튼으로 되돌리며 그 자리로 화면을 굴린다 — 같은 클릭 안에서 먼저 굴리면 그 복귀가 되감는다.
@@ -132,8 +141,7 @@ export function PlanStatusAction({
         }}
       />
       <PlanConfirmCheckModal
-        // 그사이 상태가 바뀌어 버튼이 `확정하기` 가 아니면 닫는다 — `그대로 확정` 이 다른 전이를 부르지 않게
-        open={checkOpen && confirmCheck.length > 0 && action?.kind === 'confirm'}
+        open={checkOpen && checkAvailable}
         days={confirmCheck}
         onClose={() => setCheckOpen(false)}
         onFix={(day) => {

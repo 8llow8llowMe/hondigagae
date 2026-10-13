@@ -20,6 +20,16 @@ import { expect, type Page, test } from '@playwright/test'
  * 닫힌 `Menu` 는 `null` 을 렌더한다(`src/components/menu.tsx`). 즉 **정적 마크업 테스트로는
  * 항목도 링크도 볼 수 없다** — 열어서 확인할 수 있는 곳이 여기뿐이다.
  */
+/** 일정 생성 본문의 항목 한 줄 (`PlanItemRequest`) */
+type DraftItem = {
+  day: number
+  sequence: number
+  itemType: string
+  targetId?: string
+  title: string
+  startTime?: string
+}
+
 test.describe('일정 확정과 되돌리기 (#565)', () => {
   /**
    * 폼을 거치지 않고 초안 일정을 하나 만든다 — 시작 상태를 고정하기 위해서다.
@@ -33,9 +43,14 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
    * 열이 좌측 레일보다 **길 때만** 나타난다 — 3일짜리로는 `grid-template-rows` 를 지워도
    * 간격이 그대로라 처방이 검증되지 않는다(뮤테이션으로 확인).
    */
-  async function createDraftPlan(page: Page, startOffset = 7, dayCount = 3): Promise<string> {
+  async function createDraftPlan(
+    page: Page,
+    startOffset = 7,
+    dayCount = 3,
+    items: DraftItem[] = [],
+  ): Promise<string> {
     return page.evaluate(
-      async ({ offset, dayCount }) => {
+      async ({ offset, dayCount, items }) => {
         const petList = (await (await fetch('/api/bff/members/me/pets')).json()) as {
           dataBody: { pets: { petId: string }[] }
         }
@@ -58,14 +73,14 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
             startDate: day(offset),
             endDate: day(offset + dayCount - 1),
             petId: petList.dataBody.pets[0]?.petId,
-            items: [],
+            items,
           }),
         })
 
         const created = (await response.json()) as { dataBody: { planId: string } }
         return created.dataBody.planId
       },
-      { offset: startOffset, dayCount },
+      { offset: startOffset, dayCount, items },
     )
   }
 
@@ -266,6 +281,82 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     보는 것이 요지다. 두 일정을 따로 만들면 "상태가 가른다" 가 아니라 "일정이 다르다" 가
     된다.
   */
+  /*
+    **확정 전 점검의 연결** (#1425 · #1478 · 명세 D26). 순수 판정(`confirm-check.test.ts`)과 시트
+    마크업(`plan-confirm-check-modal.test.ts`)은 단위가 지키지만, `확정하기` 가 시트를 먼저 세우고 전이를
+    부르지 않는 것 · `고치러 가기` 가 시트를 닫고 그 일자로 포커스를 옮기는 것 · `그대로 확정` 이 전이를
+    부르는 것은 클릭과 react-query 왕복이라 여기서만 보인다. 위 테스트들은 빈 일정이라 시트가 서지 않는다.
+  */
+  test('확정 전 점검 — 문제가 있으면 시트가 먼저 서고, 고치러 가기 · 그대로 확정이 이어진다', async ({
+    page,
+  }) => {
+    await page.goto('/plans')
+    // 1일차: 15:00 → 12:30 역행 + 식사 없음. 2일차는 문제가 없어 시트에 서지 않는다
+    const planId = await createDraftPlan(page, 7, 2, [
+      {
+        day: 1,
+        sequence: 0,
+        itemType: 'PLACE',
+        targetId: '212481712381923335',
+        title: '제주현대미술관',
+        startTime: '15:00:00',
+      },
+      {
+        day: 1,
+        sequence: 1,
+        itemType: 'PLACE',
+        targetId: '212481712381923329',
+        title: '가세오름',
+        startTime: '12:30:00',
+      },
+      {
+        day: 2,
+        sequence: 0,
+        itemType: 'MEAL',
+        targetId: '212481712381923334',
+        title: '동문재래시장',
+        startTime: '12:00:00',
+      },
+    ])
+
+    // 상태 전이는 `PUT /plans/{planId}` 다(`updatePlan`) — 시트가 선 동안 나가지 않아야 한다
+    const statusRequests: string[] = []
+    page.on('request', (request) => {
+      if (
+        request.method() === 'PUT' &&
+        new URL(request.url()).pathname.endsWith(`/plans/${planId}`)
+      ) {
+        statusRequests.push(request.url())
+      }
+    })
+
+    await page.goto(`/plans/${planId}`)
+
+    const confirmAction = page.getByRole('button', { name: '일정 확정하기' })
+    const sheet = page.getByRole('dialog', { name: '확정 전에 살펴볼 곳이 있어요' })
+
+    // ── 확정하기 → 시트가 먼저 선다. 전이는 나가지 않는다 ──────────────────
+    await confirmAction.click()
+    await expect(sheet).toBeVisible()
+    await expect(sheet.getByText('식사 일정이 없어요')).toBeVisible()
+    await expect(sheet.getByRole('button', { name: '2일차 고치러 가기' })).toHaveCount(0)
+    expect(statusRequests).toEqual([])
+
+    // ── 고치러 가기 → 시트가 닫히고 그 일자 제목이 포커스를 받는다 ─────────
+    await sheet.getByRole('button', { name: '1일차 고치러 가기' }).click()
+    await expect(sheet).toHaveCount(0)
+    await expect(page.locator('#day1')).toBeFocused()
+    expect(statusRequests).toEqual([])
+
+    // ── 다시 확정하기 → 그대로 확정 → 전이가 나가고 확정으로 넘어간다 ────────
+    await confirmAction.click()
+    await expect(sheet).toBeVisible()
+    await sheet.getByRole('button', { name: '그대로 확정' }).click()
+    await expect(sheet).toHaveCount(0)
+    await expect(confirmAction).toHaveCount(0)
+    expect(statusRequests).toHaveLength(1)
+  })
+
   test('완료 전에는 동행견을 고치고, 완료되면 그 자리가 사라진다', async ({ page }) => {
     await page.goto('/plans')
     /*
@@ -278,6 +369,10 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
 
     const manageMenu = page.getByRole('button', { name: '일정 관리' })
     const petsGroup = page.getByRole('group', { name: '동행 반려견' })
+
+    // 출발 당일은 개요가 목록처럼 `오늘 1일차` 로 부른다 (#1446 · `tripPhaseOf`) — `D-DAY` 가 아니다
+    await expect(page.getByText('오늘 1일차').first()).toBeVisible()
+    await expect(page.getByText('D-DAY')).toHaveCount(0)
 
     // ── 초안 — 고칠 수 있다 ───────────────────────────────────────────────
     await manageMenu.click()
