@@ -1,6 +1,6 @@
 import type { MetricTone } from '@/components/metric'
 import { walkSafetyTone } from '@/lib/insight/tone'
-import type { PlanItemWalkSafetyItem } from '@/types/plan'
+import { BEYOND_FORECAST_RANGE_REASON_CODE, type PlanItemWalkSafetyItem } from '@/types/plan'
 
 /**
  * 항목 산책 위험도 — 순수 로직 (#625).
@@ -9,11 +9,15 @@ import type { PlanItemWalkSafetyItem } from '@/types/plan'
  * 결과를 그대로 읽는다** — 배지 조건·사유별 갈래를 화면이 다시 판정하지 않는다.
  */
 
-/** 판정 못 낸 사유 여섯 종 — 서버가 가르는 **순서** 그대로다. 바꾸지 않는다 (D15-3) */
+/**
+ * 판정 못 낸 사유 여섯 종 — 서버가 가르는 **순서** 그대로다. 바꾸지 않는다 (D15-3).
+ *
+ * 넷째 `BEYOND_FORECAST_RANGE` 는 여기서 다시 선언하지 않는다 (#1491) — 일자 판정과 같은
+ * 문자열이라 `@/types/plan` 의 `BEYOND_FORECAST_RANGE_REASON_CODE` 하나를 같이 쓴다.
+ */
 export const PAST_DATE_CODE = 'PAST_DATE'
 export const NOT_PLACE_TARGET_CODE = 'NOT_PLACE_TARGET'
 export const NO_START_TIME_CODE = 'NO_START_TIME'
-export const BEYOND_FORECAST_RANGE_CODE = 'BEYOND_FORECAST_RANGE'
 export const LOOKUP_FAILED_CODE = 'LOOKUP_FAILED'
 /**
  * 여섯째 사유 (#717). **시각별 예보 지평(오늘+4) 안인데 그 시각 예보를 쓸 수 없다.**
@@ -93,7 +97,7 @@ export function itemWalkSafetyView(item: PlanItemWalkSafetyItem): ItemWalkSafety
   if (unavailableReasonCode !== null) {
     if (
       HIDDEN_REASON_CODES.has(unavailableReasonCode) ||
-      unavailableReasonCode === BEYOND_FORECAST_RANGE_CODE
+      unavailableReasonCode === BEYOND_FORECAST_RANGE_REASON_CODE
     ) {
       return { kind: 'hidden' }
     }
@@ -127,7 +131,9 @@ export function itemWalkSafetyView(item: PlanItemWalkSafetyItem): ItemWalkSafety
 export function dayBeyondForecastReason(items: readonly PlanItemWalkSafetyItem[]): string | null {
   if (items.length === 0) return null
 
-  const allBeyond = items.every((item) => item.unavailableReasonCode === BEYOND_FORECAST_RANGE_CODE)
+  const allBeyond = items.every(
+    (item) => item.unavailableReasonCode === BEYOND_FORECAST_RANGE_REASON_CODE,
+  )
   if (!allBeyond) return null
 
   return items[0]!.unavailableReason
