@@ -116,7 +116,15 @@ function walkLine(walk: WalkSource): VerdictSummaryLine | null {
 function congestionLine(congestion: CongestionSource): VerdictSummaryLine | null {
   const label = messages.place.detailSummaryCongestionLabel
 
-  if (congestion.loading) return { label, value: null, anchorId: VERDICT_ANCHOR.congestion }
+  // 일정에서 들어왔으면 로딩 자리도 여행일 라벨로 연다 — 응답 뒤 라벨이 바뀌지 않게 (#1491).
+  // walkLine 과 같다. 여행일을 모르는 응답이면 그때 `덜 붐비는 날` 로 물러선다.
+  if (congestion.loading) {
+    const loadingLabel =
+      (congestion.tripDate ?? null) === null
+        ? label
+        : messages.place.detailSummaryCongestionTripLabel
+    return { label: loadingLabel, value: null, anchorId: VERDICT_ANCHOR.congestion }
+  }
 
   const trip = tripCongestionLine(congestion)
   if (trip !== null) return trip
