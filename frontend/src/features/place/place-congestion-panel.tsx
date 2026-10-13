@@ -709,11 +709,6 @@ function DaysToggle({
 }: {
   days: CongestionDays
   onDaysChange: (days: CongestionDays) => void
-  /**
-   * 일정에서 들어왔을 때의 여행 날짜 (#1429 · 장소상세-세부명세 D1-5). 있으면 **받아 둔
-   * 기간에서 여행일만 골라** `가장 덜 붐비는 날` 보다 먼저 보여 준다. 없으면 지금 동작이다.
-   */
-  tripDates?: string[] | null
 }) {
   const isMonth = days === CONGESTION_DAYS.month
 
