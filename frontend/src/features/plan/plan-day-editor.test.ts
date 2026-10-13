@@ -34,6 +34,7 @@ function render(overrides: Record<string, unknown> = {}) {
       onToggleRemoved: () => undefined,
       onSave: () => undefined,
       onCancel: () => undefined,
+      onSaveWithTimes: () => undefined,
       ...overrides,
     }),
   )
@@ -316,5 +317,32 @@ describe('PlanDaySection — 편집 진입', () => {
     expect(renderSection({ editing: true, editor: null })).not.toContain(
       messages.plan.indoorAlternativesTitle,
     )
+  })
+})
+
+describe('PlanDayEditor — 시각 역행 확인 (#1424)', () => {
+  it('묻지 않을 때는 저장 버튼 하나다 — 확인 문구가 없다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain(messages.plan.editTimeRealignTitle)
+    expect(markup).toContain(messages.plan.editSave)
+  })
+
+  it('물을 때는 저장 자리에 확인과 두 답이 서고, 거꾸로 흐르는 시각 줄을 보여 준다', () => {
+    const markup = render({ timeRealign: '10:00 → 15:00 → 12:30' })
+
+    expect(markup).toContain(messages.plan.editTimeRealignTitle)
+    expect(markup).toContain('10:00 → 15:00 → 12:30')
+    expect(markup).toContain(messages.plan.editTimeRealignAction)
+    expect(markup).toContain(messages.plan.editTimeKeepAction)
+    // 그만둘 길은 남는다
+    expect(markup).toContain(messages.plan.editCancel)
+  })
+
+  it('확인은 이름을 가진 묶음이다 — 스크린리더가 무엇을 묻는지 읽는다', () => {
+    const markup = render({ timeRealign: '10:00 → 09:00' })
+
+    expect(markup).toContain('role="group"')
+    expect(markup).toContain('aria-labelledby="plan-edit-time-realign-title"')
   })
 })

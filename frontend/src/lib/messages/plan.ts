@@ -819,8 +819,13 @@ export const planMessages = {
    */
   addPlaceAlready: '이미 담았어요',
 
-  /** `{title}`(조사 포함) · `{day}` 치환. 성공만 토스트로 말한다 */
-  addPlaceToast: '{title} {day}일차에 담았어요',
+  /**
+   * `{title}`(조사 포함) · `{day}` 치환. 성공만 토스트로 말한다.
+   *
+   * **시각을 못 채웠을 때만 쓴다** — 앞 · 뒤 항목 사이에 들어갈 자리가 없거나(#1424) 20:00 을
+   * 넘었다. 비어 있으면 산책 위험도가 꺼지므로(D24) 시각을 정해 달라고 한 번 말한다.
+   */
+  addPlaceToast: '{title} {day}일차에 담았어요. 시각은 일정에서 정해 주세요.',
   /**
    * 담기가 시각을 채웠을 때 (#1383 · 일정상세-세부명세 D24-2). `{time}` 은 `HH:mm`.
    * **채운 시각이 추천값이라는 것을 여기서 한 번만 말한다** — 저장 뒤에는 출처가 남지 않는다.
@@ -853,6 +858,22 @@ export const planMessages = {
   itemTimeAddLabel: '{title} 시간 등록하기',
   /** 시각이 있는 행의 칩. `{title}` · `{time}`(`HH:mm`) 치환 — 보이는 `10:30` 을 품는다 */
   itemTimeEditLabel: '{title} 시작 시각 {time}, 고치기',
+  /**
+   * 시간 칩 옆 경고 칩 (#1424). 순서와 시각이 어긋난 행에만 선다 — 판정은 `timeOrderIssues`.
+   * **"역행" 이라는 낱말을 쓰지 않는다** — 무엇과 견줬는지(앞 일정)를 말해야 고칠 곳이 보인다.
+   */
+  itemTimeBackward: '앞 일정보다 이른 시각',
+  itemTimeOverlap: '다른 일정과 같은 시각',
+  /**
+   * 순서 편집 저장 전 확인 (#1424). 저장하면 남을 항목의 시각이 순서와 거꾸로일 때만 선다.
+   * **자동으로 덮어쓰지 않는다** — 어느 쪽이 맞는지(순서인지 시각인지)는 사용자만 안다.
+   */
+  editTimeRealignTitle: '시각도 순서에 맞게 다시 맞출까요?',
+  /** `{times}` 는 지금 순서대로의 `HH:mm` 을 ` → ` 로 이은 것 */
+  editTimeRealignDescription:
+    '지금 순서대로면 시각이 {times} 로 거꾸로 흘러요. 맞추면 적어 둔 시각을 순서대로 다시 나눠요.',
+  editTimeRealignAction: '시각도 맞춰 저장',
+  editTimeKeepAction: '순서만 저장',
   /** 모달 제목. `{title}` 치환 — 어느 항목의 시각인지 밝힌다 */
   itemTimeModalTitle: '{title} 시작 시각',
   /**
@@ -1023,9 +1044,10 @@ export const planMessages = {
   /**
    * `{course}`(조사 포함) · `{planTitle}` · `{day}` 치환. **일정 제목까지 말한다** —
    * 장소 담기 토스트(`addPlaceToast`)와 달리 코스 이름표만으로는 어느 일정에 담겼는지
-   * 알 수 없다.
+   * 알 수 없다. 시각을 못 채웠을 때만 쓴다 — `addPlaceToast` 와 같은 이유로 시각을 정해 달라고
+   * 말한다 (#1424).
    */
-  walkAddToast: '{course} {planTitle} {day}일차에 담았어요.',
+  walkAddToast: '{course} {planTitle} {day}일차에 담았어요. 시각은 일정에서 정해 주세요.',
   /** 담기가 시각을 채웠을 때 — `addPlaceTimedToast` 와 같은 이유 (D24-2) */
   walkAddTimedToast:
     '{course} {planTitle} {day}일차 {time}에 담았어요. 시각은 일정에서 바꿀 수 있어요.',

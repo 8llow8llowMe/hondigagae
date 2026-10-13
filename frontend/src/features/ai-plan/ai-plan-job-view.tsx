@@ -617,6 +617,8 @@ function AiPlanCommitContainer({
             title: values.title.trim(),
             totalDays,
             excludedPlaceIds,
+            // 미리보기가 이미 받은 좌표로 이동 시간을 잡는다 (#1424) — 별도 조회가 없다
+            coords,
           }),
         )
       } catch (error) {

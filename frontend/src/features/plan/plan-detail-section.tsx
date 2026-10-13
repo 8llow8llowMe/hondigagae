@@ -570,6 +570,8 @@ export function PlanDetailSection({
                   onToggleRemoved={edit.toggle}
                   onSave={() => edit.save(group.day)}
                   onCancel={requestCancel}
+                  timeRealign={edit.timeRealign}
+                  onSaveWithTimes={(realign) => edit.saveWithTimes(group.day, realign)}
                 />
               )
             }

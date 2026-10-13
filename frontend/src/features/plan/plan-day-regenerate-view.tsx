@@ -372,7 +372,7 @@ function RegenerateJob({
         : { days: draft.days.filter((entry) => entry.day === day), reasons: [] },
     [draft, day],
   )
-  const { delistedPlaceIds, loading: placesLoading } = useDraftPlaces(dayDraft)
+  const { delistedPlaceIds, coords, loading: placesLoading } = useDraftPlaces(dayDraft)
 
   /*
     **`null` 과 빈 배열의 뜻이 다르다** (R4-2). `null` 은 초안에 그 날이 없다는 뜻이고,
@@ -381,8 +381,11 @@ function RegenerateJob({
   */
   const nextItems = useMemo<PlanItemRequest[] | null>(
     () =>
-      draft === null ? null : toRegeneratedDayItems(draft, day, plan.totalDays, excludedPlaceIds),
-    [draft, day, plan.totalDays, excludedPlaceIds],
+      draft === null
+        ? null
+        : // 담기와 같은 규칙으로 시각을 잇는다 — 좌표는 같은 보강 결과다 (#1424)
+          toRegeneratedDayItems(draft, day, plan.totalDays, excludedPlaceIds, coords),
+    [draft, day, plan.totalDays, excludedPlaceIds, coords],
   )
 
   /** 제출 상태 — `?jobId=` 가 없는 이 화면의 주소다 */

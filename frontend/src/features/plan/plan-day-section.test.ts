@@ -11,6 +11,7 @@ import {
   planDayVisit,
   planDayWalkSafety,
   planDetail,
+  planItem,
   planItemWalkSafety,
   planVerdict,
 } from '@/test/fixtures/plan'
@@ -192,5 +193,33 @@ describe('PlanDaySection — 액션 줄 (#842 · #1016 · #1014)', () => {
     const row = actionRowOf(renderDaySection({ verdict: undefined }))
 
     expect(row.match(/<(a|button) /g)).toHaveLength(3)
+  })
+})
+
+describe('PlanDaySection — 시각 역행 · 겹침 경고 칩 (#1424)', () => {
+  /** 사용성 테스트 재현: 순서 편집 뒤 10:00 → 15:00 → 12:30 → 15:00 */
+  const rows = ['10:00:00', '15:00:00', '12:30:00', '15:00:00'].map((startTime, index) => ({
+    item: planItem({ planItemId: `t${index}`, day: 1, sequence: index, startTime }),
+    distanceMeters: null,
+    distanceKind: null,
+  }))
+
+  it('앞 일정보다 이른 행과 같은 시각인 행에 각각 한 번씩 경고 칩이 선다', () => {
+    const markup = renderDaySection({ rows })
+
+    expect(markup.split(messages.plan.itemTimeBackward).length - 1).toBe(1)
+    expect(markup.split(messages.plan.itemTimeOverlap).length - 1).toBe(1)
+  })
+
+  it('순서대로 흐르면 경고 칩이 없다', () => {
+    const ordered = ['10:00:00', '12:30:00'].map((startTime, index) => ({
+      item: planItem({ planItemId: `o${index}`, day: 1, sequence: index, startTime }),
+      distanceMeters: null,
+      distanceKind: null,
+    }))
+    const markup = renderDaySection({ rows: ordered })
+
+    expect(markup).not.toContain(messages.plan.itemTimeBackward)
+    expect(markup).not.toContain(messages.plan.itemTimeOverlap)
   })
 })

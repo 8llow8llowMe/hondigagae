@@ -1,5 +1,6 @@
-import { slotStartTime } from '@/lib/plan/default-start-time'
-import type { AiPlanDraft, AiPlanRequestSnapshot } from '@/types/ai-plan'
+import { draftDayStartTimes } from '@/lib/ai-plan/draft-schedule'
+import type { LatLng } from '@/lib/geo/coord'
+import type { AiPlanDraft, AiPlanRequestSnapshot, AiPlanScheduleItem } from '@/types/ai-plan'
 import {
   PLAN_ITEM_TYPES,
   type PlanCreatePayload,
@@ -47,6 +48,12 @@ export type DraftToPlanOptions = {
    * 않고** 해당 항목만 빼고 다시 담기 위해 쓴다 (명세 S5 함정 3).
    */
   excludedPlaceIds?: ReadonlySet<string>
+  /**
+   * `placeId` → 좌표 (#1424). 시각을 이을 때 **직선거리 기반 이동 시간**에 쓴다. 출처는 미리보기가
+   * 이미 받은 보강 결과(`useDraftPlaces` 의 `coords`)다 — 별도 조회를 만들지 않는다. 모르는 자리는
+   * 이동 30분으로 잇는다 (`draft-schedule.ts`).
+   */
+  coords?: ReadonlyMap<string, LatLng>
 }
 
 /**
@@ -60,7 +67,7 @@ export type DraftToPlanOptions = {
  * | `targetId`        | `placeId` — **문자열로 보낸다**    |
  * | `title`           | `title` (100자 초과면 자른다)      |
  * | `memo`            | `note` (500자 초과면 자른다)       |
- * | `startTime`       | **`sequence` 의 순서 슬롯** (D24)  |
+ * | `startTime`       | **앞 시각 + 머무름 + 이동** (#1424) |
  *
  * **명세에 없던 두 가지를 여기서 막는다.** 초안의 `itemType`·`title` 은 LLM 산출물이
  * 그대로 흘러온 문자열인데 `PlanItemRequest` 는 `itemType` 을 `PlanItemType` **enum**
@@ -74,6 +81,7 @@ export function draftToPlanPayload({
   title,
   totalDays,
   excludedPlaceIds,
+  coords,
 }: DraftToPlanOptions): PlanCreatePayload {
   return {
     /*
@@ -98,7 +106,7 @@ export function draftToPlanPayload({
     startDate: snapshot.startDate,
     endDate: snapshot.endDate,
     ...(snapshot.budget === null ? {} : { budget: snapshot.budget }),
-    items: toDraftItems(draft, totalDays ?? null, excludedPlaceIds),
+    items: toDraftItems(draft, totalDays ?? null, excludedPlaceIds, coords),
     /*
       **담기 멱등 키** (#1041 · 백엔드 #970). 이것이 없으면 다시 누름 · 새로고침 뒤 재시도 ·
       다른 기기에서 담기가 전부 새 일정을 만든다. `jobId` 는 서버가 준 UUID 그대로라
@@ -116,6 +124,7 @@ export function toDraftItems(
   draft: AiPlanDraft,
   totalDays: number | null,
   excludedPlaceIds?: ReadonlySet<string>,
+  coords?: ReadonlyMap<string, LatLng>,
 ): PlanItemRequest[] {
   const items: PlanItemRequest[] = []
 
@@ -125,25 +134,28 @@ export function toDraftItems(
     // `Plan.containsDay()` — 기간을 넘는 일차 하나가 `PLAN_002` 로 저장 전체를 막는다
     if (totalDays !== null && dayItem.day > totalDays) continue
 
-    // **sequence 는 걸러낸 뒤 다시 매긴다.** 원본 인덱스를 쓰면 제외된 항목 자리에
-    // 구멍이 생겨 화면 순서와 저장 순서가 어긋난다
-    let sequence = 0
+    /*
+      **걸러낸 뒤에 시각을 잇는다.** 원본 인덱스로 이으면 제외된 항목 자리에 구멍이 생겨 화면 순서와
+      저장 순서가 어긋나고, 빠진 장소까지의 이동 시간이 남는다. sequence 도 걸러낸 뒤 다시 매긴다.
+    */
+    const kept = keptDayItems(dayItem.items, excludedPlaceIds)
 
-    for (const item of dayItem.items) {
-      // **`title`/`note` 는 nullable 이다** — `.trim()` 을 바로 부르면 던진다
-      const itemTitle = (item.title ?? '').trim()
-      if (itemTitle === '') continue
-      if (!isPlanItemType(item.itemType)) continue
+    /*
+      **초안에는 시각이 없지만 비워 보내지 않는다** (#1383 · 일정상세-세부명세 D24). 비우면 항목 산책
+      위험도가 `NO_START_TIME` 으로 꺼진다. 예전에는 순서 슬롯(10:00 · 12:30 · 15:00)이라 날마다 같은
+      템플릿이었다 — 이제 **앞 시각 + 머무는 시간 + 직선거리 이동 시간**이다 (#1424). 20:00 을
+      넘는 자리는 키를 뺀다.
+    */
+    const startTimes = draftDayStartTimes(
+      kept.map((entry) => ({ itemType: entry.itemType, placeId: entry.placeId })),
+      coords,
+    )
 
-      const placeId = item.placeId
-      if (placeId !== null && excludedPlaceIds?.has(placeId) === true) continue
-
-      const memo = (item.note ?? '').trim().slice(0, ITEM_MEMO_MAX)
-
+    kept.forEach((entry, sequence) => {
       items.push({
         day: dayItem.day,
         sequence,
-        itemType: item.itemType,
+        itemType: entry.itemType,
         /*
           **`placeId` 를 유형으로 가리지 않는다** (#252). 예전에는 `WALK` 만 `targetId` 를
           빼고 보냈다 — 초안의 `placeId` 는 `place.id` 인데 `PlanItemRequest.targetId` 는
@@ -153,22 +165,50 @@ export function toDraftItems(
           장소를 실으면 `OllamaLlmAdapter.resolveItemType` 이 `PLACE` 로 바로잡는다 —
           **초안의 모든 `itemType` 은 `place.id` 를 `targetId` 로 받는 유형이다.**
         */
-        ...(placeId === null ? {} : { targetId: placeId }),
-        title: itemTitle.slice(0, ITEM_TITLE_MAX),
-        ...(memo === '' ? {} : { memo }),
-        /*
-          **초안에는 시각이 없지만 비워 보내지 않는다** (#1383 · 일정상세-세부명세 D24). 비우면
-          항목 산책 위험도가 `NO_START_TIME` 으로 꺼진다. 걸러낸 뒤의 `sequence` 로 고르므로
-          화면 순서와 시각 순서가 어긋나지 않는다. 여섯 번째부터는 키를 뺀다.
-        */
-        ...withStartTime(slotStartTime(sequence)),
+        ...(entry.placeId === null ? {} : { targetId: entry.placeId }),
+        title: entry.title.slice(0, ITEM_TITLE_MAX),
+        ...(entry.memo === '' ? {} : { memo: entry.memo }),
+        ...withStartTime(startTimes[sequence]),
       })
-
-      sequence += 1
-    }
+    })
   }
 
   return items
+}
+
+type KeptDraftItem = {
+  itemType: PlanItemTypeCode
+  placeId: string | null
+  title: string
+  memo: string
+}
+
+/**
+ * 담기가 실제로 싣는 그날 항목 — 보낼 수 없는 항목(제목 없음 · 모르는 유형 · 제외한 장소)을 뺀다.
+ * **시각 계산도 이 목록으로 한다** — 미리보기(#1432)가 같은 시각을 말하려면 같은 목록이어야 한다.
+ */
+export function keptDayItems(
+  dayItems: readonly AiPlanScheduleItem[],
+  excludedPlaceIds?: ReadonlySet<string>,
+): KeptDraftItem[] {
+  const kept: KeptDraftItem[] = []
+
+  for (const item of dayItems) {
+    // **`title`/`note` 는 nullable 이다** — `.trim()` 을 바로 부르면 던진다
+    const itemTitle = (item.title ?? '').trim()
+    if (itemTitle === '') continue
+    if (!isPlanItemType(item.itemType)) continue
+    if (item.placeId !== null && excludedPlaceIds?.has(item.placeId) === true) continue
+
+    kept.push({
+      itemType: item.itemType,
+      placeId: item.placeId,
+      title: itemTitle,
+      memo: (item.note ?? '').trim().slice(0, ITEM_MEMO_MAX),
+    })
+  }
+
+  return kept
 }
 
 function withStartTime(startTime: string | undefined): { startTime?: string } {

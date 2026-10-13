@@ -41,6 +41,8 @@ export function PlanDayEditor({
   onToggleRemoved,
   onSave,
   onCancel,
+  timeRealign = null,
+  onSaveWithTimes,
 }: {
   items: PlanDayEditItem[]
   dirty: boolean
@@ -55,9 +57,17 @@ export function PlanDayEditor({
   onToggleRemoved: (index: number) => void
   onSave: () => void
   onCancel: () => void
+  /**
+   * "시각도 순서에 맞게 다시 맞출까요?" 확인 (#1424). 지금 순서대로의 시각 줄(`10:00 → 15:00 →
+   * 12:30`)이고, 묻지 않으면 `null` 이다. 판정과 상태는 `usePlanDayEdit` 가 갖는다.
+   */
+  timeRealign?: string | null
+  /** 확인에 답한 저장. `true` 면 시각도 순서대로 다시 맞춘다 */
+  onSaveWithTimes: (realign: boolean) => void
 }) {
   const upRefs = useRef<(HTMLButtonElement | null)[]>([])
   const downRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const realignRef = useRef<HTMLButtonElement | null>(null)
 
   const drag = useDragReorder({ onMove })
   const rootRef = useRef<HTMLDivElement>(null)
@@ -106,6 +116,15 @@ export function PlanDayEditor({
 
     onClearFocus()
   }, [focusTarget, onClearFocus])
+
+  /*
+    **확인이 서면 초점을 그 첫 버튼으로 옮긴다.** 누른 저장 버튼이 확인으로 바뀌어 사라지므로
+    그대로 두면 초점이 `body` 로 떨어진다.
+  */
+  const asking = timeRealign !== null
+  useEffect(() => {
+    if (asking) realignRef.current?.focus()
+  }, [asking])
 
   return (
     /*
@@ -166,20 +185,52 @@ export function PlanDayEditor({
           />
         )}
 
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={onSave}
-            loading={saving}
-            disabled={!dirty}
-            // 잠긴 이유를 보이지 않는 힌트로만 두지 않는다 (E6)
-            {...(dirty ? {} : { 'aria-describedby': 'plan-edit-no-changes' })}
+        {timeRealign !== null ? (
+          /*
+            **시각 역행 확인** (#1424). 모달이 아니라 저장 자리에서 묻는다 — 저장 버튼을 누른 그
+            자리의 다음 걸음이고, 목록을 보면서 답할 수 있어야 한다(어느 시각이 거꾸로인지).
+            **두 답 모두 저장이다** — "순서만 저장" 은 예전 동작 그대로라 자동으로 덮어쓰지 않는다.
+            그만두려면 아래 `취소` 가 그대로 있다.
+          */
+          <div
+            role="group"
+            aria-labelledby="plan-edit-time-realign-title"
+            className="border-border flex flex-col gap-2 rounded-md border p-3"
           >
-            {messages.plan.editSave}
-          </Button>
-          <Button variant="secondary" onClick={onCancel}>
-            {messages.plan.editCancel}
-          </Button>
-        </div>
+            <p id="plan-edit-time-realign-title" className="text-body-2 text-fg font-semibold">
+              {messages.plan.editTimeRealignTitle}
+            </p>
+            <p className="text-caption text-fg-muted break-keep">
+              {messages.plan.editTimeRealignDescription.replace('{times}', timeRealign)}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button ref={realignRef} onClick={() => onSaveWithTimes(true)} loading={saving}>
+                {messages.plan.editTimeRealignAction}
+              </Button>
+              <Button variant="secondary" onClick={() => onSaveWithTimes(false)} disabled={saving}>
+                {messages.plan.editTimeKeepAction}
+              </Button>
+              <Button variant="ghost" onClick={onCancel}>
+                {messages.plan.editCancel}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={onSave}
+              loading={saving}
+              disabled={!dirty}
+              // 잠긴 이유를 보이지 않는 힌트로만 두지 않는다 (E6)
+              {...(dirty ? {} : { 'aria-describedby': 'plan-edit-no-changes' })}
+            >
+              {messages.plan.editSave}
+            </Button>
+            <Button variant="secondary" onClick={onCancel}>
+              {messages.plan.editCancel}
+            </Button>
+          </div>
+        )}
 
         {!dirty && (
           <p id="plan-edit-no-changes" className="text-caption text-fg-muted">

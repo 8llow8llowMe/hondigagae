@@ -13,6 +13,7 @@ import { messages } from '@/lib/messages'
 import { formatPlanDay } from '@/lib/plan/date'
 import type { PlanItemRowModel } from '@/lib/plan/detail'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
+import { timeOrderIssues } from '@/lib/plan/time-order'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceDetail } from '@/types/place'
@@ -183,6 +184,8 @@ export function PlanDaySection({
     날에도 띄우면 경고가 배경음이 되어 정작 잃을 날에 읽히지 않는다.
   */
   const hasVisited = rows.some((row) => row.item.visited)
+  // 시각이 순서와 어긋난 행 (#1424) — 행은 앞 항목을 모르므로 일자가 판정해 내린다
+  const timeIssues = timeOrderIssues(rows.map((row) => row.item.startTime))
 
   /*
     **L1 카드 하나다** (`DESIGN.md §0`, #447). 이름은 `aria-label` 이다 — 헤더가 `N일차 ·
@@ -334,6 +337,7 @@ export function PlanDaySection({
                 onOpen: () => itemTime.onOpen(row.item.planItemId),
                 focusKey: timeChipFocusKey(day, index),
               }}
+              timeIssue={timeIssues[index] ?? null}
             />
           ))}
         </SurfaceList>

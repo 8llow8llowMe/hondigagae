@@ -61,3 +61,40 @@ describe('insertedStartTime — 장소 하나를 끼울 때', () => {
     expect(insertedStartTime(['오전 10시'])).toBe('12:30:00')
   })
 })
+
+describe('insertedStartTime — 뒤 항목 시각도 본다 (#1424)', () => {
+  it('사용성 테스트 재현 — 12:30 뒤 · 숙소 15:00 앞에 끼우면 15:00 이 아니라 가운데 13:45 다', () => {
+    expect(insertedStartTime(['10:00:00', '12:30:00'], ['15:00:00'])).toBe('13:45:00')
+  })
+
+  it('앞 시각 + 2:30 이 뒤 항목보다 30분 이상 이르면 그대로 쓴다', () => {
+    expect(insertedStartTime(['10:00:00'], ['15:00:00'])).toBe('12:30:00')
+    expect(insertedStartTime(['10:00:00'], ['13:00:00'])).toBe('12:30:00')
+  })
+
+  it('뒤 항목과 30분이 안 남으면 가운데로 당긴다', () => {
+    expect(insertedStartTime(['10:00:00'], ['12:50:00'])).toBe('11:25:00')
+  })
+
+  it('앞 · 뒤 사이가 좁아 들어갈 자리가 없으면 비운다', () => {
+    expect(insertedStartTime(['14:30:00'], ['15:00:00'])).toBeUndefined()
+    expect(insertedStartTime(['14:00:00'], ['14:59:00'])).toBeUndefined()
+  })
+
+  it('이미 역행한 날(뒤가 앞보다 이르다)에는 비운다', () => {
+    expect(insertedStartTime(['16:00:00'], ['15:00:00'])).toBeUndefined()
+  })
+
+  it('뒤 항목 중 시각이 있는 첫 항목을 본다', () => {
+    expect(insertedStartTime(['12:30:00'], [null, '15:00:00'])).toBe('13:45:00')
+  })
+
+  it('앞에 시각이 없으면 순서 슬롯이 뒤 항목보다 이를 때만 쓴다 — 뒤에서 거꾸로 지어내지 않는다', () => {
+    expect(insertedStartTime([], ['15:00:00'])).toBe('10:00:00')
+    expect(insertedStartTime([null, null, null], ['15:00:00'])).toBeUndefined()
+  })
+
+  it('뒤 항목에 시각이 없으면 예전 규칙 그대로다', () => {
+    expect(insertedStartTime(['12:30:00'], [null])).toBe('15:00:00')
+  })
+})

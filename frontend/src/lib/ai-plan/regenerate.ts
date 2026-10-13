@@ -1,5 +1,6 @@
 import { toDraftItems } from '@/lib/ai-plan/draft-to-plan'
 import { isDayBefore, todayDay } from '@/lib/date/day'
+import type { LatLng } from '@/lib/geo/coord'
 import type { AiPlanDraft, AiPlanSubmitPayload } from '@/types/ai-plan'
 import type { PlanDetail, PlanItemDetail, PlanItemRequest } from '@/types/plan'
 
@@ -66,11 +67,13 @@ export function toRegeneratedDayItems(
   day: number,
   totalDays: number,
   excludedPlaceIds?: ReadonlySet<string>,
+  /** `placeId` → 좌표. 담기와 같은 규칙으로 시각을 잇는다 (#1424 · `toDraftItems`) */
+  coords?: ReadonlyMap<string, LatLng>,
 ): PlanItemRequest[] | null {
   const target = draft.days.find((entry) => entry.day === day)
   if (target === undefined) return null
 
-  return toDraftItems({ days: [target], reasons: [] }, totalDays, excludedPlaceIds)
+  return toDraftItems({ days: [target], reasons: [] }, totalDays, excludedPlaceIds, coords)
 }
 
 /**

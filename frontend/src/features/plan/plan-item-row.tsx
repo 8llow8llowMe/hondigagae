@@ -16,6 +16,7 @@ import { isPlaceTarget, type PlanItemRowModel } from '@/lib/plan/detail'
 import { planItemIllustration } from '@/lib/plan/illustration'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { formatStartTime } from '@/lib/plan/start-time'
+import type { TimeOrderIssue } from '@/lib/plan/time-order'
 import { visitToggleForm } from '@/lib/plan/visit-toggle'
 import { walkCourseMetaLine } from '@/lib/plan/walk-course-meta'
 import { itemWalkSafetyView } from '@/lib/plan/walk-safety'
@@ -149,12 +150,19 @@ export function PlanItemRow({
   walkSafety,
   dayPetConditionApplied = false,
   time,
+  timeIssue = null,
 }: {
   model: PlanItemRowModel
   /** 없으면 토글이 렌더되지 않는다 — 기간 밖 항목 섹션이 그 경로다 */
   visit?: PlanItemVisit
   /** 없으면 칩 대신 시각 캡션이다 — 기간 밖 항목 섹션이 그 경로다 (#1028) */
   time?: PlanItemTime
+  /**
+   * 이 행의 시각이 앞 일정과 어긋나는가 (#1424 · `timeOrderIssues`). **판정은 일자가 한다** —
+   * 행은 앞 항목을 모른다. 시간 칩 줄에만 경고 칩이 선다 (`time` 이 없는 고아 항목 섹션은
+   * 일자가 없어 견줄 앞 항목이 없다).
+   */
+  timeIssue?: TimeOrderIssue | null
   /**
    * 이 항목의 산책 위험도 (#625). **`undefined` 는 오류가 아니라 "아직 안 왔다"다** —
    * 조회 중이거나, 응답에 이 `planItemId` 가 없거나(일괄 교체 직후 한 프레임), 전체
@@ -296,6 +304,20 @@ export function PlanItemRow({
               onOpen={time.onOpen}
               focusKey={time.focusKey}
             />
+            {/*
+              **시각이 순서와 어긋나면 칩 바로 옆에 말한다** (#1424). 사용성 테스트에서
+              `10:00 → 15:00 → 12:30 → 15:00` 이 경고 없이 확정됐다. 고칠 곳이 바로 왼쪽 칩이라
+              여기 둔다. `danger` 인 이유: 측정값이 아니라 **일정 자료의 어긋남**이고 사용자가
+              고쳐야 하는 입력 오류다 (DESIGN.md §2-6 — 404 · 등급에는 쓰지 않는다). 색만으로
+              말하지 않는다 — 낱말이 같은 사실을 말한다.
+            */}
+            {startTime !== null && timeIssue !== null && (
+              <Badge tone="danger" size="sm">
+                {timeIssue === 'backward'
+                  ? messages.plan.itemTimeBackward
+                  : messages.plan.itemTimeOverlap}
+              </Badge>
+            )}
             {startTime !== null && walkSafetyInline}
           </div>
         ) : (
