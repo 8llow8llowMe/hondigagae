@@ -301,6 +301,17 @@ describe('verdictSummaryLines — 일정 기준 (#1429)', () => {
     )
   })
 
+  it('로딩 중에도 `여행일 붐빔` 라벨이다 — 응답 뒤 라벨이 바뀌지 않는다 (#1491)', () => {
+    const congestion = { ...congestionLoading, tripDate: '2026-09-06' }
+    const labels = labelsOf(placeDetail, walkOk, congestion)
+
+    expect(labels).toContain(messages.place.detailSummaryCongestionTripLabel)
+    expect(labels).not.toContain(messages.place.detailSummaryCongestionLabel)
+    expect(
+      valueOf(messages.place.detailSummaryCongestionTripLabel, placeDetail, walkOk, congestion),
+    ).toBeNull()
+  })
+
   it('여행일이 받은 기간 밖이면 `덜 붐비는 날` 로 물러선다', () => {
     const congestion = { ...congestionOk, tripDate: '2026-11-06' }
 
