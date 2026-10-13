@@ -10,6 +10,7 @@ import { PlanDayOverflowMenu } from '@/features/plan/plan-day-overflow-menu'
 import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
 import { PlanIndoorAlternatives } from '@/features/plan/plan-indoor-alts'
 import { PlanItemRow, type PlanItemVisit, timeChipFocusKey } from '@/features/plan/plan-item-row'
+import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
 import { formatPlanDay } from '@/lib/plan/date'
 import type { PlanItemRowModel } from '@/lib/plan/detail'
@@ -116,6 +117,19 @@ export function memoEditFocusKey(day: number, index: number): string {
   return `${day}:${index}`
 }
 
+/**
+ * 이 일자의 동선 다시 정렬 제안 — 이슈 #1462 · 일정상세-세부명세 D31.
+ *
+ * **판정은 호출부가 한다** (`routeReorderSuggestion` · `routeReorderAllowed`) — 이 카드는 앞날
+ * 숙소와 일정 상태를 모른다. 제안이 없으면 `null` 이고 줄 자체가 서지 않는다.
+ */
+export type PlanDayRouteReorder = {
+  /** 줄어드는 직선거리(m) */
+  savedMeters: number
+  /** 순서 편집을 추천 순서로 연다. 저장은 편집기가 한다 */
+  onApply: () => void
+}
+
 /** 좌측 목차의 앵커 대상. 목차와 제목이 같은 규칙으로 id 를 만들어야 링크가 맞는다 */
 export function planDayAnchorId(day: number): string {
   return `day${day}`
@@ -151,6 +165,8 @@ export function PlanDaySection({
   regenerateHref,
   planId,
   forecastPending = null,
+  routeReorder = null,
+  reorderPreview = false,
 }: {
   day: number
   /** 항목 장소 링크에 일정 맥락(`?plan=&day=`)을 싣는다 (#1429). 없으면 맨 주소다 */
@@ -201,6 +217,10 @@ export function PlanDaySection({
    * `all` 이면 판정 밴드도 서지 않는다 — 밴드가 할 말이 그 문장뿐이다.
    */
   forecastPending?: DayForecastPending | null
+  /** 동선 다시 정렬 제안 (#1462 · D31). 편집 중에는 서지 않는다 */
+  routeReorder?: PlanDayRouteReorder | null
+  /** 편집기가 제안을 받아 추천 순서로 열렸다 — 편집기 위에 한 줄로 말한다 (D31-2) */
+  reorderPreview?: boolean
 }) {
   const anchorId = planDayAnchorId(day)
   /*
@@ -357,6 +377,15 @@ export function PlanDaySection({
               {messages.plan.visitResetOnEditNotice}
             </p>
           )}
+          {/*
+            **제안을 받아 연 편집기다** (#1462 · D31-2). 순서는 바뀌어 있지만 아직 저장 전이라는 것,
+            취소하면 그대로라는 것을 보이는 글자로 말한다 — 편집기의 `aria-live` 는 스크린리더만 듣는다.
+          */}
+          {reorderPreview && (
+            <p className={cn('text-caption text-fg-muted pt-3 font-medium', INSET_CLASS.card)}>
+              {messages.plan.routeReorderApplied}
+            </p>
+          )}
           {editor}
         </div>
       ) : rows.length === 0 ? (
@@ -415,6 +444,37 @@ export function PlanDaySection({
         마지막 요소다 — 아래 여백이 없으면 버튼이 카드 테두리에 붙는다(실측 1px).
         헤더의 `pt-5` 와 짝을 맞춘다.
       */}
+      {/*
+        ── 동선 다시 정렬 제안 (#1462 · D31-2)
+
+        **항목 목록 바로 아래, 액션 줄 위다.** 제안은 방금 읽은 순서에 대한 말이라 목록에 붙고,
+        받으면 여는 것이 `순서 편집` 이라 그 버튼 무리 바로 위에 선다. 판정에 걸린 날에만 서고
+        강제가 아니다 — 누르면 편집기가 추천 순서로 열릴 뿐 저장은 사용자가 한다.
+      */}
+      {!editing && routeReorder !== null && rows.length > 0 && (
+        <div
+          className={cn(
+            'flex flex-col items-start gap-2 pt-4 md:flex-row md:items-center md:justify-between',
+            INSET_CLASS.card,
+          )}
+        >
+          <p className="text-body-2 text-fg min-w-0">
+            {messages.plan.routeReorderNotice.replace(
+              '{distance}',
+              formatDistance(routeReorder.savedMeters),
+            )}
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-label={messages.plan.routeReorderActionLabel.replace('{day}', String(day))}
+            onClick={routeReorder.onApply}
+          >
+            {messages.plan.routeReorderAction}
+          </Button>
+        </div>
+      )}
+
       {!editing && (
         <div className={cn('flex flex-wrap items-center gap-2 pt-3 pb-5', INSET_CLASS.card)}>
           {/*
