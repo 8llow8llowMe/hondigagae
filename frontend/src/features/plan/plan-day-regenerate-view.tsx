@@ -37,6 +37,7 @@ import { submitAiPlan } from '@/lib/api/ai-plan'
 import { ApiError } from '@/lib/api/error'
 import { replaceDayItems } from '@/lib/api/plan'
 import { toMessage } from '@/lib/api/response'
+import { todayFromDay } from '@/lib/date/day'
 import { messages } from '@/lib/messages'
 import { groupItemsByDay } from '@/lib/plan/detail'
 import { type PlanDaySaveError, toPlanDaySaveError } from '@/lib/plan/save-error'
@@ -69,8 +70,9 @@ export function PlanDayRegenerateView({
   planId: string
   day: number
   /**
-   * 서버가 만든 ISO 시각 (#128). **클라이언트가 따로 `new Date()` 를 부르지 않는다** —
-   * 자정 근처에서 서버 렌더와 하이드레이션의 판정이 하루 갈린다 (일정 상세와 같은 결정).
+   * 서버가 정한 오늘 `YYYY-MM-DD` (`todayDay`, #128 · #1490). **클라이언트가 따로 `new Date()` 를
+   * 부르지 않는다** — 자정 근처에서 서버 렌더와 하이드레이션의 판정이 하루 갈린다 (일정 상세와
+   * 같은 결정). 시각이 아니라 칸이라 브라우저 시간대가 날짜를 다시 정하지 않는다 (`todayFromDay`).
    */
   today: string
 }) {
@@ -146,7 +148,7 @@ export function PlanDayRegenerateView({
     없다 — 이미 받아 둔 초안을 자정이 지났다는 이유로 버리지 않는다. 그래서 `jobId === null`
     (제출 화면)일 때만 본다 — 대기·비교·적용 단계는 이 판을 거치지 않는다.
   */
-  const block = dayRegenerateBlock(plan, new Date(today))
+  const block = dayRegenerateBlock(plan, todayFromDay(today))
   if (jobId === null && block !== null) {
     return (
       <RegenerateShell day={day} backHref={backHref} planTitle={plan.title}>

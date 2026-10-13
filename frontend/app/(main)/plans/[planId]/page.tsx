@@ -11,6 +11,7 @@ import { ApiError } from '@/lib/api/error'
 import { planDetailPath } from '@/lib/api/plan'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
+import { todayDay } from '@/lib/date/day'
 import { planDetailTitle } from '@/lib/plan/detail-title'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import type { PlanDetail } from '@/types/plan'
@@ -96,12 +97,13 @@ export default async function PlanDetailPage({ params }: { params: Params }) {
   /*
     **`today` 를 서버에서 만들어 내려보낸다.** 클라이언트가 따로 `new Date()` 를 부르면
     자정 근처에서 서버 렌더와 하이드레이션의 D-day 가 하루 갈린다 (목록과 같은 결정).
+    시각이 아니라 달력의 칸(`todayDay`)을 넘긴다 — 시각은 브라우저 시간대가 날짜를 다시 정한다 (#1490).
   */
   // `main` 이 L0 바닥이다 (`DESIGN.md §0`, #447) — 카드를 쌓는 일은 `PlanDetailSection` 의 `SurfaceStack` 이 맡는다
   return (
     <Canvas as="main" id="main-content">
       <HydrationBoundary state={dehydrate(queryClient)}>
-        <PlanDetailView planId={planId} today={new Date().toISOString()} />
+        <PlanDetailView planId={planId} today={todayDay(new Date())} />
       </HydrationBoundary>
     </Canvas>
   )

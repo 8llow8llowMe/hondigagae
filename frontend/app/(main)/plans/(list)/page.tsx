@@ -6,6 +6,7 @@ import { planKeys } from '@/features/plan/queries'
 import { planListPath, type PlanSlice } from '@/lib/api/plan'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
+import { todayDay } from '@/lib/date/day'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import { parsePlanFilters } from '@/lib/url/plan-filters'
@@ -53,7 +54,9 @@ export default async function PlansPage({ searchParams }: { searchParams: Search
     2단은 1024+ 부터 — 280 레일에 본문을 더하면 768 에 들어가지 않아 가로 스크롤이 난다.
 
     **`today` 를 서버에서 만들어 내려보낸다.** 클라이언트가 따로 `new Date()` 를 부르면
-    자정 근처에서 서버 렌더와 하이드레이션의 D-day 가 하루 갈릴 수 있다.
+    자정 근처에서 서버 렌더와 하이드레이션의 D-day 가 하루 갈릴 수 있다. **시각이 아니라
+    달력의 칸(`todayDay`)을 넘긴다** (#1490) — 시각을 넘기면 브라우저 시간대가 날짜를 다시
+    정해, UTC 브라우저에서 KST 00–09시면 홈은 `오늘 1일차` 인데 목록은 `D-1` 이었다.
 
     **`main` 이 L0 바닥이다** (`DESIGN.md §0`, 이슈 #445). 장소 목록(#439)과 같은 3층 표면 —
     바닥은 전폭이어야 하므로 `Canvas` 를 `main` 에 걸고, 카드를 쌓는 일은 `PlanListView` 의
@@ -62,7 +65,7 @@ export default async function PlansPage({ searchParams }: { searchParams: Search
   return (
     <Canvas as="main" id="main-content" className="rail-layout rail-layout-filter">
       <HydrationBoundary state={dehydrate(queryClient)}>
-        <PlanListView filters={filters} today={new Date()} />
+        <PlanListView filters={filters} today={todayDay(new Date())} />
       </HydrationBoundary>
     </Canvas>
   )

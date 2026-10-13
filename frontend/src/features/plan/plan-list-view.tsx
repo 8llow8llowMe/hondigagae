@@ -14,6 +14,7 @@ import { PlanListSection } from '@/features/plan/plan-list-section'
 import { usePlanList } from '@/features/plan/use-plan-list'
 import { toErrorStatus } from '@/lib/api/error'
 import { hasMore, mergeSlices } from '@/lib/api/slice'
+import { todayFromDay } from '@/lib/date/day'
 import { messages } from '@/lib/messages'
 import { countByPet, countByStatus, filterPlans, hasActiveFilters } from '@/lib/plan/list'
 import { toPlanFilterQuery } from '@/lib/url/plan-filters'
@@ -28,10 +29,14 @@ import { DEFAULT_PLAN_FILTERS, type PlanFilters } from '@/types/plan'
  *
  * **필터가 바뀌어도 재조회하지 않는다.** `GET /plans` 에 좁히기 파라미터가 없어
  * query key 에 필터가 들어가지 않는다 (`queries.ts`).
+ *
+ * **`today` 는 서버가 정한 달력의 칸(`YYYY-MM-DD`)이다** (#1490). 시각으로 받으면 브라우저
+ * 시간대가 날짜를 다시 정해 홈과 출발 당일 표기가 갈린다 — 여기서 로컬 정오로 세운다.
  */
-export function PlanListView({ filters, today }: { filters: PlanFilters; today: Date }) {
+export function PlanListView({ filters, today }: { filters: PlanFilters; today: string }) {
   const router = useRouter()
   const pathname = usePathname()
+  const todayDate = useMemo(() => todayFromDay(today), [today])
 
   const [creating, setCreating] = useState(false)
 
@@ -77,7 +82,7 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
       totalCount={countable ? allPlans.length : null}
       // 받기 전 · 실패는 `null` 이다 — 빈 배열로 넘기면 모든 행이 "동행 반려견 없음" 이 된다 (#1042)
       pets={petsQuery.data?.pets ?? null}
-      today={today}
+      today={todayDate}
       loading={plansQuery.isPending}
       errorStatus={toErrorStatus(plansQuery.error)}
       hasNext={hasNext}

@@ -62,6 +62,24 @@ export function dayToLocalNoon(date: string): Date | null {
   return new Date(Number(year), Number(month) - 1, Number(day), 12)
 }
 
+/**
+ * 서버 페이지가 `todayDay(new Date())` 로 정해 내려보낸 오늘 → 판정 함수가 받는 `today: Date`.
+ *
+ * **오늘을 클라이언트로 넘길 때는 시각이 아니라 이 칸을 넘긴다** (#1490). 판정 함수는
+ * `todayUtc()` 로 로컬 getter 를 읽으므로, 서버가 `new Date()` 를 시각 그대로 넘기면 **브라우저
+ * 시간대가 날짜를 다시 정한다** — 브라우저가 UTC 이고 KST 00–09시면 홈은 `오늘 1일차`, 목록 ·
+ * 상세는 `D-1` 로 갈렸다. 칸을 넘기고 로컬 정오로 세우면 어느 시간대에서 읽어도 서버의 칸이다.
+ *
+ * **형식이 깨진 값은 던진다.** 이 값은 서버가 `todayDay` 로 만든 것이라 깨질 수 없고, 깨졌다면
+ * 호출부 계약이 바뀐 것이다. `new Date()` 로 메우면 이 이슈가 조용히 돌아오므로 경계(`error.tsx`)
+ * 에 맡긴다. 형식이 불확실한 값은 `dayToLocalNoon` 으로 `null` 을 받아 처리한다.
+ */
+export function todayFromDay(todayIso: string): Date {
+  const today = dayToLocalNoon(todayIso)
+  if (today === null) throw new Error(`오늘은 'YYYY-MM-DD' 여야 한다: ${todayIso}`)
+  return today
+}
+
 /** 요일 이름. 못 읽으면 `null` */
 export function weekdayOf(date: string): string | null {
   const time = parseDay(date)
