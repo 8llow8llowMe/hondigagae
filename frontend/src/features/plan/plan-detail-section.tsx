@@ -53,6 +53,7 @@ import {
 } from '@/lib/plan/item-memo-edit'
 import { packingPlacement } from '@/lib/plan/packing-promotion'
 import { isReviewSectionVisible } from '@/lib/plan/review'
+import { routeReorderAllowed, routeReorderSuggestion } from '@/lib/plan/route-reorder'
 import { planStatusActionLayout } from '@/lib/plan/status-action'
 import { canMarkVisited } from '@/lib/plan/visit-toggle'
 import {
@@ -62,7 +63,12 @@ import {
 } from '@/lib/plan/walk-safety'
 import type { Pet } from '@/types/pet'
 import type { PlaceDetail } from '@/types/place'
-import type { PlanDetail, PlanItemWalkSafetyItem, PlanWeatherResponse } from '@/types/plan'
+import type {
+  PlanDetail,
+  PlanItemDetail,
+  PlanItemWalkSafetyItem,
+  PlanWeatherResponse,
+} from '@/types/plan'
 
 /**
  * 일정 상세 레이아웃 — 좌 레일(개요) + 우 본문(일자 섹션).
@@ -174,6 +180,8 @@ export function PlanDetailSection({
   const [editingDay, setEditingDay] = useState<number | null>(null)
   const [pendingDay, setPendingDay] = useState<number | null>(null)
   const [discarding, setDiscarding] = useState(false)
+  /** 열린 편집기가 동선 다시 정렬 제안을 받아 추천 순서로 열렸다 (#1462 · D31-2) */
+  const [reorderPreview, setReorderPreview] = useState(false)
 
   const edit = usePlanDayEdit({
     planId: plan.planId,
@@ -333,11 +341,13 @@ export function PlanDetailSection({
   // 편집한 것을 브라우저 이탈로 잃지 않게 한다. 저장 중은 제외한다 (form-guide.md §7)
   useUnsavedWarning(edit.dirty && !edit.saving)
 
-  function openEditor(day: number) {
+  /** `order` 를 주면 그 순서로 연다 — 동선 다시 정렬 제안 (#1462 · D31-2) */
+  function openEditor(day: number, order?: PlanItemDetail[]) {
     const group = days[day - 1]
     if (group === undefined) return
     setEditingDay(day)
-    edit.start(group.items)
+    setReorderPreview(order !== undefined)
+    edit.start(group.items, order)
   }
 
   /** 편집 중이면 먼저 묻는다. 아니면 바로 연다 */
@@ -360,6 +370,37 @@ export function PlanDetailSection({
       return
     }
     setEditingDay(null)
+  }
+
+  /*
+    **동선 다시 정렬 제안** (#1462 · D31). 편집 중에는 어느 일자에도 내지 않는다 — 순서를 정리하는
+    중에 다른 일자의 순서를 바꾸자고 끼어들지 않고, 미저장 편집을 버리는 확인 길(`requestEditor`)에
+    추천 순서를 실어 나르지 않아도 된다.
+
+    **일괄 교체 잠금(`dayItemsBusy` — 담기 · 이동 추가 · 시각 · 메모 저장)을 `순서 편집` 진입과 같이
+    거친다** (#1460 · F6). 잠긴 동안은 줄을 내지 않고, 누른 순간에도 `requestEditor` 와 같은 판정을
+    한 번 더 본다 — 저장 중에 낡은 목록으로 추천 순서를 열면 그 저장이 바꾼 것을 편집기가 덮는다.
+  */
+  function dayRouteReorder(day: number, items: PlanItemDetail[]) {
+    if (editingDay !== null || dayItemsBusy) return null
+    const allowed = routeReorderAllowed({
+      statusCode: plan.status.code,
+      date: addPlanDays(plan.startDate, day - 1),
+      today: todayDay(today),
+      items,
+    })
+    if (!allowed) return null
+
+    const suggestion = routeReorderSuggestion(items, lodgingBasisFor(day, days))
+    if (suggestion === null) return null
+
+    return {
+      savedMeters: suggestion.savedMeters,
+      onApply: () => {
+        if (dayItemsBusy) return
+        openEditor(day, suggestion.order)
+      },
+    }
   }
 
   /*
@@ -583,6 +624,8 @@ export function PlanDetailSection({
             planId={plan.planId}
             date={addPlanDays(plan.startDate, group.day - 1)}
             rows={toItemRows(group.items, lodgingBasisFor(group.day, days))}
+            routeReorder={dayRouteReorder(group.day, group.items)}
+            reorderPreview={reorderPreview && editingDay === group.day}
             places={places}
             verdict={weather?.days.find((entry) => entry.day === group.day)}
             petConditionApplied={weather?.petConditionApplied ?? true}

@@ -65,11 +65,16 @@ export function usePlanDayEdit({
   // disabled 반영 전 빠른 연속 저장을 막는다 (form-guide.md §6)
   const savingRef = useRef(false)
 
-  const start = useCallback((dayItems: PlanItemDetail[]) => {
-    setItems(toEditItems(dayItems))
+  /**
+   * 편집을 연다. `order` 를 주면 **그 순서로 연다** — 동선 다시 정렬 제안(#1462 · 일정상세 D31)이
+   * 추천 순서를 미리 놓는다. 원본은 여전히 `dayItems` 라 `dirty` 가 켜지고, 저장하지 않고
+   * 취소하면 서버 상태는 그대로다 — 그것이 이 제안의 "되돌리기" 다.
+   */
+  const start = useCallback((dayItems: PlanItemDetail[], order?: PlanItemDetail[]) => {
+    setItems(toEditItems(order ?? dayItems))
     setOriginal(dayItems)
     setError(null)
-    setAnnouncement('')
+    setAnnouncement(order === undefined ? '' : messages.plan.routeReorderApplied)
     setFocusTarget(null)
     setTimeRealign(null)
   }, [])

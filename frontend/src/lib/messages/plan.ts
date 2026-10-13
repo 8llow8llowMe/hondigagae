@@ -1495,4 +1495,16 @@ export const planMessages = {
   /** `PLAN_004`. 원인은 메모가 아니라 일괄 교체가 되싣는 **그 일자의 장소**다 (`addMoveMissingPlaceError` 와 같은 판단) */
   itemMemoMissingPlaceError:
     '이 일자에 더 이상 조회되지 않는 장소가 있어 함께 저장할 수 없어요. 일정에서 그 장소를 빼 주세요.',
+
+  /**
+   * 동선 다시 정렬 제안 (#1462 · 일정상세 D31). `{distance}` 는 `formatDistance` 값이다.
+   * **직선임을 밝힌다** — 행의 거리 줄과 같은 어림이다(D3). 강제가 아니라 제안이라 `~해요` 로
+   * 사실만 말하고 버튼이 행동을 맡는다.
+   */
+  routeReorderNotice: '되돌아가는 구간이 있어요. 순서를 바꾸면 직선 {distance} 줄어요.',
+  routeReorderAction: '동선 다시 정렬',
+  /** 한 화면에 일자마다 설 수 있다 — 보이는 낱말을 앞에 두고 일자로 가른다(WCAG 2.5.3) */
+  routeReorderActionLabel: '동선 다시 정렬, {day}일차',
+  /** 제안을 받아 편집기가 열렸을 때 편집기 위 한 줄 · 스크린리더 알림 */
+  routeReorderApplied: '짧은 순서로 바꿔 두었어요. 저장해야 반영되고, 취소하면 그대로예요.',
 } as const

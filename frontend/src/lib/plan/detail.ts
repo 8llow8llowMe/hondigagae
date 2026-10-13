@@ -213,6 +213,14 @@ function coordOf(item: PlanItemDetail): LatLng | null {
 }
 
 /**
+ * 거리 줄이 쓰는 좌표(`place` 만) — 동선 다시 정렬(#1462 · D31)이 같은 좌표로 잰다. 둘이 다른
+ * 좌표를 쓰면 제안이 말하는 "줄어드는 거리" 와 행의 `직선 N km` 합이 어긋난다.
+ */
+export function planItemDistanceCoord(item: PlanItemDetail): LatLng | null {
+  return coordOf(item)
+}
+
+/**
  * 지도에 찍을 좌표 — **`coordOf` 보다 넓다** (#743).
  *
  * 거리 줄은 `place` 만 본다. 올레 항목(`WALK`)의 `place` 는 항상 `null` 이고 좌표는
