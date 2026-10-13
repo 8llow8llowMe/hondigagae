@@ -57,6 +57,7 @@ import { isReviewSectionVisible } from '@/lib/plan/review'
 import { routeReorderAllowed, routeReorderSuggestion } from '@/lib/plan/route-reorder'
 import { planStatusActionLayout } from '@/lib/plan/status-action'
 import { canMarkVisited } from '@/lib/plan/visit-toggle'
+import { dayVisitPending } from '@/lib/plan/visit-toggle-save'
 import {
   dayBeyondForecastReason,
   dayHasLookupFailed,
@@ -349,10 +350,10 @@ export function PlanDetailSection({
   /*
     **진행 중인 `다녀옴` 토글이 그 일자에 있으면 메모 저장을 잠근다** (#1460 리뷰). 토글은 지금 id 로
     나가는데 교체가 id 를 바꾸면 그 토글이 `PLAN_005` 가 되고, 되살리기는 토글 전 상태로 판정한다.
+    `pending` 은 상세 재조회까지 남는다(#1489) — PUT 직후 풀리면 옛 `visited` 캐시로 교체가 나간다.
   */
   const memoDayVisitPending =
-    memoTarget !== null &&
-    (days[memoTarget.day - 1]?.items.some((item) => visit.pending.has(item.planItemId)) ?? false)
+    memoTarget !== null && dayVisitPending(days[memoTarget.day - 1]?.items ?? [], visit.pending)
 
   /*
     상태 전이 (#653). **진입점이 둘로 갈려서 상태를 여기서 든다** — 정방향은 개요 아래
