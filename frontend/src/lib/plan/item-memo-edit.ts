@@ -1,5 +1,6 @@
 import { messages } from '@/lib/messages'
 import { toPayloadItem } from '@/lib/plan/day-items'
+import { memoModalKey } from '@/lib/plan/item-modal-key'
 import type { PlanDayItemsReplacePayload, PlanItemDetail } from '@/types/plan'
 
 /**
@@ -141,7 +142,13 @@ export function itemMemoModalProps(target: ItemMemoTarget | null): {
   title: string
   initial: string | null
 } {
-  if (target === null) return { open: false, key: 'closed', title: '', initial: null }
+  // 시각 모달과 형제라 종류를 앞에 붙인 key 를 쓴다 (#1485 · `item-modal-key.ts`)
+  if (target === null) return { open: false, key: memoModalKey(null), title: '', initial: null }
 
-  return { open: true, key: target.planItemId, title: target.title, initial: target.memo }
+  return {
+    open: true,
+    key: memoModalKey(target.planItemId),
+    title: target.title,
+    initial: target.memo,
+  }
 }

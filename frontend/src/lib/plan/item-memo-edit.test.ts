@@ -222,7 +222,7 @@ describe('itemMemoTargetOf · itemMemoModalProps — 연 시점 스냅숏 (#1460
 
     expect(itemMemoModalProps(target)).toEqual({
       open: true,
-      key: 'b',
+      key: 'memo:b',
       title: '고기국수',
       initial: '줄이 길어요',
     })
@@ -231,7 +231,7 @@ describe('itemMemoTargetOf · itemMemoModalProps — 연 시점 스냅숏 (#1460
   it('닫으면(null) 닫힌 열쇠다', () => {
     expect(itemMemoModalProps(null)).toEqual({
       open: false,
-      key: 'closed',
+      key: 'memo:closed',
       title: '',
       initial: null,
     })
