@@ -17,7 +17,7 @@ import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { toPetCondition } from '@/lib/api/insight'
 import { CONGESTION_DEFAULT_DAYS, type CongestionDays } from '@/lib/insight/congestion'
 import { writeRecentPlaceId } from '@/lib/insight/recent-place'
-import { basisPetOf } from '@/lib/place/plan-context'
+import { basisPetOf, tripOfBasis } from '@/lib/place/plan-context'
 import { placeItemTypeOf } from '@/lib/plan/day-items'
 
 /**
@@ -29,7 +29,16 @@ import { placeItemTypeOf } from '@/lib/plan/day-items'
 const RESUME_ADD_PARAM = 'add'
 
 /** 조회 상태를 presentational 컴포넌트가 쓰는 props 로 변환한다 */
-export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: boolean }) {
+export function PlaceDetailView({
+  placeId,
+  authed,
+  today,
+}: {
+  placeId: string
+  authed: boolean
+  /** 서버가 정한 오늘 (`yyyy-MM-dd`) — 지난 여행일을 가른다 (#1476) */
+  today: string
+}) {
   const query = usePlaceDetail(placeId)
 
   /**
@@ -53,8 +62,12 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
     말하면 사용자는 어느 쪽이 그 여행일의 답인지 알 수 없다. 기준이 정해지는 동안(`pending`)은
     둘 다 조회를 켜지 않는다: 헤더 반려견으로 먼저 부르면 요청이 두 번 나가고 판정이 한 번 뒤바뀐다.
   */
-  const planBasis = usePlacePlanBasis(authed)
-  const trip = planBasis.status === 'ready' ? planBasis.basis : null
+  const planBasis = usePlacePlanBasis(authed, today)
+  /*
+    **지난 여행일이면 날짜는 오늘로 물러선다** (#1476 · D1-5-5). 지난 날짜로 물으면 서버가 판단 근거
+    부족과 "내일 일정으로 확인해 주세요" 를 돌려준다. 반려견은 그 일정의 아이 그대로다(`basisPetOf`).
+  */
+  const trip = tripOfBasis(planBasis)
   /*
     **동반 조건 절도 같은 아이로 대조한다** (#1459 · D1-5-4). 판정은 "보리에게" 인데 크기 대조가
     헤더의 "몽" 이면 한 화면이 두 아이를 말한다. 하단 바 · 담기 시트는 반려견을 표기하지 않아

@@ -65,6 +65,8 @@ export type PlanBasis = {
   date: string
   /** 여행 날짜 전체 (양끝 포함, 날짜 순) */
   tripDates: string[]
+  /** 들어온 일차가 오늘보다 앞이다 — 날짜 기준을 쓰지 않는다(`tripOfBasis`, #1476) */
+  past: boolean
 }
 
 /**
@@ -77,20 +79,27 @@ export type PlanBasis = {
  * 다른 아이로 판정한다. 없으면 **대표 반려견(`petIds[0]`)** 이고, 내 반려견 목록에 없는
  * 아이(삭제 등)는 건너뛴다.
  *
- * **날짜는 FE 가 센다** — 시작일 + (일차 - 1). 오늘을 만들지 않으므로 타임존 문제가 없다
- * (`addPlanDays` 가 UTC 달력 칸으로 센다). 일차가 기간을 넘으면 없는 날이라 `null` 이다.
+ * **날짜는 FE 가 센다** — 시작일 + (일차 - 1)(`addPlanDays` 가 UTC 달력 칸으로 센다). 일차가 기간을
+ * 넘으면 없는 날이라 `null` 이다.
+ *
+ * **오늘은 받는다** — 서버 페이지가 `todayDay(new Date())` 로 만든 달력 칸이다(`lib/date/day.ts`).
+ * 그날이 오늘보다 앞이면 `past` 다(#1476): 지난 날짜로 물으면 서버가 `UNKNOWN` · `INSUFFICIENT` 와
+ * "내일 일정으로 확인해 주세요" 를 돌려줘, 쓸 수 있던 지금 판정을 지운다.
  */
 export function resolvePlanBasis({
   plan,
   day,
   basisPetId,
   pets,
+  today,
 }: {
   plan: PlanDetail
   day: number
   /** 그날 일정 판정의 기준견. 판정을 못 냈거나 아직 없으면 `null` */
   basisPetId: string | null
   pets: Pet[]
+  /** 오늘 (`yyyy-MM-dd`) */
+  today: string
 }): PlanBasis | null {
   const total = totalDaysBetween(plan.startDate, plan.endDate)
   if (total === null || day < 1 || day > total) return null
@@ -113,7 +122,19 @@ export function resolvePlanBasis({
   const chosen = candidates.map((petId) => petById.get(petId)).find((entry) => entry !== undefined)
   if (chosen === undefined) return null
 
-  return { pet: chosen, date, tripDates }
+  // 같은 모양(`yyyy-MM-dd`)이라 문자열 비교가 날짜 비교다
+  return { pet: chosen, date, tripDates, past: date < today }
+}
+
+/**
+ * 판정에 쓸 **여행 날짜**. 일정 기준이 없거나 **지난 여행일**이면 `null`(= 오늘 판정) (#1476).
+ *
+ * 지난 여행일에도 반려견은 그 일정의 아이 그대로다(`basisPetOf`) — 그 일정의 항목에서 들어왔으니
+ * 대조 기준은 여전히 그 아이다. 날짜만 오늘로 물러선다(장소상세-세부명세 D1-5-5).
+ */
+export function tripOfBasis(state: PlanBasisState): PlanBasis | null {
+  if (state.status !== 'ready' || state.basis.past) return null
+  return state.basis
 }
 
 /**
@@ -182,12 +203,15 @@ export function planBasisState({
   plan,
   weatherBasisPetId,
   pets,
+  today,
 }: {
   context: PlanContextQuery | null
   plan: Source<PlanDetail>
   /** 그날 일정 판정의 기준견. `undefined` 면 아직 조회 중이다 */
   weatherBasisPetId: string | null | undefined
   pets: Source<Pet[]>
+  /** 오늘 (`yyyy-MM-dd`) */
+  today: string
 }): PlanBasisState {
   if (context === null) return { status: 'none' }
   if (plan.failed || pets.failed) return { status: 'none' }
@@ -199,6 +223,7 @@ export function planBasisState({
     day: context.day,
     basisPetId: weatherBasisPetId,
     pets: pets.data,
+    today,
   })
   return basis === null ? { status: 'none' } : { status: 'ready', basis }
 }
