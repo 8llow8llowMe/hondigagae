@@ -196,6 +196,9 @@ export const NO_PLACE_ITEM_REASON_CODE = 'NO_PLACE_ITEM'
 /**
  * 이미 지난 날짜. **예보는 소급되지 않으므로 재시도를 권하지 않는다.** 코드가 사실을 다
  * 말해 주므로 화면이 자기 말투로 옮긴다 (#497).
+ *
+ * **항목 산책 위험도(`lib/plan/walk-safety.ts`)도 이 상수를 쓴다** (#1500) — 같은 문자열을
+ * 두 곳에 두지 않는다.
  */
 export const PAST_DATE_REASON_CODE = 'PAST_DATE'
 

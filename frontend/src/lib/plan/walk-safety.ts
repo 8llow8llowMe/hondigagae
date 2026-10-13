@@ -1,6 +1,10 @@
 import type { MetricTone } from '@/components/metric'
 import { walkSafetyTone } from '@/lib/insight/tone'
-import { BEYOND_FORECAST_RANGE_REASON_CODE, type PlanItemWalkSafetyItem } from '@/types/plan'
+import {
+  BEYOND_FORECAST_RANGE_REASON_CODE,
+  PAST_DATE_REASON_CODE,
+  type PlanItemWalkSafetyItem,
+} from '@/types/plan'
 
 /**
  * 항목 산책 위험도 — 순수 로직 (#625).
@@ -12,10 +16,10 @@ import { BEYOND_FORECAST_RANGE_REASON_CODE, type PlanItemWalkSafetyItem } from '
 /**
  * 판정 못 낸 사유 여섯 종 — 서버가 가르는 **순서** 그대로다. 바꾸지 않는다 (D15-3).
  *
- * 넷째 `BEYOND_FORECAST_RANGE` 는 여기서 다시 선언하지 않는다 (#1491) — 일자 판정과 같은
- * 문자열이라 `@/types/plan` 의 `BEYOND_FORECAST_RANGE_REASON_CODE` 하나를 같이 쓴다.
+ * 첫째 `PAST_DATE` (#1500) 와 넷째 `BEYOND_FORECAST_RANGE` (#1491) 는 여기서 다시 선언하지
+ * 않는다 — 일자 판정과 같은 문자열이라 `@/types/plan` 의 `PAST_DATE_REASON_CODE` ·
+ * `BEYOND_FORECAST_RANGE_REASON_CODE` 하나를 같이 쓴다.
  */
-export const PAST_DATE_CODE = 'PAST_DATE'
 export const NOT_PLACE_TARGET_CODE = 'NOT_PLACE_TARGET'
 export const NO_START_TIME_CODE = 'NO_START_TIME'
 export const LOOKUP_FAILED_CODE = 'LOOKUP_FAILED'
@@ -46,7 +50,7 @@ const UNKNOWN_LEVEL_CODE = 'UNKNOWN'
 const HIDDEN_REASON_CODES: ReadonlySet<string> = new Set([
   NO_START_TIME_CODE,
   NOT_PLACE_TARGET_CODE,
-  PAST_DATE_CODE,
+  PAST_DATE_REASON_CODE,
 ])
 
 /** `planItemId` → 항목 판정. 없는 id 는 `undefined` 다 — 오류가 아니라 "아직 안 왔다"다 */
