@@ -10,6 +10,7 @@ import {
   resolvePlanBasis,
   shortDateLabel,
   tripOfBasis,
+  weatherBasisPetIdOf,
 } from '@/lib/place/plan-context'
 import { congestion } from '@/test/fixtures/insight'
 import { pet, planDetail, secondPet } from '@/test/fixtures/plan'
@@ -345,5 +346,40 @@ describe('basisPetOf — 화면 전체가 쓰는 기준 반려견 (#1459)', () =
 
   it('기준을 정하는 동안(pending)은 아무 아이도 아니다 — 헤더 아이를 먼저 그렸다가 바꾸지 않는다', () => {
     expect(basisPetOf({ status: 'pending' }, pet)).toBeNull()
+  })
+})
+
+describe('weatherBasisPetIdOf — 일정 판정 조회를 기준견 입력으로 (#1492)', () => {
+  const days = [
+    { day: 1, basisPetId: '9007199254740993' },
+    { day: 2, basisPetId: null },
+  ]
+
+  it('조회가 실패하면 null 이다 — 기준견 없이 대표 반려견으로 간다', () => {
+    expect(weatherBasisPetIdOf({ isError: true, days: undefined }, 1)).toBeNull()
+  })
+
+  it('실패가 조회 중보다 먼저다 — 실패한 조회는 data 가 비어도 기다리지 않는다', () => {
+    expect(weatherBasisPetIdOf({ isError: true, days: undefined }, 1)).not.toBeUndefined()
+  })
+
+  it('아직 못 받았으면 undefined 다 — 조회 중이라 기다린다', () => {
+    expect(weatherBasisPetIdOf({ isError: false, days: undefined }, 1)).toBeUndefined()
+  })
+
+  it('그 일차 항목이 없으면 null 이다', () => {
+    expect(weatherBasisPetIdOf({ isError: false, days }, 3)).toBeNull()
+  })
+
+  it('맥락의 일차가 없으면(미로그인 · 쿼리 없음) null 이다', () => {
+    expect(weatherBasisPetIdOf({ isError: false, days }, undefined)).toBeNull()
+  })
+
+  it('항목의 basisPetId 가 null 이면 null 이다', () => {
+    expect(weatherBasisPetIdOf({ isError: false, days }, 2)).toBeNull()
+  })
+
+  it('그 일차의 basisPetId 를 문자열 그대로 돌려준다', () => {
+    expect(weatherBasisPetIdOf({ isError: false, days }, 1)).toBe('9007199254740993')
   })
 })
