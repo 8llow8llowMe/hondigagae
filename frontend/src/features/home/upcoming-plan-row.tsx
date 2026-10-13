@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 import { ChevronRightIcon } from '@/components/icons'
-import { formatPlanDateRange, planPhaseOf } from '@/lib/plan/date'
+import { formatPlanDateRange, tripPhaseOf } from '@/lib/plan/date'
 import { planPhaseLabel, planPhaseNote } from '@/lib/plan/phase-text'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import type { PlanSummaryItem } from '@/types/plan'
@@ -17,11 +17,15 @@ import type { PlanSummaryItem } from '@/types/plan'
  * 빈 채였다. 이제 같은 자리에 `여행 중` 이 서고 날짜 줄이 `오늘 4일차` 를 덧붙인다 —
  * 목록 행(`plan-row`)·상세 개요와 **같은 함수로** 만든 말이다.
  *
+ * **출발 당일도 `여행 중 · 오늘 1일차` 다** (#1458). 목록(#1433) · 상세 개요(#1446) · 홈 배너가
+ * 그날을 1일차로 부르는데 이 행만 `D-DAY` 였다. 그래서 표기는 `tripPhaseOf` 다 — 섹션 제목
+ * (`home-view` `showsOngoingPlan`)도 같은 함수라 그날은 제목이 `진행 중인 일정` 이다.
+ *
  * 데스크톱의 일자별 날씨 3칸은 `GET /plans/{planId}/weather` 가 필요해 이 화면 범위 밖이다.
  * 아트보드에는 있으나 지금은 그리지 않는다 — 없는 데이터를 지어내지 않는다.
  */
 export function UpcomingPlanRow({ plan, today }: { plan: PlanSummaryItem; today: Date }) {
-  const phase = planPhaseOf(plan.startDate, plan.endDate, today)
+  const phase = tripPhaseOf(plan.startDate, plan.endDate, today)
   const phaseLabel = planPhaseLabel(phase)
   const phaseNote = planPhaseNote(phase)
 

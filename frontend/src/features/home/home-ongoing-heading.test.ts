@@ -16,8 +16,10 @@ import { readSourceWithoutComments as source } from '@/test/source'
  * `home-view.tsx` 는 `useQuery` 여섯을 부르는 client component 라 `renderToStaticMarkup`
  * 으로 세울 수 없다 (`home-date-slot.test.ts` 머리주석과 같은 이유). 행 자체의 렌더는
  * `upcoming-plan-row.test.ts` 가, 판정은 `lib/plan/phase-text.test.ts` 가 본다.
+ * 출발 당일을 여행 중으로 접는 표기(`tripPhaseOf`, #1458)는 행과 제목이 함께 쓴다.
  */
 const HOME = source('src/features/home/home-view.tsx')
+const ROW = source('src/features/home/upcoming-plan-row.tsx')
 
 describe('홈 일정 섹션 제목 (#561)', () => {
   it('제목을 고정하지 않는다 — 여행 중이면 진행 중인 일정이다', () => {
@@ -29,9 +31,16 @@ describe('홈 일정 섹션 제목 (#561)', () => {
     **판정을 여기서 새로 하지 않는다.** `startDate < 오늘` 같은 비교를 홈이 직접 쓰면
     목록·상세와 갈릴 수 있다 — 이 이슈가 없앤 바로 그 구멍이다.
   */
-  it('판정은 planPhaseOf 에 맡긴다', () => {
-    expect(HOME).toContain('planPhaseOf')
+  /*
+    #1458. 제목과 행이 **같은 함수**를 쓴다 — 행이 출발 당일을 `오늘 1일차` 로 부르는데 제목이
+    `planPhaseOf` 로 그날을 다가오는 쪽에 두면 `다가오는 일정` 아래 `여행 중` 이 선다(#561 의 모순).
+  */
+  it('판정은 행과 같은 tripPhaseOf 에 맡긴다', () => {
+    expect(HOME).toContain('tripPhaseOf')
+    expect(HOME).not.toContain('planPhaseOf(')
     expect(HOME).toContain("?.kind === 'ongoing'")
+    expect(ROW).toContain('tripPhaseOf(')
+    expect(ROW).not.toContain('planPhaseOf(')
   })
 
   it('제목 전환은 이 섹션에 실제로 선 일정으로 정한다 — 전체 목록이 아니다', () => {

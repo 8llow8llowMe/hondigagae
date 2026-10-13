@@ -141,7 +141,8 @@ export function planPhaseOf(startDate: string, endDate: string, today: Date): Pl
 }
 
 /**
- * 일정 **목록 · 상세 개요**가 말할 시점 — 출발 당일부터 `여행 중 · 1일차` 다 (#1433 · #1446).
+ * 일정 **목록 · 상세 개요 · 홈 일정 행과 섹션 제목**이 말할 시점 — 출발 당일부터 `여행 중 · 1일차` 다
+ * (#1433 · #1446 · #1458).
  *
  * `planPhaseOf` 는 출발 당일을 `upcoming`(`D-DAY`)에 남긴다. 그 판정에는 상세의 `여행 완료하기`
  * 자리 · `다녀옴` 토글 · 준비물 승격이 걸려 있어(`status-action.ts` · `visit-toggle.ts` ·
