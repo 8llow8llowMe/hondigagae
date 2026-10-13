@@ -4,6 +4,8 @@ import { messages } from '@/lib/messages'
 import {
   ITEM_MEMO_MAX,
   itemMemoChanged,
+  itemMemoModalProps,
+  itemMemoTargetOf,
   setItemMemoPayload,
   validateItemMemo,
   visitsToRestore,
@@ -184,9 +186,54 @@ describe('visitsToRestore', () => {
     expect(visitsToRestore(ITEMS, AFTER.slice(0, 2))).toEqual([])
   })
 
+  it('같은 장소가 두 번 담겨도 자리(순번)로 가른다 — 다녀온 쪽만 되살린다', () => {
+    const twice = (planItemId: string, sequence: number, visited: boolean) =>
+      planItem({ planItemId, day: 2, sequence, title: '협재해수욕장', targetId: BIG_ID, visited })
+    const before = [twice('x', 0, false), twice('y', 1, true)]
+    const after = [twice('new-x', 0, false), twice('new-y', 1, false)]
+
+    expect(visitsToRestore(before, after)).toEqual(['new-y'])
+  })
+
   it('다녀옴이 없던 날은 빈 배열이다', () => {
     const before = ITEMS.map((item) => ({ ...item, visited: false }))
 
     expect(visitsToRestore(before, AFTER)).toEqual([])
+  })
+})
+
+describe('itemMemoTargetOf · itemMemoModalProps — 연 시점 스냅숏 (#1460 리뷰)', () => {
+  it('열 때 제목 · 메모 · 자리를 적어 둔다', () => {
+    expect(itemMemoTargetOf(2, ITEMS, 'b')).toEqual({
+      day: 2,
+      planItemId: 'b',
+      index: 1,
+      title: '고기국수',
+      memo: '줄이 길어요',
+    })
+  })
+
+  it('상세에 없는 항목이면 열지 않는다', () => {
+    expect(itemMemoTargetOf(2, ITEMS, 'gone')).toBeNull()
+  })
+
+  it('모달은 스냅숏만 본다 — 교체로 상세 id 가 바뀌어도 열린 채 같은 열쇠다(onSaved 까지 유지)', () => {
+    const target = itemMemoTargetOf(2, ITEMS, 'b')
+
+    expect(itemMemoModalProps(target)).toEqual({
+      open: true,
+      key: 'b',
+      title: '고기국수',
+      initial: '줄이 길어요',
+    })
+  })
+
+  it('닫으면(null) 닫힌 열쇠다', () => {
+    expect(itemMemoModalProps(null)).toEqual({
+      open: false,
+      key: 'closed',
+      title: '',
+      initial: null,
+    })
   })
 })
