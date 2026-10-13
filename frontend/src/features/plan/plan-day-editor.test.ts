@@ -97,6 +97,23 @@ describe('PlanDayEditor — 편집 중 화면', () => {
     }
   })
 
+  it('삭제 · 복구 버튼도 높이 44 다 — 같은 행의 이동 버튼과 같은 하한 (#1470 · DESIGN.md §7)', () => {
+    const removeButtons = (markup: string) =>
+      [...markup.matchAll(/<button[^>]*aria-label="[^"]*(삭제|복구)[^"]*"[^>]*>/g)].map(
+        (match) => match[0],
+      )
+
+    const normal = removeButtons(render())
+    const restored = removeButtons(render({ items: toggleRemoved(ITEMS, 0) }))
+
+    expect(normal).toHaveLength(ITEMS.length)
+    expect(restored).toHaveLength(ITEMS.length)
+    for (const button of [...normal, ...restored]) {
+      expect(button).toContain('h-11')
+      expect(button).not.toContain('h-8')
+    }
+  })
+
   it('편집 영역 머리는 헤더 아래로 여백을 두고 선다 — 진입 시 끌어 올 때의 기준이다 (#1427)', () => {
     expect(render()).toMatch(/^<div class="scroll-mt-28 /)
   })
