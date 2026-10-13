@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   describeGoldenWindow,
   formatHourRuns,
+  headlineGoldenSpan,
   isWithinGoldenWindow,
   lacksSafeHour,
   markGoldenWindow,
@@ -353,5 +354,83 @@ describe('lacksSafeHour (#1362)', () => {
     expect(
       lacks([at(9, 'SAFE', '안전'), at(12, 'CAUTION', '주의'), at(13, 'CAUTION', '주의')]),
     ).toBe(true)
+  })
+})
+
+/*
+  #1428. 헤드라인이 서버 창 **전체**(`12:00 – 23:00`)를 적는데 바로 아래 문장은 "12시는 노면이
+  26℃까지 올라 주의 등급이에요. 13–23시가 좋아요." 라고 한다 — 숫자와 문장이 어긋났다.
+  헤드라인은 창 안의 **안전 구간**을 적는다.
+*/
+describe('headlineGoldenSpan (#1428)', () => {
+  const at = (hh: number, code: string, name: string): HourlyWalkSafetyItem => ({
+    at: `${DAY}${String(hh).padStart(2, '0')}:00:00`,
+    walkSafetyLevel: { code, name, description: null, scoreDescription: null },
+    temperature: 30,
+    estimatedPavementCelsius: 30,
+    precipitationProbability: 0,
+  })
+  const safe = (hh: number) => at(hh, 'SAFE', '안전')
+  const caution = (hh: number) => at(hh, 'CAUTION', '주의')
+  const t = (hh: number) => `${DAY}${String(hh).padStart(2, '0')}:00:00`
+
+  it('주의 1칸 + 안전 N칸 창은 안전 구간만 적는다 — 재현 모양', () => {
+    const hourly = [caution(12), ...[13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].map(safe)]
+
+    expect(headlineGoldenSpan(hourly, t(12), t(23))).toEqual({ start: t(13), end: t(23) })
+  })
+
+  it('전부 안전이면 서버 창 그대로다', () => {
+    const hourly = [12, 13, 14].map(safe)
+
+    expect(headlineGoldenSpan(hourly, t(12), t(14))).toEqual({ start: t(12), end: t(14) })
+  })
+
+  /* 안전 칸이 없으면 지어내지 않는다 — 제목이 `나은 시간` 으로 바뀌는 갈래(#1362)가 받는다 */
+  it('안전 0칸이면 서버 창 그대로다', () => {
+    const hourly = [12, 13, 14].map(caution)
+
+    expect(headlineGoldenSpan(hourly, t(12), t(14))).toEqual({ start: t(12), end: t(14) })
+  })
+
+  it('안전 구간이 둘이면 더 긴 쪽이다', () => {
+    const hourly = [safe(11), safe(12), caution(13), safe(14), safe(15), safe(16)]
+
+    expect(headlineGoldenSpan(hourly, t(11), t(16))).toEqual({ start: t(14), end: t(16) })
+  })
+
+  it('안전 구간 둘의 길이가 같으면 더 이른 쪽이다', () => {
+    const hourly = [safe(11), safe(12), caution(13), safe(14), safe(15)]
+
+    expect(headlineGoldenSpan(hourly, t(11), t(15))).toEqual({ start: t(11), end: t(12) })
+  })
+
+  it('안전 한 칸이면 시작과 끝이 같다', () => {
+    const hourly = [caution(12), safe(13), caution(14)]
+
+    expect(headlineGoldenSpan(hourly, t(12), t(14))).toEqual({ start: t(13), end: t(13) })
+  })
+
+  /* 창 밖의 안전한 아침이 창을 넘어 헤드라인으로 새지 않는다 */
+  it('창 밖의 안전 칸은 세지 않는다', () => {
+    const hourly = [safe(9), safe(10), safe(11), caution(12), safe(13)]
+
+    expect(headlineGoldenSpan(hourly, t(12), t(13))).toEqual({ start: t(13), end: t(13) })
+  })
+
+  /* 판단 근거 부족은 안전이 아니다 — 모르는 것을 좋은 것으로 말하지 않는다 */
+  it('판단 근거 부족 칸은 안전 구간에 넣지 않는다', () => {
+    const hourly = [at(12, 'UNKNOWN', '판단 근거 부족'), safe(13), safe(14)]
+
+    expect(headlineGoldenSpan(hourly, t(12), t(14))).toEqual({ start: t(13), end: t(14) })
+  })
+
+  it('곡선이 비면 서버 창 그대로다 — 쪼갤 근거가 없다', () => {
+    expect(headlineGoldenSpan([], t(12), t(14))).toEqual({ start: t(12), end: t(14) })
+  })
+
+  it('서버 창이 없으면 null 이다', () => {
+    expect(headlineGoldenSpan([safe(12)], null, null)).toBeNull()
+    expect(headlineGoldenSpan([safe(12)], t(12), null)).toBeNull()
   })
 })

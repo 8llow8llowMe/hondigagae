@@ -221,6 +221,78 @@ function hourOf(at: string): number {
   return Number.parseInt(at.slice(11, 13), 10)
 }
 
+/** 헤드라인이 적을 구간. 둘 다 서버가 준 지역 시각 문자열 그대로다 */
+export type GoldenSpan = { start: string; end: string }
+
+/**
+ * 헤드라인이 적을 구간 — [#1428](https://github.com/8llow8llowMe/hondigagae/issues/1428).
+ *
+ * **서버 창은 주의 시각을 품을 수 있다** (`GoldenWalkWindow.acceptableRuns` 가 `SAFE`·`CAUTION`
+ * 을 함께 이어 붙인다 — #204 · #262 가 전제한 설계다). 그 창을 헤드라인에 그대로 적으면
+ * `12:00 – 23:00` 아래에 "12시는 … 주의 등급이에요. 13–23시가 좋아요." 가 서서 숫자와 문장이
+ * 어긋난다. 그래서 헤드라인은 **창 안의 안전 구간**을 적고, 주의 시각은 문장이 말한다.
+ *
+ * ### 안전 구간이 여럿이면 — 가장 긴 것, 길이가 같으면 가장 이른 것
+ *
+ * **서버가 창을 고르는 규칙과 같은 순서다** (`GoldenWalkWindow.from`: 안전 우선 → 길이 →
+ * 이른 시작). 헤드라인은 "가장 좋은 한 구간" 을 말하는 자리이고, 서버가 같은 질문에 이미 그
+ * 순서로 답하고 있다 — 화면이 다른 기준(예: 가장 이른 것)을 쓰면 같은 날 두 규칙이 생긴다.
+ * 나머지 안전 구간은 바로 아래 문장(`goldenBetterRuns`)이 함께 적는다.
+ *
+ * 길이는 **칸 수**로 잰다 — `hourly` 가 1시간 단위라 칸 수가 곧 시간이다.
+ *
+ * ### 안전 구간을 만들지 못하면 서버 창 그대로
+ *
+ * - **안전 0칸** — 제목이 `나은 시간` 으로 바뀌는 갈래(#1362 `lacksSafeHour`)가 받는다. 그날
+ *   헤드라인이 적을 "좋은" 구간은 없고, 서버 창이 그 "나은" 구간이다.
+ * - **곡선이 비었거나 창 안 칸이 없다** — 쪼갤 근거가 없다. 아는 만큼만 말한다.
+ *
+ * **판단 근거 부족(`UNKNOWN`)은 안전이 아니다** — 안전 구간에 넣지 않는다 (A-2).
+ *
+ * 구간을 묶는 규칙은 `describeGoldenWindow` 와 같다(창 판정 · `hourly` 순서) — 그래야 이 구간이
+ * 문장의 `{runs}` 중 하나와 정확히 겹친다.
+ *
+ * @returns 서버 창이 없으면 `null`
+ */
+export function headlineGoldenSpan(
+  hourly: readonly HourlyWalkSafetyItem[],
+  goldenStart: string | null,
+  goldenEnd: string | null,
+): GoldenSpan | null {
+  if (goldenStart === null || goldenEnd === null) return null
+
+  const safeRuns: { start: string; end: string; cells: number }[] = []
+  let open = false
+
+  for (const item of hourly) {
+    if (!isWithinGoldenWindow(item.at, goldenStart, goldenEnd)) continue
+
+    if (item.walkSafetyLevel.code !== SAFE_CODE) {
+      open = false
+      continue
+    }
+
+    const last = safeRuns[safeRuns.length - 1]
+    if (open && last !== undefined) {
+      last.end = item.at
+      last.cells += 1
+    } else {
+      safeRuns.push({ start: item.at, end: item.at, cells: 1 })
+      open = true
+    }
+  }
+
+  // `>` 이라 길이가 같으면 먼저 나온(= 이른) 구간이 남는다
+  const best = safeRuns.reduce<(typeof safeRuns)[number] | null>(
+    (picked, run) => (picked === null || run.cells > picked.cells ? run : picked),
+    null,
+  )
+
+  return best === null
+    ? { start: goldenStart, end: goldenEnd }
+    : { start: best.start, end: best.end }
+}
+
 /**
  * 창 안에 **안전 시각이 하나도 없는가** (#1362) — 제목이 `좋은 시간` 이라고 말해도 되는지.
  *

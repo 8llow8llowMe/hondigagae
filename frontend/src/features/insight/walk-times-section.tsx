@@ -10,6 +10,7 @@ import type { GoldenWindowRun } from '@/lib/insight/golden-window'
 import {
   describeGoldenWindow,
   formatHourRuns,
+  headlineGoldenSpan,
   lacksSafeHour,
   SAFE_CODE,
 } from '@/lib/insight/golden-window'
@@ -285,6 +286,21 @@ function GoldenWindow({ data }: { data: WalkTimesResponse }) {
   const single = data.goldenStart === data.goldenEnd
 
   /*
+    **헤드라인은 창 전체가 아니라 창 안의 안전 구간을 적는다** (#1428). 서버 창은 주의 시각을
+    품을 수 있어 `12:00 – 23:00` 아래에 "12시는 … 주의 등급이에요. 13–23시가 좋아요." 가 서면
+    숫자와 문장이 어긋난다. 구간 선택 규칙(가장 긴 것 → 가장 이른 것)과 안전 0칸일 때 서버 창을
+    그대로 두는 이유는 `headlineGoldenSpan` 에 있다.
+
+    **문장을 걷는 기준(`single`)은 서버 창 그대로다** — 문장은 창 안의 분포를 말하므로 창이 한
+    칸일 때만 걷는다. 헤드라인이 한 칸(`spanSingle`)이어도 창이 넓으면 문장이 주의 시각을 말해야 한다.
+  */
+  const span = headlineGoldenSpan(data.hourly, data.goldenStart, data.goldenEnd) ?? {
+    start: data.goldenStart ?? '',
+    end: data.goldenEnd ?? '',
+  }
+  const spanSingle = span.start === span.end
+
+  /*
     **시각에 등급 색을 주지 않는다** ([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) **A-3**).
 
     **등급 배지가 이 줄에서 빠졌다** (#637). `11:00 – 23:00 [주의]` 는 창 **전체**가
@@ -317,11 +333,11 @@ function GoldenWindow({ data }: { data: WalkTimesResponse }) {
   return (
     <div className="flex flex-col gap-1">
       <p className="text-title-1 text-fg font-bold tabular-nums">
-        {single ? (
-          messages.home.goldenSingleHour.replace('{time}', hourMinute(data.goldenStart))
+        {spanSingle ? (
+          messages.home.goldenSingleHour.replace('{time}', hourMinute(span.start))
         ) : (
           <>
-            {hourMinute(data.goldenStart)} – {hourMinute(data.goldenEnd)}
+            {hourMinute(span.start)} – {hourMinute(span.end)}
           </>
         )}
       </p>
