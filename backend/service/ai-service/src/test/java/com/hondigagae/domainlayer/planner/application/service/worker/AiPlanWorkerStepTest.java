@@ -11,6 +11,7 @@ import com.hondigagae.domainlayer.planner.application.model.AiPlanJobSubscriptio
 import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.JejuZone;
 import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
+import com.hondigagae.domainlayer.planner.application.model.PetAdmission;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
@@ -32,7 +33,10 @@ import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStatus;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStep;
 import com.hondigagae.domainlayer.planner.domain.model.PackingList;
 import com.hondigagae.global.properties.AiLlmProperties;
+import com.hondigagae.shared.travel.pet.PetSizeType;
+import com.hondigagae.shared.travel.place.AllowedPetSize;
 import com.hondigagae.shared.travel.plan.PlanItemType;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -571,6 +575,78 @@ class AiPlanWorkerStepTest {
         assertThat(llm.lastQuery.safeCandidates()).extracting(PlaceCandidate::placeId).containsExactly(801L, 803L, 100L);
     }
 
+    // 동행견 입장 판정 (#1420) ────────────────────────────────────────────
+
+    /**
+     * 운영 사례 — 보리(웰시코기 · 중형견 · 체중 미상) + 몽실이(말티즈 · 소형견 3.2kg). 이 일정 3일차에 한림공원(소형견만 ·
+     * "7kg 이하")이 들어갔다. 가장 제약이 큰 아이 기준이라 중형견 · 10kg(체중 미상 보리의 중형견 하한)으로 판정한다.
+     */
+    private static final List<PetCondition> BORI_AND_MONGSIL = List.of(
+        PetCondition.builder().breed("웰시코기").sizeName("중형견").sizeType(PetSizeType.MEDIUM).build(),
+        PetCondition.builder().breed("말티즈").sizeName("소형견").sizeType(PetSizeType.SMALL).weightText("3.2")
+            .weightKg(new BigDecimal("3.2")).build());
+
+    @Test
+    @DisplayName("후보 검색마다 동행견 중 가장 큰 크기 · 가장 무거운 체중을 입장 기준으로 싣는다 — 권역 거리순 조회까지 (#1420)")
+    void passesPetAdmissionToEverySearch() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("petIds", "1,2");
+        job.requestParams().put("requestNote", MEASURED_NOTE);
+        RecordingCandidates candidates = southEastReady();
+        StubPetConditions pets = new StubPetConditions();
+        pets.conditions = BORI_AND_MONGSIL;
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), new RecordingLlm(), candidates, pets, new StubFavorites()).runJob(JOB_ID);
+
+        assertThat(candidates.admissions).containsOnlyKeys(
+            "findPetFriendlyCandidates", "findRequestedCandidates", "findNearbyCandidates", "findNearbyRestaurantCandidates",
+            "findNearbyLodgingCandidates", "findLodgingCandidates", "findRestaurantCandidates");
+        // 체중 미상 보리의 중형견 하한 10kg 이 몽실이 3.2kg 보다 무겁다
+        assertThat(candidates.admissions.values()).allSatisfy(seen -> assertThat(seen).allSatisfy(admission -> {
+            assertThat(admission.sizeType()).isEqualTo(PetSizeType.MEDIUM);
+            assertThat(admission.weightKg()).isEqualByComparingTo("10");
+        }));
+        assertThat(candidates.admissions.get("findNearbyCandidates")).hasSize(JejuZone.values().length);
+    }
+
+    @Test
+    @DisplayName("동행견이 들어갈 수 없는 즐겨찾기는 후보에서 빠지고, 필수 포함은 사용자가 고른 곳이라 남는다 — 한림공원 사례 (#1420)")
+    void dropsInadmissibleFavoritesButKeepsPinned() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("petIds", "1,2");
+        job.requestParams().put("pinnedPlaceIds", "126455");
+        job.requestParams().put("preferFavorites", "true");
+        RecordingCandidates candidates = new RecordingCandidates();
+        candidates.general = List.of(
+            located(100L, "관광지", 33.5, 126.5),
+            // 이 대역은 검색 필터를 흉내 내지 않는다 — tour-service 를 빠져나온 것도 메모리에서 걸러진다
+            restricted(101L, "소형견 전용 정원", AllowedPetSize.SMALL_ONLY, null));
+        candidates.byIds = List.of(
+            restricted(126455L, "한림공원", AllowedPetSize.SMALL_ONLY, 7),
+            restricted(500L, "소형견 카페", AllowedPetSize.SMALL_ONLY, null),
+            restricted(501L, "중소형견 카페", AllowedPetSize.SMALL_MEDIUM, 15),
+            // 크기는 받지만 상한 7kg — 체중 미상 보리는 중형견 정의상 10kg 이상이라 들어갈 수 없다
+            restricted(502L, "7kg 이하 카페", AllowedPetSize.ALL, 7));
+        StubPetConditions pets = new StubPetConditions();
+        pets.conditions = BORI_AND_MONGSIL;
+        StubFavorites favorites = new StubFavorites();
+        favorites.favoriteIds = List.of(500L, 501L, 502L);
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), llm, candidates, pets, favorites).runJob(JOB_ID);
+
+        assertThat(llm.lastQuery.safeCandidates()).extracting(PlaceCandidate::placeId).containsExactly(126455L, 100L, 501L);
+    }
+
+    private static PlaceCandidateQueryResult restricted(
+        long placeId, String title, AllowedPetSize allowedPetSize, Integer maxPetWeightKg
+    ) {
+        return PlaceCandidateQueryResult.builder()
+            .placeId(placeId).title(title).contentTypeName("관광지")
+            .allowedPetSize(allowedPetSize).maxPetWeightKg(maxPetWeightKg).lat(33.5).lng(126.5)
+            .build();
+    }
+
     /** 일반 후보는 북부 25곳(id 1~25) · 남서부 25곳(id 26~50), 거리순 조회는 북동부에서만 방문 10 · 숙박 4 · 음식점 4곳을 돌려준다. */
     private static RecordingCandidates northEastFocusReady() {
         RecordingCandidates candidates = new RecordingCandidates();
@@ -722,9 +798,16 @@ class AiPlanWorkerStepTest {
     private AiPlanWorker worker(
         FakeJobStore store, FakeJobEvents events, RecordingLlm llm, RecordingCandidates candidates
     ) {
+        return worker(store, events, llm, candidates, new StubPetConditions(), new StubFavorites());
+    }
+
+    private AiPlanWorker worker(
+        FakeJobStore store, FakeJobEvents events, RecordingLlm llm, RecordingCandidates candidates,
+        StubPetConditions pets, StubFavorites favorites
+    ) {
         return new AiPlanWorker(
             store, events, llm, candidates,
-            new StubPetConditions(), new StubPlanOutlines(), new StubFavorites(), new StubWeather(),
+            pets, new StubPlanOutlines(), favorites, new StubWeather(),
             new AiLlmProperties(null, null, null, null, null, null, null, null, null, null, null, null), metrics);
     }
 
@@ -917,10 +1000,22 @@ class AiPlanWorkerStepTest {
         private int nearbyLookups;
         /** 아이디로 찾을 때(필수 포함 · 즐겨찾기) 돌려줄 장소 (#1423). 비우면 아무것도 찾지 못한다. */
         private List<PlaceCandidateQueryResult> byIds = List.of();
+        /**
+         * 검색 메서드마다 받은 입장 기준 (#1420). 이 대역은 기준으로 거르지 않는다 — 운영에서는 tour-service 가 거르고,
+         * 그래도 남은 것은 워커가 메모리에서 거른다.
+         */
+        private final Map<String, List<PetAdmission>> admissions = new LinkedHashMap<>();
+
+        private void record(String lookup, PetAdmission admission) {
+            admissions.computeIfAbsent(lookup, key -> new ArrayList<>()).add(admission);
+        }
 
         @Override
-        public List<PlaceCandidateQueryResult> findNearbyCandidates(String areaCode, double lat, double lng, int size) {
+        public List<PlaceCandidateQueryResult> findNearbyCandidates(
+            String areaCode, double lat, double lng, int size, PetAdmission admission
+        ) {
             nearbyLookups++;
+            record("findNearbyCandidates", admission);
             if (nearbyVisitFailure != null) {
                 throw nearbyVisitFailure;
             }
@@ -928,16 +1023,20 @@ class AiPlanWorkerStepTest {
         }
 
         @Override
-        public List<PlaceCandidateQueryResult> findNearbyLodgingCandidates(String areaCode, double lat, double lng, int size) {
+        public List<PlaceCandidateQueryResult> findNearbyLodgingCandidates(
+            String areaCode, double lat, double lng, int size, PetAdmission admission
+        ) {
             nearbyLookups++;
+            record("findNearbyLodgingCandidates", admission);
             return nearbyLodgings.getOrDefault(anchorZone(lat, lng), List.of());
         }
 
         @Override
         public List<PlaceCandidateQueryResult> findNearbyRestaurantCandidates(
-            String areaCode, double lat, double lng, int size
+            String areaCode, double lat, double lng, int size, PetAdmission admission
         ) {
             nearbyLookups++;
+            record("findNearbyRestaurantCandidates", admission);
             return nearbyRestaurants.getOrDefault(anchorZone(lat, lng), List.of());
         }
 
@@ -952,13 +1051,17 @@ class AiPlanWorkerStepTest {
         }
 
         @Override
-        public List<PlaceCandidateQueryResult> findRestaurantCandidates(String areaCode, String sigunguCode, int size) {
+        public List<PlaceCandidateQueryResult> findRestaurantCandidates(
+            String areaCode, String sigunguCode, int size, PetAdmission admission
+        ) {
+            record("findRestaurantCandidates", admission);
             return restaurants;
         }
 
         @Override
-        public List<PlaceCandidateQueryResult> findLodgingCandidates(String areaCode, String sigunguCode, int size) {
+        public List<PlaceCandidateQueryResult> findLodgingCandidates(String areaCode, String sigunguCode, int size, PetAdmission admission) {
             lodgingSigunguCode = sigunguCode;
+            record("findLodgingCandidates", admission);
             if (lodgingFailure != null) {
                 throw lodgingFailure;
             }
@@ -966,9 +1069,12 @@ class AiPlanWorkerStepTest {
         }
 
         @Override
-        public List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, String sigunguCode, int size) {
+        public List<PlaceCandidateQueryResult> findPetFriendlyCandidates(
+            String areaCode, String sigunguCode, int size, PetAdmission admission
+        ) {
             requestedSigunguCode = sigunguCode;
             captured = true;
+            record("findPetFriendlyCandidates", admission);
             if (general != null) {
                 return general;
             }
@@ -979,8 +1085,9 @@ class AiPlanWorkerStepTest {
 
         @Override
         public List<PlaceCandidateQueryResult> findRequestedCandidates(
-            String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory
+            String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory, PetAdmission admission
         ) {
+            record("findRequestedCandidates", admission);
             requestedLookups++;
             requestedSize = size;
             requestedIndoor = indoor;
@@ -996,9 +1103,12 @@ class AiPlanWorkerStepTest {
 
     private static final class StubPetConditions implements PetConditionQueryPort {
 
+        /** 반려견을 지정한 요청(petIds)이 받을 특성. 비우면 아무것도 찾지 못한다. */
+        private List<PetCondition> conditions = List.of();
+
         @Override
         public List<PetCondition> findConditions(long memberId, List<Long> petIds) {
-            return List.of();
+            return conditions;
         }
 
         @Override
@@ -1017,9 +1127,15 @@ class AiPlanWorkerStepTest {
 
     private static final class StubFavorites implements FavoritePlaceIdsQueryPort {
 
+        /** 즐겨찾기 아이디. null 이면 불리면 안 되는 것이다 — 즐겨찾기 선호를 끈 요청이 기본이다. */
+        private List<Long> favoriteIds;
+
         @Override
         public List<Long> findFavoritePlaceIds(long memberId) {
-            throw new UnsupportedOperationException();
+            if (favoriteIds == null) {
+                throw new UnsupportedOperationException();
+            }
+            return favoriteIds;
         }
     }
 

@@ -7,6 +7,7 @@ import com.hondigagae.domainlayer.planner.application.model.AiPlanJobMode;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanStepOutcome;
 import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.JejuZone;
+import com.hondigagae.domainlayer.planner.application.model.PetAdmission;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
@@ -319,8 +320,10 @@ public class AiPlanWorker {
         boolean zoneBalanced = isZoneBalanced(areaCode, sigunguCode, regenerateDay);
         // 하루 재생성은 기존 일정이 앞뒤 동선을 정하므로 요청 문구의 지역을 읽지 않는다 (#1423)
         RequestedRegion region = regenerateDay == null ? RequestedRegion.from(params.get("requestNote")) : RequestedRegion.NONE;
+        // 일정 생성은 가장 제약이 큰 아이가 기준이다 — 한 마리라도 못 들어가면 그 장소는 갈 수 없다 (#1420)
+        PetAdmission admission = PetAdmission.of(petConditions);
         List<PlaceCandidate> placeCandidates = loadCandidates(
-            areaCode, sigunguCode, zoneBalanced, pinnedPlaceIds, favoritePlaceIds, params.get("requestNote"), region);
+            areaCode, sigunguCode, zoneBalanced, pinnedPlaceIds, favoritePlaceIds, params.get("requestNote"), region, admission);
 
         onStep.accept(AiPlanJobStep.WEATHER);
         List<DayWeatherOutlook> weatherOutlook =
@@ -453,37 +456,84 @@ public class AiPlanWorker {
     /**
      * 후보 장소를 가져온다. 후보 없이 생성하면 모델이 존재하지 않는 장소를 지어내므로
      * 항상 부른다 — 후보가 비면 어댑터가 {@code NO_PLACE_CANDIDATES} 로 실패시킨다.
+     *
+     * <p>동행견이 들어갈 수 없는 장소는 두 겹으로 거른다 (#1420) — 검색은 tour-service 검색 필터로, 다 모은 풀은
+     * {@link #admitted} 가 한 번 더 거른다.
      */
     private List<PlaceCandidate> loadCandidates(
         String areaCode, String sigunguCode, boolean zoneBalanced, List<Long> pinnedPlaceIds,
-        List<Long> favoritePlaceIds, String requestNote, RequestedRegion region
+        List<Long> favoritePlaceIds, String requestNote, RequestedRegion region, PetAdmission admission
     ) {
-        List<PlaceCandidate> pool = assembleCandidates(
-            areaCode, sigunguCode, zoneBalanced, pinnedPlaceIds, favoritePlaceIds, requestNote, region);
+        List<PlaceCandidate> pool = admitted(
+            assembleCandidates(areaCode, sigunguCode, zoneBalanced, pinnedPlaceIds, favoritePlaceIds, requestNote, region, admission),
+            pinnedPlaceIds, admission);
         log.info("AI plan candidate pool size={} zoneBalanced={} areaCode={} sigunguCode={} zones={}",
             pool.size(), zoneBalanced, areaCode, sigunguCode, CandidateZonePolicy.describe(pool));
         return pool;
     }
 
+    /**
+     * 동행견 중 한 마리라도 들어갈 수 없는 장소(크기 · 체중 제한)를 다 모은 후보 풀에서 뺀다 (#1420).
+     *
+     * <p>운영에서 중형견 + 소형견 3.2kg 일정에 한림공원(소형견만 · 7kg 이하)이 들어갔다 — 프롬프트 지시뿐이고 서버 검증이
+     * 없었다. 검색 후보는 tour-service 가 같은 규칙({@link PetAdmission})으로 이미 걸렀으니, 여기서 걸리는 것은 주로 아이디로
+     * 가져온 즐겨찾기 · 필수 포함이다.
+     *
+     * <ul>
+     *   <li><b>필수 포함은 빼지 않는다</b> — 사용자가 직접 고른 곳이다(권역 이탈 교체 · 숙소 재배치가 보호하는 것과 같은 이유).
+     *       대신 경고를 남긴다</li>
+     *   <li><b>즐겨찾기는 뺀다</b> — 선호는 힌트일 뿐이고, 입장 불가는 물리적 제약이다</li>
+     * </ul>
+     *
+     * <p><b>이 한 곳에서 거르면 충분하다 — 가드마다 입장 검사를 따로 넣지 않는다.</b> 후보 목록은
+     * {@code query.placeCandidates} 하나이고, 모델 · 초안 변환(후보 밖 항목 제거) · {@code AiPlanRepeatGuard} ·
+     * {@code AiPlanRouteGuard}(권역 이탈 교체 · 숙소 재배치) · {@link RequestNoteDraftPolicy}(요청 문구 채우기) 가 모두
+     * 그 안에서 고른다. 여기서 빠진 장소는 교체 단계가 다시 넣지 못한다.
+     */
+    private static List<PlaceCandidate> admitted(List<PlaceCandidate> pool, List<Long> pinnedPlaceIds, PetAdmission admission) {
+        Set<Long> pinned = Set.copyOf(pinnedPlaceIds);
+        List<PlaceCandidate> kept = new ArrayList<>(pool.size());
+        List<Long> dropped = new ArrayList<>();
+        for (PlaceCandidate candidate : pool) {
+            if (admission.admits(candidate)) {
+                kept.add(candidate);
+            } else if (pinned.contains(candidate.placeId())) {
+                log.warn("AI plan pinned place may not admit companion pets placeId={} title={} allowedPetSize={} maxPetWeightKg={} "
+                        + "petSize={} petWeightKg={}",
+                    candidate.placeId(), candidate.title(), candidate.allowedPetSize(), candidate.maxPetWeightKg(),
+                    admission.sizeType(), admission.weightKg());
+                kept.add(candidate);
+            } else {
+                dropped.add(candidate.placeId());
+            }
+        }
+        if (dropped.isEmpty()) {
+            return pool;
+        }
+        log.info("AI plan candidates dropped by pet admission count={} placeIds={} petSize={} petWeightKg={}",
+            dropped.size(), dropped, admission.sizeType(), admission.weightKg());
+        return List.copyOf(kept);
+    }
+
     private List<PlaceCandidate> assembleCandidates(
         String areaCode, String sigunguCode, boolean zoneBalanced, List<Long> pinnedPlaceIds,
-        List<Long> favoritePlaceIds, String requestNote, RequestedRegion region
+        List<Long> favoritePlaceIds, String requestNote, RequestedRegion region, PetAdmission admission
     ) {
         List<PlaceCandidate> searched = placeCandidateQueryPort
-            .findPetFriendlyCandidates(areaCode, sigunguCode, aiLlmProperties.placeCandidateSize()).stream()
+            .findPetFriendlyCandidates(areaCode, sigunguCode, aiLlmProperties.placeCandidateSize(), admission).stream()
             .map(this::toCandidate)
             .toList();
-        searched = reserveRequested(areaCode, sigunguCode, searched, requestNote, region);
+        searched = reserveRequested(areaCode, sigunguCode, searched, requestNote, region, admission);
         ZoneAnchoredCandidates anchored = zoneBalanced && !searched.isEmpty()
-            ? loadZoneAnchored(areaCode)
+            ? loadZoneAnchored(areaCode, admission)
             : ZoneAnchoredCandidates.NONE;
         int visitFloor = 0;
         if (zoneBalanced) {
             searched = CandidateZonePolicy.ensureVisits(anchored.visits(), searched, aiLlmProperties.placeCandidateSize());
             visitFloor = CandidateZonePolicy.VISITS_PER_ZONE;
         }
-        searched = spreadByZone(Kind.LODGING, areaCode, sigunguCode, searched, anchored.lodgings(), visitFloor);
-        searched = spreadByZone(Kind.RESTAURANT, areaCode, sigunguCode, searched, anchored.restaurants(), visitFloor);
+        searched = spreadByZone(Kind.LODGING, areaCode, sigunguCode, searched, anchored.lodgings(), visitFloor, admission);
+        searched = spreadByZone(Kind.RESTAURANT, areaCode, sigunguCode, searched, anchored.restaurants(), visitFloor, admission);
         searched = focusOnRequestedRegion(searched, zoneBalanced ? anchored.all() : List.of(), region);
         if (sigunguCode != null && searched.isEmpty()) {
             // 지역 전체로 넓히지 않는다. 사용자가 "제주시만" 이라고 한 요청에 서귀포 장소를
@@ -520,7 +570,8 @@ public class AiPlanWorker {
      * ({@link CandidateZonePolicy#focus}) 요청 후보까지 비지 않게 하려는 것이다. 실제로 좁히면 focus 가 범위 밖을 뺀다.
      */
     private List<PlaceCandidate> reserveRequested(
-        String areaCode, String sigunguCode, List<PlaceCandidate> searched, String requestNote, RequestedRegion region
+        String areaCode, String sigunguCode, List<PlaceCandidate> searched, String requestNote, RequestedRegion region,
+        PetAdmission admission
     ) {
         RequestNoteConstraints constraints = RequestNoteConstraints.from(requestNote);
         if (!constraints.asksAnything()) {
@@ -529,7 +580,7 @@ public class AiPlanWorker {
         int quota = Math.min(REQUEST_SLOT, aiLlmProperties.placeCandidateSize());
         List<PlaceCandidate> found = placeCandidateQueryPort
             .findRequestedCandidates(
-                areaCode, sigunguCode, ZONE_FETCH_SIZE, constraints.indoorFilter(), constraints.categoryFilter())
+                areaCode, sigunguCode, ZONE_FETCH_SIZE, constraints.indoorFilter(), constraints.categoryFilter(), admission)
             .stream()
             .map(this::toCandidate)
             // 실내 검색에는 숙소도 걸린다. 숙소가 앞자리를 차지하면 요청을 반영한 것처럼 보이기만 한다
@@ -577,7 +628,7 @@ public class AiPlanWorker {
      */
     private List<PlaceCandidate> spreadByZone(
         Kind kind, String areaCode, String sigunguCode, List<PlaceCandidate> searched,
-        List<PlaceCandidate> anchored, int visitFloor
+        List<PlaceCandidate> anchored, int visitFloor, PetAdmission admission
     ) {
         if (searched.isEmpty()) {
             return searched;
@@ -585,8 +636,8 @@ public class AiPlanWorker {
         List<PlaceCandidate> found = new ArrayList<>(anchored);
         try {
             List<PlaceCandidateQueryResult> results = kind == Kind.LODGING
-                ? placeCandidateQueryPort.findLodgingCandidates(areaCode, sigunguCode, ZONE_FETCH_SIZE)
-                : placeCandidateQueryPort.findRestaurantCandidates(areaCode, sigunguCode, ZONE_FETCH_SIZE);
+                ? placeCandidateQueryPort.findLodgingCandidates(areaCode, sigunguCode, ZONE_FETCH_SIZE, admission)
+                : placeCandidateQueryPort.findRestaurantCandidates(areaCode, sigunguCode, ZONE_FETCH_SIZE, admission);
             results.stream().map(this::toCandidate).forEach(found::add);
         } catch (AiPlanException exception) {
             log.warn("Zone candidates lookup failed, continuing without them. kind={} errorCode={}",
@@ -667,7 +718,7 @@ public class AiPlanWorker {
      * <p>부르는 순서는 종류 우선(방문 → 음식점 → 숙박), 종류 안에서는 권역 선언 순서다. 예산에 걸려 뒤가 잘리면 id 순 결과가
      * 대신할 수 없는 방문 장소를 먼저 지키고, 숙박은 id 순 첫 페이지에도 권역마다 있어(남동부 6곳) 맨 뒤에 둔다.
      */
-    private ZoneAnchoredCandidates loadZoneAnchored(String areaCode) {
+    private ZoneAnchoredCandidates loadZoneAnchored(String areaCode, PetAdmission admission) {
         List<AnchoredLookup> plan = new ArrayList<>();
         for (AnchoredKind kind : AnchoredKind.values()) {
             for (JejuZone zone : JejuZone.values()) {
@@ -676,7 +727,7 @@ public class AiPlanWorker {
         }
         List<Supplier<List<PlaceCandidateQueryResult>>> lookups = plan.stream()
             .<Supplier<List<PlaceCandidateQueryResult>>>map(lookup -> () -> lookup.kind().find(
-                placeCandidateQueryPort, areaCode, lookup.zone().getAnchorLat(), lookup.zone().getAnchorLng()))
+                placeCandidateQueryPort, areaCode, lookup.zone().getAnchorLat(), lookup.zone().getAnchorLng(), admission))
             .toList();
         BudgetedLookups.Outcome<PlaceCandidateQueryResult> outcome =
             BudgetedLookups.run(lookups, ZONE_ANCHORED_BUDGET.toNanos(), nanoClock);
@@ -710,24 +761,31 @@ public class AiPlanWorker {
     private enum AnchoredKind {
         VISIT {
             @Override
-            List<PlaceCandidateQueryResult> find(PlaceCandidateQueryPort port, String areaCode, double lat, double lng) {
-                return port.findNearbyCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE);
+            List<PlaceCandidateQueryResult> find(
+                PlaceCandidateQueryPort port, String areaCode, double lat, double lng, PetAdmission admission
+            ) {
+                return port.findNearbyCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE, admission);
             }
         },
         RESTAURANT {
             @Override
-            List<PlaceCandidateQueryResult> find(PlaceCandidateQueryPort port, String areaCode, double lat, double lng) {
-                return port.findNearbyRestaurantCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE);
+            List<PlaceCandidateQueryResult> find(
+                PlaceCandidateQueryPort port, String areaCode, double lat, double lng, PetAdmission admission
+            ) {
+                return port.findNearbyRestaurantCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE, admission);
             }
         },
         LODGING {
             @Override
-            List<PlaceCandidateQueryResult> find(PlaceCandidateQueryPort port, String areaCode, double lat, double lng) {
-                return port.findNearbyLodgingCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE);
+            List<PlaceCandidateQueryResult> find(
+                PlaceCandidateQueryPort port, String areaCode, double lat, double lng, PetAdmission admission
+            ) {
+                return port.findNearbyLodgingCandidates(areaCode, lat, lng, ZONE_FETCH_SIZE, admission);
             }
         };
 
-        abstract List<PlaceCandidateQueryResult> find(PlaceCandidateQueryPort port, String areaCode, double lat, double lng);
+        abstract List<PlaceCandidateQueryResult> find(
+            PlaceCandidateQueryPort port, String areaCode, double lat, double lng, PetAdmission admission);
     }
 
     private record AnchoredLookup(JejuZone zone, AnchoredKind kind) {
@@ -750,7 +808,8 @@ public class AiPlanWorker {
 
     /**
      * 즐겨찾기 장소를 후보에 합친다. 필수 포함과 달리 <b>없어도 실패하지 않는다</b> —
-     * 선호는 신호일 뿐이고, 원천에서 사라진 장소는 조용히 빠진다.
+     * 선호는 신호일 뿐이고, 원천에서 사라진 장소는 조용히 빠진다. 아이디 조회라 검색 필터를 거치지 않으므로
+     * 동행견이 들어갈 수 없는 곳은 {@link #admitted} 가 뺀다 (#1420).
      */
     private List<PlaceCandidate> mergeFavorites(List<PlaceCandidate> candidates, List<Long> favoritePlaceIds) {
         if (favoritePlaceIds.isEmpty()) {
@@ -783,7 +842,7 @@ public class AiPlanWorker {
             .contentTypeName(result.contentTypeName())
             .addr(result.addr())
             .petAllowanceName(result.petAllowanceName())
-            .allowedPetSizeName(result.allowedPetSizeName())
+            .allowedPetSize(result.allowedPetSize())
             .maxPetWeightKg(result.maxPetWeightKg())
             .indoor(result.indoor())
             .sourceCategory(result.sourceCategory())

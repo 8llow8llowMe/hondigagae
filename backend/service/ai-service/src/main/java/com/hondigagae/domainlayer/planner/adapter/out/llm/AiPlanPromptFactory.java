@@ -257,8 +257,8 @@ public class AiPlanPromptFactory {
             if (!PetAllowanceType.ALLOWED.getDisplayName().equals(candidate.petAllowanceName())) {
                 prompt.append(" | 동반: ").append(nullSafe(candidate.petAllowanceName()));
             }
-            if (candidate.allowedPetSizeName() != null && !candidate.allowedPetSizeName().isBlank()) {
-                prompt.append(" | 입장크기: ").append(candidate.allowedPetSizeName());
+            if (candidate.allowedPetSize() != null) {
+                prompt.append(" | 입장크기: ").append(candidate.allowedPetSize().getDisplayName());
             }
             if (candidate.maxPetWeightKg() != null) {
                 prompt.append(" | 체중제한: ").append(candidate.maxPetWeightKg()).append("kg");
