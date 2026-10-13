@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { Banner } from '@/components/banner'
 import { ConfirmModal } from '@/components/confirm-modal'
@@ -146,7 +146,26 @@ export function PlanDetailSection({
   onRetryWalkSafety: () => void
   today: Date
 }) {
-  const { days, outOfRange } = groupItemsByDay(plan.items, plan.totalDays)
+  const { days, outOfRange } = useMemo(
+    () => groupItemsByDay(plan.items, plan.totalDays),
+    [plan.items, plan.totalDays],
+  )
+  /*
+    **일자마다 더 짧은 순서를 렌더마다 다시 찾지 않는다** (#1477). 구간마다 모든 순서를 견주는 완전
+    탐색이라(7개 구간이면 5,040가지) 다녀옴 토글 · 토스트처럼 상세가 다시 그려질 때마다 일수만큼
+    돌았다. 판정 입력은 그날 항목과 앞날 숙소뿐이라 항목이 바뀔 때만 다시 센다. 낼지 말지
+    (`routeReorderAllowed` — 상태 · 오늘 · 다녀옴)는 싸서 그대로 렌더에서 본다.
+  */
+  const routeSuggestions = useMemo(
+    () =>
+      new Map(
+        days.map((group) => [
+          group.day,
+          routeReorderSuggestion(group.items, lodgingBasisFor(group.day, days)),
+        ]),
+      ),
+    [days],
+  )
 
   /*
     **`planItemId` 로 잇는다.** `day`+`sequence` 로 이으면 일괄 교체 직후 한 프레임 동안
@@ -180,7 +199,10 @@ export function PlanDetailSection({
   const [editingDay, setEditingDay] = useState<number | null>(null)
   const [pendingDay, setPendingDay] = useState<number | null>(null)
   const [discarding, setDiscarding] = useState(false)
-  /** 열린 편집기가 동선 다시 정렬 제안을 받아 추천 순서로 열렸다 (#1462 · D31-2) */
+  /**
+   * 열린 편집기가 동선 다시 정렬 제안을 받아 추천 순서로 열렸다 (#1462 · D31-2). 안내 줄은 `dirty` 일 때만
+   * 선다(#1477) — ▲▼ 로 원래 순서로 되돌리면 "짧은 순서로 바꿔 두었어요" 가 더는 사실이 아니다.
+   */
   const [reorderPreview, setReorderPreview] = useState(false)
 
   const edit = usePlanDayEdit({
@@ -391,7 +413,7 @@ export function PlanDetailSection({
     })
     if (!allowed) return null
 
-    const suggestion = routeReorderSuggestion(items, lodgingBasisFor(day, days))
+    const suggestion = routeSuggestions.get(day) ?? null
     if (suggestion === null) return null
 
     return {
@@ -625,7 +647,7 @@ export function PlanDetailSection({
             date={addPlanDays(plan.startDate, group.day - 1)}
             rows={toItemRows(group.items, lodgingBasisFor(group.day, days))}
             routeReorder={dayRouteReorder(group.day, group.items)}
-            reorderPreview={reorderPreview && editingDay === group.day}
+            reorderPreview={reorderPreview && editingDay === group.day && edit.dirty}
             places={places}
             verdict={weather?.days.find((entry) => entry.day === group.day)}
             petConditionApplied={weather?.petConditionApplied ?? true}

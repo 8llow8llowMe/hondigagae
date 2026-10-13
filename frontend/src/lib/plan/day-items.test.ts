@@ -225,12 +225,41 @@ describe('순서 편집 저장 — 시각 역행 (#1424)', () => {
     }),
   ]
 
-  it('저장하면 남을 항목의 시각이 역행하면 참이다', () => {
-    expect(editStartTimesRegress(toEditItems(REGRESSED))).toBe(true)
+  /** 편집 전 — 시각이 순서대로였다. 사용자가 `나`(15:00)를 `다`(12:30) 위로 옮겨 REGRESSED 가 됐다 */
+  const BEFORE_EDIT = [REGRESSED[0], REGRESSED[2], REGRESSED[1], REGRESSED[3]] as PlanItemDetail[]
+
+  it('편집이 시각 있는 항목의 순서를 바꿔 역행하면 참이다', () => {
+    expect(editStartTimesRegress(toEditItems(REGRESSED), BEFORE_EDIT)).toBe(true)
   })
 
   it('역행한 항목을 삭제 표시하면 묻지 않는다 — 남는 항목만 본다', () => {
-    expect(editStartTimesRegress(toggleRemoved(toEditItems(REGRESSED), 2))).toBe(false)
+    expect(editStartTimesRegress(toggleRemoved(toEditItems(REGRESSED), 2), BEFORE_EDIT)).toBe(false)
+  })
+
+  describe('편집 전부터 있던 역행에는 묻지 않는다 (#1477)', () => {
+    /** 시각 없는 항목 하나를 끼운, 이미 역행한 날 */
+    const free = planItem({ planItemId: 'f1', day: 1, sequence: 4, title: '라', startTime: null })
+    const ALREADY: PlanItemDetail[] = [...REGRESSED.slice(0, 3), free, ...REGRESSED.slice(3)]
+
+    it('시각 없는 항목만 옮기면 묻지 않는다 — 역행은 D25-4 칩이 이미 말한다', () => {
+      const moved = moveEditItem(toEditItems(ALREADY), 3, 'up')
+
+      expect(editStartTimesRegress(moved, ALREADY)).toBe(false)
+    })
+
+    it('시각 없는 항목만 지워도 묻지 않는다', () => {
+      expect(editStartTimesRegress(toggleRemoved(toEditItems(ALREADY), 3), ALREADY)).toBe(false)
+    })
+
+    it('아무것도 바꾸지 않은 저장도 묻지 않는다', () => {
+      expect(editStartTimesRegress(toEditItems(ALREADY), ALREADY)).toBe(false)
+    })
+
+    it('시각 있는 항목끼리 순서를 바꾸면 묻는다 — 이 편집이 시각 순서를 건드렸다', () => {
+      const swapped = moveEditItem(toEditItems(ALREADY), 1, 'up')
+
+      expect(editStartTimesRegress(swapped, ALREADY)).toBe(true)
+    })
   })
 
   it('기본은 시각을 원문 그대로 되싣는다 — 자동으로 덮어쓰지 않는다', () => {

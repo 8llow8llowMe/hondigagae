@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -62,6 +62,12 @@ export function usePlanDayEdit({
    * 동안은 `null` 이다. **순서나 삭제 표시를 바꾸면 접는다** — 물은 근거가 낡는다.
    */
   const [timeRealign, setTimeRealign] = useState<string | null>(null)
+  /**
+   * 편집기가 열린 **뒤에** 낼 알림 (#1477). 열리는 커밋에 문장을 함께 실으면 `aria-live` 영역이 내용을
+   * 든 채 처음 생겨, 화면 낭독기 대부분이 읽지 않는다 — 빈 영역이 먼저 생기고 그다음 커밋에 문장이
+   * 들어가야 바뀜으로 알린다.
+   */
+  const [openingAnnouncement, setOpeningAnnouncement] = useState<string | null>(null)
   // disabled 반영 전 빠른 연속 저장을 막는다 (form-guide.md §6)
   const savingRef = useRef(false)
 
@@ -74,10 +80,17 @@ export function usePlanDayEdit({
     setItems(toEditItems(order ?? dayItems))
     setOriginal(dayItems)
     setError(null)
-    setAnnouncement(order === undefined ? '' : messages.plan.routeReorderApplied)
+    setAnnouncement('')
+    setOpeningAnnouncement(order === undefined ? null : messages.plan.routeReorderApplied)
     setFocusTarget(null)
     setTimeRealign(null)
   }, [])
+
+  useEffect(() => {
+    if (openingAnnouncement === null) return
+    setAnnouncement(openingAnnouncement)
+    setOpeningAnnouncement(null)
+  }, [openingAnnouncement])
 
   /**
    * 한 칸 이동.
@@ -117,14 +130,14 @@ export function usePlanDayEdit({
   const dirty = hasEditChanges(items, original)
 
   /**
-   * 저장. **저장하면 남을 항목의 시각이 역행하면 먼저 묻는다** (#1424) — 순서 편집은 시각을
+   * 저장. **이 편집이 시각 역행을 만들었으면 먼저 묻는다** (#1424) — 순서 편집은 시각을
    * 고치지 않고 원문을 되싣기 때문에(#1028 · G0) `10:00 → 15:00 → 12:30` 이 그대로 확정됐다.
    * 자동으로 고치지 않는다: 어느 쪽(순서 · 시각)이 맞는지는 사용자만 안다. 답은
-   * `saveWithTimes` 로 온다.
+   * `saveWithTimes` 로 온다. 편집 전부터 있던 역행에는 묻지 않는다(#1477 · `editStartTimesRegress`).
    */
   function save(day: number) {
     if (savingRef.current) return
-    if (editStartTimesRegress(items)) {
+    if (editStartTimesRegress(items, original)) {
       setTimeRealign(startTimesLine(survivingItems(items).map((item) => item.startTime)))
       return
     }

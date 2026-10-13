@@ -133,12 +133,34 @@ export function planDayItemsPayload(
 }
 
 /**
- * 저장하면 남을 항목의 시각이 **역행하는가** (#1424). 순서 편집은 시각을 고치지 않고 원문을
- * 되싣으므로(#1028 · G0) 순서를 바꾸면 `10:00 → 15:00 → 12:30` 이 그대로 확정됐다 — 저장 전에
- * 물을지를 이것으로 가른다. 겹침만으로는 묻지 않는다 (`hasBackwardTime`).
+ * 저장 전에 "시각도 순서에 맞게 다시 맞출까요?" 를 **물어야 하는가** (#1424 · #1477). 순서 편집은 시각을
+ * 고치지 않고 원문을 되싣으므로(#1028 · G0) 순서를 바꾸면 `10:00 → 15:00 → 12:30` 이 그대로 확정됐다.
+ *
+ * 둘 다일 때만 참이다:
+ * - 저장하면 남을 항목의 시각이 **역행한다** — 겹침만으로는 묻지 않는다 (`hasBackwardTime`)
+ * - **이 편집이 시각 있는 항목끼리의 순서를 바꿨다.** 시각 없는 항목만 옮겼거나 지운 것뿐이면 시각들의
+ *   순서는 원본 그대로라, 남은 역행은 편집 전부터 있던 것이다 — 상세의 D25-4 칩이 이미 말한다.
+ *   동선 다시 정렬(D31)이 이 갈래다: 시각 있는 항목을 제자리에 두므로 역행을 새로 만들지 않는다.
+ *   묻고 `다시 맞추기` 를 고르면 화면이 사용자의 시각을 다른 항목에 옮겨 붙인다(D31-1 이 기각한 것)
  */
-export function editStartTimesRegress(items: PlanDayEditItem[]): boolean {
-  return hasBackwardTime(survivingItems(items).map((item) => item.startTime))
+export function editStartTimesRegress(
+  items: PlanDayEditItem[],
+  original: readonly PlanItemDetail[],
+): boolean {
+  const surviving = survivingItems(items)
+  if (!hasBackwardTime(surviving.map((item) => item.startTime))) return false
+
+  const kept = new Set(surviving.map((item) => item.planItemId))
+  const before = timedItemIds(original).filter((planItemId) => kept.has(planItemId))
+  const after = timedItemIds(surviving)
+  return after.some((planItemId, index) => planItemId !== before[index])
+}
+
+/** 시각 있는 항목(`formatStartTime` 이 값을 내는 것)의 `planItemId` 를 순서대로 */
+function timedItemIds(items: readonly PlanItemDetail[]): string[] {
+  return items
+    .filter((item) => formatStartTime(item.startTime) !== null)
+    .map((item) => item.planItemId)
 }
 
 /**

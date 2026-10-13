@@ -176,7 +176,27 @@ describe('제안 순서의 저장 — 편집기의 일괄 교체 그대로 (D31-
   })
 
   it('시각 역행을 새로 만들지 않아 저장이 "시각도 맞출까요?" 를 묻지 않는다 (D25-3)', () => {
-    expect(editStartTimesRegress(toEditItems(order))).toBe(false)
+    expect(editStartTimesRegress(toEditItems(order), items)).toBe(false)
+  })
+
+  /*
+    시각이 **이미** 거꾸로인 날(#1477). 남는 시각이 역행하므로 예전에는 저장이 D25-3 확인을 물었고,
+    `다시 맞추기` 를 고르면 P 의 15:00 과 Q 의 12:30 이 맞바뀌었다 — D31-1 이 기각한 "화면이 사용자의
+    시각을 다른 항목에 옮겨 붙이는" 동작이다. 그 역행은 상세의 D25-4 칩이 말한다.
+  */
+  it('이미 시각이 거꾸로인 날이어도 받은 순서를 저장할 때 묻지 않는다 (#1477)', () => {
+    const regressed = [
+      at('A', 126.5),
+      at('C', 126.6),
+      at('B', 126.55),
+      at('D', 126.65),
+      at('P', 126.7, { startTime: '15:00:00' }),
+      at('Q', 126.75, { startTime: '12:30:00' }),
+    ]
+    const suggested = routeReorderSuggestion(regressed, null)?.order
+
+    expect(ids(suggested)).toEqual(['A', 'B', 'C', 'D', 'P', 'Q'])
+    expect(editStartTimesRegress(toEditItems(suggested ?? []), regressed)).toBe(false)
   })
 })
 
