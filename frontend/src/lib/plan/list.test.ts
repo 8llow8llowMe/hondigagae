@@ -11,9 +11,11 @@ import {
 import {
   countByPet,
   countByStatus,
+  duplicatedPlanTitles,
   filterPlans,
   groupPlans,
   hasActiveFilters,
+  needsCompletionPrompt,
 } from '@/lib/plan/list'
 import type { PlanStatusCode, PlanSummaryItem } from '@/types/plan'
 
@@ -295,4 +297,71 @@ describe('개수 — 0 을 감추지 않는다', () => {
     expect(counts.get('p1')).toBe(1)
     expect(counts.get('p2')).toBe(1)
   })
+})
+
+describe('출발 당일은 여행 중 칸이다 (#1433)', () => {
+  it('오늘 시작한 일정은 다가오는 쪽이 아니라 여행 중으로 간다', () => {
+    const today = plan({ planId: 't', startDate: '2026-08-27', endDate: '2026-08-29' })
+    const groups = groupPlans([today], TODAY)
+
+    expect(groups.ongoing.map((p) => p.planId)).toEqual(['t'])
+    expect(groups.upcoming).toEqual([])
+  })
+})
+
+describe('같은 제목 구분 (#1433)', () => {
+  it('두 번 이상 나오는 제목만 고른다', () => {
+    const titles = duplicatedPlanTitles([
+      plan({ planId: 'a', title: '몽과 제주 2박 3일' }),
+      plan({ planId: 'b', title: '몽과 제주 2박 3일' }),
+      plan({ planId: 'c', title: '초코와 서귀포' }),
+    ])
+
+    expect([...titles]).toEqual(['몽과 제주 2박 3일'])
+  })
+
+  it('앞뒤 공백만 다른 제목도 같은 제목이다 — 화면에서는 똑같이 읽힌다', () => {
+    const titles = duplicatedPlanTitles([
+      plan({ planId: 'a', title: '몽과 제주 ' }),
+      plan({ planId: 'b', title: '몽과 제주' }),
+    ])
+
+    expect(titles.has('몽과 제주')).toBe(true)
+  })
+
+  it('겹치는 제목이 없으면 비어 있다', () => {
+    expect(duplicatedPlanTitles([plan()]).size).toBe(0)
+  })
+})
+
+describe('완료 안내 — 지난 확정 일정에만 (#1433)', () => {
+  const past = { startDate: '2026-08-20', endDate: '2026-08-22' }
+
+  it('종료일이 지난 확정 일정이면 안내한다', () => {
+    expect(needsCompletionPrompt(plan({ ...past, status: confirmed() }), TODAY)).toBe(true)
+  })
+
+  it('종료일 당일은 아직 안내하지 않는다 — 여행이 끝나지 않았다', () => {
+    const endsToday = plan({ startDate: '2026-08-25', endDate: '2026-08-27', status: confirmed() })
+    expect(needsCompletionPrompt(endsToday, TODAY)).toBe(false)
+  })
+
+  it('초안·완료는 안내하지 않는다 — 초안에서는 완료를 열지 않는다', () => {
+    expect(needsCompletionPrompt(plan({ ...past }), TODAY)).toBe(false)
+    expect(
+      needsCompletionPrompt(
+        plan({ ...past, status: { code: 'COMPLETED', name: '완료', description: null } }),
+        TODAY,
+      ),
+    ).toBe(false)
+  })
+
+  it('날짜를 못 읽으면 안내하지 않는다', () => {
+    const broken = plan({ startDate: 'x', endDate: 'y', status: confirmed() })
+    expect(needsCompletionPrompt(broken, TODAY)).toBe(false)
+  })
+
+  function confirmed() {
+    return { code: 'CONFIRMED', name: '확정', description: null } as const
+  }
 })

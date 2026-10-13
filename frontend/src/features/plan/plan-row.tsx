@@ -3,10 +3,13 @@ import Link from 'next/link'
 import { ChevronRightIcon } from '@/components/icons'
 import { PetAvatar } from '@/components/pet-avatar'
 import { PlanStatusBadge } from '@/features/plan/plan-status-badge'
+import { messages } from '@/lib/messages'
 import { planCompanionLabel, type PlanCompanions } from '@/lib/plan/companion-pets'
-import { formatPlanDateRange, planPhaseOf } from '@/lib/plan/date'
+import { formatPlanDateRange, tripPhaseOf } from '@/lib/plan/date'
+import { needsCompletionPrompt } from '@/lib/plan/list'
 import { planPhaseLabel, planPhaseNote } from '@/lib/plan/phase-text'
 import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { PlanSummaryItem } from '@/types/plan'
 
 /**
@@ -28,6 +31,7 @@ export function PlanRow({
   plan,
   companions,
   today,
+  periodEmphasized = false,
 }: {
   plan: PlanSummaryItem
   /**
@@ -43,13 +47,23 @@ export function PlanRow({
    */
   companions: PlanCompanions
   today: Date
+  /**
+   * 목록에 같은 제목이 또 있으면 켠다 (#1433, `duplicatedPlanTitles`). 날짜 줄을 캡션 회색에서
+   * 본문 무게로 올려 제목 다음으로 읽히게 한다 — 기간이 곧 그 행의 이름이 된다.
+   */
+  periodEmphasized?: boolean
 }) {
-  const phase = planPhaseOf(plan.startDate, plan.endDate, today)
+  /*
+    목록은 출발 당일부터 `여행 중 · 오늘 1일차` 다 (#1433 · `tripPhaseOf`). 칸 나누기
+    (`groupPlans`)도 같은 함수를 봐서 행과 칸 제목이 어긋나지 않는다
+  */
+  const phase = tripPhaseOf(plan.startDate, plan.endDate, today)
   const phaseLabel = planPhaseLabel(phase)
   const phaseNote = planPhaseNote(phase)
   // 아바타는 이름을 부를 아이가 있을 때만 선다 — "동행 반려견 없음" 옆의 원형은 없는 아이를 그린다
   const lead = companions.kind === 'listed' ? companions.pets[0] : undefined
   const companion = planCompanionLabel(companions)
+  const completionPrompt = needsCompletionPrompt(plan, today)
 
   return (
     <li className={INSET_CLASS.card}>
@@ -66,11 +80,30 @@ export function PlanRow({
               {/* 데스크톱은 제목 옆, 모바일은 행 우측 상단 — 위치만 다르고 같은 배지다 */}
               <PlanStatusBadge status={plan.status} className="hidden lg:inline-flex" />
             </span>
-            <span className="text-caption text-fg-muted mt-1 block font-medium tabular-nums">
+            <span
+              className={cn(
+                'mt-1 block font-medium tabular-nums',
+                periodEmphasized ? 'text-body-2 text-fg' : 'text-caption text-fg-muted',
+              )}
+            >
               {formatPlanDateRange(plan.startDate, plan.endDate)}
               {/* 여행 중일 때만 붙는다 — 기둥의 `여행 중` 이 며칠째인지까지는 못 말한다 */}
               {phaseNote !== null && ` · ${phaseNote}`}
             </span>
+            {/*
+              지난 확정 일정의 완료 안내 (#1433). 상태를 여기서 바꾸지 않는다 — 행 전체가 상세로
+              가는 링크이고, 상세의 지난 일정에는 `여행 완료하기` 가 전폭 버튼으로 서 있다
+              (`status-action.ts` `forwardActionPlacement`). 링크 안에 버튼을 또 두지 않는다
+            */}
+            {completionPrompt && (
+              <span className="text-caption mt-1 flex flex-wrap items-center gap-x-1 font-medium">
+                <span className="text-fg-muted">{messages.plan.completionPrompt}</span>
+                <span className="text-brand-600 inline-flex items-center font-semibold">
+                  {messages.plan.completionPromptAction}
+                  <ChevronRightIcon size={16} />
+                </span>
+              </span>
+            )}
           </span>
 
           <PlanStatusBadge status={plan.status} className="lg:hidden" />

@@ -253,12 +253,19 @@ export const planMessages = {
   dday: 'D-{days}',
   ddayToday: 'D-DAY',
   /**
-   * D-day 자리에 대신 서는 말. **출발 당일은 여기가 아니라 `ddayToday` 다** —
-   * 그날은 `D-DAY` 가 더 강하다 (`lib/plan/date.ts` `planPhaseOf`).
+   * D-day 자리에 대신 서는 말. 상세 개요는 출발 당일에 `ddayToday` 를 쓰지만
+   * (`lib/plan/date.ts` `planPhaseOf`), **목록은 출발 당일부터 이 말이다** (#1433 ·
+   * `tripPhaseOf`) — 같은 날 홈 배너가 그날을 1일차로 부른다.
    */
   ongoing: '여행 중',
-  /** 날짜 줄에 덧붙는 진행도. `{day}` 치환 — 2일차부터 나온다 */
+  /** 날짜 줄에 덧붙는 진행도. `{day}` 치환 — 목록은 1일차부터, 상세 개요는 2일차부터 나온다 */
   ongoingDay: '오늘 {day}일차',
+  /**
+   * 종료일이 지난 확정 일정의 행 안내 (#1433). 완료는 사람이 상세의 `여행 완료하기` 로
+   * 닫는다(#613 · #971) — 행 전체가 상세로 가는 링크라 이 줄은 그 행동을 말로만 이끈다.
+   */
+  completionPrompt: '여행을 마쳤나요?',
+  completionPromptAction: '완료로 옮기기',
 
   // ── 만들기 ─────────────────────────────────────────────────────────────
 

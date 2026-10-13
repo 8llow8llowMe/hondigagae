@@ -407,13 +407,108 @@ describe('여행 중 — 다가오는 일정과 지난 일정 사이의 셋째 �
     expect(upcomingSection).toContain('border-t')
   })
 
-  /* 출발 당일은 `D-DAY` 가 더 강하다 — `여행 중` 으로 덮지 않는다 (`planPhaseOf` 머리주석) */
-  it('출발 당일은 여행 중이 아니라 D-DAY 다', () => {
+  /*
+    출발 당일은 목록에서 `여행 중 · 오늘 1일차` 다 (#1433). 같은 날 홈 배너가 그날을 1일차로
+    부른다 — 예전에는 여기만 `D-DAY` 라 두 화면이 같은 일정에 다른 말을 했다
+  */
+  it('출발 당일은 D-DAY 가 아니라 여행 중 1일차다', () => {
     const markup = render({
       plans: [plan({ startDate: '2026-08-27', endDate: '2026-08-29' })],
     })
 
-    expect(markup).toContain(messages.plan.ddayToday)
-    expect(markup).not.toContain(messages.plan.sectionOngoing)
+    expect(markup).not.toContain(messages.plan.ddayToday)
+    expect(markup).toContain(messages.plan.sectionOngoing)
+    expect(markup).toContain('오늘 1일차')
+    expect(markup).not.toContain(messages.plan.sectionUpcoming)
+  })
+})
+
+describe('지난 확정 일정의 완료 안내 (#1433)', () => {
+  const pastRange = { startDate: '2026-08-20', endDate: '2026-08-22' }
+
+  it('종료일이 지난 확정 일정에 안내가 붙는다 — 상세로 가는 행 링크 안이다', () => {
+    const markup = render({
+      plans: [
+        plan({ ...pastRange, status: { code: 'CONFIRMED', name: '확정', description: null } }),
+      ],
+    })
+
+    expect(markup).toContain(messages.plan.completionPrompt)
+    expect(markup).toContain(messages.plan.completionPromptAction)
+    const link = markup.slice(markup.indexOf('<a '), markup.indexOf('</a>'))
+    expect(link).toContain('href="/plans/223456789012000001"')
+    expect(link).toContain(messages.plan.completionPrompt)
+    // 링크 안에 버튼을 또 두지 않는다
+    expect(link).not.toContain('<button')
+  })
+
+  it('지난 초안·완료 일정에는 안내가 없다', () => {
+    const markup = render({
+      plans: [
+        plan({ ...pastRange, planId: 'd' }),
+        plan({
+          ...pastRange,
+          planId: 'c',
+          status: { code: 'COMPLETED', name: '완료', description: null },
+        }),
+      ],
+    })
+
+    expect(markup).not.toContain(messages.plan.completionPrompt)
+  })
+
+  it('아직 끝나지 않은 확정 일정에는 안내가 없다', () => {
+    const markup = render({
+      plans: [plan({ status: { code: 'CONFIRMED', name: '확정', description: null } })],
+    })
+
+    expect(markup).not.toContain(messages.plan.completionPrompt)
+  })
+})
+
+describe('같은 제목 구분 (#1433)', () => {
+  const PERIOD_EMPHASIZED = 'tabular-nums text-body-2 text-fg"'
+
+  it('제목이 겹치면 날짜 줄을 본문 무게로 올린다', () => {
+    const markup = render({
+      plans: [
+        plan({
+          planId: 'a',
+          title: '몽과 제주 2박 3일',
+          startDate: '2026-09-12',
+          endDate: '2026-09-14',
+        }),
+        plan({
+          planId: 'b',
+          title: '몽과 제주 2박 3일',
+          startDate: '2026-10-13',
+          endDate: '2026-10-15',
+        }),
+      ],
+    })
+
+    expect(markup.split(PERIOD_EMPHASIZED).length - 1).toBe(2)
+    expect(markup).toContain('2026년 9월 12일 (토) – 9월 14일 (월)')
+    expect(markup).toContain('2026년 10월 13일 (화) – 10월 15일 (목)')
+  })
+
+  it('겹치지 않으면 날짜 줄은 캡션 그대로다', () => {
+    const markup = render({
+      plans: [plan({ planId: 'a', title: '가' }), plan({ planId: 'b', title: '나' })],
+    })
+
+    expect(markup).not.toContain(PERIOD_EMPHASIZED)
+  })
+
+  it('다른 묶음에 있어도 같은 제목이면 둘 다 올린다', () => {
+    const markup = render({
+      plans: [
+        plan({ planId: 'a', title: '몽과 제주' }),
+        plan({ planId: 'b', title: '몽과 제주', startDate: '2026-08-01', endDate: '2026-08-03' }),
+      ],
+    })
+
+    expect(markup).toContain(messages.plan.sectionPast)
+    expect(markup.split(PERIOD_EMPHASIZED).length - 1).toBe(2)
   })
 })

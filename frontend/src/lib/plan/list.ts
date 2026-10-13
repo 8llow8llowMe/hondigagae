@@ -1,4 +1,4 @@
-import { planPhaseOf } from '@/lib/plan/date'
+import { isPastPlan, tripPhaseOf } from '@/lib/plan/date'
 import type { PlanFilters, PlanStatusFilter, PlanSummaryItem } from '@/types/plan'
 
 /**
@@ -52,7 +52,7 @@ export function groupPlans(plans: readonly PlanSummaryItem[], today: Date): Plan
   const past: PlanSummaryItem[] = []
 
   for (const plan of plans) {
-    const phase = planPhaseOf(plan.startDate, plan.endDate, today)
+    const phase = tripPhaseOf(plan.startDate, plan.endDate, today)
     // 날짜를 못 읽으면(`null`) 다가오는 쪽이다 — 지난 쪽으로 미는 편이 더 위험하다
     if (phase?.kind === 'past') past.push(plan)
     else if (phase?.kind === 'ongoing') ongoing.push(plan)
@@ -66,6 +66,43 @@ export function groupPlans(plans: readonly PlanSummaryItem[], today: Date): Plan
   past.sort((a, b) => compare(b.endDate, a.endDate) || compare(b.planId, a.planId))
 
   return { ongoing, upcoming, past }
+}
+
+/**
+ * 목록에 **두 번 이상 나오는 제목** (#1433). 같은 제목의 행은 기간을 앞세워 구분한다.
+ *
+ * "몽과 제주 2박 3일" 이 넷이면 행마다 날짜가 적혀 있어도 캡션 회색이라 제목만 읽히고,
+ * 넷이 같은 일정처럼 보였다. 겹치는 행에서만 날짜 줄의 위계를 올린다 — 모든 행을 올리면
+ * 겹치지 않는 목록에서 제목과 날짜가 같은 무게로 다툰다.
+ *
+ * 앞뒤 공백은 비교에서 버린다. 화면에서는 똑같이 읽히는 두 제목이다.
+ */
+export function duplicatedPlanTitles(plans: readonly PlanSummaryItem[]): Set<string> {
+  const seen = new Set<string>()
+  const duplicated = new Set<string>()
+
+  for (const plan of plans) {
+    const title = plan.title.trim()
+    if (seen.has(title)) duplicated.add(title)
+    else seen.add(title)
+  }
+
+  return duplicated
+}
+
+/**
+ * `여행을 마쳤나요?` 안내를 붙일 일정 (#1433) — **종료일이 지난 확정 일정**.
+ *
+ * 완료는 서버가 자동으로 바꾸지 않는다. 사람이 상세의 `여행 완료하기` 로 닫는 설계다
+ * (#613 · #971). 그런데 목록에는 그 행동으로 이끄는 말이 없어, 다녀온 여행이 `확정` 으로
+ * 남고 `완료` 탭은 0건이었다. 여기서 상태를 바꾸지 않는다 — 안내하고 상세로 보낼 뿐이다.
+ *
+ * - **초안은 아니다.** 초안에서는 완료를 열지 않는다 (공통명세 S4).
+ * - **종료일 당일은 아니다.** 아직 여행 중이다 (`isPastPlan` 의 선).
+ * - 날짜를 못 읽으면 지난 일정으로 보지 않으므로 안내도 없다.
+ */
+export function needsCompletionPrompt(plan: PlanSummaryItem, today: Date): boolean {
+  return plan.status.code === 'CONFIRMED' && isPastPlan(plan.endDate, today)
 }
 
 function compare(a: string, b: string): number {
