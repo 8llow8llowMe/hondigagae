@@ -94,26 +94,50 @@ describe('draftToPlanPayload — 항목 매핑', () => {
     expect('memo' in (result.items?.[0] ?? {})).toBe(false)
   })
 
-  it('startTime 을 그날 순서 슬롯으로 채운다 — 비우면 산책 위험도가 꺼진다 (#1383 · D24)', () => {
+  it('startTime 을 앞 시각 + 머무는 시간 + 이동 시간으로 채운다 — 비우면 산책 위험도가 꺼진다 (#1424)', () => {
+    // 좌표를 모르면 이동 30분 — 장소 90분을 머문 뒤 이어 붙인다
     const result = payload([
       { day: 1, items: [item(), item(), item()] },
       { day: 2, items: [item()] },
     ])
     expect(result.items?.map((entry) => [entry.day, entry.startTime])).toEqual([
       [1, '10:00:00'],
-      [1, '12:30:00'],
-      [1, '15:00:00'],
+      [1, '12:00:00'],
+      [1, '14:00:00'],
       [2, '10:00:00'],
     ])
   })
 
-  it('여섯 번째 항목부터는 startTime 키를 넣지 않는다', () => {
-    const result = payload([{ day: 1, items: Array.from({ length: 6 }, () => item()) }])
-    expect('startTime' in (result.items?.[4] ?? {})).toBe(true)
-    expect('startTime' in (result.items?.[5] ?? {})).toBe(false)
+  it('좌표가 있으면 직선거리로 이동 시간을 잡는다 — 날마다 같은 템플릿이 아니다 (#1424)', () => {
+    const coords = new Map([
+      ['a', { lat: 33.3, lng: 126.5 }],
+      // 위도 0.18도 ≈ 20km → 이동 40분
+      ['b', { lat: 33.48, lng: 126.5 }],
+    ])
+    const result = draftToPlanPayload({
+      jobId: JOB_ID,
+      draft: draft([{ day: 1, items: [item({ placeId: 'a' }), item({ placeId: 'b' })] }]),
+      snapshot,
+      title: '제주',
+      coords,
+    })
+    expect(result.items?.map((entry) => entry.startTime)).toEqual(['10:00:00', '12:10:00'])
   })
 
-  it('걸러낸 항목은 슬롯을 차지하지 않는다 — sequence 와 같은 자리를 받는다', () => {
+  it('숙박은 그날 마지막 일정 뒤 · 체크인 15:00 보다 이르지 않다 (#1424)', () => {
+    const result = payload([
+      { day: 1, items: [item(), item({ itemType: 'LODGING', title: '숙소' })] },
+    ])
+    expect(result.items?.map((entry) => entry.startTime)).toEqual(['10:00:00', '15:00:00'])
+  })
+
+  it('20:00 을 넘는 항목부터는 startTime 키를 넣지 않는다', () => {
+    const result = payload([{ day: 1, items: Array.from({ length: 7 }, () => item()) }])
+    expect(result.items?.[5]?.startTime).toBe('20:00:00')
+    expect('startTime' in (result.items?.[6] ?? {})).toBe(false)
+  })
+
+  it('걸러낸 항목은 시각을 차지하지 않는다 — sequence 와 같은 자리를 받는다', () => {
     const result = payload([{ day: 1, items: [item({ title: '  ' }), item()] }])
     expect(result.items?.[0]?.startTime).toBe('10:00:00')
   })

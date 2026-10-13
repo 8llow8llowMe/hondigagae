@@ -2,6 +2,7 @@ import { messages } from '@/lib/messages'
 import { insertedStartTime } from '@/lib/plan/default-start-time'
 import { isPlaceTarget } from '@/lib/plan/detail'
 import { formatStartTime } from '@/lib/plan/start-time'
+import { hasBackwardTime, realignedStartTimes } from '@/lib/plan/time-order'
 import { withObjectParticle } from '@/lib/text/korean'
 import type { PlanDayItemsReplacePayload, PlanItemDetail, PlanItemPayload } from '@/types/plan'
 
@@ -101,10 +102,37 @@ export function survivingItems(items: PlanDayEditItem[]): PlanItemDetail[] {
 export function planDayItemsPayload(
   items: PlanDayEditItem[],
   day: number,
+  options: { realignStartTimes?: boolean } = {},
 ): PlanDayItemsReplacePayload {
+  const surviving = survivingItems(items)
+  /*
+    **시각을 다시 맞추는 것은 사용자가 고른 때만이다** (#1424). 저장 전에 역행을 보면 화면이
+    "시각도 순서에 맞게 다시 맞출까요?" 를 묻고(`editStartTimesRegress`), 그렇다고 답했을 때만
+    있던 시각을 순서대로 다시 나눠 싣는다(`realignedStartTimes`). 기본은 여전히 원문 그대로다.
+  */
+  const times =
+    options.realignStartTimes === true
+      ? realignedStartTimes(surviving.map((item) => item.startTime))
+      : null
+
   return {
-    items: survivingItems(items).map((item, index) => toPayloadItem(item, day, index)),
+    items: surviving.map((item, index) =>
+      toPayloadItem(
+        times === null ? item : { ...item, startTime: times[index] ?? null },
+        day,
+        index,
+      ),
+    ),
   }
+}
+
+/**
+ * 저장하면 남을 항목의 시각이 **역행하는가** (#1424). 순서 편집은 시각을 고치지 않고 원문을
+ * 되싣으므로(#1028 · G0) 순서를 바꾸면 `10:00 → 15:00 → 12:30` 이 그대로 확정됐다 — 저장 전에
+ * 물을지를 이것으로 가른다. 겹침만으로는 묻지 않는다 (`hasBackwardTime`).
+ */
+export function editStartTimesRegress(items: PlanDayEditItem[]): boolean {
+  return hasBackwardTime(survivingItems(items).map((item) => item.startTime))
 }
 
 function toPayloadItem(item: PlanItemDetail, day: number, sequence: number): PlanItemPayload {
@@ -185,11 +213,15 @@ export function itemInsertIndex(items: PlanItemDetail[]): number {
  * 담기가 새 항목에 채울 시각 (서버 형식 `HH:mm:ss`). 못 채우면 `undefined`.
  *
  * **비우면 그 항목의 산책 위험도가 `NO_START_TIME` 으로 꺼진다** (#1383 · 일정상세-세부명세
- * D24). 끼울 자리(`itemInsertIndex`) **앞** 항목들의 시각만 본다. 담기 토스트가 같은 값을
- * 말하도록 본문 조립과 따로 꺼내 둔다.
+ * D24). 끼울 자리(`itemInsertIndex`) **앞 · 뒤** 항목들의 시각을 본다 — 뒤는 대개 끝에 붙은
+ * 숙박이고, 그 시각보다 늦게 넣으면 숙소와 겹친다 (#1424). 담기 토스트가 같은 값을 말하도록 본문
+ * 조립과 따로 꺼내 둔다. **못 채우면 토스트가 "시각을 정해 주세요" 를 말한다** (`addPlaceToastMessage`).
  */
 export function insertedItemStartTime(items: PlanItemDetail[]): string | undefined {
-  return insertedStartTime(items.slice(0, itemInsertIndex(items)).map((item) => item.startTime))
+  const at = itemInsertIndex(items)
+  const times = items.map((item) => item.startTime)
+
+  return insertedStartTime(times.slice(0, at), times.slice(at))
 }
 
 /**

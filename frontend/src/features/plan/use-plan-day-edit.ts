@@ -9,15 +9,18 @@ import { planKeys } from '@/features/plan/queries'
 import { replaceDayItems } from '@/lib/api/plan'
 import { messages } from '@/lib/messages'
 import {
+  editStartTimesRegress,
   hasEditChanges,
   type MoveDirection,
   moveEditItem,
   type PlanDayEditItem,
   planDayItemsPayload,
+  survivingItems,
   toEditItems,
   toggleRemoved,
 } from '@/lib/plan/day-items'
 import { type PlanDaySaveError, toPlanDaySaveError } from '@/lib/plan/save-error'
+import { startTimesLine } from '@/lib/plan/time-order'
 import type { PlanItemDetail } from '@/types/plan'
 
 /**
@@ -54,6 +57,11 @@ export function usePlanDayEdit({
    * 같은 방향 버튼이 경계에서 `disabled` 가 되면 반대쪽으로 옮겨야 하기 때문이다.
    */
   const [focusTarget, setFocusTarget] = useState<PlanDayEditFocus | null>(null)
+  /**
+   * "시각도 순서에 맞게 다시 맞출까요?" 확인 (#1424). 값은 지금 순서대로의 시각 줄이고, 묻지 않는
+   * 동안은 `null` 이다. **순서나 삭제 표시를 바꾸면 접는다** — 물은 근거가 낡는다.
+   */
+  const [timeRealign, setTimeRealign] = useState<string | null>(null)
   // disabled 반영 전 빠른 연속 저장을 막는다 (form-guide.md §6)
   const savingRef = useRef(false)
 
@@ -63,6 +71,7 @@ export function usePlanDayEdit({
     setError(null)
     setAnnouncement('')
     setFocusTarget(null)
+    setTimeRealign(null)
   }, [])
 
   /**
@@ -79,6 +88,7 @@ export function usePlanDayEdit({
       // 경계에서는 같은 배열이 온다 — 알림도 포커스 이동도 하지 않는다
       if (next === current) return current
 
+      setTimeRealign(null)
       const moved = direction === 'up' ? index - 1 : index + 1
       if (moveFocus) setFocusTarget({ index: moved, direction })
       setAnnouncement(messages.plan.editAnnounceMoved.replace('{position}', String(moved + 1)))
@@ -89,6 +99,7 @@ export function usePlanDayEdit({
   const toggle = useCallback((index: number) => {
     setItems((current) => {
       const next = toggleRemoved(current, index)
+      setTimeRealign(null)
       setAnnouncement(
         next[index]?.removed === true
           ? messages.plan.editAnnounceRemoved
@@ -100,13 +111,37 @@ export function usePlanDayEdit({
 
   const dirty = hasEditChanges(items, original)
 
+  /**
+   * 저장. **저장하면 남을 항목의 시각이 역행하면 먼저 묻는다** (#1424) — 순서 편집은 시각을
+   * 고치지 않고 원문을 되싣기 때문에(#1028 · G0) `10:00 → 15:00 → 12:30` 이 그대로 확정됐다.
+   * 자동으로 고치지 않는다: 어느 쪽(순서 · 시각)이 맞는지는 사용자만 안다. 답은
+   * `saveWithTimes` 로 온다.
+   */
   function save(day: number) {
     if (savingRef.current) return
+    if (editStartTimesRegress(items)) {
+      setTimeRealign(startTimesLine(survivingItems(items).map((item) => item.startTime)))
+      return
+    }
+    commit(day, false)
+  }
+
+  /** 확인에 답한 저장 — `realign` 이면 있던 시각을 순서대로 다시 나눠 싣는다 */
+  function saveWithTimes(day: number, realign: boolean) {
+    if (savingRef.current) return
+    commit(day, realign)
+  }
+
+  function commit(day: number, realign: boolean) {
     savingRef.current = true
     setSaving(true)
     setError(null)
 
-    void replaceDayItems(planId, day, planDayItemsPayload(items, day))
+    void replaceDayItems(
+      planId,
+      day,
+      planDayItemsPayload(items, day, { realignStartTimes: realign }),
+    )
       .then((next) => {
         queryClient.setQueryData(planKeys.detail(planId), next)
         /*
@@ -126,6 +161,7 @@ export function usePlanDayEdit({
         setItems([])
         setOriginal([])
         setFocusTarget(null)
+        setTimeRealign(null)
         onSaved()
       })
       .catch((cause: unknown) =>
@@ -154,5 +190,7 @@ export function usePlanDayEdit({
     move,
     toggle,
     save,
+    saveWithTimes,
+    timeRealign,
   }
 }

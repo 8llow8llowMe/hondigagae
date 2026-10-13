@@ -6,7 +6,9 @@ import {
   appendMoveItemPayload,
   appendPlaceItemPayload,
   appendWalkCourseItemPayload,
+  editStartTimesRegress,
   hasEditChanges,
+  insertedItemStartTime,
   ITEM_TITLE_MAX,
   itemInsertIndex,
   moveEditItem,
@@ -206,6 +208,55 @@ describe('planDayItemsPayload', () => {
   })
 })
 
+describe('순서 편집 저장 — 시각 역행 (#1424)', () => {
+  /** 사용성 테스트 재현: 순서를 바꾼 뒤 10:00 → 15:00 → 12:30 → 15:00 */
+  const REGRESSED: PlanItemDetail[] = [
+    planItem({ planItemId: 'p1', day: 1, sequence: 0, title: '가', startTime: '10:00:00' }),
+    planItem({ planItemId: 'p2', day: 1, sequence: 1, title: '나', startTime: '15:00:00' }),
+    planItem({ planItemId: 'p3', day: 1, sequence: 2, title: '다', startTime: '12:30:00' }),
+    planItem({
+      planItemId: 'p4',
+      day: 1,
+      sequence: 3,
+      title: '숙소',
+      startTime: '15:00:00',
+      itemType: { code: 'LODGING', name: '숙박', description: null },
+    }),
+  ]
+
+  it('저장하면 남을 항목의 시각이 역행하면 참이다', () => {
+    expect(editStartTimesRegress(toEditItems(REGRESSED))).toBe(true)
+  })
+
+  it('역행한 항목을 삭제 표시하면 묻지 않는다 — 남는 항목만 본다', () => {
+    expect(editStartTimesRegress(toggleRemoved(toEditItems(REGRESSED), 2))).toBe(false)
+  })
+
+  it('기본은 시각을 원문 그대로 되싣는다 — 자동으로 덮어쓰지 않는다', () => {
+    expect(
+      planDayItemsPayload(toEditItems(REGRESSED), 1).items.map((item) => item.startTime),
+    ).toEqual(['10:00:00', '15:00:00', '12:30:00', '15:00:00'])
+  })
+
+  it('다시 맞추기를 고르면 있던 시각을 순서대로 다시 나눠 싣는다', () => {
+    expect(
+      planDayItemsPayload(toEditItems(REGRESSED), 1, { realignStartTimes: true }).items.map(
+        (item) => [item.title, item.startTime],
+      ),
+    ).toEqual([
+      ['가', '10:00:00'],
+      ['나', '12:30:00'],
+      ['다', '15:00:00'],
+      ['숙소', '15:00:00'],
+    ])
+  })
+
+  it('다시 맞춰도 시각이 없던 항목은 키를 넣지 않는다', () => {
+    const payload = planDayItemsPayload(toEditItems(ITEMS), 2, { realignStartTimes: true })
+    expect(payload.items[1]).not.toHaveProperty('startTime')
+  })
+})
+
 describe('survivingItems', () => {
   it('저장 후 남을 항목만 준다', () => {
     expect(survivingItems(toggleRemoved(toEditItems(ITEMS), 1)).map((item) => item.title)).toEqual([
@@ -306,6 +357,37 @@ describe('appendPlaceItemPayload — 장소 담기 (#82)', () => {
     const payload = appendPlaceItemPayload(withLodging, 1, place)
     expect(payload.items[1]?.title).toBe(place.title)
     expect(payload.items[1]?.startTime).toBe('15:30:00')
+  })
+
+  it('숙소 체크인과 겹치지 않는다 — 12:30 뒤 · 숙소 15:00 앞이면 가운데 13:45 다 (#1424)', () => {
+    const day = [
+      planItem({ planItemId: 'a', day: 1, sequence: 0, startTime: '10:00:00' }),
+      planItem({ planItemId: 'b', day: 1, sequence: 1, startTime: '12:30:00' }),
+      planItem({
+        planItemId: 'l',
+        day: 1,
+        sequence: 2,
+        startTime: '15:00:00',
+        itemType: { code: 'LODGING', name: '숙박', description: null },
+      }),
+    ]
+    expect(insertedItemStartTime(day)).toBe('13:45:00')
+    expect(appendPlaceItemPayload(day, 1, place).items[2]?.startTime).toBe('13:45:00')
+  })
+
+  it('숙소 앞에 들어갈 자리가 없으면 시각을 비운다 (#1424)', () => {
+    const day = [
+      planItem({ planItemId: 'a', day: 1, sequence: 0, startTime: '14:40:00' }),
+      planItem({
+        planItemId: 'l',
+        day: 1,
+        sequence: 1,
+        startTime: '15:00:00',
+        itemType: { code: 'LODGING', name: '숙박', description: null },
+      }),
+    ]
+    expect(insertedItemStartTime(day)).toBeUndefined()
+    expect(appendPlaceItemPayload(day, 1, place).items[1]).not.toHaveProperty('startTime')
   })
 
   it('sequence 를 0부터 다시 매기고 새 항목이 마지막 번호를 받는다', () => {
@@ -410,8 +492,10 @@ describe('addPlaceToastMessage — 담기 성공 토스트 (#1383 · D24-2)', ()
     )
   })
 
-  it('시각을 못 채웠으면 예전 문장 그대로다', () => {
-    expect(addPlaceToastMessage('카페', 1, undefined)).toBe('카페를 1일차에 담았어요')
+  it('시각을 못 채웠으면 시각을 정해 달라고 말한다 (#1424)', () => {
+    expect(addPlaceToastMessage('카페', 1, undefined)).toBe(
+      '카페를 1일차에 담았어요. 시각은 일정에서 정해 주세요.',
+    )
   })
 })
 
