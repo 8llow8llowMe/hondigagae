@@ -12,6 +12,7 @@ import { createPet } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
 import { EMPTY_PET_FORM_VALUES } from '@/lib/pet/form'
 import { registeredPetListHref } from '@/lib/pet/next-step'
+import { petCreatedReturnHref } from '@/lib/pet/return-to'
 import { withObjectParticle } from '@/lib/text/korean'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -101,8 +102,15 @@ export function PetCreateView({
               **목록으로 갈 때는 방금 등록한 아이를 주소에 싣는다** (#1430). 목록이 그 아이로
               AI 일정 만들기를 권한다 — 등록하고 나면 다음 할 일이 없던 자리다. `returnTo` 로
               돌아가는 갈래는 이미 하던 일이 있으므로 권하지 않는다.
+
+              **AI 일정 만들기로 돌아가면 방금 등록한 아이를 싣는다** (#1449). 폼이 `?pet=` 으로
+              그 아이를 미리 고른다 — 싣지 않으면 헤더 선택 · 대표견이 체크된다.
             */
-            router.replace(returnTo ?? registeredPetListHref(pet.petId))
+            router.replace(
+              returnTo === null
+                ? registeredPetListHref(pet.petId)
+                : petCreatedReturnHref(returnTo, pet.petId),
+            )
           }}
         />
       </div>
