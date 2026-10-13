@@ -1453,4 +1453,14 @@ export const planMessages = {
    * 굵기도 본문(400)이다 — 제목 굵기(600)에 보조 텍스트 색을 얹으면 위계가 어긋난다.
    */
   briefingEveFootnote: '기상특보와 산책 골든타임은 내일 아침에 열려요.',
+
+  /**
+   * 항목 메모 펴기 · 접기 (#1448 · 일정상세 D29). 장소 소개(`detailOverviewMore`)와 같은 낱말이다.
+   * 접근 이름에 항목 이름을 넣는다 — 한 일자에 같은 버튼이 여럿 서서 낱말만으로는 어느
+   * 항목의 메모인지 가를 수 없다. 보이는 낱말을 앞에 두어 음성 제어로도 잡힌다(WCAG 2.5.3).
+   */
+  itemMemoMore: '더 보기',
+  itemMemoLess: '접기',
+  itemMemoMoreLabel: '더 보기, {title} 메모',
+  itemMemoLessLabel: '접기, {title} 메모',
 } as const

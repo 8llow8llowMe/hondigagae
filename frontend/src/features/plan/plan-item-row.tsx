@@ -6,6 +6,7 @@ import { FormAlert } from '@/components/form-alert'
 import { CheckIcon, ClockIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
 import { ThumbnailTile } from '@/components/thumbnail-tile'
+import { PlanItemMemo } from '@/features/plan/plan-item-memo'
 import { formatStandaloneCelsius } from '@/lib/format/celsius'
 import { formatDistance } from '@/lib/format/distance'
 import { isLongTrip } from '@/lib/geo/distance'
@@ -15,6 +16,7 @@ import { placeMetaLine } from '@/lib/place/meta'
 import { placeHrefFromPlan } from '@/lib/place/plan-context'
 import { isPlaceTarget, type PlanItemRowModel } from '@/lib/plan/detail'
 import { planItemIllustration } from '@/lib/plan/illustration'
+import { planItemMemoView } from '@/lib/plan/item-memo'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { formatStartTime } from '@/lib/plan/start-time'
 import type { TimeOrderIssue } from '@/lib/plan/time-order'
@@ -203,6 +205,8 @@ export function PlanItemRow({
   const illustration = thumbnail === null ? planItemIllustration(item.itemType.code) : null
   const meta =
     placeMetaLine(place?.addr1 ?? null, place?.indoor ?? null) ?? walkCourseMetaLine(walkCourse)
+  // 공백뿐이면 null — 빈 줄을 세우지 않는다 (D29)
+  const memo = planItemMemoView(item.memo)
   // 형식이 어긋나면 null 이다 — 에러도 배지도 내지 않고 줄 자체를 그리지 않는다 (D14-3)
   const startTime = formatStartTime(item.startTime)
   // walkSafety 가 없으면 view 도 없다 — 시각 줄에 배지·문장 자리를 만들지 않는다
@@ -410,6 +414,12 @@ export function PlanItemRow({
         )}
 
         <PlanItemDistance model={model} />
+
+        {/*
+          항목 메모 — AI 초안 설명이거나 사용자가 적은 값 (#1448 · 명세 D29). D8-11 의 "표시 안 함"
+          을 뒤집었다. 미리보기(#1432)와 같은 자리(맨 아래) · 같은 글자 등급이다. 없으면 줄이 없다.
+        */}
+        {memo !== null && <PlanItemMemo memo={memo} title={item.title} />}
       </div>
     </>
   )
