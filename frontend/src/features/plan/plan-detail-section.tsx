@@ -39,6 +39,7 @@ import type { PlanCompanions } from '@/lib/plan/companion-pets'
 import { planConfirmCheck } from '@/lib/plan/confirm-check'
 import { addPlanDays, planPhaseOf } from '@/lib/plan/date'
 import { placeIdsOf } from '@/lib/plan/day-items'
+import { dayItemsLock } from '@/lib/plan/day-items-lock'
 import {
   groupItemsByDay,
   lodgingBasisFor,
@@ -310,7 +311,18 @@ export function PlanDetailSection({
     메모 저장(#1460)도 같은 일괄 교체라 이 잠금에 든다. `saving` 은 `다녀옴` 되살리기 · 재조회까지
     남는다 — 그 틈에 순서 편집이 다시 교체하면 되살리기가 `PLAN_005` 다 (`use-plan-item-memo.ts`).
   */
-  const dayItemsBusy = addPlace.adding || addMove.adding || itemTime.saving || itemMemo.saving
+  /*
+    **저장은 일정 전체에서 하나씩, `순서 편집` 진입은 같은 일자만 막는다** (#1488 · D30-4). 교체 응답은
+    일정 상세 전체라 저장 둘이 겹치면 늦게 온 옛 스냅숏이 다른 일자의 변경을 캐시에서 되돌린다. 진입은
+    읽기라 다른 일자의 교체와 겹쳐도 그 일자 목록이 낡지 않는다(E0) — 근거는 `dayItemsLock` 주석.
+  */
+  const dayItemsLockState = dayItemsLock([
+    { saving: addPlace.adding, day: addPlace.pending?.day ?? null },
+    { saving: addMove.adding, day: addMove.pendingDay },
+    { saving: itemTime.saving, day: timeTarget?.day ?? null },
+    { saving: itemMemo.saving, day: memoTarget?.day ?? null },
+  ])
+  const dayItemsBusy = dayItemsLockState.busy
 
   function openItemTime(day: number, planItemId: string) {
     itemTime.clearFailure()
@@ -376,8 +388,11 @@ export function PlanDetailSection({
 
   /** 편집 중이면 먼저 묻는다. 아니면 바로 연다 */
   function requestEditor(day: number) {
-    // 일자 저장(담기 · 이동 추가 · 시각 · 메모)이 도는 중이면 낡은 목록으로 열린다 (F6)
-    if (dayItemsBusy) return
+    /*
+      그 일자 저장(담기 · 이동 추가 · 시각 · 메모)이 도는 중이면 낡은 목록으로 열린다 (F6). 버튼이
+      `disabled` 로 서지만(#1488) 누른 순간에도 한 번 더 본다 — 반영 전 클릭이 있다.
+    */
+    if (dayItemsLockState.blocksEntry(day)) return
     if (editingDay !== null && edit.dirty) {
       setPendingDay(day)
       setDiscarding(true)
@@ -401,12 +416,12 @@ export function PlanDetailSection({
     중에 다른 일자의 순서를 바꾸자고 끼어들지 않고, 미저장 편집을 버리는 확인 길(`requestEditor`)에
     추천 순서를 실어 나르지 않아도 된다.
 
-    **일괄 교체 잠금(`dayItemsBusy` — 담기 · 이동 추가 · 시각 · 메모 저장)을 `순서 편집` 진입과 같이
-    거친다** (#1460 · F6). 잠긴 동안은 줄을 내지 않고, 누른 순간에도 `requestEditor` 와 같은 판정을
+    **일괄 교체 잠금(담기 · 이동 추가 · 시각 · 메모 저장)을 `순서 편집` 진입과 같이 거친다** (#1460 · F6) —
+    진입이라 같은 일자 저장만 본다(`blocksEntry`, #1488). 잠긴 동안은 줄을 내지 않고, 누른 순간에도 `requestEditor` 와 같은 판정을
     한 번 더 본다 — 저장 중에 낡은 목록으로 추천 순서를 열면 그 저장이 바꾼 것을 편집기가 덮는다.
   */
   function dayRouteReorder(day: number, items: PlanItemDetail[]) {
-    if (editingDay !== null || dayItemsBusy) return null
+    if (editingDay !== null || dayItemsLockState.blocksEntry(day)) return null
     const allowed = routeReorderAllowed({
       statusCode: plan.status.code,
       date: addPlanDays(plan.startDate, day - 1),
@@ -421,7 +436,7 @@ export function PlanDetailSection({
     return {
       savedMeters: suggestion.savedMeters,
       onApply: () => {
-        if (dayItemsBusy) return
+        if (dayItemsLockState.blocksEntry(day)) return
         openEditor(day, suggestion.order)
       },
     }
@@ -663,6 +678,7 @@ export function PlanDetailSection({
             onRetryVerdict={onRetryWeather}
             editing={editingDay === group.day}
             onStartEdit={() => requestEditor(group.day)}
+            editBlocked={dayItemsLockState.blocksEntry(group.day)}
             regenerateHref={
               regenerateBlocked ? null : `/plans/${plan.planId}/days/${group.day}/regenerate`
             }
@@ -738,6 +754,8 @@ export function PlanDetailSection({
                   onSaveWithTimes={(realign) => {
                     if (!dayItemsBusy) edit.saveWithTimes(group.day, realign)
                   }}
+                  // 다른 일자 저장이 도는 동안 저장 답이 `disabled` 로 선다 (#1488). 위 두 판정은 반영 전 클릭용이다
+                  blocked={dayItemsBusy}
                 />
               )
             }
