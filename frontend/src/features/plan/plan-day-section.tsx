@@ -156,6 +156,7 @@ export function PlanDaySection({
   onRetryVerdict,
   editing,
   onStartEdit,
+  editBlocked = false,
   editor,
   add,
   visit,
@@ -187,6 +188,12 @@ export function PlanDaySection({
   /** 이 일자가 편집 중이다. **한 번에 한 일자만 연다** — 일괄 교체 단위가 일자다 (E0) */
   editing: boolean
   onStartEdit: () => void
+  /**
+   * 이 일자 항목을 되싣는 저장이 도는 중이다 (#1488 · `dayItemsLock.blocksEntry`). `순서 편집` 이
+   * `disabled` 로 선다 — 예전에는 눌러도 반응 없이 무시됐다. 그 저장의 진행 표시(담기 스피너 ·
+   * 모달)가 이유를 말한다.
+   */
+  editBlocked?: boolean
   /** 편집 중일 때 항목 목록 자리에 들어간다 */
   editor: ReactNode
   add: PlanDayAdd
@@ -487,7 +494,7 @@ export function PlanDaySection({
 
           {/* 항목이 없으면 바꿀 순서도 없다 */}
           {rows.length > 0 && (
-            <Button variant="secondary" size="sm" onClick={onStartEdit}>
+            <Button variant="secondary" size="sm" onClick={onStartEdit} disabled={editBlocked}>
               {messages.plan.editDayAction}
             </Button>
           )}

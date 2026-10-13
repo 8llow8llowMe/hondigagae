@@ -43,6 +43,7 @@ export function PlanDayEditor({
   onCancel,
   timeRealign = null,
   onSaveWithTimes,
+  blocked = false,
 }: {
   items: PlanDayEditItem[]
   dirty: boolean
@@ -64,6 +65,11 @@ export function PlanDayEditor({
   timeRealign?: string | null
   /** 확인에 답한 저장. `true` 면 시각도 순서대로 다시 맞춘다 */
   onSaveWithTimes: (realign: boolean) => void
+  /**
+   * 다른 일자의 일괄 교체 저장이 도는 중이다 (#1488 · `dayItemsLock.busy`). 저장 답들이 `disabled` 로
+   * 서고 이유 줄이 붙는다 — 예전에는 클릭만 조용히 무시했다. `취소` 와 순서 조작은 그대로다.
+   */
+  blocked?: boolean
 }) {
   const upRefs = useRef<(HTMLButtonElement | null)[]>([])
   const downRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -116,6 +122,9 @@ export function PlanDayEditor({
 
     onClearFocus()
   }, [focusTarget, onClearFocus])
+
+  // 잠긴 이유 줄(`plan-edit-blocked`)은 변경이 있을 때만 선다 — 아래 렌더와 같은 조건이다
+  const blockedHint = dirty && blocked ? { 'aria-describedby': 'plan-edit-blocked' } : {}
 
   /*
     **확인이 서면 초점을 그 첫 버튼으로 옮긴다.** 누른 저장 버튼이 확인으로 바뀌어 사라지므로
@@ -204,10 +213,21 @@ export function PlanDayEditor({
               {messages.plan.editTimeRealignDescription.replace('{times}', timeRealign)}
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <Button ref={realignRef} onClick={() => onSaveWithTimes(true)} loading={saving}>
+              <Button
+                ref={realignRef}
+                onClick={() => onSaveWithTimes(true)}
+                loading={saving}
+                disabled={blocked}
+                {...blockedHint}
+              >
                 {messages.plan.editTimeRealignAction}
               </Button>
-              <Button variant="secondary" onClick={() => onSaveWithTimes(false)} disabled={saving}>
+              <Button
+                variant="secondary"
+                onClick={() => onSaveWithTimes(false)}
+                disabled={saving || blocked}
+                {...blockedHint}
+              >
                 {messages.plan.editTimeKeepAction}
               </Button>
               <Button variant="ghost" onClick={onCancel}>
@@ -220,9 +240,9 @@ export function PlanDayEditor({
             <Button
               onClick={onSave}
               loading={saving}
-              disabled={!dirty}
+              disabled={!dirty || blocked}
               // 잠긴 이유를 보이지 않는 힌트로만 두지 않는다 (E6)
-              {...(dirty ? {} : { 'aria-describedby': 'plan-edit-no-changes' })}
+              {...(dirty ? blockedHint : { 'aria-describedby': 'plan-edit-no-changes' })}
             >
               {messages.plan.editSave}
             </Button>
@@ -235,6 +255,13 @@ export function PlanDayEditor({
         {!dirty && (
           <p id="plan-edit-no-changes" className="text-caption text-fg-muted">
             {messages.plan.editNoChanges}
+          </p>
+        )}
+
+        {/* 변경이 없어 잠긴 이유가 먼저다 — 둘 다 내면 같은 버튼에 이유가 둘이다 */}
+        {dirty && blocked && (
+          <p id="plan-edit-blocked" className="text-caption text-fg-muted">
+            {messages.plan.editBlockedNote}
           </p>
         )}
       </div>
