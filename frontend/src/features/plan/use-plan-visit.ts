@@ -8,7 +8,7 @@ import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidati
 import { planKeys } from '@/features/plan/queries'
 import { markItemVisited } from '@/lib/api/plan'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
-import { toVisitToggleError } from '@/lib/plan/visit-error'
+import { runVisitToggle } from '@/lib/plan/visit-toggle-save'
 
 /**
  * 항목 방문 체크 토글 — 이슈 #124.
@@ -16,7 +16,7 @@ import { toVisitToggleError } from '@/lib/plan/visit-error'
  * **낙관적 업데이트를 하지 않는다** (`api-integration-guide.md` §7). 응답이
  * `Response<Void>` 라 갈아끼울 상세가 없고, `PLAN_005` 처럼 재시도로 풀리지 않는
  * 실패가 있어 롤백이 잦다. 그래서 왕복(PUT → 상세 재조회)이 끝날 때까지 **그 행만**
- * 잠긴다.
+ * 잠긴다. 재조회까지 기다리는 것은 `runVisitToggle` 이 지킨다 (#1489 — PUT 직후 풀던 틈).
  *
  * **일괄 교체와 달리 항목별로 동시에 진행할 수 있다.** 담기·순서편집은 일자 하나를
  * 통째로 덮어써서 두 요청이 겹치면 한쪽이 사라지지만, 방문 체크는 항목 한 행만 바꾸므로
@@ -57,35 +57,36 @@ export function usePlanVisit({ planId }: { planId: string }): PlanVisitState {
       })
 
       /*
-        **`.then(onSuccess, onError)` 2인자 형태다.** `.then().catch()` 체인이면 성공
-        후처리(무효화)에서 던진 예외가 저장 실패로 분류돼 **서버는 저장했는데 화면이
-        "저장하지 못했어요" 를 낸다** — 담기 훅에서 같은 함정을 주석으로 남겨 뒀다.
+        흐름은 `runVisitToggle` 이 소유한다 (#1489). **약속은 상세 재조회까지 끝난 뒤에 풀린다** —
+        PUT 만 기다리고 `pending` 을 풀면 재조회 전 캐시가 옛 `visited` 인 채로 그 일자 메모 저장
+        잠금(`dayVisitPending`)이 풀려, 일괄 교체가 방금 남긴 체크를 지운다. 후처리 예외를 저장
+        실패로 말하지 않는 것(옛 2인자 `.then`)도 그 함수가 지킨다.
       */
-      void markItemVisited(planId, planItemId, visited)
-        .then(
-          () => {
-            /*
-              **무효화가 유일한 갱신 경로다.** 응답이 `Response<Void>` 라 `setQueryData`
-              로 갈아끼울 상세가 없다.
+      void runVisitToggle({
+        mark: () => markItemVisited(planId, planItemId, visited),
+        afterMarked: () => {
+          /*
+            **판정(`planKeys.weather`)은 무효화하지 않는다.** 그날 판정은 첫 장소 항목을
+            기준으로 하는데(컨트롤러 설명) 방문 체크는 항목 구성·순서를 바꾸지 않는다.
+            담기·순서편집이 판정을 다시 받는 것과 갈리는 지점이다.
 
-              **판정(`planKeys.weather`)은 무효화하지 않는다.** 그날 판정은 첫 장소 항목을
-              기준으로 하는데(컨트롤러 설명) 방문 체크는 항목 구성·순서를 바꾸지 않는다.
-              담기·순서편집이 판정을 다시 받는 것과 갈리는 지점이다.
+            **`planKeys.walkSafety` 도 같은 이유로 무효화하지 않는다** (#625 · D15-6).
+            방문 체크는 `planItemId`·`startTime`·장소를 바꾸지 않으므로 그 항목의
+            산책 위험도 판정도 그대로 유효하다.
 
-              **`planKeys.walkSafety` 도 같은 이유로 무효화하지 않는다** (#625 · D15-6).
-              방문 체크는 `planItemId`·`startTime`·장소를 바꾸지 않으므로 그 항목의
-              산책 위험도 판정도 그대로 유효하다.
-            */
-            void queryClient.invalidateQueries({ queryKey: planKeys.detail(planId) })
-            /*
-              **브리핑은 버린다** (#1055) — 판정과 갈리는 지점이다. 브리핑의 `visitedCount` 와
-              첫/마지막 항목의 `visited` 가 방문 여부를 그대로 싣는다.
-            */
-            void invalidatePlanBriefing(queryClient, planId)
-          },
-          (cause: unknown) =>
-            setFailures((current) => new Map(current).set(planItemId, toVisitToggleError(cause))),
-        )
+            **브리핑은 버린다** (#1055) — 판정과 갈리는 지점이다. 브리핑의 `visitedCount` 와
+            첫/마지막 항목의 `visited` 가 방문 여부를 그대로 싣는다.
+          */
+          void invalidatePlanBriefing(queryClient, planId)
+        },
+        // **무효화가 유일한 갱신 경로다.** 응답이 `Response<Void>` 라 갈아끼울 상세가 없다
+        refetchDetail: () => queryClient.invalidateQueries({ queryKey: planKeys.detail(planId) }),
+      })
+        .then((result) => {
+          if (result.kind === 'failed') {
+            setFailures((current) => new Map(current).set(planItemId, result.error))
+          }
+        })
         .finally(() => {
           inFlight.current.delete(planItemId)
           setPending((current) => {
