@@ -5,6 +5,7 @@ import { isPlaceTarget } from '@/lib/plan/detail'
 import { formatStartTime } from '@/lib/plan/start-time'
 import { hasBackwardTime, realignedStartTimes } from '@/lib/plan/time-order'
 import { withObjectParticle } from '@/lib/text/korean'
+import { fillTemplate } from '@/lib/text/template'
 import type {
   PlanDayItemsReplacePayload,
   PlanItemDetail,
@@ -273,10 +274,11 @@ export function addPlaceToastMessage(
   const time = formatStartTime(startTime ?? null)
   const template = time === null ? messages.plan.addPlaceToast : messages.plan.addPlaceTimedToast
 
-  return template
-    .replace('{title}', withObjectParticle(title))
-    .replace('{day}', String(day))
-    .replace('{time}', time ?? '')
+  return fillTemplate(template, {
+    title: withObjectParticle(title),
+    day: String(day),
+    time: time ?? '',
+  })
 }
 
 /** 기존 항목을 되싣고 `itemInsertIndex` 자리에 하나를 끼운 본문. `sequence` 는 0부터 다시 매긴다 */

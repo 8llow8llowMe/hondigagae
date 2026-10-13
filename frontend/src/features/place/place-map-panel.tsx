@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 
 import { PlaceRowContent } from '@/features/place/place-row'
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceSummary } from '@/types/place'
 
@@ -119,7 +120,7 @@ export function PlaceMapPanel({
                   {detailLink && (
                     <Link
                       href={`/places/${place.placeId}`}
-                      aria-label={messages.map.rowDetailLabel.replace('{title}', place.title)}
+                      aria-label={fillTemplate(messages.map.rowDetailLabel, { title: place.title })}
                       className="border-border-strong bg-bg text-fg hover:bg-band text-body-1 focus-visible:ring-brand-500 flex h-11 min-w-11 items-center justify-center rounded-md border px-4 font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                     >
                       {messages.map.rowDetail}

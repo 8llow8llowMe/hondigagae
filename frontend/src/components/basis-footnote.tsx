@@ -1,4 +1,5 @@
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -38,7 +39,7 @@ export function BasisFootnote({
       : messages.common.feelsLikeHumidity.replace('{value}', String(humidity)),
     providerName === null || providerName === ''
       ? null
-      : messages.common.feelsLikeProvider.replace('{name}', providerName),
+      : fillTemplate(messages.common.feelsLikeProvider, { name: providerName }),
   ].filter((part): part is string => part !== null)
 
   if (parts.length === 0) return null

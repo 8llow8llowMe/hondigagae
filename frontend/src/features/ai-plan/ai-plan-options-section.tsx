@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/checkbox'
 import { CloseIcon } from '@/components/icons'
 import { MAX_PINNED_PLACES } from '@/lib/ai-plan/pinned'
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 import type { PinnedPlace } from '@/types/ai-plan'
 
 /**
@@ -119,7 +120,9 @@ export function AiPlanOptionsSection({
                   <button
                     type="button"
                     onClick={() => onRemovePinned(place.placeId)}
-                    aria-label={messages.aiPlan.pinnedRemoveLabel.replace('{title}', place.title)}
+                    aria-label={fillTemplate(messages.aiPlan.pinnedRemoveLabel, {
+                      title: place.title,
+                    })}
                     className="text-fg-muted hover:text-fg focus-visible:ring-brand-500 flex size-6 shrink-0 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:outline-none"
                   >
                     <CloseIcon size={14} />

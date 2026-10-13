@@ -1,6 +1,7 @@
 import { messages } from '@/lib/messages'
 import { setItemMemoPayload, visitsToRestore } from '@/lib/plan/item-memo-edit'
 import { type PlanDaySaveError, toPlanDaySaveError } from '@/lib/plan/save-error'
+import { fillTemplate } from '@/lib/text/template'
 import type { PlanDayItemsReplacePayload, PlanDetail, PlanItemDetail } from '@/types/plan'
 
 /**
@@ -93,9 +94,9 @@ export async function runItemMemoSave(
   const clearing = (memo ?? '').trim() === ''
   const toast = restoreFailed
     ? messages.plan.itemMemoVisitRestoreFailedToast
-    : (clearing ? messages.plan.itemMemoClearedToast : messages.plan.itemMemoSavedToast).replace(
-        '{title}',
-        target.title,
+    : fillTemplate(
+        clearing ? messages.plan.itemMemoClearedToast : messages.plan.itemMemoSavedToast,
+        { title: target.title },
       )
 
   return { kind: 'saved', toast, restored, restoreFailed }

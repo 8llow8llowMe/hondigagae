@@ -21,6 +21,7 @@ import { formatStandaloneCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { shortDateLabel } from '@/lib/place/plan-context'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { WalkSafetyResponse } from '@/types/insight'
@@ -300,10 +301,11 @@ function BasisLine({
     return (
       <p className="text-caption text-fg-muted font-medium tabular-nums">
         {withPet
-          ? messages.place.detailWalkSafetyTripBasisWithPet
-              .replace('{name}', petName)
-              .replace('{date}', date)
-              .replace('{time}', time)
+          ? fillTemplate(messages.place.detailWalkSafetyTripBasisWithPet, {
+              name: petName,
+              date,
+              time,
+            })
           : messages.place.detailWalkSafetyTripBasis
               .replace('{date}', date)
               .replace('{time}', time)}
@@ -314,9 +316,7 @@ function BasisLine({
   return (
     <p className="text-caption text-fg-muted font-medium tabular-nums">
       {withPet
-        ? messages.place.detailWalkSafetyBasisWithPet
-            .replace('{time}', time)
-            .replace('{name}', petName)
+        ? fillTemplate(messages.place.detailWalkSafetyBasisWithPet, { time, name: petName })
         : messages.place.detailWalkSafetyBasis.replace('{time}', time)}
     </p>
   )

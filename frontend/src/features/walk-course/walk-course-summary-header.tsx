@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { Surface } from '@/components/surface'
 import { formatCourseDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import { walkCourseActivityFit } from '@/lib/walk-course/activity-fit'
@@ -182,9 +183,9 @@ export function WalkCourseSummaryHeader({ course }: { course: WalkCourseDetail }
  * 자정 UTC 로 읽히면 KST 기준 하루 밀린다. 문자열 그대로 렌더하되 `<time>` 으로 시맨틱만 준다.
  */
 export function WalkCourseSourceLine({ course }: { course: WalkCourseDetail }) {
-  const [before = '', after = ''] = messages.walkCourse.source
-    .replace('{provider}', course.providerName)
-    .split('{date}')
+  const [before = '', after = ''] = fillTemplate(messages.walkCourse.source, {
+    provider: course.providerName,
+  }).split('{date}')
 
   return (
     /*

@@ -11,6 +11,7 @@ import { markRepresentativePet, removePetImage, uploadPetImage } from '@/lib/api
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 import { withObjectParticle } from '@/lib/text/korean'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
@@ -137,7 +138,9 @@ export function PetPhotoSection({ pet }: { pet: Pet }) {
                 () => represent.mutateAsync(),
                 // 목적격 조사(을/를)는 이름의 받침에 따라 갈린다 — 같은 화면의
                 // 삭제 확인 문구가 이미 같은 헬퍼를 거친다 (`pet-delete-section.tsx`)
-                messages.pet.representativeDone.replace('{name}', withObjectParticle(pet.name)),
+                fillTemplate(messages.pet.representativeDone, {
+                  name: withObjectParticle(pet.name),
+                }),
                 messages.pet.representativeFailed,
               )
             }

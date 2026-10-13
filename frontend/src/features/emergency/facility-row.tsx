@@ -6,6 +6,7 @@ import { summarizeTodayHours, todayHoursLabel } from '@/lib/emergency/operating-
 import { formatDistance } from '@/lib/format/distance'
 import { directionsUrl } from '@/lib/geo/map-link'
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { NearbyFacilityItem } from '@/types/emergency'
@@ -490,7 +491,7 @@ export function CallButton({ name, tel }: { name: string; tel: string | null }) 
   return (
     <a
       href={`tel:${tel.replace(/[^\d+]/g, '')}`}
-      aria-label={messages.emergency.callLabel.replace('{name}', name)}
+      aria-label={fillTemplate(messages.emergency.callLabel, { name })}
       className={cn(ACTION_BASE, ACTION_LIVE)}
     >
       <PhoneIcon size={20} />
@@ -535,7 +536,7 @@ export function DirectionsButton({ facility }: { facility: NearbyFacilityItem })
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label={messages.emergency.directionsLabel.replace('{name}', facility.name)}
+      aria-label={fillTemplate(messages.emergency.directionsLabel, { name: facility.name })}
       className={cn(ACTION_BASE, ACTION_LIVE)}
     >
       <DirectionsIcon size={20} />

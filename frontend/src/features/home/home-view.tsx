@@ -57,6 +57,7 @@ import { resolveSelectedPet } from '@/lib/nav/selected-pet'
 import { tripPhaseOf } from '@/lib/plan/date'
 import { pickHomePlans } from '@/lib/plan/trip-banner'
 import { withCompanionParticle } from '@/lib/text/korean'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { PlanSummaryItem } from '@/types/plan'
@@ -312,7 +313,9 @@ export function HomeView({
     : selectedPet === null
       ? messages.home.suitabilityFallback
       : // 동반격 조사(와/과)는 이름의 받침에 따라 갈린다 — 고정하면 한쪽이 반드시 틀린다
-        messages.home.suitabilityHeading.replace('{name}', withCompanionParticle(selectedPet.name))
+        fillTemplate(messages.home.suitabilityHeading, {
+          name: withCompanionParticle(selectedPet.name),
+        })
 
   /*
     캡션이 말할 축을 응답에서 읽는다 (`appliedFactorsOf`). **고정 문구가 아니다** — 예전에는

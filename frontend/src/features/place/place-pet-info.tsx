@@ -4,6 +4,7 @@ import { messages } from '@/lib/messages'
 import { petSizeVerdict } from '@/lib/place/pet-size'
 import { toPlainText } from '@/lib/place/text'
 import { withParenthesizedParticle, withTopicParticle } from '@/lib/text/korean'
+import { fillTemplate } from '@/lib/text/template'
 import type { EnumMetadata } from '@/types/api'
 import type { PlacePetInfo } from '@/types/place'
 
@@ -260,7 +261,7 @@ export function sizeVerdictLine(
 
   // 크기 이름은 **서버 metadata 의 name** 이다. FE 가 code 를 한국어로 번역하지 않는다
   if (verdict === 'unknown' || petSizeName === null) {
-    return messages.place.detailPetSizeUnknown.replace('{name}', petName)
+    return fillTemplate(messages.place.detailPetSizeUnknown, { name: petName })
   }
 
   const template =
@@ -270,8 +271,7 @@ export function sizeVerdictLine(
 
   // 조사는 **괄호 안 크기 이름**의 받침을 본다 (`withParenthesizedParticle` 주석).
   // 판정 대상을 화제로 올리는 문장이라 주격(이/가)이 아니라 주제격(은/는)이다
-  return template.replace(
-    '{nameWithSize}',
-    withParenthesizedParticle(petName, petSizeName, withTopicParticle),
-  )
+  return fillTemplate(template, {
+    nameWithSize: withParenthesizedParticle(petName, petSizeName, withTopicParticle),
+  })
 }

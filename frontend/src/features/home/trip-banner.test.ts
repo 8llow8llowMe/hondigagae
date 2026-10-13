@@ -55,6 +55,13 @@ describe('TripBannerCard — 갈래별 문구와 목적지', () => {
     expect(markup).toContain('10월 6일 (화) 출발')
   })
 
+  /* #1487 — 일정 제목은 사용자 입력이다. 문자열 치환이면 `$$` 가 `$` 로, `$`` 가 앞 글자로 바뀐다 */
+  it('일정 제목 안의 $$ · $` 를 치환 패턴으로 해석하지 않는다', () => {
+    const markup = render({ kind: 'SOON', plan: { ...PLAN, title: '제주 $$ 여행 $`' }, days: 5 })
+
+    expect(markup).toContain('D-5 · 제주 $$ 여행 $`')
+  })
+
   it('출발일을 못 읽으면 설명 줄을 비운다 — 서버 문자열로 다른 모양을 만들지 않는다', () => {
     const markup = render({ kind: 'SOON', plan: { ...PLAN, startDate: '2026-13-01' }, days: 5 })
 

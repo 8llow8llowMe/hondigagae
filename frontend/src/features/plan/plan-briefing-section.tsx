@@ -26,6 +26,7 @@ import {
 } from '@/lib/plan/briefing'
 import { type BriefingDayFact, briefingDayFacts } from '@/lib/plan/briefing-day-facts'
 import { formatPlanDay } from '@/lib/plan/date'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { HourlyWalkSafetyItem } from '@/types/insight'
@@ -481,7 +482,7 @@ function ScheduleCard({
       {basisLine !== null && (
         <p className="text-caption text-fg-muted break-keep">
           {schedule.representativePlaceId === null ? (
-            messages.plan.briefingScheduleBasisPlace.replace('{title}', basisLine)
+            fillTemplate(messages.plan.briefingScheduleBasisPlace, { title: basisLine })
           ) : (
             /*
               **id 가 없으면 링크를 렌더하지 않는다** (명세 D4). 제목만 오는 경우가 있어
@@ -491,7 +492,7 @@ function ScheduleCard({
               href={`/places/${schedule.representativePlaceId}`}
               className="text-link hover:text-link-hover focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:outline-none"
             >
-              {messages.plan.briefingScheduleBasisPlace.replace('{title}', basisLine)}
+              {fillTemplate(messages.plan.briefingScheduleBasisPlace, { title: basisLine })}
             </Link>
           )}
         </p>
@@ -521,7 +522,7 @@ function ScheduleCard({
         toLatLng({ lat: schedule.representativeLat, lng: schedule.representativeLng }) !== null && (
           <div className="flex w-full flex-col gap-1">
             <p className="text-caption text-fg-muted break-keep">
-              {messages.plan.briefingScheduleMapBasis.replace('{title}', basisTitle)}
+              {fillTemplate(messages.plan.briefingScheduleMapBasis, { title: basisTitle })}
             </p>
 
             <PlaceMiniMap
@@ -942,7 +943,7 @@ function WalkTimesCard({
       <p className="text-caption text-fg-muted font-medium break-keep">
         {representativePlaceTitle === null
           ? messages.plan.briefingWalkBasisNoPlace
-          : messages.plan.briefingWalkBasis.replace('{title}', representativePlaceTitle)}
+          : fillTemplate(messages.plan.briefingWalkBasis, { title: representativePlaceTitle })}
       </p>
     </div>
   )

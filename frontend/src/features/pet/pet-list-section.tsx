@@ -12,6 +12,7 @@ import { MAX_PET_COUNT } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
 import { aiPlanForPetHref, petListDescription, registeredPet } from '@/lib/pet/next-step'
 import { withCompanionParticle } from '@/lib/text/korean'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
@@ -233,7 +234,7 @@ function PetNextStep({ petId, name }: { petId: string; name: string }) {
       */}
       <ButtonLink href={aiPlanForPetHref(petId)} className="max-w-full min-w-0">
         <span className="truncate">
-          {messages.pet.nextStepAction.replace('{name}', withCompanionParticle(name))}
+          {fillTemplate(messages.pet.nextStepAction, { name: withCompanionParticle(name) })}
         </span>
       </ButtonLink>
     </div>

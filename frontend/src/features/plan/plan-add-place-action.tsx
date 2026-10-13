@@ -4,6 +4,7 @@ import type { PlanAddTarget } from '@/features/plan/use-plan-add-place'
 import { messages } from '@/lib/messages'
 import { addPlaceConfirmNotice, type AddPlaceConfirmReason } from '@/lib/plan/add-place-confirm'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
+import { fillTemplate } from '@/lib/text/template'
 import type { PlaceSummary } from '@/types/place'
 
 /**
@@ -68,10 +69,12 @@ export function planAddPlaceAction(
       size="md"
       loading={pending}
       disabled={disabled && !pending}
-      aria-label={(confirmingPlaceId === place.placeId
-        ? messages.plan.addPlaceConfirmLabel
-        : messages.plan.addPlaceLabel
-      ).replace('{title}', place.title)}
+      aria-label={fillTemplate(
+        confirmingPlaceId === place.placeId
+          ? messages.plan.addPlaceConfirmLabel
+          : messages.plan.addPlaceLabel,
+        { title: place.title },
+      )}
       onClick={() => onAdd(place)}
     >
       {messages.plan.addPlaceShort}

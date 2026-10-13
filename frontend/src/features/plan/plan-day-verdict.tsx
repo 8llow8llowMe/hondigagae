@@ -16,6 +16,7 @@ import { formatStandaloneCelsius } from '@/lib/format/celsius'
 import { type DisplayTemperature, displayTemperature } from '@/lib/insight/temperature'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 import { cn } from '@/lib/utils/cn'
 import {
   MID_TERM_FORECAST_CODE,
@@ -170,10 +171,9 @@ export function PlanDayVerdict({
             {verdict.representativePlaceTitle !== null && (
               <span className="break-keep">
                 {'· '}
-                {messages.plan.verdictBasisPlace.replace(
-                  '{title}',
-                  verdict.representativePlaceTitle,
-                )}
+                {fillTemplate(messages.plan.verdictBasisPlace, {
+                  title: verdict.representativePlaceTitle,
+                })}
               </span>
             )}
           </span>
@@ -392,7 +392,7 @@ function temperatureClue(
   if (temperature.kind === 'feelsLike') return source
   if (source === null) return messages.plan.verdictTemperatureLabel
 
-  return messages.plan.verdictFallbackMetric.replace('{source}', source)
+  return fillTemplate(messages.plan.verdictFallbackMetric, { source })
 }
 
 /**
@@ -419,7 +419,7 @@ function PlanVerdictNotes({
         이 줄은 **누구의 판정인지**라 먼저 와야 나머지가 그 아이 이야기로 읽힌다.
       */}
       {basisPetName !== null && (
-        <p>{messages.plan.verdictBasisPet.replace('{name}', basisPetName)}</p>
+        <p>{fillTemplate(messages.plan.verdictBasisPet, { name: basisPetName })}</p>
       )}
       {!petConditionApplied && <p>{messages.plan.verdictPetConditionMissing}</p>}
     </div>

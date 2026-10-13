@@ -2,6 +2,7 @@ import { countsAreComplete, narrowByKeyword } from '@/features/emergency/facilit
 import type { EmergencyBasis } from '@/features/emergency/resolve-anchor'
 import type { JejuRegionCode } from '@/lib/geo/jeju-regions'
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 import type { NearbyFacilityResult } from '@/types/emergency'
 
 /**
@@ -107,10 +108,11 @@ export function emergencyHeadSubtitle(
   if (total === 0) return null
 
   if (keyword !== null) {
-    return messages.emergency.subtitleKeyword
-      .replace('{keyword}', keyword)
-      .replace('{total}', String(total))
-      .replace('{openNow}', String(openNow))
+    return fillTemplate(messages.emergency.subtitleKeyword, {
+      keyword,
+      total: String(total),
+      openNow: String(openNow),
+    })
   }
 
   const region =

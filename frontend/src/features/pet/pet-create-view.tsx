@@ -14,6 +14,7 @@ import { EMPTY_PET_FORM_VALUES } from '@/lib/pet/form'
 import { registeredPetListHref } from '@/lib/pet/next-step'
 import { petCreatedReturnHref } from '@/lib/pet/return-to'
 import { withObjectParticle } from '@/lib/text/korean'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
@@ -90,7 +91,9 @@ export function PetCreateView({
               (공통명세 S2) "등록했어요" 를 그 안에 두면 수정에서도 그 말이 나온다.
             */
             showToast({
-              message: messages.pet.registeredToast.replace('{name}', withObjectParticle(pet.name)),
+              message: fillTemplate(messages.pet.registeredToast, {
+                name: withObjectParticle(pet.name),
+              }),
             })
             /*
               push 를 쓰면 뒤로가기로 폼에 돌아와 같은 반려견을 두 번 등록할 수 있다.

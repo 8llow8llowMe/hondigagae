@@ -9,6 +9,7 @@ import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
 import { shortAddress } from '@/lib/place/address'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
+import { fillTemplate } from '@/lib/text/template'
 import type { PlaceDetail } from '@/types/place'
 import type { PlanAlternativePlaceItem } from '@/types/plan'
 
@@ -172,7 +173,7 @@ function PlanIndoorAlternativeRow({
           className="shrink-0"
           loading={pending}
           disabled={disabled && !pending}
-          aria-label={messages.plan.addPlaceLabel.replace('{title}', alternative.title)}
+          aria-label={fillTemplate(messages.plan.addPlaceLabel, { title: alternative.title })}
           onClick={() => onAdd(alternative)}
         >
           {messages.plan.addPlaceShort}

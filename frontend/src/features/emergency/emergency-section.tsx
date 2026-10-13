@@ -15,6 +15,7 @@ import { type EmergencyBasis, showsDistance } from '@/features/emergency/resolve
 import { formatDistance } from '@/lib/format/distance'
 import type { JejuRegionCode } from '@/lib/geo/jeju-regions'
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { FacilityFilters, NearbyFacilityResult } from '@/types/emergency'
@@ -178,7 +179,7 @@ export function EmergencySection({
           INSET_CLASS[inset],
         )}
       >
-        {messages.emergency.source.replace('{provider}', result.providerName)}
+        {fillTemplate(messages.emergency.source, { provider: result.providerName })}
       </p>
     </>
   )
@@ -260,7 +261,7 @@ function EmptyResult({
   const title =
     filters.keyword === null
       ? messages.emergency.narrowedTitle
-      : messages.emergency.searchNarrowedTitle.replace('{keyword}', filters.keyword)
+      : fillTemplate(messages.emergency.searchNarrowedTitle, { keyword: filters.keyword })
 
   return (
     <div className={cn('flex flex-col items-start gap-2 py-6', INSET_CLASS[inset])}>

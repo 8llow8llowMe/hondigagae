@@ -8,6 +8,7 @@ import { messages } from '@/lib/messages'
 import { petCreateHref } from '@/lib/pet/return-to'
 import { planCompanionsOf } from '@/lib/plan/companion-pets'
 import { duplicatedPlanTitles, groupPlans } from '@/lib/plan/list'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
@@ -264,7 +265,7 @@ function NoPlans({ hasPets, firstPetName }: { hasPets: boolean; firstPetName: st
       description={
         firstPetName === null
           ? messages.plan.emptyDescription
-          : messages.plan.emptyDescriptionWithPet.replace('{pet}', firstPetName)
+          : fillTemplate(messages.plan.emptyDescriptionWithPet, { pet: firstPetName })
       }
       action={<ButtonLink href="/plans/new">{messages.plan.createAction}</ButtonLink>}
     />

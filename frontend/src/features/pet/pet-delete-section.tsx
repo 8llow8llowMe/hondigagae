@@ -16,6 +16,7 @@ import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 import { petDeleteCompanionLines } from '@/lib/pet/delete-companions'
 import { withObjectParticle } from '@/lib/text/korean'
+import { fillTemplate } from '@/lib/text/template'
 import type { PlanCompanionSummary } from '@/types/plan'
 
 /**
@@ -76,7 +77,7 @@ export function PetDeleteConfirm({
         open={confirming}
         onClose={onCancel}
         onConfirm={onConfirm}
-        title={messages.pet.deleteConfirmTitle.replace('{name}', withObjectParticle(petName))}
+        title={fillTemplate(messages.pet.deleteConfirmTitle, { name: withObjectParticle(petName) })}
         description={
           /*
             **일정 문장을 설명 안에 둔다.** `alertdialog` 의 `aria-describedby` 가 이 자리를

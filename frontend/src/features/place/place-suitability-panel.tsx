@@ -12,6 +12,7 @@ import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { petCreateHref } from '@/lib/pet/return-to'
 import { shortDateLabel } from '@/lib/place/plan-context'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { DailyWeatherItem, PlaceSuitabilityResponse } from '@/types/insight'
@@ -98,7 +99,7 @@ export function PlaceSuitabilityPanel({
         */}
         <p className="text-body-1 flex flex-wrap items-center gap-x-1 gap-y-2 font-semibold">
           <span className="text-fg-muted">
-            {messages.place.detailSuitabilitySpeaker.replace('{name}', petName)}
+            {fillTemplate(messages.place.detailSuitabilitySpeaker, { name: petName })}
           </span>
           <MetricWord tone={tone}>{data.suitabilityLevel.name}</MetricWord>
           <WeatherWarningBadge warning={data.weatherWarning} />
@@ -154,12 +155,8 @@ function BasisLine({
   return (
     <p className="text-caption text-fg-muted font-medium tabular-nums">
       {date === null
-        ? messages.place.detailSuitabilityBasis
-            .replace('{date}', targetDate)
-            .replace('{name}', petName)
-        : messages.place.detailSuitabilityTripBasis
-            .replace('{name}', petName)
-            .replace('{date}', date)}
+        ? fillTemplate(messages.place.detailSuitabilityBasis, { date: targetDate, name: petName })
+        : fillTemplate(messages.place.detailSuitabilityTripBasis, { name: petName, date })}
     </p>
   )
 }

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
@@ -96,7 +97,7 @@ export function AiPlanJobCondition({
           띄어쓰기 없는 긴 낱말(URL 등)이 폭을 넘지 않게 `break-words` 를 함께 건다.
         */
         <p className="text-body-2 text-fg-muted line-clamp-3 break-words">
-          {messages.aiPlan.jobConditionNote.replace('{note}', note)}
+          {fillTemplate(messages.aiPlan.jobConditionNote, { note })}
         </p>
       )}
     </AiPlanJobBlock>
