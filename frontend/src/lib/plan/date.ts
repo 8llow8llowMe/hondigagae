@@ -6,6 +6,24 @@ import { parseDay, todayUtc, weekdayOf } from '@/lib/date/day'
  * **`today` 를 주입받는다** — 모듈 안에서 `new Date()` 를 부르면 테스트가 실행 시각에
  * 따라 흔들린다. 서버·클라이언트가 같은 값을 그려야 하이드레이션도 맞는다.
  *
+ * ### `today: Date` 의 입력 규약 (#1490)
+ *
+ * 이 파일과 같은 축의 판정 함수(`planPhaseOf` · `tripPhaseOf` · `isPastPlan` ·
+ * `formatPlanDateRangeCompact`, 그리고 `todayUtc` · `todayDay` 를 거치는 `lib/plan/*` 판정)는
+ * `today` 를 **로컬 getter(`getFullYear` · `getMonth` · `getDate`)로 읽는다.** 시각이 아니라
+ * 그 시각이 실행 환경의 시간대에서 떨어지는 **달력의 칸**만 본다.
+ *
+ * - **화면은 서버가 정한 칸을 로컬 정오로 세워 넘긴다** — 서버 페이지가 `todayDay(new Date())`
+ *   로 `YYYY-MM-DD` 를 만들어 내려보내고, 클라이언트가 `todayFromDay` (형식이 불확실하면
+ *   `dayToLocalNoon`)로 `Date` 를 세운다 (`lib/date/day.ts`). 홈 · 일정 목록 · 상세 · 일자
+ *   재생성이 이 경로다.
+ * - **서버가 만든 시각(`new Date()` · ISO 문자열)을 클라이언트로 넘기지 않는다.** 브라우저
+ *   시간대가 날짜를 다시 정한다 — 브라우저가 UTC 이고 KST 00–09시면 같은 일정이 홈에서는
+ *   `오늘 1일차`, 목록 · 상세에서는 `D-1` 이었다.
+ * - 자정이 아니라 **정오**인 이유는 `dayToLocalNoon` 주석에 있다 (±12시간 안에서 칸이 바뀌지 않는다).
+ * - 테스트는 `new Date(y, m, d)` 로 로컬 날짜를 직접 만들어 넘긴다. 시간대가 결과를 바꾸는지
+ *   볼 때는 `process.env.TZ` 를 테스트 안에서 바꾼다 (`date.test.ts` 의 #1490 묶음).
+ *
  * 날짜 문자열을 읽는 규칙 자체는 `lib/date/day.ts` 가 소유한다 — 달력 UI 가 같은 규칙을
  * 쓰게 되면서 밖으로 꺼냈다. **여기는 "일정 화면의 표기" 만 갖는다.**
  */

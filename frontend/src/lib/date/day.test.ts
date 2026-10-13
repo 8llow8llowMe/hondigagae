@@ -5,6 +5,7 @@ import {
   isDayWithin,
   parseDay,
   todayDay,
+  todayFromDay,
   toDayString,
   weekdayOf,
 } from '@/lib/date/day'
@@ -52,6 +53,38 @@ describe('toDayString / todayDay', () => {
       // 예전 두 만들기 화면의 계산 — 이 값이 달력의 min 이 되어 어제가 열렸다
       expect(earlyMorning.toISOString().slice(0, 10)).toBe('2026-10-11')
     })
+  })
+})
+
+/*
+  **#1490.** 판정 함수(`planPhaseOf` · `tripPhaseOf` …)는 `todayUtc()` 로 **로컬 getter** 를 읽는다.
+  그래서 서버가 만든 시각(instant)을 브라우저로 넘기면 브라우저 시간대가 날짜를 다시 정한다.
+  서버가 정한 달력의 칸을 넘기고 브라우저에서 로컬 정오로 세우면, 어느 시간대에서 읽어도 같은 칸이다.
+
+  시간대는 `process.env.TZ` 를 테스트 안에서 바꿔 고정한다 (위 #1396 과 같은 방식 — Node 는 바로
+  반영한다). `TZ=UTC pnpm test` 같은 실행 옵션에 기대면 기본 실행(`pnpm verify` · CI)에서는 그 갈래가
+  돌지 않는다.
+*/
+describe('todayFromDay (#1490)', () => {
+  const originalTz = process.env.TZ
+  afterEach(() => {
+    process.env.TZ = originalTz
+  })
+
+  // UTC-12 ~ UTC+14 양 끝과 운영(서울) · 브라우저 기본값(UTC)
+  const ZONES = ['UTC', 'Asia/Seoul', 'America/Los_Angeles', 'Etc/GMT+12', 'Pacific/Kiritimati']
+
+  it.each(ZONES)('%s 에서 읽어도 서버가 정한 칸 그대로다', (zone) => {
+    process.env.TZ = zone
+    const today = todayFromDay('2026-10-15')
+
+    expect(todayDay(today)).toBe('2026-10-15')
+    expect(today.getDate()).toBe(15)
+  })
+
+  it('형식이 깨진 값은 던진다 — new Date() 로 메우면 #1490 이 조용히 돌아온다', () => {
+    expect(() => todayFromDay('2026-02-31')).toThrow()
+    expect(() => todayFromDay('2026-10-14T18:00:00.000Z')).toThrow()
   })
 })
 

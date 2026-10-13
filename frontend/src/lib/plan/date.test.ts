@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
+import { todayDay, todayFromDay } from '@/lib/date/day'
 import {
   formatPlanDateRange,
   formatPlanDateRangeCompact,
@@ -140,5 +141,41 @@ describe('tripPhaseOf — 목록은 출발 당일부터 여행 중이다 (#1433)
   /* 버튼·토글·준비물 자리는 여전히 출발 당일을 `upcoming` 으로 본다 — 판정 축은 바꾸지 않는다 */
   it('planPhaseOf 는 출발 당일을 여전히 D-DAY(upcoming 0)로 둔다', () => {
     expect(planPhaseOf('2026-10-13', '2026-10-15', OCT_13)).toEqual({ kind: 'upcoming', days: 0 })
+  })
+})
+
+/*
+  **#1490.** 홈 · 목록 · 상세가 같은 `tripPhaseOf` 를 쓰면서 넘기는 `today` 의 모양이 달랐다.
+  홈은 서버가 정한 칸의 로컬 정오, 목록 · 상세는 서버가 만든 시각(instant)이었다. 판정 함수는
+  로컬 getter 로 날짜를 읽으므로, 브라우저가 UTC 이고 KST 00–09시면 시각 쪽만 하루 전으로 읽혔다.
+  시간대는 `process.env.TZ` 를 테스트 안에서 바꿔 고정한다 (`lib/date/day.test.ts` 와 같은 방식).
+*/
+describe('tripPhaseOf — 브라우저 시간대가 서버와 달라도 출발 당일이다 (#1490)', () => {
+  const originalTz = process.env.TZ
+  afterEach(() => {
+    process.env.TZ = originalTz
+  })
+
+  // KST 10/15 03:00 — 서울 서버에게는 출발 당일, UTC 로는 아직 10/14 다
+  const SERVER_NOW = new Date('2026-10-15T03:00:00+09:00')
+
+  it('서버가 정한 칸을 로컬 정오로 세우면 UTC 브라우저에서도 오늘 1일차다', () => {
+    process.env.TZ = 'Asia/Seoul'
+    const todayIso = todayDay(SERVER_NOW)
+    expect(todayIso).toBe('2026-10-15')
+
+    process.env.TZ = 'UTC'
+    expect(tripPhaseOf('2026-10-15', '2026-10-17', todayFromDay(todayIso))).toEqual({
+      kind: 'ongoing',
+      day: 1,
+    })
+  })
+
+  it('시각을 그대로 넘기면 UTC 브라우저는 D-1 로 읽는다 — 고치기 전 목록 · 상세의 모양', () => {
+    process.env.TZ = 'UTC'
+    expect(tripPhaseOf('2026-10-15', '2026-10-17', new Date(SERVER_NOW.toISOString()))).toEqual({
+      kind: 'upcoming',
+      days: 1,
+    })
   })
 })

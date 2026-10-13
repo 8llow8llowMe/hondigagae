@@ -16,6 +16,7 @@ import {
   usePlanWeather,
 } from '@/features/plan/use-plan-detail'
 import { ApiError, isRetriable } from '@/lib/api/error'
+import { todayFromDay } from '@/lib/date/day'
 import { messages } from '@/lib/messages'
 import { planCompanionsOf } from '@/lib/plan/companion-pets'
 import { alternativePlaceIds } from '@/lib/plan/detail'
@@ -136,7 +137,7 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
       walkSafetyItems={walkSafety.data?.items ?? []}
       walkSafetyFailed={walkSafety.isError && isRetriable(walkSafety.error)}
       onRetryWalkSafety={() => void walkSafety.refetch()}
-      today={new Date(today)}
+      today={todayFromDay(today)}
     />
   )
 }
