@@ -4,6 +4,7 @@ import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.plan.adapter.out.client.feign.dto.PlaceWalkSafetyClientResponse;
 import java.time.LocalDateTime;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -17,6 +18,12 @@ import org.springframework.web.bind.annotation.RequestParam;
  *
  * <p>같은 대상 서비스를 여러 클라이언트가 호출하므로 {@code contextId} 를 반드시 다르게 준다
  * (coding-conventions §10).
+ *
+ * <p><b>{@code targetDateTime} 의 {@code @DateTimeFormat} 을 빼지 않는다 (#1419).</b> 없으면 Feign 이
+ * 값을 <b>요청 로케일의 SHORT 형식</b>으로 문자열화한다. BFF(Node fetch)는 {@code Accept-Language: *}
+ * 를 보내고 Tomcat 은 이를 {@code Locale.ROOT} 로 읽으므로 {@code 2026-10-15 10:00} 이 나가고,
+ * tour-service 는 이를 읽지 못해 400 을 준다 — 운영에서 일정 항목 산책 위험도가 전부
+ * {@code LOOKUP_FAILED} 였던 원인이다.
  */
 @FeignClient(
     name = "${feign-client.target-services.tour-service:tour-service}",
@@ -27,7 +34,8 @@ public interface PlaceWalkSafetyClient {
     @GetMapping("/api/v1/places/{placeId}/walk-safety")
     Response<PlaceWalkSafetyClientResponse> getWalkSafety(
         @PathVariable long placeId,
-        @RequestParam("targetDateTime") LocalDateTime targetDateTime,
+        @RequestParam("targetDateTime") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+        LocalDateTime targetDateTime,
         @RequestParam(name = "petSizeType", required = false) String petSizeType,
         @RequestParam("heatSensitive") boolean heatSensitive,
         @RequestParam("coldSensitive") boolean coldSensitive,
