@@ -4,6 +4,7 @@ import {
   isDayBefore,
   isDayWithin,
   parseDay,
+  serviceTodayDay,
   todayDay,
   todayFromDay,
   toDayString,
@@ -85,6 +86,55 @@ describe('todayFromDay (#1490)', () => {
   it('형식이 깨진 값은 던진다 — new Date() 로 메우면 #1490 이 조용히 돌아온다', () => {
     expect(() => todayFromDay('2026-02-31')).toThrow()
     expect(() => todayFromDay('2026-10-14T18:00:00.000Z')).toThrow()
+  })
+})
+
+/*
+  **#1499.** 담기 시트는 서버가 그린 적 없는 트리라 오늘을 브라우저에서 만든다. `todayDay(new Date())`
+  는 **브라우저 시간대**의 칸이라, 브라우저가 UTC 이고 KST 00–09시면 하루 이르다 — KST 기준 어제가
+  출발일 하한이 됐다. 서비스의 오늘(백엔드 `Clock` · 운영 컨테이너 `TZ`)은 서울 기준이므로,
+  클라이언트도 실행 환경 시간대와 무관하게 서울의 칸을 읽는다. 시간대는 위 #1490 과 같이 테스트
+  안에서 `process.env.TZ` 로 고정한다.
+*/
+describe('serviceTodayDay (#1499)', () => {
+  const originalTz = process.env.TZ
+  afterEach(() => {
+    process.env.TZ = originalTz
+  })
+
+  it('UTC 실행 환경에서 KST 새벽이면 KST 날짜다 — todayDay 는 하루 이르다', () => {
+    process.env.TZ = 'UTC'
+    const kstEarlyMorning = new Date('2026-10-15T08:30:00+09:00')
+
+    expect(serviceTodayDay(kstEarlyMorning)).toBe('2026-10-15')
+    // 예전 시트의 계산 — 브라우저 시간대(UTC)의 칸이라 KST 기준 어제다
+    expect(todayDay(kstEarlyMorning)).toBe('2026-10-14')
+  })
+
+  // UTC-12 ~ UTC+14 양 끝과 운영(서울) · 브라우저 기본값(UTC)
+  const ZONES = ['UTC', 'Asia/Seoul', 'America/Los_Angeles', 'Etc/GMT+12', 'Pacific/Kiritimati']
+
+  it.each(ZONES)('%s 에서 읽어도 서울의 칸이다 — 자정 직후 · 직전 모두', (zone) => {
+    process.env.TZ = zone
+
+    expect(serviceTodayDay(new Date('2026-10-15T00:00:00+09:00'))).toBe('2026-10-15')
+    expect(serviceTodayDay(new Date('2026-10-15T23:59:59+09:00'))).toBe('2026-10-15')
+    expect(serviceTodayDay(new Date('2026-12-31T23:59:59+09:00'))).toBe('2026-12-31')
+    expect(serviceTodayDay(new Date('2027-01-01T00:00:00+09:00'))).toBe('2027-01-01')
+  })
+
+  it('서울 시간대 프로세스(운영 서버)에서는 todayDay 와 같다 — 서버 페이지가 내린 오늘과 갈리지 않는다', () => {
+    process.env.TZ = 'Asia/Seoul'
+    const instants = [
+      '2026-10-15T00:00:00+09:00',
+      '2026-10-15T08:59:59+09:00',
+      '2026-10-15T23:59:59+09:00',
+    ]
+
+    for (const instant of instants) {
+      const now = new Date(instant)
+      expect(serviceTodayDay(now)).toBe(todayDay(now))
+    }
   })
 })
 
