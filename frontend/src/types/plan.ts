@@ -199,6 +199,13 @@ export const NO_PLACE_ITEM_REASON_CODE = 'NO_PLACE_ITEM'
  */
 export const PAST_DATE_REASON_CODE = 'PAST_DATE'
 
+/**
+ * 예보 범위 밖의 날 (#1426). **일자 카드가 문장을 말하지 않는다** — 날마다 같은 문장이라
+ * 일정 상단에서 한 번만 말하고(`planForecastNotice`) 일자에는 `예보 전` 칩만 붙는다.
+ * 문장 자체는 서버 것을 쓴다 — 예보 범위(11일)는 서버 상수다.
+ */
+export const BEYOND_FORECAST_RANGE_REASON_CODE = 'BEYOND_FORECAST_RANGE'
+
 /** `GET /plans/{planId}/weather` */
 export type PlanWeatherResponse = {
   planId: string

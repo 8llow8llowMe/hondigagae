@@ -440,6 +440,24 @@ describe('PlanItemRow', () => {
     expect(markup).toContain('직선 4.1km')
   })
 
+  it('항목 사이 거리 옆에 예상 이동 시간을 `약` 으로 붙인다 (#1426 · D27-3)', () => {
+    const markup = renderItemRow({
+      model: { item: planDetail.items[0]!, distanceMeters: 12_000, distanceKind: 'previous' },
+    })
+
+    // 12km × 1.3 ÷ 40km/h = 23.4분 → 10분 올림 30분 — AI 초안 담기의 근사와 같은 값이다
+    expect(markup).toContain('직선 12km 이동 · 약 30분')
+  })
+
+  it('숙소 기준 첫 줄에는 이동 시간을 붙이지 않는다 — 항목 사이 이동만 말한다', () => {
+    const markup = renderItemRow({
+      model: { item: planDetail.items[0]!, distanceMeters: 12_000, distanceKind: 'lodging' },
+    })
+
+    expect(markup).toContain('숙소에서 직선 12km')
+    expect(markup).not.toContain('약 30분')
+  })
+
   it('30km 이상은 경고 톤 + 문장이 함께 간다 — 색으로만 말하지 않는다', () => {
     const markup = renderItemRow({
       model: {
@@ -931,14 +949,15 @@ describe('PlanOverviewPanel — 일자별 적합도 목차 (#732 · #841)', () =
   })
 
   /*
-    **요약할 것이 없으면 목차가 아니라 한 문장이다** (#847). 예보 지평선보다 먼 일정 ·
-    지난 일정 · 장소를 안 담은 일정이 여기로 떨어진다 — 예전에는 `정보 없음` 일곱 줄이
-    353px 를 쓰면서 아무것도 요약하지 않았다 (D18-2).
+    **요약할 것이 없으면 구획을 내지 않는다** (#1426 · D27-2 — #847 의 "한 문장" 을 걷었다).
+    예보 지평선보다 먼 일정 · 지난 일정 · 장소를 안 담은 일정이 여기로 떨어진다. 이유는 일자 열
+    맨 위 예보 안내와 일자 카드가 각자 말하므로, 섹션 머리 + `확인할 수 있는 날이 없어요` 두 줄은
+    아무것도 요약하지 않으면서 개요 카드의 자리를 차지했다.
 
     **`nav` 가 없는 것까지 잰다.** 링크 없는 랜드마크는 링크 목록에도 로터에도 잡히지
     않으면서 이름만 차지한다 (#848 이 보는 경로와 같다).
   */
-  it('전부 정보 없음이면 목차가 한 문장으로 접힌다', () => {
+  it('전부 정보 없음이면 목차 구획이 통째로 없다 — 머리 · 구획선 · 빈 문장 모두', () => {
     const markup = renderOverview({
       verdicts: verdictsOf(7).map((verdict) => ({
         ...verdict,
@@ -946,25 +965,14 @@ describe('PlanOverviewPanel — 일자별 적합도 목차 (#732 · #841)', () =
         suitabilityLevel: null,
       })),
     })
+    const judged = renderOverview({ verdicts: verdictsOf(3) })
 
-    expect(markup).toContain(messages.plan.verdictTocAllUnavailable)
+    expect(markup).not.toContain(messages.plan.verdictTocTitle)
+    expect(markup).not.toContain('확인할 수 있는 날이 없어요')
     expect(tocAnchors(markup)).toHaveLength(0)
-    expect(markup).not.toContain(messages.plan.verdictTocUnavailable)
     expect(markup).not.toContain('<nav')
-  })
-
-  /* 조용히 사라지면 "여기 있던 요약이 어디 갔나" 가 된다 — 구획은 남고 내용만 바뀐다 */
-  it('접힌 갈래도 섹션 머리와 구획선을 남긴다', () => {
-    const markup = renderOverview({
-      verdicts: verdictsOf(3).map((verdict) => ({
-        ...verdict,
-        score: null,
-        suitabilityLevel: null,
-      })),
-    })
-
-    expect(markup).toContain(messages.plan.verdictTocTitle)
-    expect(markup.split('border-t pt-4')).toHaveLength(2 + 1)
+    // 목차가 선 화면보다 구획선이 하나 적다 — 다른 구획(동행 · D-N)은 그대로다
+    expect(markup.split('border-t pt-4').length).toBe(judged.split('border-t pt-4').length - 1)
   })
 
   /*

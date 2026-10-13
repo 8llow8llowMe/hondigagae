@@ -396,17 +396,23 @@ export const planMessages = {
   verdictTocTitle: '일자별 적합도',
   /** 목차에서 판정을 못 낸 날. 낮은 등급으로 칠하지 않고 점선 unknown 으로 둔다 */
   verdictTocUnavailable: '정보 없음',
+  /*
+    `verdictTocAllUnavailable`(`적합도를 확인할 수 있는 날이 없어요.`)는 걷었다 (#1426). 세울 줄이
+    0개면 목차 구획 자체를 내지 않는다 — `plan-overview-panel.tsx` 의 `PlanVerdictToc` 주석.
+  */
+
   /**
-   * 세울 줄이 하나도 남지 않았을 때 목차를 대신하는 한 문장 (#847).
+   * 예보 범위 밖 안내의 머리 (#1426 · D27-1). 일정 상단에 **한 번** 선다 — 아래에 서버 문장
+   * (`예보는 오늘부터 …` · `산책 위험도는 …`)이 그대로 붙는다.
    *
-   * **`아직` 을 쓰지 않는다.** 이 갈래로 떨어지는 사유는 넷이고(`unavailableReasonCode`)
-   * 그중 `PAST_DATE` 는 기다려도 풀리지 않는다 — `아직` 은 지난 일정에서 거짓이 된다.
-   *
-   * **이유를 여기서 말하지 않는다.** 사유는 일자마다 갈리고 문장은 서버가 준다 — 일자
-   * 카드가 각자 말하는 것을 목차가 하나로 뭉뚱그리면 틀린 날이 생긴다 (#717 이
-   * `dayBeyondForecastReason` 에 세운 것과 같은 규칙이다).
+   * **`아직` 을 쓴다** — 이 갈래는 `BEYOND_FORECAST_RANGE` 뿐이라 기다리면 풀린다. 지난 날
+   * (`PAST_DATE`)은 여기 오지 않는다.
    */
-  verdictTocAllUnavailable: '적합도를 확인할 수 있는 날이 없어요.',
+  forecastNoticeTitle: '아직 예보가 나오지 않은 날이 있어요',
+  /** 일자 제목 옆 칩 — 적합도 · 산책 위험도 둘 다 예보 밖인 날 (#1426) */
+  forecastPendingChip: '예보 전',
+  /** 일자 제목 옆 칩 — 적합도는 났고 산책 위험도만 예보 밖인 날 (#1426) */
+  walkForecastPendingChip: '산책 위험도 예보 전',
   /**
    * 개요 스트립에 다 세우지 못한 일자 수 (#732). `{count}` 치환.
    *
@@ -467,7 +473,11 @@ export const planMessages = {
    * `4.1km` 만 쓰면 주행거리로 읽힌다. `{distance}` 치환.
    */
   distanceFromLodging: '숙소에서 직선 {distance}',
-  distanceFromPrevious: '직선 {distance} 이동',
+  /**
+   * `{duration}` 은 `travelDurationLabel` 결과(#1426 · D27-3) — 직선거리로 어림한 값이라 `약` 을
+   * 붙인다. AI 초안 담기가 시각을 잇는 근사와 같은 함수다.
+   */
+  distanceFromPrevious: '직선 {distance} 이동 · 약 {duration}',
   /**
    * `{distance}` 치환. 실내 대안 행 — **그날 기준 장소로부터**의 거리다.
    * 서버가 하버사인으로 재 주므로 화면이 계산하지 않지만, `직선` 은 똑같이 붙인다.
