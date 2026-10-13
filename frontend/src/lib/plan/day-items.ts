@@ -1,10 +1,16 @@
 import { messages } from '@/lib/messages'
+import { isCafePlace } from '@/lib/place/cafe'
 import { insertedStartTime } from '@/lib/plan/default-start-time'
 import { isPlaceTarget } from '@/lib/plan/detail'
 import { formatStartTime } from '@/lib/plan/start-time'
 import { hasBackwardTime, realignedStartTimes } from '@/lib/plan/time-order'
 import { withObjectParticle } from '@/lib/text/korean'
-import type { PlanDayItemsReplacePayload, PlanItemDetail, PlanItemPayload } from '@/types/plan'
+import type {
+  PlanDayItemsReplacePayload,
+  PlanItemDetail,
+  PlanItemPayload,
+  PlanItemTypeCode,
+} from '@/types/plan'
 
 /**
  * 일자 편집모드의 순수 로직 — 이동 · 삭제 표시 · 요청 본문 조립.
@@ -264,6 +270,33 @@ function insertItemPayload(
   }
 }
 
+/** 장소 담기가 싣는 항목 유형 — 담기 경로는 이 둘만 만든다. 숙박(`LODGING`)은 담기 밖이다 */
+export type AddedPlaceItemType = Extract<PlanItemTypeCode, 'PLACE' | 'MEAL'>
+
+/** 담을 장소 하나. `itemType` 은 `placeItemTypeOf` 로 판정한 값이다 */
+export type AddedPlace = { placeId: string; title: string; itemType: AddedPlaceItemType }
+
+/**
+ * 담을 장소의 일정 항목 유형 (#1447 · 일정상세-세부명세 D26-5).
+ *
+ * **음식점(`contentType.code === 'RESTAURANT'`)이면 `MEAL`, 아니면 `PLACE`.** 상세 응답의
+ * `PlanItemPlace` 에는 `contentType` 이 없어 일정 화면은 담긴 항목이 음식점인지 모른다 — 장소를
+ * 아는 것은 담는 순간뿐이라 여기서 가른다. 그래야 확정 전 점검(`confirm-check.ts`)의 식사 판정
+ * (`itemType.code === 'MEAL'`)이 음식점을 담은 날을 "식사 없음" 으로 잘못 묻지 않는다.
+ *
+ * **카페는 `PLACE` 다.** 원천상 `RESTAURANT` 이지만(`isCafePlace`) 끼니가 아니다 — 카페만 담은 날은
+ * 식사를 물어야 맞다. 판정은 `isCafePlace` 하나를 쓴다(목록 · 지도 핀과 같은 판정).
+ *
+ * `MEAL` 의 저장 계약은 `PLACE` 와 같다 — `targetId` 는 `place.id` 이고 서버가 같은 검증을 한다
+ * (`PlanItemRequest.targetId` · `verifyPlaceTargets`).
+ */
+export function placeItemTypeOf(place: {
+  contentType: { code: string }
+  sourceCategory: string | null
+}): AddedPlaceItemType {
+  return place.contentType.code === 'RESTAURANT' && !isCafePlace(place) ? 'MEAL' : 'PLACE'
+}
+
 /**
  * 그 일자에 장소 하나를 담은 일괄 교체 본문 — **끝에 붙은 숙박 앞, 없으면 맨 끝** (#1175).
  *
@@ -271,7 +304,9 @@ function insertItemPayload(
  * 전부 되싣고 하나를 더한 목록을 보낸다 — 되싣지 않으면 그 일자가 새 항목 하나만
  * 남기고 비워진다 (E1).
  *
- * `itemType` 은 **`PLACE` 고정**이다. 식사·숙박 구분은 이 이슈 밖이다. **`WALK` 담기는
+ * `itemType` 은 **호출부가 `placeItemTypeOf` 로 판정해 넘긴다** (#1447) — 음식점은 `MEAL`, 나머지는
+ * `PLACE` 다. 예전(#1175)에는 `PLACE` 고정이라 음식점을 담은 날도 확정 전 점검이 "식사 없음" 을 냈다
+ * (일정상세 D26-5). **`WALK` 담기는
  * 이 함수를 쓰지 않는다** — [#382](https://github.com/8llow8llowMe/hondigagae/issues/382)로
  * `walk_course` 조회 API 가 생겨 더 이상 막힌 것이 아니고, `appendWalkCourseItemPayload`
  * (아래)가 자매 함수로 따로 있다 — 중복 판정(`placeIdsOf` vs `walkCourseIdsOf`)과 `title`
@@ -283,10 +318,10 @@ function insertItemPayload(
 export function appendPlaceItemPayload(
   items: PlanItemDetail[],
   day: number,
-  place: { placeId: string; title: string },
+  place: AddedPlace,
 ): PlanDayItemsReplacePayload {
   return insertItemPayload(items, day, {
-    itemType: 'PLACE',
+    itemType: place.itemType,
     // 문자열 그대로다 — Snowflake 라 Number() 를 거치면 정밀도를 잃는다 (E1 규칙 1)
     targetId: place.placeId,
     title: place.title.slice(0, ITEM_TITLE_MAX),

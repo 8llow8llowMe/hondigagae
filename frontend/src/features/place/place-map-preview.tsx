@@ -17,6 +17,7 @@ import { PlaceAddToPlanSheet } from '@/features/plan/place-add-to-plan-sheet'
 import { toPetCondition } from '@/lib/api/insight'
 import { messages } from '@/lib/messages'
 import { copyText, placeShareUrl, sharePlace } from '@/lib/place/share'
+import { placeItemTypeOf } from '@/lib/plan/day-items'
 import type { PlaceSummary } from '@/types/place'
 
 /**
@@ -56,6 +57,12 @@ export function PlaceMapPreview({
   const [added, setAdded] = useState(false)
 
   const title = summary?.title ?? detail.data?.title ?? null
+  /*
+    담기 항목 유형 — 음식점은 식사(`MEAL`)로 담는다 (#1447 · 일정상세 D26-5). 제목과 같은 출처
+    (요약 먼저, 없으면 상세)를 본다. 둘 다 없으면 담기 시트가 서지 않는다(`title !== null`).
+  */
+  const placeSource = summary ?? detail.data ?? null
+  const itemType = placeSource === null ? 'PLACE' : placeItemTypeOf(placeSource)
   const { showToast } = useToast()
 
   /*
@@ -147,7 +154,7 @@ export function PlaceMapPreview({
           <PlaceAddToPlanSheet
             open={addOpen}
             onClose={() => setAddOpen(false)}
-            place={{ placeId, title }}
+            place={{ placeId, title, itemType }}
             onAdded={() => setAdded(true)}
           />
           {/* 로그인 뒤에는 상세로 돌아간다 (`returnTo` 가 상세 고정) — 담으려던 장소는 기억된다 */}

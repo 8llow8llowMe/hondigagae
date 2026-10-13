@@ -10,6 +10,7 @@ import { planKeys } from '@/features/plan/queries'
 import { replaceDayItems } from '@/lib/api/plan'
 import { messages } from '@/lib/messages'
 import {
+  type AddedPlace,
   addPlaceToastMessage,
   appendPlaceItemPayload,
   insertedItemStartTime,
@@ -64,7 +65,8 @@ export function usePlanAddPlace({
       day: number
       /** 그 일자의 **현재 항목 전부**. 되싣지 않으면 일자가 비워진다 */
       dayItems: PlanItemDetail[]
-      place: { placeId: string; title: string }
+      /** `itemType` 은 호출부가 `placeItemTypeOf` 로 판정한다 — 음식점은 `MEAL` (#1447) */
+      place: AddedPlace
     }) => {
       if (addingRef.current) return
       addingRef.current = true

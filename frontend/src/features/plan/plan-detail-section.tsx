@@ -553,7 +553,15 @@ export function PlanDetailSection({
                   day: group.day,
                   // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
                   dayItems: group.items,
-                  place: alternative,
+                  /*
+                    **실내 대안은 `PLACE` 로 담는다.** 대안 항목(`PlanAlternativePlaceItem`)에는
+                    `contentType` 이 없어 음식점인지 알 수 없다 (#1447 · 일정상세 D26-5).
+                  */
+                  place: {
+                    placeId: alternative.placeId,
+                    title: alternative.title,
+                    itemType: 'PLACE',
+                  },
                 }),
               onAddMove: () => openMoveAdd(group.day),
             }}

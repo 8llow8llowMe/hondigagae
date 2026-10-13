@@ -17,6 +17,7 @@ import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { toPetCondition } from '@/lib/api/insight'
 import { CONGESTION_DEFAULT_DAYS, type CongestionDays } from '@/lib/insight/congestion'
 import { writeRecentPlaceId } from '@/lib/insight/recent-place'
+import { placeItemTypeOf } from '@/lib/plan/day-items'
 
 /**
  * 로그인 후 돌아왔을 때 담기 시트를 다시 열라는 표시 (아트보드 04 ④).
@@ -170,7 +171,8 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
         <PlaceAddToPlanSheet
           open={addOpen}
           onClose={() => setAddOpen(false)}
-          place={{ placeId, title }}
+          // 음식점은 식사(`MEAL`)로 담는다 (#1447 · 일정상세 D26-5)
+          place={{ placeId, title, itemType: placeItemTypeOf(query.data) }}
           onAdded={() => setAdded(true)}
         />
       )}
