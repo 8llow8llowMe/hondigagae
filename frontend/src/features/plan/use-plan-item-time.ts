@@ -11,6 +11,7 @@ import { changeItemStartTime } from '@/lib/api/plan'
 import { messages } from '@/lib/messages'
 import { toItemStartTimeError } from '@/lib/plan/item-time-error'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
+import { fillTemplate } from '@/lib/text/template'
 import type { PlanItemDetail } from '@/types/plan'
 
 /**
@@ -117,10 +118,12 @@ export function usePlanItemTime({
             ])
 
             showToast({
-              message: (startTime === null
-                ? messages.plan.itemTimeClearedToast
-                : messages.plan.itemTimeSavedToast
-              ).replace('{title}', target.title),
+              message: fillTemplate(
+                startTime === null
+                  ? messages.plan.itemTimeClearedToast
+                  : messages.plan.itemTimeSavedToast,
+                { title: target.title },
+              ),
             })
             onSaved?.()
           },

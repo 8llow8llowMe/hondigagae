@@ -7,6 +7,7 @@ import {
   type PlanDayGroup,
   planItemMapCoord,
 } from '@/lib/plan/detail'
+import { fillTemplate } from '@/lib/text/template'
 import type { PlanDetail, PlanItemDetail } from '@/types/plan'
 
 /**
@@ -135,14 +136,14 @@ export function addPlaceNearbyCaption(basis: AddPlaceFocusBasis | null): string 
       : basis.item.title
 
   if (basis.item.itemType.code === 'WALK') {
-    return messages.plan.addPlaceNearbyCaptionWalk.replace('{name}', name)
+    return fillTemplate(messages.plan.addPlaceNearbyCaptionWalk, { name })
   }
   const template = {
     previous: messages.plan.addPlaceNearbyCaptionPrevious,
     lodging: messages.plan.addPlaceNearbyCaptionLodging,
     'previous-lodging': messages.plan.addPlaceNearbyCaptionPreviousLodging,
   }[basis.kind]
-  return template.replace('{name}', name)
+  return fillTemplate(template, { name })
 }
 
 /**
@@ -156,6 +157,6 @@ export function addPlaceNearbyCaption(basis: AddPlaceFocusBasis | null): string 
 export function addPlaceFocusMarkerName(basis: AddPlaceFocusBasis | null): string | null {
   if (basis === null) return null
   return basis.item.itemType.code === 'WALK'
-    ? messages.plan.addPlaceFocusWalkStart.replace('{name}', basis.item.title)
+    ? fillTemplate(messages.plan.addPlaceFocusWalkStart, { name: basis.item.title })
     : basis.item.title
 }

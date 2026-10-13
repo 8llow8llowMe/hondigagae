@@ -35,6 +35,7 @@ import {
   validatePackingAdd,
   withCheckedItem,
 } from '@/lib/plan/packing'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { PlanPackingDetailItem, PlanPackingListResponse } from '@/types/plan'
@@ -608,7 +609,7 @@ function PackingRow({
         <button
           type="button"
           onClick={() => onRemove(item.packingItemId)}
-          aria-label={messages.plan.packingRemoveLabel.replace('{name}', item.name)}
+          aria-label={fillTemplate(messages.plan.packingRemoveLabel, { name: item.name })}
           className="text-fg-muted hover:text-fg focus-visible:ring-brand-500 inline-flex h-11 w-11 shrink-0 items-center justify-center focus-visible:ring-2 focus-visible:outline-none"
         >
           <CloseIcon className="h-4 w-4" />
@@ -697,10 +698,9 @@ function AddSection({
         {...(categories.length === 0
           ? {}
           : {
-              hint: messages.plan.packingAddCategoryHint.replace(
-                '{categories}',
-                categories.join(' · '),
-              ),
+              hint: fillTemplate(messages.plan.packingAddCategoryHint, {
+                categories: categories.join(' · '),
+              }),
             })}
         {...(errors.category === undefined ? {} : { error: errors.category })}
       >

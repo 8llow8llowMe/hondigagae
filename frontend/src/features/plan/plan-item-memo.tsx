@@ -5,6 +5,7 @@ import { useId, useState } from 'react'
 import { Button } from '@/components/button'
 import { messages } from '@/lib/messages'
 import type { PlanItemMemoView } from '@/lib/plan/item-memo'
+import { fillTemplate } from '@/lib/text/template'
 import { cn } from '@/lib/utils/cn'
 
 type PlanItemMemoProps = {
@@ -88,10 +89,10 @@ export function PlanItemMemoText({
               size="sm"
               aria-expanded={expanded}
               aria-controls={bodyId}
-              aria-label={(expanded
-                ? messages.plan.itemMemoLessLabel
-                : messages.plan.itemMemoMoreLabel
-              ).replace('{title}', title)}
+              aria-label={fillTemplate(
+                expanded ? messages.plan.itemMemoLessLabel : messages.plan.itemMemoMoreLabel,
+                { title },
+              )}
               onClick={onToggle}
               // 넓은 폭에서 접지 않는 길이면 버튼도 없다 — 눌러도 아무 일이 없는 버튼이 된다
               className={cn('z-10', memo.collapse === 'mobile' && 'md:hidden')}
@@ -105,7 +106,7 @@ export function PlanItemMemoText({
               size="sm"
               aria-haspopup="dialog"
               data-plan-memo-edit={edit.focusKey}
-              aria-label={messages.plan.itemMemoEditLabel.replace('{title}', title)}
+              aria-label={fillTemplate(messages.plan.itemMemoEditLabel, { title })}
               onClick={edit.onOpen}
               // 늘린 링크(`::after`) 위에 서야 눌린다 — 시간 칩 · `더 보기` 와 같은 로컬 레이어
               className="z-10"

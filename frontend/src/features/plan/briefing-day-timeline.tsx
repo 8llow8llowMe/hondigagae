@@ -12,6 +12,7 @@ import { messages } from '@/lib/messages'
 import type { BriefingTarget } from '@/lib/plan/briefing'
 import { basisItemId, nextDestination, toPlanRouteModel } from '@/lib/plan/briefing-day'
 import { planItemMapCoord } from '@/lib/plan/detail'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { PlanItemDetail } from '@/types/plan'
@@ -95,7 +96,9 @@ export function BriefingDayTimeline({
       {/* 기준 장소가 그날 항목에 없는 갈래 (D15-3) */}
       {basisId === null && representativePlaceTitle !== null && (
         <p className="text-caption text-fg-muted break-keep">
-          {messages.plan.briefingScheduleBasisPlace.replace('{title}', representativePlaceTitle)}
+          {fillTemplate(messages.plan.briefingScheduleBasisPlace, {
+            title: representativePlaceTitle,
+          })}
         </p>
       )}
 
@@ -114,7 +117,7 @@ export function BriefingDayTimeline({
           rel="noopener noreferrer"
           className="border-border-strong text-fg hover:bg-band focus-visible:ring-brand-500 text-body-2 flex h-11 items-center justify-center rounded-md border px-4 font-semibold break-keep focus-visible:ring-2 focus-visible:outline-none"
         >
-          {messages.plan.briefingScheduleDirections.replace('{title}', next.title)}
+          {fillTemplate(messages.plan.briefingScheduleDirections, { title: next.title })}
         </a>
       )}
 

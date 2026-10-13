@@ -1,4 +1,5 @@
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 
 type EmptyCopy = { title: string; description: string }
 
@@ -14,7 +15,7 @@ type EmptyCopy = { title: string; description: string }
  */
 export function searchEmptyCopy(keyword: string): EmptyCopy {
   return {
-    title: messages.place.searchEmptyTitle.replace('{keyword}', keyword),
+    title: fillTemplate(messages.place.searchEmptyTitle, { keyword }),
     description: /\s/.test(keyword.trim())
       ? messages.place.searchEmptyMultiWordDescription
       : messages.place.searchEmptyDescription,
@@ -54,7 +55,7 @@ export function mapEmptyCopy({
   if (keyword !== null && fetchedCount === 0) {
     if (radiusBounded) {
       return {
-        title: messages.map.searchEmptyInRangeTitle.replace('{keyword}', keyword),
+        title: fillTemplate(messages.map.searchEmptyInRangeTitle, { keyword }),
         description: messages.map.searchEmptyInRangeDescription,
         action: 'searchWider',
       }

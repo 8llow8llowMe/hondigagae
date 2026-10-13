@@ -14,6 +14,7 @@ import { messages } from '@/lib/messages'
 import { isPetSizeCode } from '@/lib/pet/form'
 import { toPlaceFilterWeight } from '@/lib/pet/weight'
 import { withParenthesizedParticle, withSubjectParticle } from '@/lib/text/korean'
+import { fillTemplate } from '@/lib/text/template'
 import type { Pet } from '@/types/pet'
 import type { PlaceFilters } from '@/types/place'
 
@@ -108,10 +109,9 @@ export function PetSizeField({
           (`withParenthesizedParticle` 주석). 크기 이름 셋이 모두 받침으로 끝나므로
           `가` 로 박아 두었을 때는 모든 경우가 비문이었다.
         */}
-        {messages.place.filterPetSizeLabelFor.replace(
-          '{nameWithSize}',
-          withParenthesizedParticle(pet.name, pet.sizeType.name, withSubjectParticle),
-        )}
+        {fillTemplate(messages.place.filterPetSizeLabelFor, {
+          nameWithSize: withParenthesizedParticle(pet.name, pet.sizeType.name, withSubjectParticle),
+        })}
       </FilterCheck>
     </FilterList>
   )

@@ -5,6 +5,7 @@ import { Button, ButtonLink } from '@/components/button'
 import { toLoginHref } from '@/features/nav/menu-items'
 import { messages } from '@/lib/messages'
 import { withObjectParticle } from '@/lib/text/korean'
+import { fillTemplate } from '@/lib/text/template'
 
 /**
  * 미로그인이 담기·저장을 눌렀을 때 — 아트보드 `혼디가개 장소 상세` 04 ④.
@@ -32,9 +33,10 @@ export function PlaceLoginPromptSheet({
   const withParticle = withObjectParticle(place.title)
 
   const title = intent === 'add' ? messages.plan.addToPlanLoginTitle : messages.favorite.loginTitle
-  const description = (
-    intent === 'add' ? messages.plan.addToPlanLoginDescription : messages.favorite.loginDescription
-  ).replace('{title}', withParticle)
+  const description = fillTemplate(
+    intent === 'add' ? messages.plan.addToPlanLoginDescription : messages.favorite.loginDescription,
+    { title: withParticle },
+  )
 
   const returnTo = intent === 'add' ? `/places/${place.placeId}?add=1` : `/places/${place.placeId}`
 

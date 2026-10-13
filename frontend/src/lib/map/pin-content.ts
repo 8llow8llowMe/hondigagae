@@ -21,6 +21,7 @@
 import { clusterMarkerLabel, clusterMarkerText } from '@/lib/map/cluster'
 import type { MapPinIcon } from '@/lib/map/pin-icons'
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 
 /**
  * 원 핀의 이름 알약이 **상시** 서는 가장 먼 줌 — 카카오 level 6(500m 축척, #1280 D1).
@@ -255,14 +256,14 @@ function classNames(names: (string | false)[], interactive: boolean): string {
  * 같은 `PinContent` 타입이라 applier(`markerElement`)가 하나로 남는다 — `clusterContent` 와 같은 이유.
  */
 export function focusMarkerContent(name: string): PinContent {
-  const label = messages.map.focusMarkerText.replace('{name}', name)
+  const label = fillTemplate(messages.map.focusMarkerText, { name })
   return {
     tag: 'div',
     role: 'img',
     className: 'map-pin map-pin-static map-pin-focus',
     text: null,
     label,
-    ariaLabel: messages.map.focusMarkerLabel.replace('{name}', name),
+    ariaLabel: fillTemplate(messages.map.focusMarkerLabel, { name }),
     ariaPressed: null,
     icon: null,
   }

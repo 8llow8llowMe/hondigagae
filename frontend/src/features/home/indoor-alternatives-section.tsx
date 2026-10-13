@@ -6,6 +6,7 @@ import { Surface, SurfaceList } from '@/components/surface'
 import { formatDistance } from '@/lib/format/distance'
 import type { IndoorAlternative } from '@/lib/insight/indoor'
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 
 /**
  * 비 예보일 때의 실내 대안 — 홈-세부명세 D1(데스크톱 우측 "비 올 때 실내") · D5-1 §13.
@@ -61,9 +62,10 @@ function IndoorAlternativeRow({ alternative }: { alternative: IndoorAlternative 
             {alternative.title}
           </span>
           <span className="text-caption text-fg-muted mt-1 font-medium tabular-nums">
-            {messages.home.indoorDistance
-              .replace('{place}', alternative.nearPlaceTitle)
-              .replace('{distance}', formatDistance(alternative.distanceMeters))}
+            {fillTemplate(messages.home.indoorDistance, {
+              place: alternative.nearPlaceTitle,
+              distance: formatDistance(alternative.distanceMeters),
+            })}
           </span>
         </span>
 

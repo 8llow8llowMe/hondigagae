@@ -41,6 +41,7 @@ import { hoursHeadline } from '@/lib/place/hours'
 import { indoorLabel } from '@/lib/place/indoor'
 import { toPlainText } from '@/lib/place/text'
 import { withCompanionParticle } from '@/lib/text/korean'
+import { fillTemplate } from '@/lib/text/template'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceSuitabilityResponse, WalkSafetyResponse } from '@/types/insight'
 import type { PlaceDetail, PlaceSummary } from '@/types/place'
@@ -612,7 +613,9 @@ function PreviewVerdictCard({
         <h3 id={headingId} className="text-caption text-fg-muted font-semibold">
           {petName === null
             ? messages.map.previewVerdictHeadNoPet
-            : messages.map.previewVerdictHead.replace('{pet}', withCompanionParticle(petName))}
+            : fillTemplate(messages.map.previewVerdictHead, {
+                pet: withCompanionParticle(petName),
+              })}
         </h3>
 
         {suitability.loading ? (
@@ -762,7 +765,8 @@ function PreviewUseInfo({
   const hasHours = hoursFirst !== null || rest !== null
   if (!hasHours && parking === null && address === null && moreRows.length === 0) return null
 
-  const restLine = rest === null ? null : messages.map.previewRestDate.replace('{value}', rest)
+  const restLine =
+    rest === null ? null : fillTemplate(messages.map.previewRestDate, { value: rest })
 
   return (
     <section aria-labelledby={headingId} className={cn('flex flex-col gap-1', className)}>

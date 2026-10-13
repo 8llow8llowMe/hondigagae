@@ -16,6 +16,7 @@ import { toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
 import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { KEYWORD_MAX_LENGTH, normalizeKeyword } from '@/lib/url/keyword'
 import { DEFAULT_PLACE_FILTERS } from '@/lib/url/place-filters'
@@ -329,7 +330,7 @@ function SearchPanel({
         <EmptyState
           inset="panel"
           headingLevel={3}
-          title={messages.place.searchEmptyTitle.replace('{keyword}', keyword)}
+          title={fillTemplate(messages.place.searchEmptyTitle, { keyword })}
           description={messages.aiPlan.pickerSearchEmptyDescription}
         />
       ) : (

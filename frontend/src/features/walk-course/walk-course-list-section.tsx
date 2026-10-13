@@ -16,6 +16,7 @@ import { classify } from '@/lib/api/error'
 import { toMessage } from '@/lib/api/response'
 import { formatDuration } from '@/lib/format/duration'
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import { hasCoordinates } from '@/lib/walk-course/coordinates'
@@ -218,7 +219,7 @@ function basisLine({ petName, levelName, maxDurationMinutes }: WalkCourseBasis):
     return filled(messages.walkCourse.activityBasisWithoutPet)
   }
 
-  return filled(messages.walkCourse.activityBasis).replace('{pet}', petName)
+  return fillTemplate(filled(messages.walkCourse.activityBasis), { pet: petName })
 }
 
 /**

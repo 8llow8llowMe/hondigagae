@@ -6,6 +6,7 @@ import { PlaceRowContent } from '@/features/place/place-row'
 import { messages } from '@/lib/messages'
 import { addPlaceConfirmNotice, type AddPlaceConfirmReason } from '@/lib/plan/add-place-confirm'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
+import { fillTemplate } from '@/lib/text/template'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import type { PlaceSummary } from '@/types/place'
 
@@ -85,10 +86,12 @@ export function PlanAddPlaceRow({
               size="md"
               loading={pending}
               disabled={disabled && !pending}
-              aria-label={(confirmReason === null
-                ? messages.plan.addPlaceLabel
-                : messages.plan.addPlaceConfirmLabel
-              ).replace('{title}', place.title)}
+              aria-label={fillTemplate(
+                confirmReason === null
+                  ? messages.plan.addPlaceLabel
+                  : messages.plan.addPlaceConfirmLabel,
+                { title: place.title },
+              )}
               onClick={() => onAdd(place)}
             >
               {messages.plan.addPlaceShort}

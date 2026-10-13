@@ -1,4 +1,5 @@
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 import type { Pet } from '@/types/pet'
 
 /**
@@ -45,9 +46,7 @@ export function companionLabel(names: readonly string[]): string | null {
   if (first === undefined) return null
   if (names.length === 1) return first
 
-  return messages.plan.companionMore
-    .replace('{name}', first)
-    .replace('{count}', String(names.length - 1))
+  return fillTemplate(messages.plan.companionMore, { name: first, count: String(names.length - 1) })
 }
 
 /**

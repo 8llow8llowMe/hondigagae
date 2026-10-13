@@ -9,6 +9,7 @@ import { Modal } from '@/components/modal'
 import { Textarea } from '@/components/textarea'
 import { messages } from '@/lib/messages'
 import { ITEM_MEMO_MAX } from '@/lib/plan/item-memo-edit'
+import { fillTemplate } from '@/lib/text/template'
 
 /** 입력 id. `Field` 의 `htmlFor` 와 `Textarea` 의 `id` 가 같아야 라벨이 붙는다 */
 export const PLAN_ITEM_MEMO_INPUT_ID = 'plan-item-memo'
@@ -71,7 +72,7 @@ export function PlanItemMemoEditView({
     <Modal
       open={open}
       onClose={onClose}
-      title={messages.plan.itemMemoModalTitle.replace('{title}', title)}
+      title={fillTemplate(messages.plan.itemMemoModalTitle, { title })}
       description={messages.plan.itemMemoModalDescription}
       {...(inputRef === undefined ? {} : { initialFocusRef: inputRef })}
       size="md"

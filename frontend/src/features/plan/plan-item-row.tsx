@@ -24,6 +24,7 @@ import { travelDurationLabel } from '@/lib/plan/travel-time'
 import { visitToggleForm } from '@/lib/plan/visit-toggle'
 import { walkCourseMetaLine } from '@/lib/plan/walk-course-meta'
 import { itemWalkSafetyView } from '@/lib/plan/walk-safety'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { PlanItemWalkSafetyItem } from '@/types/plan'
@@ -592,7 +593,7 @@ function PlanItemTimeChip({
         size="sm"
         aria-haspopup="dialog"
         data-plan-time-chip={focusKey}
-        aria-label={messages.plan.itemTimeAddLabel.replace('{title}', title)}
+        aria-label={fillTemplate(messages.plan.itemTimeAddLabel, { title })}
         leading={<ClockIcon size={16} />}
         onClick={onOpen}
         className="z-10 -ml-3"
@@ -608,9 +609,7 @@ function PlanItemTimeChip({
       size="sm"
       aria-haspopup="dialog"
       data-plan-time-chip={focusKey}
-      aria-label={messages.plan.itemTimeEditLabel
-        .replace('{title}', title)
-        .replace('{time}', startTime)}
+      aria-label={fillTemplate(messages.plan.itemTimeEditLabel, { title, time: startTime })}
       leading={<ClockIcon size={16} />}
       onClick={onOpen}
       className="z-10 tabular-nums"

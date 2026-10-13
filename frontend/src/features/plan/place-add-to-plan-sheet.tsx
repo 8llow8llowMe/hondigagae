@@ -40,6 +40,7 @@ import { groupItemsByDay } from '@/lib/plan/detail'
 import { toPlanCreatePayload } from '@/lib/plan/form'
 import { toPlanDaySaveError } from '@/lib/plan/save-error'
 import { withTopicParticle } from '@/lib/text/korean'
+import { fillTemplate } from '@/lib/text/template'
 import { EMPTY_PLAN_FORM_VALUES, type PlanDetail, type PlanFormValues } from '@/types/plan'
 
 /**
@@ -304,7 +305,7 @@ function CreatePlanForm({
   return (
     <div className="px-4 pb-4">
       <p className="text-body-2 text-fg-muted pb-4 break-keep">
-        {messages.plan.addToPlanCreateHint.replace('{title}', withTopicParticle(place.title))}
+        {fillTemplate(messages.plan.addToPlanCreateHint, { title: withTopicParticle(place.title) })}
       </p>
 
       <FormAlert message={add.error} />

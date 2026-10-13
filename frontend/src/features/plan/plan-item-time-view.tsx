@@ -8,6 +8,7 @@ import { ChevronDownIcon } from '@/components/icons'
 import { Modal } from '@/components/modal'
 import { messages } from '@/lib/messages'
 import { CLOCK_MAX, type ClockField, formatClockPart } from '@/lib/plan/clock-time'
+import { fillTemplate } from '@/lib/text/template'
 
 const FORM_ID = 'plan-item-time-form'
 
@@ -95,7 +96,7 @@ export function PlanItemTimeView({
     <Modal
       open={open}
       onClose={onClose}
-      title={messages.plan.itemTimeModalTitle.replace('{title}', title)}
+      title={fillTemplate(messages.plan.itemTimeModalTitle, { title })}
       /*
         **초기화 경고가 없다** (#1053). 저장이 단건 API 라 그 날의 `다녀옴` 체크가 남는다 —
         #1028 의 일괄 교체 시절에는 체크된 날에만 이 자리에 한 줄을 더 냈다.

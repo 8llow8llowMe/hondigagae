@@ -23,6 +23,7 @@ import { messages } from '@/lib/messages'
 import { canCopyPlan } from '@/lib/plan/copy'
 import { shareMenuState } from '@/lib/plan/share-link'
 import { PLAN_STATUS_ACTION_LABELS, type PlanStatusActionSpec } from '@/lib/plan/status-action'
+import { fillTemplate } from '@/lib/text/template'
 import type { Pet } from '@/types/pet'
 import type { PlanDetail } from '@/types/plan'
 
@@ -284,7 +285,7 @@ export function PlanManageMenu({
           setErrorMessage(null)
         }}
         onConfirm={handleConfirm}
-        title={messages.plan.deleteConfirmTitle.replace('{title}', plan.title)}
+        title={fillTemplate(messages.plan.deleteConfirmTitle, { title: plan.title })}
         description={messages.plan.deleteConfirmDescription}
         confirmLabel={messages.plan.deleteAction}
         cancelLabel={messages.plan.editCancel}

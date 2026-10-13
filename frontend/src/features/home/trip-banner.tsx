@@ -3,6 +3,7 @@ import { Surface } from '@/components/surface'
 import { messages } from '@/lib/messages'
 import { formatPlanDay } from '@/lib/plan/date'
 import type { TripBanner } from '@/lib/plan/trip-banner'
+import { fillTemplate } from '@/lib/text/template'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -44,9 +45,10 @@ function titleOf(banner: TripBanner): string {
     case 'EVE':
       return messages.plan.briefingBannerEveTitle
     case 'SOON':
-      return messages.home.tripBannerSoonTitle
-        .replace('{days}', String(banner.days))
-        .replace('{title}', banner.plan.title)
+      return fillTemplate(messages.home.tripBannerSoonTitle, {
+        days: String(banner.days),
+        title: banner.plan.title,
+      })
   }
 }
 

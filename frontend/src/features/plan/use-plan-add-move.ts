@@ -12,6 +12,7 @@ import { messages } from '@/lib/messages'
 import { appendMoveItemPayload } from '@/lib/plan/day-items'
 import { type PlanDaySaveError, toPlanDaySaveError } from '@/lib/plan/save-error'
 import { withObjectParticle } from '@/lib/text/korean'
+import { fillTemplate } from '@/lib/text/template'
 import type { PlanItemDetail } from '@/types/plan'
 
 /**
@@ -84,9 +85,10 @@ export function usePlanAddMove({
             void invalidatePlanBriefing(queryClient, planId)
 
             showToast({
-              message: messages.plan.addMoveToast
-                .replace('{title}', withObjectParticle(sentTitle))
-                .replace('{day}', String(day)),
+              message: fillTemplate(messages.plan.addMoveToast, {
+                title: withObjectParticle(sentTitle),
+                day: String(day),
+              }),
             })
             onAdded?.(day)
           },

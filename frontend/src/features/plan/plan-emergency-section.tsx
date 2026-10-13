@@ -5,6 +5,7 @@ import { PhoneIcon } from '@/components/icons'
 import { Surface, SurfaceList } from '@/components/surface'
 import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type {
@@ -224,7 +225,7 @@ function FacilityRow({ facility }: { facility: PlanEmergencyFacility }) {
 
       <a
         href={`tel:${facility.tel.replace(/[^\d+]/g, '')}`}
-        aria-label={messages.plan.emergencyCallLabel.replace('{name}', facility.name)}
+        aria-label={fillTemplate(messages.plan.emergencyCallLabel, { name: facility.name })}
         className="border-border text-fg hover:bg-band focus-visible:ring-brand-500 flex size-11 shrink-0 items-center justify-center rounded-md border transition-colors focus-visible:ring-2 focus-visible:outline-none"
       >
         <PhoneIcon size={20} />

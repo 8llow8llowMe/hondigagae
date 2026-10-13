@@ -40,6 +40,7 @@ import { toPlanCreatePayload } from '@/lib/plan/form'
 import { toPlanDaySaveError } from '@/lib/plan/save-error'
 import { formatStartTime } from '@/lib/plan/start-time'
 import { withObjectParticle, withTopicParticle } from '@/lib/text/korean'
+import { fillTemplate } from '@/lib/text/template'
 import { EMPTY_PLAN_FORM_VALUES, type PlanDetail, type PlanFormValues } from '@/types/plan'
 
 /** 담기 시트가 알아야 하는 코스의 최소 정보 — 코스 상세(`WalkCourseDetail`)의 부분집합 */
@@ -58,10 +59,11 @@ export type WalkCourseAddTarget = {
  * 값으로 검증하기 위해서다 — 조사·거리 표기 둘 다 실수하기 쉬운 자리다.
  */
 export function walkCourseSummaryLine(course: WalkCourseAddTarget): string {
-  return messages.plan.walkAddSummaryLine
-    .replace('{courseLabel}', course.courseLabel)
-    .replace('{name}', course.name)
-    .replace('{distanceKm}', formatCourseDistance(course.distanceKm))
+  return fillTemplate(messages.plan.walkAddSummaryLine, {
+    courseLabel: course.courseLabel,
+    name: course.name,
+    distanceKm: formatCourseDistance(course.distanceKm),
+  })
 }
 
 /**
@@ -81,11 +83,12 @@ export function walkCourseAddToastMessage(
   const time = formatStartTime(startTime ?? null)
   const template = time === null ? messages.plan.walkAddToast : messages.plan.walkAddTimedToast
 
-  return template
-    .replace('{course}', withObjectParticle(courseLabel))
-    .replace('{planTitle}', planTitle)
-    .replace('{day}', String(day))
-    .replace('{time}', time ?? '')
+  return fillTemplate(template, {
+    course: withObjectParticle(courseLabel),
+    planTitle,
+    day: String(day),
+    time: time ?? '',
+  })
 }
 
 /**
@@ -344,10 +347,9 @@ function CreateWalkCoursePlanForm({
   return (
     <div className="px-4 pb-4">
       <p className="text-body-2 text-fg-muted pb-4 break-keep">
-        {messages.plan.addToPlanCreateHint.replace(
-          '{title}',
-          withTopicParticle(`${course.courseLabel} ${course.name}`),
-        )}
+        {fillTemplate(messages.plan.addToPlanCreateHint, {
+          title: withTopicParticle(`${course.courseLabel} ${course.name}`),
+        })}
       </p>
 
       <FormAlert message={add.error} />

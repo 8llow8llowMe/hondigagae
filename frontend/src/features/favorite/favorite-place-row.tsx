@@ -10,6 +10,7 @@ import { ThumbnailTile } from '@/components/thumbnail-tile'
 import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
+import { fillTemplate } from '@/lib/text/template'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { FavoritePlaceItem } from '@/types/favorite'
@@ -120,8 +121,8 @@ export function FavoritePlaceRow({
                   ? messages.favorite.save
                   : messages.favorite.unsave
                 : unsaved
-                  ? messages.favorite.saveLabel.replace('{title}', item.title)
-                  : messages.favorite.unsaveLabel.replace('{title}', item.title)
+                  ? fillTemplate(messages.favorite.saveLabel, { title: item.title })
+                  : fillTemplate(messages.favorite.unsaveLabel, { title: item.title })
             }
             className={cn(
               // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)

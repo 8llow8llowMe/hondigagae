@@ -38,6 +38,7 @@ import type { MapSdkFailure } from '@/lib/map/sdk'
 import { boundsCenter, isWithinBounds, type MapBounds } from '@/lib/map/viewport'
 import { visibleCountLabel } from '@/lib/map/visible-count'
 import { messages } from '@/lib/messages'
+import { fillTemplate } from '@/lib/text/template'
 import { cn } from '@/lib/utils/cn'
 import type { NearbyFacilityItem } from '@/types/emergency'
 
@@ -804,7 +805,7 @@ function PanelBody({
     const title =
       board.filters.keyword === null
         ? messages.emergency.narrowedTitle
-        : messages.emergency.searchNarrowedTitle.replace('{keyword}', board.filters.keyword)
+        : fillTemplate(messages.emergency.searchNarrowedTitle, { keyword: board.filters.keyword })
 
     /* 잘린 목록에서 "없어요" 를 확언하지 않는다 — `EmergencySection` 과 같은 규칙 (#584) */
     const truncated = board.query.data !== undefined && !countsAreComplete(board.query.data)

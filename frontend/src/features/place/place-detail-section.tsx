@@ -44,6 +44,7 @@ import { parseHomepage } from '@/lib/place/homepage'
 import { indoorLabel } from '@/lib/place/indoor'
 import { meaningfulOverview } from '@/lib/place/overview'
 import { toPlainText } from '@/lib/place/text'
+import { fillTemplate } from '@/lib/text/template'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceDetail, PlaceIntro } from '@/types/place'
@@ -880,7 +881,7 @@ function infoSourceLine(place: PlaceDetail, copyright: string | null): string | 
   const source = place.sourceName?.trim()
   if (source === undefined || source === '') return null
 
-  return messages.place.detailSourcePrefix.replace('{source}', source)
+  return fillTemplate(messages.place.detailSourcePrefix, { source })
 }
 
 /** `addr2` 는 `addr1` 이 있을 때만 뒤에 붙인다 */
