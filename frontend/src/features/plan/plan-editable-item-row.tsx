@@ -194,6 +194,11 @@ export function PlanEditableItemRow({
 
           **이름에 장소명을 넣는다.** `위로 이동` 만으로는 행마다 같은 이름이라 어느 장소의
           버튼인지 알 수 없다. 삭제 · 복구도 같은 문제라 함께 붙인다 — 보이는 글자는 그대로다.
+
+          **삭제 · 복구도 `md`(높이 44)다** (#1470). `sm` 은 50×32 로 보이고 누르는 띠만 세로로
+          넓혀 가로는 그대로였다 — 이동 버튼이 그 32 시절 테두리 · 틈 누름을 놓쳤던 것(#1463)과 같은
+          위험이다. 보이는 크기를 키워 같은 행의 이동 버튼과 높이를 맞춘다: 누르는 자리만 넓히면
+          옆 이동 버튼의 히트 영역과 겹친다.
         */}
         <div className="flex shrink-0 items-center gap-1">
           <Button
@@ -220,7 +225,7 @@ export function PlanEditableItemRow({
           />
           <Button
             variant="secondary"
-            size="sm"
+            size="md"
             aria-label={(entry.removed
               ? messages.plan.editRestoreLabel
               : messages.plan.editRemoveLabel
