@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
+import { messages } from '@/lib/messages'
 import {
   isValidWeightInput,
   toPlaceFilterWeight,
   toWeightInput,
   toWeightPayload,
+  weightBlurMessage,
 } from '@/lib/pet/weight'
 
 describe('isValidWeightInput', () => {
@@ -89,5 +91,27 @@ describe('toPlaceFilterWeight', () => {
   it('0 이하는 값이 아니다', () => {
     expect(toPlaceFilterWeight(0)).toBeNull()
     expect(toPlaceFilterWeight(-1)).toBeNull()
+  })
+})
+
+describe('weightBlurMessage', () => {
+  it('저장할 수 없는 값(날짜처럼 친 값 · 0.0)이면 오류 문구를 돌려준다', () => {
+    expect(weightBlurMessage('20220312')).toBe(messages.pet.weightInvalid)
+    expect(weightBlurMessage('0.0')).toBe(messages.pet.weightInvalid)
+  })
+
+  it('빈 값은 오류가 아니다 — "모름" 이 정당한 답이다', () => {
+    expect(weightBlurMessage('')).toBeUndefined()
+  })
+
+  it('유효한 값(단위를 붙인 값 포함)이면 오류가 없다', () => {
+    expect(weightBlurMessage('3.5')).toBeUndefined()
+    expect(weightBlurMessage('3.5kg')).toBeUndefined()
+  })
+
+  it('판정이 isValidWeightInput 과 어긋나지 않는다', () => {
+    for (const raw of ['', '3', '3.', 'abc', '99.9', '100', '0.1']) {
+      expect(weightBlurMessage(raw) === undefined).toBe(isValidWeightInput(raw))
+    }
   })
 })
