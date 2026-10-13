@@ -416,6 +416,15 @@ private Long targetId;
     호출하는 쪽 서비스의 compose environment에 해당 `*_APP_NAME`을 주입합니다.
     local은 매핑 없이 기본값 폴백으로 동작합니다.
 - 같은 대상 서비스를 여러 인터페이스가 호출하면 `contextId`를 반드시 지정합니다 (빈 이름 충돌 방지).
+- Feign 메서드 파라미터(`@RequestParam` · `@PathVariable` · `@RequestHeader`, 컬렉션 원소 포함)가
+  `LocalDate` · `LocalTime` · `LocalDateTime` · `ZonedDateTime` · `OffsetDateTime` · `OffsetTime` 이면
+  타입에 맞는 `@DateTimeFormat(iso = DATE | TIME | DATE_TIME)` 를 반드시 붙입니다 (#1419).
+  - 없으면 Feign 이 값을 **요청 스레드 로케일의 SHORT 형식**으로 문자열화합니다. BFF(Node fetch)가 보내는
+    `Accept-Language: *` 를 Tomcat 이 `Locale.ROOT` 로 읽어 `LocalDateTime` 이 `2026-10-15 10:00` 으로 나가고,
+    받는 쪽은 400 을 줍니다. 어댑터 테스트는 클라이언트를 mock 으로 바꾸므로 실제로 나가는 URL 을 보지 못합니다.
+  - `Instant` · `Year` · `YearMonth` · `MonthDay` 는 기본 형식이 원래 로케일과 무관하므로 붙이지 않습니다.
+    `Instant` 에 `ISO.DATE_TIME` 을 붙이면 오히려 변환이 실패합니다.
+  - 가드: plan-service `FeignDateParamContractTest` 가 Feign 인터페이스를 훑어 빠지거나 종류가 틀린 곳을 잡습니다.
 - `adapter/out/client`의 adapter는 Feign 응답을 바로 사용하지 않고 `QueryResult` 또는 domain/model로 변환합니다.
 - `url`, per-client `configuration`은 꼭 필요한 사유가 없으면 기본값으로 추가하지 않습니다.
 - timeout, 공통 헤더 정책은 가능한 한 `spring.cloud.openfeign.client.config` 같은 공통 설정으로 관리합니다.
