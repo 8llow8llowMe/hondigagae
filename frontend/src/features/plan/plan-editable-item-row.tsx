@@ -184,13 +184,24 @@ export function PlanEditableItemRow({
           )}
         </div>
 
+        {/*
+          **이동 버튼은 `md` 아이콘 버튼(44×44)이다** (#1427). `sm` 은 보이는 32 를 두고 누르는
+          띠를 **세로로만** 넓혀(`SM_HIT_AREA`) 가로는 32 그대로였다 — DESIGN.md §7 의 44 에 못
+          미쳤고, 버튼 사이 4px 틈 · 옆 몇 px 를 누르면 그 누름은 카드가 받아 **아무 일도 없이**
+          끝났다(카드의 마우스 누름은 움직이지 않으면 끌기도 클릭도 아니다). 간헐적으로 "눌러도
+          반응이 없다" 의 원인이다. 끌기 센서가 버튼 누름을 가로채는 것은 아니다 — 버튼에서 시작한
+          누름은 `isInteractiveOrigin` 이 이미 끌기에서 뺀다 (`lib/plan/drag-gesture.ts`).
+
+          **이름에 장소명을 넣는다.** `위로 이동` 만으로는 행마다 같은 이름이라 어느 장소의
+          버튼인지 알 수 없다. 삭제 · 복구도 같은 문제라 함께 붙인다 — 보이는 글자는 그대로다.
+        */}
         <div className="flex shrink-0 items-center gap-1">
           <Button
             ref={upRef}
             variant="ghost"
-            size="sm"
+            size="md"
             iconOnly
-            aria-label={messages.plan.editMoveUp}
+            aria-label={messages.plan.editMoveUp.replace('{title}', () => entry.item.title)}
             disabled={first}
             leading={<ChevronDownIcon size={18} className="rotate-180" />}
             onKeyDown={handleKeyDown}
@@ -199,15 +210,23 @@ export function PlanEditableItemRow({
           <Button
             ref={downRef}
             variant="ghost"
-            size="sm"
+            size="md"
             iconOnly
-            aria-label={messages.plan.editMoveDown}
+            aria-label={messages.plan.editMoveDown.replace('{title}', () => entry.item.title)}
             disabled={bottom}
             leading={<ChevronDownIcon size={18} />}
             onKeyDown={handleKeyDown}
             onClick={() => onMove(index, 'down')}
           />
-          <Button variant="secondary" size="sm" onClick={() => onToggleRemoved(index)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-label={(entry.removed
+              ? messages.plan.editRestoreLabel
+              : messages.plan.editRemoveLabel
+            ).replace('{title}', () => entry.item.title)}
+            onClick={() => onToggleRemoved(index)}
+          >
             {entry.removed ? messages.plan.editRestore : messages.plan.editRemove}
           </Button>
         </div>

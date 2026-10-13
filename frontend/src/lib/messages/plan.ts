@@ -714,10 +714,19 @@ export const planMessages = {
   /** 거리 자리를 대신한다 — 순서를 옮길 때마다 숫자가 흔들리면 신뢰가 깨진다 */
   editDistanceNote: '이동 거리는 저장 후 다시 계산돼요',
 
-  editMoveUp: '위로 이동',
-  editMoveDown: '아래로 이동',
+  /**
+   * 이동·삭제 버튼의 접근 가능한 이름 — **어느 장소의 버튼인지 이름이 말한다** (#1427).
+   * `위로 이동` 만으로는 스크린리더가 행마다 같은 말을 읽어, 테스트 중 다른 항목을 옮겼다.
+   * `{title}` 은 항목 제목(`PlanItem.title`)이다.
+   */
+  editMoveUp: '{title} 위로 이동',
+  editMoveDown: '{title} 아래로 이동',
+  /** 보이는 글자다. 접근 가능한 이름은 아래 `…Label` 이 장소명을 붙여 준다 */
   editRemove: '삭제',
   editRestore: '복구',
+  // 보이는 글자(`삭제` · `복구`)를 이름 안에 그대로 둔다 — 음성 입력이 보이는 말로 찾는다 (WCAG 2.5.3)
+  editRemoveLabel: '{title} 삭제',
+  editRestoreLabel: '{title} 복구',
   /** 취소선(시각)과 함께 간다 — 색·선만으로 알리지 않는다 */
   editRemoveMark: '저장하면 삭제돼요',
 
