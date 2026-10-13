@@ -238,3 +238,58 @@ test.describe('순서 편집 — 터치로 카드를 끈다 (#1029)', () => {
     expect(Math.abs((await page.evaluate(() => window.scrollY)) - scrollBefore)).toBeLessThan(2)
   })
 })
+
+/**
+ * **이동 버튼을 연달아 눌러도 매번 한 칸씩 옮긴다** — 이슈 #1463.
+ *
+ * 사용성 테스트에서 ▲▼ 누름이 간헐적으로 먹지 않았다(3번 중 1번). 끌기 센서가 버튼 누름을
+ * 가로채는지 375px 에서 마우스 · 터치 탭 · 짧은(30~150ms) · 긴(600ms) 간격으로 시나리오당
+ * 30회씩 쟀고 **버튼 안의 누름은 하나도 빠지지 않았다**(1440/1440). 빠진 것은 버튼 테두리
+ * 바깥 — 둥근 모서리 · 버튼 사이 틈 — 을 누른 경우뿐이고, 그 누름은 카드가 받아 끌기도
+ * 클릭도 아닌 채 끝난다(#1427 이 44px 로 키운 이유).
+ *
+ * 그래서 이 스펙은 **회귀 방지**다. `locator.click()` 은 가려진 요소를 만나면 다시 시도해
+ * 누락을 감춘다 — 사람처럼 좌표를 한 번 눌러(`mouse.click` · `touchscreen.tap`) 그 자리에서
+ * 순서를 단언한다. 한 칸 옮길 때마다 행이 다시 그려지고 포커스가 옮긴 항목을 따라가므로,
+ * 그 재렌더 직후의 다음 누름이 살아 있는지가 요점이다.
+ */
+test.describe('순서 편집 — 이동 버튼 연타 (#1463)', () => {
+  const PRESSES = 10
+
+  async function pressRepeatedly(list: Locator, press: (x: number, y: number) => Promise<void>) {
+    const rows = list.locator(':scope > li')
+    for (let step = 0; step < PRESSES; step += 1) {
+      const before = await titles(list)
+      // 짝수는 1행 ▼, 홀수는 2행 ▲ — 둘 다 앞의 두 항목을 맞바꾼다
+      const button =
+        step % 2 === 0
+          ? rows.nth(0).getByRole('button', { name: '아래로 이동' })
+          : rows.nth(1).getByRole('button', { name: '위로 이동' })
+      const point = await center(button)
+      await press(point.x, point.y)
+
+      await expect
+        .poll(() => titles(list), { message: `${step + 1}번째 누름이 순서를 바꾸지 않았다` })
+        .toEqual([before[1], before[0], before[2]])
+      await expect(lifted(list)).toHaveCount(0)
+    }
+  }
+
+  test.describe('마우스', () => {
+    test.use({ viewport: { width: 375, height: 812 } })
+
+    test('375px 에서 ▲▼ 를 연달아 클릭하면 누를 때마다 한 칸씩 옮긴다', async ({ page }) => {
+      const list = await openEditor(page)
+      await pressRepeatedly(list, (x, y) => page.mouse.click(x, y))
+    })
+  })
+
+  test.describe('터치', () => {
+    test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true })
+
+    test('375px 에서 ▲▼ 를 연달아 탭하면 누를 때마다 한 칸씩 옮긴다', async ({ page }) => {
+      const list = await openEditor(page)
+      await pressRepeatedly(list, (x, y) => page.touchscreen.tap(x, y))
+    })
+  })
+})
