@@ -1464,4 +1464,35 @@ export const planMessages = {
   itemMemoLess: '접기',
   itemMemoMoreLabel: '더 보기, {title} 메모',
   itemMemoLessLabel: '접기, {title} 메모',
+
+  /**
+   * 항목 메모 고치기 · 지우기 (#1460 · 일정상세 D30). 진입점은 메모 줄의 `메모 수정` 하나다 —
+   * 접근 이름은 `더 보기` 와 같은 꼴(보이는 낱말 먼저, 항목 이름 뒤)이다(WCAG 2.5.3).
+   */
+  itemMemoEdit: '메모 수정',
+  itemMemoEditLabel: '메모 수정, {title}',
+  /** `{title}` 치환. 어느 항목의 메모인지 모달 제목이 말한다 (`itemTimeModalTitle` 과 같은 꼴) */
+  itemMemoModalTitle: '{title} 메모',
+  /** 지우는 길이 둘(비우고 저장 · `메모 지우기`)이라 하나를 여기서 말해 둔다 */
+  itemMemoModalDescription: '비워 두고 저장하면 메모가 지워져요.',
+  itemMemoFieldLabel: '메모',
+  itemMemoFieldHint: '500자까지 쓸 수 있어요.',
+  /** 서버 `PlanItemRequest.memo` `@Size(max = 500)` 의 복제 */
+  itemMemoTooLong: '메모는 500자 이하로 입력해 주세요.',
+  itemMemoSave: '저장',
+  itemMemoClear: '메모 지우기',
+  /** `{title}` 치환. 성공만 토스트로 말한다 */
+  itemMemoSavedToast: '{title} 메모를 저장했어요',
+  itemMemoClearedToast: '{title} 메모를 지웠어요',
+  /**
+   * 메모는 저장됐는데 교체가 푼 `다녀옴` 을 다시 남기지 못했다 (D30-3). **저장 실패가 아니다** —
+   * 모달은 닫히고, 다시 누를 토글이 행에 그대로 있다.
+   */
+  itemMemoVisitRestoreFailedToast:
+    '메모는 저장했지만 ‘다녀옴’ 표시를 다시 남기지 못했어요. 다녀온 곳을 한 번 더 눌러 주세요.',
+  /** 5xx·무응답. 입력은 모달에 그대로 남는다 — 같은 버튼으로 다시 보낸다 */
+  itemMemoErrorDescription: '메모를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.',
+  /** `PLAN_004`. 원인은 메모가 아니라 일괄 교체가 되싣는 **그 일자의 장소**다 (`addMoveMissingPlaceError` 와 같은 판단) */
+  itemMemoMissingPlaceError:
+    '이 일자에 더 이상 조회되지 않는 장소가 있어 함께 저장할 수 없어요. 일정에서 그 장소를 빼 주세요.',
 } as const

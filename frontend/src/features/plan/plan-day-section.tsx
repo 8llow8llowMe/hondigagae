@@ -100,6 +100,22 @@ export type PlanDayItemTime = {
   onOpen: (planItemId: string) => void
 }
 
+/**
+ * 이 일자의 `메모 수정` 한 묶음 — 이슈 #1460 · `일정상세-세부명세.md` D30. 모달은 화면에 하나고,
+ * 일괄 교체 잠금은 호출부가 든다 (`PlanDayItemTime` 과 같은 분담).
+ */
+export type PlanDayItemMemo = {
+  onOpen: (planItemId: string) => void
+}
+
+/**
+ * `메모 수정` 버튼의 **일자 · 순서** 표식 (#1460). 메모 저장은 일괄 교체라 `planItemId` 가 새로
+ * 발급돼 버튼이 다시 마운트된다 — 같은 자리를 찾아 초점을 돌려준다 (`timeChipFocusKey` 와 같은 꼴).
+ */
+export function memoEditFocusKey(day: number, index: number): string {
+  return `${day}:${index}`
+}
+
 /** 좌측 목차의 앵커 대상. 목차와 제목이 같은 규칙으로 id 를 만들어야 링크가 맞는다 */
 export function planDayAnchorId(day: number): string {
   return `day${day}`
@@ -131,6 +147,7 @@ export function PlanDaySection({
   visit,
   walkSafety,
   itemTime,
+  itemMemo,
   regenerateHref,
   planId,
   forecastPending = null,
@@ -165,6 +182,8 @@ export function PlanDaySection({
    * 더 이상 시각을 고치지 않는다 (명세 G0).
    */
   itemTime: PlanDayItemTime
+  /** 항목 `메모 수정` (#1460). 없으면 버튼이 서지 않는다 — 편집 중에는 행이 편집기라 어차피 없다 */
+  itemMemo?: PlanDayItemMemo
   /**
    * `다시 만들기` 가 가는 곳 (#128). `장소 추가` 와 같이 모달이 아니라 라우트다.
    *
@@ -367,6 +386,14 @@ export function PlanDaySection({
               }}
               timeIssue={timeIssues[index] ?? null}
               planId={planId}
+              memoEdit={
+                itemMemo === undefined
+                  ? undefined
+                  : {
+                      onOpen: () => itemMemo.onOpen(row.item.planItemId),
+                      focusKey: memoEditFocusKey(day, index),
+                    }
+              }
             />
           ))}
         </SurfaceList>

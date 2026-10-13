@@ -12,6 +12,18 @@ type PlanItemMemoProps = {
   memo: PlanItemMemoView
   /** 접근 이름에 넣을 항목 이름 */
   title: string
+  /**
+   * `메모 수정` 진입점 (#1460 · D30). **optional 이다** — 넘기지 않으면 버튼이 없다. 기간 밖
+   * 항목 섹션처럼 저장할 일자가 없는 사용처가 그 경로다.
+   */
+  edit?: PlanItemMemoEdit | undefined
+}
+
+/** 메모 고치기 진입점 — 모달을 연다. 저장 · 잠금은 호출부가 소유한다 */
+export type PlanItemMemoEdit = {
+  onOpen: () => void
+  /** 저장 뒤 초점을 돌려받을 표식 — 일괄 교체가 `planItemId` 를 새로 발급해 버튼이 다시 마운트된다 */
+  focusKey: string
 }
 
 /**
@@ -24,13 +36,14 @@ type PlanItemMemoProps = {
  * 두 줄에서 접고 `더 보기` 로 편다. 버튼은 행 면을 덮는 늘린 링크(`::after`) 위에 서야
  * 눌리므로 `z-10` 이다 — 시간 칩과 같은 로컬 레이어다.
  */
-export function PlanItemMemo({ memo, title }: PlanItemMemoProps) {
+export function PlanItemMemo({ memo, title, edit }: PlanItemMemoProps) {
   const [expanded, setExpanded] = useState(false)
 
   return (
     <PlanItemMemoText
       memo={memo}
       title={title}
+      edit={edit}
       expanded={expanded}
       onToggle={() => setExpanded((previous) => !previous)}
     />
@@ -41,6 +54,7 @@ export function PlanItemMemo({ memo, title }: PlanItemMemoProps) {
 export function PlanItemMemoText({
   memo,
   title,
+  edit,
   expanded,
   onToggle,
 }: PlanItemMemoProps & { expanded: boolean; onToggle: () => void }) {
@@ -61,22 +75,45 @@ export function PlanItemMemoText({
         {memo.text}
       </p>
 
-      {memo.collapse !== 'none' && (
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-expanded={expanded}
-          aria-controls={bodyId}
-          aria-label={(expanded
-            ? messages.plan.itemMemoLessLabel
-            : messages.plan.itemMemoMoreLabel
-          ).replace('{title}', title)}
-          onClick={onToggle}
-          // 넓은 폭에서 접지 않는 길이면 버튼도 없다 — 눌러도 아무 일이 없는 버튼이 된다
-          className={cn('z-10 -ml-3', memo.collapse === 'mobile' && 'md:hidden')}
-        >
-          {expanded ? messages.plan.itemMemoLess : messages.plan.itemMemoMore}
-        </Button>
+      {/*
+        **`더 보기` 와 `메모 수정` 을 한 줄에 둔다** (#1460 · D30-1). 메모를 읽은 자리에서 바로 고친다 —
+        행마다 서는 버튼이라 ghost 로 캡션 톤에 머문다. `-ml-3` 은 ghost 좌우 여백만큼 당겨 첫
+        버튼 글자를 메모 첫 글자에 맞춘다(시간 칩과 같은 판단).
+      */}
+      {(memo.collapse !== 'none' || edit !== undefined) && (
+        <div className="-ml-3 flex flex-wrap items-center">
+          {memo.collapse !== 'none' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-expanded={expanded}
+              aria-controls={bodyId}
+              aria-label={(expanded
+                ? messages.plan.itemMemoLessLabel
+                : messages.plan.itemMemoMoreLabel
+              ).replace('{title}', title)}
+              onClick={onToggle}
+              // 넓은 폭에서 접지 않는 길이면 버튼도 없다 — 눌러도 아무 일이 없는 버튼이 된다
+              className={cn('z-10', memo.collapse === 'mobile' && 'md:hidden')}
+            >
+              {expanded ? messages.plan.itemMemoLess : messages.plan.itemMemoMore}
+            </Button>
+          )}
+          {edit !== undefined && (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-haspopup="dialog"
+              data-plan-memo-edit={edit.focusKey}
+              aria-label={messages.plan.itemMemoEditLabel.replace('{title}', title)}
+              onClick={edit.onOpen}
+              // 늘린 링크(`::after`) 위에 서야 눌린다 — 시간 칩 · `더 보기` 와 같은 로컬 레이어
+              className="z-10"
+            >
+              {messages.plan.itemMemoEdit}
+            </Button>
+          )}
+        </div>
       )}
     </div>
   )

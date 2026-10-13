@@ -6,7 +6,7 @@ import { FormAlert } from '@/components/form-alert'
 import { CheckIcon, ClockIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
 import { ThumbnailTile } from '@/components/thumbnail-tile'
-import { PlanItemMemo } from '@/features/plan/plan-item-memo'
+import { PlanItemMemo, type PlanItemMemoEdit } from '@/features/plan/plan-item-memo'
 import { formatStandaloneCelsius } from '@/lib/format/celsius'
 import { formatDistance } from '@/lib/format/distance'
 import { isLongTrip } from '@/lib/geo/distance'
@@ -156,6 +156,7 @@ export function PlanItemRow({
   time,
   timeIssue = null,
   planId,
+  memoEdit,
 }: {
   model: PlanItemRowModel
   /**
@@ -167,6 +168,11 @@ export function PlanItemRow({
   visit?: PlanItemVisit
   /** 없으면 칩 대신 시각 캡션이다 — 기간 밖 항목 섹션이 그 경로다 (#1028) */
   time?: PlanItemTime
+  /**
+   * 메모 줄의 `메모 수정` (#1460 · 명세 D30). 없으면 버튼이 없다 — 기간 밖 항목 섹션이 그 경로다.
+   * 메모가 없는 행에는 진입점을 두지 않는다(D30-1).
+   */
+  memoEdit?: PlanItemMemoEdit | undefined
   /**
    * 이 행의 시각이 앞 일정과 어긋나는가 (#1424 · `timeOrderIssues`). **판정은 일자가 한다** —
    * 행은 앞 항목을 모른다. 시간 칩 줄에만 경고 칩이 선다 (`time` 이 없는 고아 항목 섹션은
@@ -419,7 +425,7 @@ export function PlanItemRow({
           항목 메모 — AI 초안 설명이거나 사용자가 적은 값 (#1448 · 명세 D29). D8-11 의 "표시 안 함"
           을 뒤집었다. 미리보기(#1432)와 같은 자리(맨 아래) · 같은 글자 등급이다. 없으면 줄이 없다.
         */}
-        {memo !== null && <PlanItemMemo memo={memo} title={item.title} />}
+        {memo !== null && <PlanItemMemo memo={memo} title={item.title} edit={memoEdit} />}
       </div>
     </>
   )
