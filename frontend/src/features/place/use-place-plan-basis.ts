@@ -4,7 +4,12 @@ import { useSearchParams } from 'next/navigation'
 
 import { usePetList } from '@/features/pet/use-pet-list'
 import { usePlanDetail, usePlanWeather } from '@/features/plan/use-plan-detail'
-import { parsePlanContext, type PlanBasisState, planBasisState } from '@/lib/place/plan-context'
+import {
+  parsePlanContext,
+  type PlanBasisState,
+  planBasisState,
+  weatherBasisPetIdOf,
+} from '@/lib/place/plan-context'
 
 /**
  * 장소 상세가 **일정에서 들어왔을 때의 판정 기준** (#1429 · 장소상세-세부명세 D1-5).
@@ -34,11 +39,10 @@ export function usePlacePlanBasis(authed: boolean, today: string): PlanBasisStat
     **일정 판정은 실패해도 기다리지 않는다** — 실패면 기준견 없이(`null`) 대표 반려견으로 간다.
     조회 중일 때만 `undefined` 로 기다린다.
   */
-  const weatherBasisPetId = weather.isError
-    ? null
-    : weather.data === undefined
-      ? undefined
-      : (weather.data.days.find((entry) => entry.day === context?.day)?.basisPetId ?? null)
+  const weatherBasisPetId = weatherBasisPetIdOf(
+    { isError: weather.isError, days: weather.data?.days },
+    context?.day,
+  )
 
   return planBasisState({
     context,

@@ -187,6 +187,27 @@ export function basisPetOf(state: PlanBasisState, selected: Pet | null): Pet | n
   return selected
 }
 
+/**
+ * 일정 판정 조회 → `planBasisState` 의 `weatherBasisPetId` (#1492).
+ *
+ * - 조회 실패 → `null` (기준견 없이 대표 반려견으로 간다 — 일정 판정은 실패해도 기다리지 않는다)
+ * - 아직 못 받았다 → `undefined` (조회 중 — 기다린다)
+ * - 받았는데 그 일차 항목이 없거나 `basisPetId` 가 `null` → `null`
+ *
+ * 실패가 조회 중보다 먼저다 — 실패한 조회는 `data` 도 비어 있어 순서를 바꾸면 영원히 기다린다.
+ */
+export function weatherBasisPetIdOf(
+  weather: {
+    isError: boolean
+    days: readonly { day: number; basisPetId: string | null }[] | undefined
+  },
+  day: number | undefined,
+): string | null | undefined {
+  if (weather.isError) return null
+  if (weather.days === undefined) return undefined
+  return weather.days.find((entry) => entry.day === day)?.basisPetId ?? null
+}
+
 type Source<T> = { data: T | undefined; pending: boolean; failed: boolean }
 
 /**
