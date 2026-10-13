@@ -73,7 +73,11 @@ describe('petCreatedReturnHref — 등록한 아이를 싣고 돌아간다 (#144
     expect(petCreatedReturnHref('/ai-plans/new', PET_ID)).toBe(`/ai-plans/new?pet=${PET_ID}`)
   })
 
-  it('기존 쿼리 · 해시는 지키고 합친다', () => {
+  /*
+    URL 을 합칠 뿐이다. 폼이 `?from=` 과 `?pet=` 중 무엇을 체크하는지는 여기서 정하지 않는다 —
+    되살린 조건의 반려견이 목록에 남아 있으면 그쪽이 이긴다(AI 공통명세 S9 6번, #1492).
+  */
+  it('기존 쿼리 · 해시는 지키고 합친다 — 어느 쪽이 체크되는지는 폼이 정한다', () => {
     expect(petCreatedReturnHref('/ai-plans/new?from=job-1#top', PET_ID)).toBe(
       `/ai-plans/new?from=job-1&pet=${PET_ID}#top`,
     )
