@@ -788,8 +788,8 @@ describe('itemInsertIndex · 담기 자리 — 끝에 붙은 숙박 앞 (#1175)'
 })
 
 describe('placeItemTypeOf — 담을 장소의 일정 항목 유형 (#1447 · 일정상세 D26-5)', () => {
-  const of = (code: string, sourceCategory: string | null = null) =>
-    placeItemTypeOf({ contentType: { code }, sourceCategory })
+  const of = (code: string, sourceCategory: string | null = null, title = '도라지식당') =>
+    placeItemTypeOf({ contentType: { code }, sourceCategory, title })
 
   it('음식점(RESTAURANT)은 MEAL 이다 — 확정 전 점검이 식사로 센다', () => {
     expect(of('RESTAURANT')).toBe('MEAL')
@@ -798,6 +798,28 @@ describe('placeItemTypeOf — 담을 장소의 일정 항목 유형 (#1447 · �
 
   it('카페는 음식점 분류여도 PLACE 다 — 끼니로 세지 않는다', () => {
     expect(of('RESTAURANT', '카페')).toBe('PLACE')
+  })
+
+  /*
+    dev 실측(#1472): 관광정보 API 음식점은 카페든 식당이든 원천 분류가 `null` 이고, 식약처 카페는
+    `휴게음식점` · `제과점영업` 으로 온다. 원천 분류만 보면 아래 카페가 전부 식사로 담겼다.
+  */
+  it('원천 분류가 비었거나 휴게음식점인 카페 · 제과점도 PLACE 다 — 장소명으로 가린다 (#1472)', () => {
+    expect(of('RESTAURANT', null, '카페코지')).toBe('PLACE')
+    expect(of('RESTAURANT', null, '커피템플')).toBe('PLACE')
+    expect(of('RESTAURANT', null, '오드랑베이커리')).toBe('PLACE')
+    expect(of('RESTAURANT', null, '영국찻집')).toBe('PLACE')
+    expect(of('RESTAURANT', null, 'AND 유 CAFE')).toBe('PLACE')
+    expect(of('RESTAURANT', '휴게음식점', '커피빈제주애월DT점')).toBe('PLACE')
+    expect(of('RESTAURANT', '제과점영업', '사계제과')).toBe('PLACE')
+  })
+
+  it('이름에 카페 낱말이 없는 음식점은 원천 분류가 비어도 MEAL 이다', () => {
+    expect(of('RESTAURANT', null, '도라지식당')).toBe('MEAL')
+    expect(of('RESTAURANT', null, '삼대국수회관')).toBe('MEAL')
+    // `tea` 를 낱말로 쓰지 않는 이유 — 스테이크집이 카페로 걸린다
+    expect(of('RESTAURANT', null, 'Steak House')).toBe('MEAL')
+    expect(of('RESTAURANT', '휴게음식점', '용꽈배기')).toBe('MEAL')
   })
 
   it('음식점이 아니면 PLACE 다 — 숙박 장소도 담기는 PLACE 그대로다', () => {

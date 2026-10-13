@@ -1,5 +1,5 @@
 import { messages } from '@/lib/messages'
-import { isCafePlace } from '@/lib/place/cafe'
+import { isCafeLikePlace } from '@/lib/place/cafe'
 import { insertedStartTime } from '@/lib/plan/default-start-time'
 import { isPlaceTarget } from '@/lib/plan/detail'
 import { formatStartTime } from '@/lib/plan/start-time'
@@ -292,8 +292,10 @@ export type AddedPlace = { placeId: string; title: string; itemType: AddedPlaceI
  * 아는 것은 담는 순간뿐이라 여기서 가른다. 그래야 확정 전 점검(`confirm-check.ts`)의 식사 판정
  * (`itemType.code === 'MEAL'`)이 음식점을 담은 날을 "식사 없음" 으로 잘못 묻지 않는다.
  *
- * **카페는 `PLACE` 다.** 원천상 `RESTAURANT` 이지만(`isCafePlace`) 끼니가 아니다 — 카페만 담은 날은
- * 식사를 물어야 맞다. 판정은 `isCafePlace` 하나를 쓴다(목록 · 지도 핀과 같은 판정).
+ * **카페는 `PLACE` 다.** 원천상 `RESTAURANT` 이지만 끼니가 아니다 — 카페만 담은 날은 식사를 물어야
+ * 맞다. 판정은 `isCafeLikePlace` 다(#1472) — 원천 분류 `카페` 에 더해 장소명으로도 가린다. 원천
+ * 분류만 보면 관광정보 API 카페(분류가 비어 있다)를 전부 식사로 담았다. 목록 · 지도 핀의 카페
+ * 표시(`isCafePlace`)와 판정이 다른 이유는 `cafe.ts` 주석.
  *
  * `MEAL` 의 저장 계약은 `PLACE` 와 같다 — `targetId` 는 `place.id` 이고 서버가 같은 검증을 한다
  * (`PlanItemRequest.targetId` · `verifyPlaceTargets`).
@@ -301,8 +303,9 @@ export type AddedPlace = { placeId: string; title: string; itemType: AddedPlaceI
 export function placeItemTypeOf(place: {
   contentType: { code: string }
   sourceCategory: string | null
+  title: string
 }): AddedPlaceItemType {
-  return place.contentType.code === 'RESTAURANT' && !isCafePlace(place) ? 'MEAL' : 'PLACE'
+  return place.contentType.code === 'RESTAURANT' && !isCafeLikePlace(place) ? 'MEAL' : 'PLACE'
 }
 
 /**

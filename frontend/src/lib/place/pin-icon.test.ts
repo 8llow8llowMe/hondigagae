@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isCafePlace } from '@/lib/place/cafe'
+import { isCafeLikePlace, isCafePlace } from '@/lib/place/cafe'
 import { placePinIcon } from '@/lib/place/pin-icon'
 
 const at = (code: string, sourceCategory: string | null = null) => ({
@@ -25,6 +25,18 @@ describe('placePinIcon — contentType.code 로 고른다 (#1280 D2-1)', () => {
   it('카페 분류 음식점은 커피잔이다 — 목록 행의 `카페` 와 같은 판정', () => {
     expect(placePinIcon(at('RESTAURANT', '카페'))).toBe('coffee')
     expect(isCafePlace(at('RESTAURANT', '카페'))).toBe(true)
+  })
+
+  /*
+    이름 판정(`isCafeLikePlace`)은 담기 항목 유형에만 쓴다 (#1472). 핀이 이름으로 커피잔이 되면
+    `카페` 칩(서버 조건 `sourceCategory=카페`)으로는 안 나오는 곳이 카페로 보인다.
+  */
+  it('장소명이 카페여도 원천 분류가 카페가 아니면 핀은 수저다 — 칩과 같은 판정 (#1472)', () => {
+    const place = { ...at('RESTAURANT'), title: '카페코지' }
+
+    expect(isCafeLikePlace(place)).toBe(true)
+    expect(isCafePlace(place)).toBe(false)
+    expect(placePinIcon(place)).toBe('utensils')
   })
 
   it('음식점이 아니면 원천 분류가 카페여도 바꾸지 않는다', () => {
