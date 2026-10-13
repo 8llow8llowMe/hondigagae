@@ -139,7 +139,8 @@ describe('WalkTimesSection — 추천 구간', () => {
   it('창 안 등급이 섞인 날에도 헤드라인에 등급 색이 없다', () => {
     const line = headlineLine(render(MIXED_WINDOW_DAY))
 
-    expect(line).toContain('15:00')
+    // 창 15–21 안의 안전 구간 17 · 19–21 중 더 긴 쪽이다 (#1428)
+    expect(line).toContain('19:00 – 21:00')
     expect(line).not.toContain('text-metric-')
   })
 
@@ -708,7 +709,8 @@ describe('WalkTimesSection — 창 안 등급 문장 (#637)', () => {
   it('헤드라인 줄에 등급 배지를 세우지 않는다', () => {
     const line = headlineOf(render(MIXED_DAY))
 
-    expect(line).toContain('11:00 – 23:00')
+    // 안전 구간 11–13 · 16–23 중 더 긴 쪽이다 (#1428). 창 전체 `11:00 – 23:00` 이 아니다
+    expect(line).toContain('16:00 – 23:00')
     expect(line).not.toContain('주의')
     // `MetricWord` 의 고정 크기 (20/800). 이 줄에 배지가 남으면 여기서 걸린다
     expect(line).not.toContain('text-emphasis')
@@ -1240,7 +1242,9 @@ describe('WalkTimesSection — 창 안 등급이 여럿일 때 (#671 A-2)', () =
       ]),
     )
 
-    expect(markup).toContain('14:00 – 16:00')
+    // 헤드라인은 안전 칸만 적는다 (#1428) — 판단 근거 부족인 14시를 좋은 시간에 넣지 않는다
+    expect(markup).toContain('15:00 – 16:00')
+    expect(markup).not.toContain('14:00 – 16:00')
     expect(markup).not.toContain('등급이에요')
     expect(markup).not.toContain('좋아요.')
   })
@@ -1412,5 +1416,75 @@ describe('WalkTimesSection — 안전 시각이 없는 창의 제목 (#1362)', (
     )
 
     expect(headingOf(markup)).toBe(messages.home.goldenHeadingRelative)
+  })
+})
+
+/*
+  #1428 — 헤드라인 `12:00 – 23:00` 아래에 "12시는 노면이 26℃까지 올라 주의 등급이에요.
+  13–23시가 좋아요." 가 섰다. 헤드라인 숫자가 창 전체를, 문장이 창 안의 분포를 말해 어긋났다.
+*/
+describe('WalkTimesSection — 헤드라인은 안전 구간이다 (#1428)', () => {
+  const DAY = '2026-08-29T'
+  const at = (hh: number) => `${DAY}${String(hh).padStart(2, '0')}:00:00`
+
+  function walkHour(hh: number, code: string, name: string, pavement: number) {
+    return {
+      at: at(hh),
+      walkSafetyLevel: { code, name, description: null, scoreDescription: null },
+      temperature: 30,
+      estimatedPavementCelsius: pavement,
+      precipitationProbability: 0,
+    }
+  }
+  const safe = (hh: number) => walkHour(hh, 'SAFE', '안전', 24)
+  const caution = (hh: number) => walkHour(hh, 'CAUTION', '주의', 26)
+
+  function withWindow(hours: ReturnType<typeof walkHour>[]): WalkTimesResponse {
+    return {
+      ...GOOD_DAY,
+      hourly: hours,
+      goldenStart: hours[0]?.at ?? null,
+      goldenEnd: hours[hours.length - 1]?.at ?? null,
+    }
+  }
+  const headline = (markup: string) => /<p class="text-title-1[^>]*>(.*?)<\/p>/.exec(markup)?.[1]
+
+  it('주의 1칸 + 안전 N칸 — 헤드라인은 안전 구간, 주의 시각은 문장이 말한다', () => {
+    const markup = render(
+      withWindow([caution(12), ...[13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].map(safe)]),
+    )
+
+    expect(headline(markup)).toBe('13:00 – 23:00')
+    expect(markup).toContain('12시는 노면이 26℃까지 올라')
+    expect(markup).toContain('13–23시가 좋아요.')
+  })
+
+  it('전부 안전이면 서버 창 그대로다', () => {
+    expect(headline(render(withWindow([12, 13, 14].map(safe))))).toBe('12:00 – 14:00')
+  })
+
+  /* 안전 0칸은 #1362 갈래가 받는다 — 제목이 `나은 시간` 이고 숫자는 서버 창 그대로다 */
+  it('안전 0칸이면 제목이 나은 시간이고 숫자는 서버 창이다', () => {
+    const markup = render(withWindow([12, 13, 14].map(caution)))
+
+    expect(markup).toContain(`>${messages.home.goldenHeadingRelative}</h2>`)
+    expect(headline(markup)).toBe('12:00 – 14:00')
+  })
+
+  it('안전 구간이 둘이면 더 긴 쪽을 적고, 문장은 둘 다 적는다', () => {
+    const markup = render(
+      withWindow([safe(11), safe(12), caution(13), safe(14), safe(15), safe(16)]),
+    )
+
+    expect(headline(markup)).toBe('14:00 – 16:00')
+    expect(markup).toContain('11–12시 · 14–16시가 좋아요.')
+  })
+
+  /* 안전이 한 칸이면 0분짜리 구간을 만들지 않는다(#200) — 창이 넓으니 문장은 남는다 */
+  it('안전 한 칸이면 한 시각으로 적고 문장은 그대로다', () => {
+    const markup = render(withWindow([caution(12), safe(13), caution(14)]))
+
+    expect(headline(markup)).toBe(messages.home.goldenSingleHour.replace('{time}', '13:00'))
+    expect(markup).toContain('주의 등급</span>이에요.')
   })
 })

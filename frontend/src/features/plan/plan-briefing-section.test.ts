@@ -363,6 +363,60 @@ describe('PlanBriefingSection — 산책하기 좋은 시간 (명세 D5-4)', () 
     expect(markup).toContain(CURVE_CELL)
   })
 
+  /*
+    #1428 — 창(18–21)이 주의 시각을 품을 수 있다. 곡선이 오면 홈 헤드라인과 같은 판정으로
+    안전 구간만 적는다. 곡선이 없을 때는 서버 창 그대로다(위 "곡선 조회가 실패하면" 갈래).
+  */
+  describe('시각은 창 안의 안전 구간이다 (#1428)', () => {
+    const hour = (hh: number, code: string, name: string) => ({
+      at: `2026-09-13T${hh}:00:00`,
+      walkSafetyLevel: { code, name, description: null, scoreDescription: null },
+      temperature: 30,
+      estimatedPavementCelsius: 30,
+      precipitationProbability: 0,
+    })
+    const withCurve = (hourly: ReturnType<typeof hour>[]) =>
+      render({}, { hourly, failed: false, onRetry: () => undefined })
+
+    it('주의 1칸 + 안전 N칸이면 안전 구간을 적는다', () => {
+      const markup = withCurve([
+        hour(18, 'CAUTION', '주의'),
+        hour(19, 'SAFE', '안전'),
+        hour(20, 'SAFE', '안전'),
+        hour(21, 'SAFE', '안전'),
+      ])
+
+      expect(markup).toContain('19:00 – 21:00')
+      expect(markup).toContain('19:00부터 21:00까지')
+      expect(markup).not.toContain('18:00 – 21:00')
+    })
+
+    it('전부 안전이면 서버 창 그대로다', () => {
+      const markup = withCurve([18, 19, 20, 21].map((hh) => hour(hh, 'SAFE', '안전')))
+
+      expect(markup).toContain('18:00 – 21:00')
+    })
+
+    it('안전 0칸이면 서버 창 그대로다', () => {
+      const markup = withCurve([18, 19, 20, 21].map((hh) => hour(hh, 'CAUTION', '주의')))
+
+      expect(markup).toContain('18:00 – 21:00')
+    })
+
+    /* 0분짜리 구간(`19:00 – 19:00`)을 만들지 않는다 (#200) */
+    it('안전 한 칸이면 시각 하나만 적는다', () => {
+      const markup = withCurve([
+        hour(18, 'CAUTION', '주의'),
+        hour(19, 'SAFE', '안전'),
+        hour(20, 'CAUTION', '주의'),
+        hour(21, 'CAUTION', '주의'),
+      ])
+
+      expect(markup).toContain('>19:00</p>')
+      expect(markup).not.toContain('19:00 – 19:00')
+    })
+  })
+
   it('곡선이 빈 배열이면 곡선 자리를 비운다 — 상태 문구가 이미 이유를 말한다', () => {
     const markup = render({}, { hourly: [], failed: false, onRetry: () => undefined })
 

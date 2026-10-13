@@ -17,6 +17,7 @@ import {
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { PlanDayVerdict, planDayVerdictIsBlank } from '@/features/plan/plan-day-verdict'
 import { toLatLng } from '@/lib/geo/coord'
+import { headlineGoldenSpan } from '@/lib/insight/golden-window'
 import { messages } from '@/lib/messages'
 import {
   BRIEFING_REASON_LOOKUP_FAILED,
@@ -888,7 +889,11 @@ function WalkTimesCard({
   return (
     <div className={cn('flex flex-col gap-3 pb-4', INSET_CLASS.card)}>
       {status !== null && status.code === 'AVAILABLE' && hasWindow ? (
-        <GoldenWindowLine walkTimes={walkTimes} description={status.description} />
+        <GoldenWindowLine
+          walkTimes={walkTimes}
+          hourly={curve.hourly}
+          description={status.description}
+        />
       ) : status !== null ? (
         /*
           **모르는 코드도 여기로 온다.** 서버가 상태를 하나 더 내도 화면은 그것을 그대로
@@ -903,7 +908,7 @@ function WalkTimesCard({
         </div>
       ) : hasWindow ? (
         // 옛 서버 — 상태가 없으면 아는 만큼만 말한다 (창만)
-        <GoldenWindowLine walkTimes={walkTimes} description={null} />
+        <GoldenWindowLine walkTimes={walkTimes} hourly={curve.hourly} description={null} />
       ) : (
         <p className="text-body-1 text-fg-muted font-semibold">{messages.plan.briefingWalkNone}</p>
       )}
@@ -992,26 +997,44 @@ function RetryButton({ onRetry, label }: { onRetry: () => void; label?: string }
  *
  * **`goldenLevel` 은 응답·타입에서 그대로 받는다.** 화면의 소비처가 없어진 것이지 계약이
  * 바뀐 것이 아니다 (`plan-briefing-section.test.ts` 가 소스로 잠근다).
+ *
+ * ### 시각은 창 안의 **안전 구간**이다 ([#1428](https://github.com/8llow8llowMe/hondigagae/issues/1428))
+ *
+ * 서버 창은 주의 시각을 품을 수 있다 — 홈 헤드라인과 같은 판정(`headlineGoldenSpan`)을 쓴다.
+ * 브리핑 응답에는 `hourly` 가 없어 **따로 부른 곡선이 도착해야** 안전 구간을 가를 수 있다. 곡선이
+ * 아직이거나 실패했으면 서버 창 그대로다 — 쪼갤 근거가 없을 때 지어내지 않는다.
+ *
+ * **한 시각이면 대시로 잇지 않는다** — `13:00 – 13:00` 은 0분짜리 구간으로 읽힌다(#200).
  */
 function GoldenWindowLine({
   walkTimes,
+  hourly,
   description,
 }: {
   walkTimes: PlanBriefingWalkTimes
+  /** 따로 부른 곡선. 아직 없으면 `null` — 서버 창 그대로 적는다 */
+  hourly: readonly HourlyWalkSafetyItem[] | null
   description: string | null
 }) {
-  const from = hourMinute(walkTimes.goldenStart)
-  const to = hourMinute(walkTimes.goldenEnd)
+  const span = headlineGoldenSpan(hourly ?? [], walkTimes.goldenStart, walkTimes.goldenEnd)
+  const from = hourMinute(span?.start ?? walkTimes.goldenStart)
+  const to = hourMinute(span?.end ?? walkTimes.goldenEnd)
 
   return (
     <div className="flex flex-col gap-1">
       <p className="text-title-1 text-fg font-bold tabular-nums">
-        <span aria-hidden>
-          {from} – {to}
-        </span>
-        <span className="sr-only">
-          {messages.plan.briefingWalkRangeLabel.replace('{from}', from).replace('{to}', to)}
-        </span>
+        {from === to ? (
+          from
+        ) : (
+          <>
+            <span aria-hidden>
+              {from} – {to}
+            </span>
+            <span className="sr-only">
+              {messages.plan.briefingWalkRangeLabel.replace('{from}', from).replace('{to}', to)}
+            </span>
+          </>
+        )}
       </p>
       {description !== null && (
         <p className="text-body-2 text-fg-muted break-keep">{description}</p>
