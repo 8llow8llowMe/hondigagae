@@ -274,7 +274,8 @@ function CreatePlanForm({
   const add = useAddPlaceToPlan({ place, onAdded, onClose })
   /*
     **여기서 오늘을 읽는다.** 이 본문은 시트가 열린 뒤에만 렌더돼 서버가 그린 적이 없다 —
-    하이드레이션이 어긋날 서버 출력 자체가 없다. 근거는 `use-today.ts` 주석.
+    하이드레이션이 어긋날 서버 출력 자체가 없다. 값은 브라우저 시간대가 아니라 서울의 칸이다
+    (#1499). 근거는 `use-today.ts` 주석.
   */
   const today = useToday()
 

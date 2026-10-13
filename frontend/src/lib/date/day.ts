@@ -44,6 +44,42 @@ export function todayDay(today: Date): string {
 }
 
 /**
+ * 서비스의 시간대. 백엔드 "오늘" 의 기준(plan-service `Clock` 빈)과 같은 값이다.
+ *
+ * 백엔드는 `-Duser.timezone`(배포 환경변수 `TIME_ZONE`)에 기대지 않고 이 값을 직접 못박는다
+ * (`backend/docs/services/plan-service.md`). 프런트 서버 페이지의 `todayDay(new Date())` 는 프로세스
+ * 시간대(운영 컨테이너 `TZ: ${TIME_ZONE}` = 이 값)를 따른다.
+ */
+export const SERVICE_TIME_ZONE = 'Asia/Seoul'
+
+const serviceDayFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: SERVICE_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+/**
+ * 서비스 시간대(서울)의 오늘을 달력의 칸으로 — **실행 환경의 시간대와 무관하다** (#1499).
+ *
+ * **브라우저가 스스로 오늘을 만들어야 할 때 쓴다** (`useToday`). `todayDay(new Date())` 는 실행
+ * 환경의 로컬 날짜라, 브라우저가 UTC 이고 KST 00–09시면 KST 기준 어제다 — 담기 시트가 그 값을
+ * 출발일 하한으로 써서 어제를 고를 수 있었다. 서버 페이지는 프로세스 시간대가 서울이라 같은 시각에
+ * 둘의 결과가 같다. 다만 **서버가 렌더하는 트리**는 하이드레이션 때문에 서버가 정한 칸을 내려받는
+ * 경로(`todayFromDay`)가 먼저다.
+ *
+ * 형식 문자열(`en-CA` 의 `YYYY-MM-DD`)에 기대지 않고 부분(`formatToParts`)을 읽는다 — 로케일
+ * 데이터가 바뀌면 형식이 조용히 달라진다.
+ */
+export function serviceTodayDay(now: Date): string {
+  const parts = serviceDayFormat.formatToParts(now)
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((candidate) => candidate.type === type)?.value ?? ''
+
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
+/**
  * 달력의 칸 → 그 날의 **로컬 정오** `Date`. 못 읽으면 `null`.
  *
  * `todayUtc()` 를 받는 함수들(`planPhaseOf` · `isPastPlan`)에 **서버가 정한 오늘**을 넘기기
