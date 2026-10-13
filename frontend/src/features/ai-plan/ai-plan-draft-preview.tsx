@@ -1,16 +1,25 @@
+'use client'
+
+import { useState } from 'react'
+
 import { Badge } from '@/components/badge'
 import { EmptyState } from '@/components/empty-state'
 import { ReasonList } from '@/components/reason-list'
 import { Surface, SurfaceList } from '@/components/surface'
 import { AiPlanDraftItemRow } from '@/features/ai-plan/ai-plan-draft-item-row'
+import {
+  AiPlanDraftPlaceSheet,
+  type DraftPlaceSummary,
+} from '@/features/ai-plan/ai-plan-draft-place-sheet'
 import { formatBudget } from '@/lib/ai-plan/budget'
 import { draftDayCoverage, isVisitDay } from '@/lib/ai-plan/draft-days'
 import { draftItemDistances } from '@/lib/ai-plan/draft-distance'
 import { draftItemThumbnail } from '@/lib/ai-plan/draft-thumbnail'
-import { draftItemCount } from '@/lib/ai-plan/draft-to-plan'
+import { draftDayPreviewTimes, draftItemCount } from '@/lib/ai-plan/draft-to-plan'
 import type { LatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
 import { formatPlanDateRange } from '@/lib/plan/date'
+import { formatStartTime } from '@/lib/plan/start-time'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { AiPlanDraft, AiPlanScheduleItem } from '@/types/ai-plan'
@@ -76,7 +85,12 @@ export type AiPlanDraftPreviewProps = {
  * **담기 패널을 받지 않는다** — `footer` prop 을 걷었다. 액션은 카드가 아니라 카드 밖
  * L0 이고, 그 배치는 담는 쪽이 갖는다 (#464 가 `PetForm` 의 `footer` 를 걷은 것과 같다).
  *
- * 표시 전용이라 node 환경에서 렌더 테스트가 된다.
+ * **행을 누르면 장소 요약 시트가 열린다** (#1432 · 명세 S11-2). 고른 행 하나만 상태로 갖는다 —
+ * 그 밖은 표시 전용이라 node 환경에서 렌더 테스트가 된다(시트는 닫힌 채 그려진다).
+ *
+ * **행마다 담으면 들어갈 시각을 보인다** (#1432 · 명세 S11-1). 담기와 같은 `draftDayPreviewTimes` 에
+ * **담기와 같은 제외 · 기간 · 좌표**를 넘긴다 — 셋 중 하나라도 다르면 화면값과 저장값이 갈린다.
+ * **이미 담은 초안(`committed`)에는 내지 않는다** — 저장된 일정의 시각은 그 뒤 고쳐졌을 수 있다.
  */
 export function AiPlanDraftPreview({
   draft,
@@ -92,6 +106,8 @@ export function AiPlanDraftPreview({
   excludedPlaceIds,
   committed,
 }: AiPlanDraftPreviewProps) {
+  /** 시트로 연 행 — 일차와 그 일차 안 자리. 초안이 바뀌어 사라지면 시트도 닫힌 것으로 읽는다 */
+  const [selected, setSelected] = useState<{ day: number; index: number } | null>(null)
   const itemCount = draftItemCount(draft)
   const budgetLabel = formatBudget(budget)
   /*
@@ -240,6 +256,13 @@ export function AiPlanDraftPreview({
           어긋난다.
         */
         const empty = !isVisitDay(dayItem)
+        /*
+          **담기와 같은 입력으로 잇는다** (#1432). `excludedPlaceIds` 를 빼고 계산하면 뺀 장소까지의
+          이동 시간이 남아 뒤 항목 시각이 저장값보다 늦다.
+        */
+        const startTimes = committed
+          ? []
+          : draftDayPreviewTimes(dayItem, { totalDays, excludedPlaceIds, coords })
 
         return (
           /*
@@ -275,6 +298,10 @@ export function AiPlanDraftPreview({
                     distanceMeters={distances[index] ?? null}
                     delisted={item.placeId !== null && delistedPlaceIds.has(item.placeId)}
                     excluded={item.placeId !== null && excludedPlaceIds.has(item.placeId)}
+                    startTime={formatStartTime(startTimes[index] ?? null)}
+                    {...(item.placeId === null
+                      ? {}
+                      : { onSelect: () => setSelected({ day: dayItem.day, index }) })}
                   />
                 ))}
               </SurfaceList>
@@ -282,8 +309,69 @@ export function AiPlanDraftPreview({
           </Surface>
         )
       })}
+
+      <AiPlanDraftPlaceSheet
+        summary={
+          selected === null
+            ? null
+            : selectedSummary(selected, {
+                draft,
+                totalDays,
+                committed,
+                metaLines,
+                coords,
+                thumbnails,
+                delistedPlaceIds,
+                excludedPlaceIds,
+              })
+        }
+        onClose={() => setSelected(null)}
+      />
     </>
   )
+}
+
+/**
+ * 고른 행 → 시트가 그릴 값. **행이 그리는 것과 같은 출처**에서 꺼낸다 — 시각도 같은 함수다.
+ * 고른 행이 사라졌거나(초안이 바뀜) 장소가 없는 항목이면 `null` 이라 시트가 닫힌다.
+ */
+function selectedSummary(
+  selected: { day: number; index: number },
+  props: Pick<
+    AiPlanDraftPreviewProps,
+    | 'draft'
+    | 'totalDays'
+    | 'committed'
+    | 'metaLines'
+    | 'coords'
+    | 'thumbnails'
+    | 'delistedPlaceIds'
+    | 'excludedPlaceIds'
+  >,
+): DraftPlaceSummary | null {
+  const dayItem = props.draft.days.find((candidate) => candidate.day === selected.day)
+  const item = dayItem?.items[selected.index]
+  if (dayItem === undefined || item === undefined || item.placeId === null) return null
+
+  const startTime = props.committed
+    ? null
+    : formatStartTime(
+        draftDayPreviewTimes(dayItem, {
+          totalDays: props.totalDays,
+          excludedPlaceIds: props.excludedPlaceIds,
+          coords: props.coords,
+        })[selected.index] ?? null,
+      )
+
+  return {
+    item,
+    placeId: item.placeId,
+    meta: props.metaLines.get(item.placeId),
+    thumbnail: draftItemThumbnail(item, props.thumbnails),
+    startTime,
+    delisted: props.delistedPlaceIds.has(item.placeId),
+    excluded: props.excludedPlaceIds.has(item.placeId),
+  }
 }
 
 /** 개요 카드가 `aria-labelledby` 로 가리키는 `h2` 의 id */

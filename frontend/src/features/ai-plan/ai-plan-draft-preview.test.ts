@@ -591,3 +591,63 @@ describe('AiPlanDraftPreview — title·note 가 null 로 올 수 있다', () =>
     expect(html).toContain(messages.aiPlan.itemTitleUnknown)
   })
 })
+
+describe('AiPlanDraftPreview — 담으면 들어갈 시각 (#1432 · 명세 S11-1)', () => {
+  /** 행의 시각 캡션만 뽑는다 — 시트는 닫혀 있어 렌더되지 않으므로 행 순서 그대로다 */
+  function shownTimes(html: string): string[] {
+    return [...html.matchAll(/<time dateTime="([^"]+)">/g)].map((match) => match[1] ?? '')
+  }
+
+  it('행마다 담기와 같은 시각을 HH:mm 으로 낸다 — 날마다 10:00 부터다', () => {
+    // 1일차: 10:00 → +90 체류 +30 이동(좌표 모름) = 12:00 · 2일차: 10:00
+    expect(shownTimes(render())).toEqual(['10:00', '12:00', '10:00'])
+  })
+
+  it('보이는 글자는 숫자지만 스크린리더에는 추천 시각이라고 말한다', () => {
+    expect(render()).toContain(messages.aiPlan.itemTimeSrLabel)
+  })
+
+  it('빼기로 표시한 항목에는 시각이 없고, 뒤 항목은 그 항목을 건너뛰어 다시 잇는다', () => {
+    const html = render({ excludedPlaceIds: new Set(['212481712381923328']) })
+
+    // 1일차 첫 항목이 빠지면 둘째가 그날 첫 항목 — 10:00
+    expect(shownTimes(html)).toEqual(['10:00', '10:00'])
+  })
+
+  it('기간 밖 일차에는 시각을 내지 않는다 — 담기가 버리는 날이다', () => {
+    expect(shownTimes(render({ totalDays: 1 }))).toEqual(['10:00', '12:00'])
+  })
+
+  it('이미 담은 초안에는 시각을 내지 않는다 — 저장된 일정은 그 뒤 고쳐졌을 수 있다', () => {
+    expect(shownTimes(render({ committed: true }))).toEqual([])
+  })
+})
+
+describe('AiPlanDraftPreview — 행을 눌러 장소 요약 시트 (#1432 · 명세 S11-2)', () => {
+  it('장소가 있는 항목은 제목이 시트를 여는 버튼이다', () => {
+    expect(render().match(/<button type="button" aria-haspopup="dialog"/g)).toHaveLength(3)
+  })
+
+  it('장소가 없는 항목(MOVE)은 누를 수 없다 — 보여 줄 장소가 없다', () => {
+    const html = render({
+      draft: {
+        // 이동만 있는 날은 빈 초안이라(#1270) 방문 항목 하나를 함께 둔다
+        days: [
+          {
+            day: 1,
+            items: [item(), item({ placeId: null, itemType: 'MOVE', title: '애월로 이동' })],
+          },
+        ],
+        reasons: [],
+      },
+    })
+
+    expect(html.match(/aria-haspopup="dialog"/g)).toHaveLength(1)
+    expect(html).toContain('애월로 이동')
+    expect(html).not.toMatch(/aria-haspopup="dialog"[^>]*>애월로 이동/)
+  })
+
+  it('처음에는 시트가 닫혀 있다', () => {
+    expect(render()).not.toContain(messages.aiPlan.placeSheetOpenDetail)
+  })
+})
