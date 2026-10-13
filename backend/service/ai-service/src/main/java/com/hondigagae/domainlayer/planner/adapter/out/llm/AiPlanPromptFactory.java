@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.application.model.RequestNoteConstraints;
+import com.hondigagae.domainlayer.planner.application.model.RequestedRegion;
 import com.hondigagae.domainlayer.planner.application.service.CandidateZonePolicy;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import java.time.LocalDate;
@@ -16,6 +17,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /**
@@ -195,9 +197,11 @@ public class AiPlanPromptFactory {
         if (query.requestNote() != null && !query.requestNote().isBlank()) {
             prompt.append("- 사용자 요청: ").append(query.requestNote()).append('\n');
             if (RequestNoteConstraints.from(query.requestNote()).asksAnything()) {
-                prompt.append("- 위 요청의 실내·카페는 후보의 실내 여부와 분류로만 맞출 것. ")
+                // "날마다" 를 함께 적는다 — 하루에만 넣고 나머지 날을 야외로 채운 초안이 나왔다 (#1423)
+                prompt.append("- 위 요청의 실내·카페는 후보의 실내 여부와 분류로만 맞추고, 날마다 맞는 후보를 하나 이상 넣을 것. ")
                     .append("숙소는 대신하지 말 것. 맞는 후보가 없으면 넣었다고 적지 말 것\n");
             }
+            appendRequestedRegion(prompt, query);
         }
         if (!query.safePinnedPlaceIds().isEmpty()) {
             prompt.append("- 필수 포함: 후보 목록에서 [필수 포함] 표시가 붙은 장소 ")
@@ -304,6 +308,32 @@ public class AiPlanPromptFactory {
     private static final Pattern LOCALITY_SUFFIX = Pattern.compile("^[가-힣]+[읍면]$|^[가-힣]+[0-9]?동$");
 
     /**
+     * 요청 지역 줄 (#1423). 요청 문구에 지명 · 방향어가 있으면 그 권역 위주로 고르라고 따로 적는다 — 권역 이름은 후보 줄의
+     * {@code 권역:} 과 같은 {@link JejuZone#getDisplayName()} 이라 모델이 문자열로 맞춘다. 하루 재생성은 기존 일정이 앞뒤
+     * 동선을 정하므로 싣지 않는다(워커도 그 풀을 지역으로 좁히지 않는다).
+     */
+    private static void appendRequestedRegion(StringBuilder prompt, AiPlanGenerationQuery query) {
+        if (isRegenerate(query)) {
+            return;
+        }
+        RequestedRegion region = RequestedRegion.from(query.requestNote());
+        if (!region.asksAnything()) {
+            return;
+        }
+        String zones = region.zones().stream().map(JejuZone::getDisplayName).collect(Collectors.joining(" · "));
+        prompt.append("- 요청 지역: ").append(region.label())
+            .append(" — 장소와 숙소를 ").append(zones).append(" 권역 위주로 고르고, 모자라면 맞닿은 권역에서 고를 것\n");
+    }
+
+    /**
+     * 요청 지역이 섬의 일부로 좁히는가 — 그러면 권역 순서 제안을 싣지 않는다 (#1423). "애월이랑 남원" 처럼 맞닿은 권역까지가
+     * 섬 전체인 요청은 좁히지 않으므로(후보 풀도 그대로다) 한 바퀴 순서(#1257)를 그대로 둔다. 하루 재생성은 지역을 읽지 않는다.
+     */
+    private static boolean narrowsRegion(AiPlanGenerationQuery query) {
+        return !isRegenerate(query) && RequestedRegion.from(query.requestNote()).narrows();
+    }
+
+    /**
      * 일자별 권역 순서 제안 (#1257). 규칙 2의 "여러 날이면 섬을 한 방향으로 돈다" 만으로는 모델이 날짜 사이에 섬을
      * 가로질렀다(dev 7일 북부 → 남서부 50.4km, 남동부 → 남서부 56.9km). 서버가 {@link JejuZone#aroundTheIsland} 로
      * 순서를 먼저 정해 <b>제안</b>으로 싣는다 — 날씨 · 요청에 맞지 않으면 맞닿은 권역으로 바꿔도 된다.
@@ -315,11 +345,13 @@ public class AiPlanPromptFactory {
      *   <li><b>후보가 6권역을 다 덮지 않는다</b> — 시군구를 지정했거나 제주 밖이면 돌 섬이 없다. <b>방문 장소(숙박 ·
      *       음식점이 아닌 곳)가 없는 권역은 덮은 것으로 보지 않는다 (#1312)</b> — 그 권역의 날에 갈 곳이 없어 모델이 다른
      *       권역 장소로 채운다. 방문 조회가 실패해 숙박 · 음식점만 남은 권역도 같다</li>
+     *   <li><b>요청 지역이 섬의 일부로 좁힌다 (#1423)</b> — 섬을 한 바퀴 도는 고정 순서가 "성산 쪽 위주로" 같은 요청을
+     *       덮었다. 그때는 {@link #appendRequestedRegion} 의 요청 지역 줄이 대신한다</li>
      * </ul>
      */
     private void appendZoneOrder(StringBuilder prompt, AiPlanGenerationQuery query) {
         int days = resolveDayCount(query);
-        if (days < 2 || isRegenerate(query) || !query.safePinnedPlaceIds().isEmpty()) {
+        if (days < 2 || isRegenerate(query) || !query.safePinnedPlaceIds().isEmpty() || narrowsRegion(query)) {
             return;
         }
         Set<JejuZone> covered = EnumSet.noneOf(JejuZone.class);

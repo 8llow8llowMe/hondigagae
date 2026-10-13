@@ -89,6 +89,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
         "WEATHER_OK", "날씨 양호",
         "INDOOR_ALTERNATIVE", "실내 대안",
         "REST_SLOT", "휴식 시간 확보",
+        "REQUEST_APPLIED", "요청 반영",
         "REQUEST_UNMET", "요청 반영");
 
     /** 표에 없는 코드의 이름. 코드를 그대로 내보내면 화면에 {@code CAFE_OK} 같은 기호가 보인다. */

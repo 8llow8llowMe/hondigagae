@@ -32,6 +32,7 @@ import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStatus;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStep;
 import com.hondigagae.domainlayer.planner.domain.model.PackingList;
 import com.hondigagae.global.properties.AiLlmProperties;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -232,6 +233,32 @@ class AiPlanWorkerStepTest {
                 assertThat(reason.code()).isEqualTo("REQUEST_UNMET");
                 assertThat(reason.description()).isEqualTo("요청하신 실내 카페가 이번 후보에 없어요.");
             });
+    }
+
+    @Test
+    @DisplayName("후보에 맞는 곳이 있으면 초안에서 빠진 날에 넣고 근거 맨 앞에서 넣었다고 말한다 (#1423)")
+    void fillsTheRequestedPlaceIntoTheDraft() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("requestNote", MEASURED_NOTE);
+        FakeJobStore store = new FakeJobStore(job);
+        RecordingCandidates candidates = new RecordingCandidates();
+        candidates.requested = List.of(place(200L, "바다뷰 카페", "음식점", true, "카페"));
+        RecordingLlm llm = new RecordingLlm();
+        // 모델은 일반 후보(100) 하나만 골랐다 — 후보 풀에 실내 카페가 있어도 초안에는 없다
+        llm.draft = AiPlanDraft.builder()
+            .days(List.of(AiPlanDraft.AiPlanDraftDay.builder().day(1).items(List.of(AiPlanDraft.AiPlanDraftItem.builder()
+                .itemType(PlanItemType.PLACE).placeId(100L).title("후보").note("바다를 보며 걸어요.").build())).build()))
+            .reasons(List.of())
+            .build();
+
+        worker(store, new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        AiPlanDraft saved = store.current().planDraft();
+        assertThat(saved.days().get(0).items()).extracting(AiPlanDraft.AiPlanDraftItem::placeId).containsExactly(100L, 200L);
+        assertThat(saved.reasons()).first().satisfies(reason -> {
+            assertThat(reason.code()).isEqualTo("REQUEST_APPLIED");
+            assertThat(reason.description()).isEqualTo("요청하신 실내 카페를 넣었어요.");
+        });
     }
 
     @Test
@@ -448,6 +475,122 @@ class AiPlanWorkerStepTest {
             assertThat(inZone).as("%s 숙박", zone).filteredOn(Kind.LODGING::matches).hasSize(2);
             assertThat(inZone).as("%s 음식점", zone).filteredOn(Kind.RESTAURANT::matches).hasSize(2);
         }
+    }
+
+    // 요청 지역 (#1423) ──────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("제주 전체 요청에 지역을 적으면 맞닿은 권역 밖 후보를 빼고 요청 권역을 거리순 결과로 채운다 — 새 조회는 없다")
+    void focusesThePoolOnTheRequestedRegion() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("requestNote", "성산 쪽 위주로 다니고 싶어요");
+        RecordingCandidates candidates = northEastFocusReady();
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        List<PlaceCandidate> pool = llm.lastQuery.safeCandidates();
+        assertThat(candidates.nearbyLookups).isEqualTo(18);
+        // 남서부(성산의 맞닿은 권역 밖)는 하나도 남지 않는다
+        assertThat(pool).noneSatisfy(candidate ->
+            assertThat(JejuZone.of(candidate.lat(), candidate.lng())).isEqualTo(JejuZone.SOUTH_WEST));
+        List<PlaceCandidate> northEast = pool.stream()
+            .filter(candidate -> JejuZone.of(candidate.lat(), candidate.lng()) == JejuZone.NORTH_EAST).toList();
+        assertThat(northEast).filteredOn(CandidateZonePolicy::isVisit).hasSize(CandidateZonePolicy.FOCUS_VISITS_PER_ZONE);
+        assertThat(northEast).filteredOn(Kind.RESTAURANT::matches).hasSize(CandidateZonePolicy.FOCUS_RESTAURANTS_PER_ZONE);
+        assertThat(northEast).filteredOn(Kind.LODGING::matches).hasSize(CandidateZonePolicy.FOCUS_LODGINGS_PER_ZONE);
+        // 북부 일반 후보 25곳은 맞닿은 권역이라 남는다 — 25 + 북동부 14
+        assertThat(pool).hasSize(39);
+    }
+
+    @Test
+    @DisplayName("필수 포함 장소는 요청 지역의 맞닿은 권역 밖이어도 남는다 — 지역으로 좁힌 뒤에 합친다 (#1423)")
+    void keepsPinnedPlaceOutsideTheRequestedRegion() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("requestNote", "성산 쪽 위주로 다니고 싶어요");
+        job.requestParams().put("pinnedPlaceIds", "777");
+        RecordingCandidates candidates = northEastFocusReady();
+        candidates.byIds = List.of(located(777L, "관광지", 33.2500, 126.3600));
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        List<PlaceCandidate> pool = llm.lastQuery.safeCandidates();
+        assertThat(pool.get(0).placeId()).isEqualTo(777L);
+        assertThat(JejuZone.of(pool.get(0).lat(), pool.get(0).lng())).isEqualTo(JejuZone.SOUTH_WEST);
+        // 남서부 일반 후보는 빠지고 필수 포함 하나만 남서부다
+        assertThat(pool).filteredOn(candidate -> JejuZone.of(candidate.lat(), candidate.lng()) == JejuZone.SOUTH_WEST)
+            .extracting(PlaceCandidate::placeId).containsExactly(777L);
+        assertThat(pool).hasSize(40);
+    }
+
+    @Test
+    @DisplayName("요청 지역이 풀을 좁히면 실내 · 카페 요청 후보는 맞닿은 권역 안을 먼저 고르고 모자라면 밖에서 채운다 (#1423)")
+    void picksRequestedCafesWithinTheRequestedRegionFirst() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("requestNote", "성산 쪽에서 카페 가고 싶어요");
+        RecordingCandidates candidates = new RecordingCandidates();
+        candidates.requested = List.of(
+            restaurant(801L, "당당", 33.4600, 126.3100),
+            restaurant(803L, "성산 카페", 33.4500, 126.9200));
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        // 성산 카페(북동부)가 앞이고, 8곳에 모자라 북서부 카페도 뒤에 든다. 방문 장소가 모자라 풀 자체는 좁히지 않았다
+        assertThat(llm.lastQuery.safeCandidates()).extracting(PlaceCandidate::placeId).containsExactly(803L, 801L, 100L);
+    }
+
+    @Test
+    @DisplayName("부정된 카페 요청(\"카페 말고 바다 위주로\")은 요청 조건 검색을 하지 않는다 (#1423)")
+    void skipsRequestedLookupWhenTheCafeIsNegated() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("requestNote", "카페 말고 바다 위주로");
+        RecordingCandidates candidates = new RecordingCandidates();
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), new RecordingLlm(), candidates).runJob(JOB_ID);
+
+        assertThat(candidates.requestedLookups).isZero();
+    }
+
+    @Test
+    @DisplayName("하루 재생성이면 요청 문구의 지역을 읽지 않는다 — 기존 일정이 앞뒤 동선을 정한다 (#1423)")
+    void ignoresRequestedRegionOnRegeneration() {
+        AiPlanJob job = pendingJob(null);
+        job.requestParams().put("requestNote", "성산 쪽에서 카페 가고 싶어요");
+        job.requestParams().put("regenerateDay", "2");
+        job.requestParams().put("planId", "7");
+        RecordingCandidates candidates = new RecordingCandidates();
+        candidates.requested = List.of(
+            restaurant(801L, "당당", 33.4600, 126.3100),
+            restaurant(803L, "성산 카페", 33.4500, 126.9200));
+        RecordingLlm llm = new RecordingLlm();
+
+        worker(new FakeJobStore(job), new FakeJobEvents(), llm, candidates).runJob(JOB_ID);
+
+        assertThat(llm.lastQuery.safeCandidates()).extracting(PlaceCandidate::placeId).containsExactly(801L, 803L, 100L);
+    }
+
+    /** 일반 후보는 북부 25곳(id 1~25) · 남서부 25곳(id 26~50), 거리순 조회는 북동부에서만 방문 10 · 숙박 4 · 음식점 4곳을 돌려준다. */
+    private static RecordingCandidates northEastFocusReady() {
+        RecordingCandidates candidates = new RecordingCandidates();
+        List<PlaceCandidateQueryResult> general = new ArrayList<>();
+        for (long id = 1; id <= 50; id++) {
+            general.add(id <= 25 ? located(id, "관광지", 33.5, 126.5) : located(id, "관광지", 33.25, 126.36));
+        }
+        candidates.general = general;
+        List<PlaceCandidateQueryResult> visits = new ArrayList<>();
+        for (int index = 0; index < 10; index++) {
+            visits.add(located(901L + index, "관광지", 33.4600 + index * 0.001, 126.8800));
+        }
+        candidates.nearbyVisits.put(JejuZone.NORTH_EAST, visits);
+        candidates.nearbyLodgings.put(JejuZone.NORTH_EAST, List.of(
+            located(951L, "숙박", 33.4700, 126.8700), located(952L, "숙박", 33.4710, 126.8700),
+            located(953L, "숙박", 33.4720, 126.8700), located(954L, "숙박", 33.4730, 126.8700)));
+        candidates.nearbyRestaurants.put(JejuZone.NORTH_EAST, List.of(
+            located(961L, "음식점", 33.4800, 126.8600), located(962L, "음식점", 33.4810, 126.8600),
+            located(963L, "음식점", 33.4820, 126.8600), located(964L, "음식점", 33.4830, 126.8600)));
+        return candidates;
     }
 
     /** 일반 후보는 북부 50곳(id 1~50, 남동부 0), 거리순 조회는 남동부에서만 방문 5 · 숙박 3 · 음식점 3곳을 돌려준다. */
@@ -726,6 +869,8 @@ class AiPlanWorkerStepTest {
         private boolean failing;
         private Runnable onCall;
         private AiPlanGenerationQuery lastQuery;
+        /** 돌려줄 초안. 비우면 일자도 근거도 없는 초안이다. */
+        private AiPlanDraft draft;
 
         @Override
         public AiPlanDraft generatePlanDraft(AiPlanGenerationQuery query) {
@@ -737,7 +882,7 @@ class AiPlanWorkerStepTest {
             if (failing) {
                 throw new IllegalStateException("model exploded");
             }
-            return AiPlanDraft.builder().days(List.of()).reasons(List.of()).build();
+            return draft != null ? draft : AiPlanDraft.builder().days(List.of()).reasons(List.of()).build();
         }
 
         @Override
@@ -770,6 +915,8 @@ class AiPlanWorkerStepTest {
         private final Map<JejuZone, List<PlaceCandidateQueryResult>> nearbyRestaurants = new EnumMap<>(JejuZone.class);
         private AiPlanException nearbyVisitFailure;
         private int nearbyLookups;
+        /** 아이디로 찾을 때(필수 포함 · 즐겨찾기) 돌려줄 장소 (#1423). 비우면 아무것도 찾지 못한다. */
+        private List<PlaceCandidateQueryResult> byIds = List.of();
 
         @Override
         public List<PlaceCandidateQueryResult> findNearbyCandidates(String areaCode, double lat, double lng, int size) {
@@ -843,7 +990,7 @@ class AiPlanWorkerStepTest {
 
         @Override
         public List<PlaceCandidateQueryResult> findCandidatesByIds(List<Long> placeIds) {
-            return List.of();
+            return byIds.stream().filter(result -> placeIds.contains(result.placeId())).toList();
         }
     }
 

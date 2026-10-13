@@ -3,7 +3,9 @@ package com.hondigagae.domainlayer.planner.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
+import com.hondigagae.domainlayer.planner.application.model.RequestedRegion;
 import com.hondigagae.domainlayer.planner.application.service.CandidateZonePolicy.Kind;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -247,6 +249,93 @@ class CandidateZonePolicyTest {
                 .contains("SOUTH_WEST(visit=0,lodging=1,restaurant=0)")
                 .contains("NORTH_WEST(visit=0,lodging=0,restaurant=1)")
                 .endsWith("unknown=1");
+        }
+    }
+
+    @Nested
+    @DisplayName("요청 지역 (#1423)")
+    class Focus {
+
+        /** "성산 위주" — 요청 권역은 북동부, 맞닿은 권역까지(reach)는 북부 · 북동부 · 남동부다. */
+        private final RequestedRegion seongsan = RequestedRegion.from("성산 위주로 다니고 싶어요");
+
+        /** 북부 방문 4 · 남동부 방문 2 · 북동부 방문 1 · 음식점 1(reach 안 방문 7) + 남서부 방문 2 · 숙박 1 + 권역 모름 1. */
+        private List<PlaceCandidate> pool() {
+            return List.of(
+                visit(1L, "관광지"), visit(2L, "관광지"), visit(3L, "관광지"), visit(4L, "관광지"),
+                spot(11L, 33.3260, 126.8420), spot(12L, 33.3523, 126.7470),
+                spot(21L, 33.2500, 126.3600), spot(22L, 33.2955, 126.1631), JUNGMUN_STAY,
+                spot(31L, 33.4592, 126.8317), cafe(32L, 33.5260, 126.8630),
+                cafe(699L, 35.1587, 129.1604));
+        }
+
+        /** 권역 대표점 거리순 결과의 모양 — 방문 → 음식점 → 숙박. 북동부 것과, 요청 권역이 아닌 남동부 · 북부 것이 섞였다. */
+        private List<PlaceCandidate> extra() {
+            List<PlaceCandidate> extra = new ArrayList<>();
+            extra.add(spot(31L, 33.4592, 126.8317));             // 이미 풀에 있다
+            for (int index = 0; index < 10; index++) {
+                extra.add(spot(1001L + index, 33.4700 + index * 0.001, 126.9000));
+            }
+            extra.add(spot(1101L, 33.3000, 126.7600));             // 남동부 — 맞닿았지만 요청 권역이 아니다
+            extra.add(visit(1201L, "관광지"));                       // 북부 — 같다
+            for (int index = 0; index < 4; index++) {
+                extra.add(cafe(2001L + index, 33.4800 + index * 0.001, 126.8800));
+            }
+            for (int index = 0; index < 4; index++) {
+                extra.add(stay(3001L + index, 33.4900 + index * 0.001, 126.8700));
+            }
+            return extra;
+        }
+
+        @Test
+        @DisplayName("맞닿은 권역 밖과 권역 모르는 후보를 빼고, 요청 권역을 권역별 목표(방문 8 · 음식점 3 · 숙박 3)까지 채운다 — 남은 것도 센다")
+        void dropsOutsideReachAndFillsRequestedZone() {
+            List<PlaceCandidate> focused = CandidateZonePolicy.focus(pool(), extra(), seongsan, 50);
+
+            // 북동부 방문은 이미 1곳 → 7곳, 음식점은 1곳 → 2곳, 숙박 0 → 3곳. 남동부 · 북부 추가분은 싣지 않는다
+            assertThat(focused).extracting(PlaceCandidate::placeId).containsExactly(
+                1L, 2L, 3L, 4L, 11L, 12L, 31L, 32L,
+                1001L, 1002L, 1003L, 1004L, 1005L, 1006L, 1007L,
+                2001L, 2002L,
+                3001L, 3002L, 3003L);
+        }
+
+        @Test
+        @DisplayName("상한을 넘지 않는다 — 칸이 모자라면 방문 장소부터 싣는다")
+        void keepsWithinLimit() {
+            List<PlaceCandidate> focused = CandidateZonePolicy.focus(pool(), extra(), seongsan, 12);
+
+            assertThat(focused).hasSize(12).extracting(PlaceCandidate::placeId)
+                .containsExactly(1L, 2L, 3L, 4L, 11L, 12L, 31L, 32L, 1001L, 1002L, 1003L, 1004L);
+        }
+
+        @Test
+        @DisplayName("맞닿은 권역까지 남는 방문 장소가 6곳보다 적으면 모으지 않고 풀을 그대로 돌려준다")
+        void keepsPoolWhenTooFewVisitsRemain() {
+            List<PlaceCandidate> pool = List.of(
+                visit(1L, "관광지"), visit(2L, "관광지"), spot(31L, 33.4592, 126.8317),
+                spot(21L, 33.2500, 126.3600), spot(22L, 33.2955, 126.1631), spot(23L, 33.2448, 126.3715),
+                spot(24L, 33.2600, 126.3000), spot(25L, 33.2700, 126.2000));
+
+            assertThat(CandidateZonePolicy.visitsWithin(pool, seongsan.reach())).isEqualTo(3);
+            assertThat(CandidateZonePolicy.focus(pool, extra(), seongsan, 50)).isSameAs(pool);
+        }
+
+        @Test
+        @DisplayName("지역을 묻지 않았거나 맞닿은 권역까지가 섬 전체면 풀 그대로다")
+        void keepsPoolWithoutNarrowingRegion() {
+            List<PlaceCandidate> pool = pool();
+
+            assertThat(CandidateZonePolicy.focus(pool, extra(), RequestedRegion.NONE, 50)).isSameAs(pool);
+            assertThat(CandidateZonePolicy.focus(pool, extra(), RequestedRegion.from("애월이랑 남원"), 50)).isSameAs(pool);
+        }
+
+        @Test
+        @DisplayName("채울 결과가 없으면(시군구 지정) 거르기만 한다")
+        void onlyFiltersWithoutExtra() {
+            List<PlaceCandidate> focused = CandidateZonePolicy.focus(pool(), List.of(), seongsan, 50);
+
+            assertThat(focused).extracting(PlaceCandidate::placeId).containsExactly(1L, 2L, 3L, 4L, 11L, 12L, 31L, 32L);
         }
     }
 
