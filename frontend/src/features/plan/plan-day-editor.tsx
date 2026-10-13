@@ -10,6 +10,7 @@ import type { PlanDayEditFocus } from '@/features/plan/use-plan-day-edit'
 import { messages } from '@/lib/messages'
 import type { PlanDayEditItem } from '@/lib/plan/day-items'
 import { hasUnresolvedPlace } from '@/lib/plan/detail'
+import { editorTopNeedsReveal } from '@/lib/plan/edit-reveal'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -59,6 +60,31 @@ export function PlanDayEditor({
   const downRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   const drag = useDragReorder({ onMove })
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  /*
+    **편집을 연 직후 편집 영역 머리가 보이게 한다** (#1427). `순서 편집` 은 카드 맨 아래에
+    있고, 누르면 높은 항목 목록이 낮은 편집기로 바뀌며 액션 줄 · 실내 대안이 사라진다. 스크롤
+    위치는 그대로라 목록 아래쪽에서 누른 사람에게는 편집기 머리가 헤더 뒤로 올라가고 다음
+    일자가 화면에 선다 — 판정은 `lib/plan/edit-reveal.ts`.
+
+    **마운트 때 한 번만** 본다. 편집 중 순서를 옮길 때마다 화면을 끌어당기면 그것이 또 튐이다.
+    `useEffect` 인 이유: 브라우저의 scroll anchoring 보정이 끝난 뒤의 좌표를 읽어야 한다.
+    즉시 이동(`behavior` 기본값)이라 감속 설정과 부딪히지 않는다.
+  */
+  useEffect(() => {
+    const node = rootRef.current
+    if (node === null) return
+
+    const headerHeight =
+      Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--header-h'),
+      ) || 0
+    const top = node.getBoundingClientRect().top
+    if (editorTopNeedsReveal({ top, viewportHeight: window.innerHeight, headerHeight })) {
+      node.scrollIntoView({ block: 'start' })
+    }
+  }, [])
 
   /*
     **이동 후 포커스가 옮겨진 항목을 따라간다** (E6). 이것이 없으면 한 칸 옮길 때마다
@@ -82,7 +108,11 @@ export function PlanDayEditor({
   }, [focusTarget, onClearFocus])
 
   return (
-    <div className="py-2">
+    /*
+      `scroll-mt-28`(112) — 헤더(56/64) 아래로 48 이상을 남긴다. 편집기 바로 위에 서는
+      다녀옴 초기화 안내 한 줄(`plan-day-section.tsx`, 약 30px)까지 함께 보이게 하는 값이다.
+    */
+    <div ref={rootRef} className="scroll-mt-28 py-2">
       <p className={cn('text-caption text-fg-muted font-medium', INSET_CLASS.card)}>
         {messages.plan.editHint}
       </p>

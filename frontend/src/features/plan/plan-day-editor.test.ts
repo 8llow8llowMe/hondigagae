@@ -55,11 +55,49 @@ describe('PlanDayEditor — 편집 중 화면', () => {
     expect(render()).toContain('<ol')
   })
 
-  it('이동 버튼에 접근 가능한 이름이 있다', () => {
+  it('이동 버튼 이름이 어느 장소의 버튼인지 말한다 (#1427)', () => {
     const markup = render()
 
-    expect(markup).toContain(`aria-label="${messages.plan.editMoveUp}"`)
-    expect(markup).toContain(`aria-label="${messages.plan.editMoveDown}"`)
+    for (const entry of ITEMS) {
+      const title = entry.item.title
+      expect(markup).toContain(`aria-label="${messages.plan.editMoveUp.replace('{title}', title)}"`)
+      expect(markup).toContain(
+        `aria-label="${messages.plan.editMoveDown.replace('{title}', title)}"`,
+      )
+      expect(markup).toContain(
+        `aria-label="${messages.plan.editRemoveLabel.replace('{title}', title)}"`,
+      )
+    }
+    // 템플릿 자리표시자가 화면에 새지 않는다
+    expect(markup).not.toContain('{title}')
+  })
+
+  it('삭제 표시한 행은 복구 이름도 장소명을 단다 — 보이는 글자는 그대로다', () => {
+    const markup = render({ items: toggleRemoved(ITEMS, 0) })
+    const title = ITEMS[0]!.item.title
+
+    expect(markup).toContain(
+      `aria-label="${messages.plan.editRestoreLabel.replace('{title}', title)}"`,
+    )
+    expect(markup).toContain(`>${messages.plan.editRestore}<`)
+  })
+
+  it('이동 버튼은 44×44 다 — 가로까지 터치 타깃 하한을 채운다 (#1427 · DESIGN.md §7)', () => {
+    const markup = render()
+    const moveButtons = [...markup.matchAll(/<button[^>]*aria-label="[^"]*로 이동"[^>]*>/g)].map(
+      (match) => match[0],
+    )
+
+    expect(moveButtons).toHaveLength(ITEMS.length * 2)
+    for (const button of moveButtons) {
+      expect(button).toContain('h-11')
+      expect(button).toContain('w-11')
+      expect(button).not.toContain('h-8')
+    }
+  })
+
+  it('편집 영역 머리는 헤더 아래로 여백을 두고 선다 — 진입 시 끌어 올 때의 기준이다 (#1427)', () => {
+    expect(render()).toMatch(/^<div class="scroll-mt-28 /)
   })
 
   it('맨 위의 위로 이동과 맨 아래의 아래로 이동은 잠긴다', () => {
