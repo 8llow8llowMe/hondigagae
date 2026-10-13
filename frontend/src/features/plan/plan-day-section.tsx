@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 
+import { Badge } from '@/components/badge'
 import { Button, ButtonLink } from '@/components/button'
 import { ErrorState } from '@/components/error-state'
 import { Surface, SurfaceList } from '@/components/surface'
@@ -12,6 +13,7 @@ import { PlanItemRow, type PlanItemVisit, timeChipFocusKey } from '@/features/pl
 import { messages } from '@/lib/messages'
 import { formatPlanDay } from '@/lib/plan/date'
 import type { PlanItemRowModel } from '@/lib/plan/detail'
+import type { DayForecastPending } from '@/lib/plan/forecast-notice'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { timeOrderIssues } from '@/lib/plan/time-order'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -69,11 +71,10 @@ export type PlanDayVisit = {
 export type PlanDayWalkSafety = {
   /** 그 항목의 판정. 없으면 아직 안 왔거나 응답에 없는 것이지 오류가 아니다 (D15-6) */
   of: (planItemId: string) => PlanItemWalkSafetyItem | undefined
-  /**
-   * `BEYOND_FORECAST_RANGE` 를 이 일자 단위로 접은 문장 — `lib/plan/walk-safety.ts` 의
-   * `dayBeyondForecastReason()` 가 계산한다. 없으면 `null` 이다.
-   */
-  beyondForecastReason: string | null
+  /*
+    `beyondForecastReason`(예보 밖 문장)은 여기서 걷었다 (#1426 · D27-1). 그 문장은 일정 상단
+    안내(`PlanForecastNotice`)가 한 번만 말하고, 일자에는 `forecastPending` 칩만 붙는다.
+  */
   /**
    * 전체 조회가 5xx·무응답으로 실패했다. **일정 전체에 하나뿐인 사실**이라 호출부가
    * 한 일자에만 `true` 를 준다 — 여러 일자 카드에 같은 오류·재시도를 중복해 세우지
@@ -132,6 +133,7 @@ export function PlanDaySection({
   itemTime,
   regenerateHref,
   planId,
+  forecastPending = null,
 }: {
   day: number
   /** 항목 장소 링크에 일정 맥락(`?plan=&day=`)을 싣는다 (#1429). 없으면 맨 주소다 */
@@ -172,6 +174,14 @@ export function PlanDaySection({
    * 와 같은 판단). **어느 일정이 그런지는 호출부가 안다** — 여기는 `startDate` 를 모른다.
    */
   regenerateHref: string | null
+  /**
+   * 이 일자가 예보 범위 밖인가 (#1426 · D27-1). `planForecastNotice` 가 일정 단위로 계산한다.
+   *
+   * 값이 있으면 **제목 옆 칩 하나**가 그 사실을 말하고, 예전 두 문장(판정 자리의 `예보는 …` ·
+   * 산책 위험도의 `… 나흘 뒤까지입니다…`)은 일정 상단 안내가 한 번만 말한다.
+   * `all` 이면 판정 밴드도 서지 않는다 — 밴드가 할 말이 그 문장뿐이다.
+   */
+  forecastPending?: DayForecastPending | null
 }) {
   const anchorId = planDayAnchorId(day)
   /*
@@ -224,6 +234,18 @@ export function PlanDaySection({
           {dayLabel !== null && (
             <span className="text-body-2 text-fg-muted font-medium tabular-nums">{dayLabel}</span>
           )}
+          {/*
+            **예보 전 칩** (#1426). 등급이 아니라 상태라 `MetricBadge` 가 아니라 중립 배지다 —
+            판정 못 낸 날을 낮은 등급으로 칠하지 않는다는 규칙(#497)과 같다. 이유 문장은 일정
+            상단 안내가 한 번만 갖는다.
+          */}
+          {forecastPending !== null && (
+            <Badge tone="neutral" size="sm">
+              {forecastPending === 'all'
+                ? messages.plan.forecastPendingChip
+                : messages.plan.walkForecastPendingChip}
+            </Badge>
+          )}
 
           {/*
             **액션은 이 줄을 떠났다** (#653 · 진단 PL-4 · 명세 D11-4). 390 실측에서 액션 셋이
@@ -245,28 +267,35 @@ export function PlanDaySection({
           는 모달 안, 실내 대안 `담기` 는 그 목록 머리다. "잃기 전에 알린다" 는 목적은
           그대로다 — 넷 다 저장 전에 선다.
         */}
-        <PlanDayVerdict
-          verdict={verdict}
-          petConditionApplied={petConditionApplied}
-          basisPetName={basisPetName}
-          failed={verdictFailed}
-          pending={verdictPending}
-          onRetry={onRetryVerdict}
-          /*
+        {/*
+          **예보 밖인 날은 밴드를 세우지 않는다** (#1426). 밴드가 할 말이 `예보는 오늘부터 …` 한
+          문장뿐이고 그 문장은 일정 상단이 한 번 말한다 — 제목 옆 `예보 전` 칩이 이 날을 가리킨다.
+          조회 실패는 예외다: 실패한 날은 오류 · 재시도가 서야 한다.
+        */}
+        {(forecastPending !== 'all' || verdictFailed) && (
+          <PlanDayVerdict
+            verdict={verdict}
+            petConditionApplied={petConditionApplied}
+            basisPetName={basisPetName}
+            failed={verdictFailed}
+            pending={verdictPending}
+            onRetry={onRetryVerdict}
+            /*
             **아래 빈 일차 안내와 같은 말을 두 번 하지 않게 한다** (#497). 항목이 없는 날은
             `이 날은 아직 담은 곳이 없어요.` 가 이미 그 사실을 말하므로 판정 자리의 서버
             문장(`NO_PLACE_ITEM`)이 빠진다.
           */
-          dayHasItems={rows.length > 0}
-        />
+            dayHasItems={rows.length > 0}
+          />
+        )}
 
         {/*
           항목 산책 위험도 — 일자 단위 알림 (#625 · 명세 D15-7).
 
           **전체 5xx 는 일정 전체에 한 번뿐이다** — 호출부가 한 일자에만 `failed: true` 를
           준다(D15-7 "재시도 버튼은 일자마다가 아니라 한 번"). `BEYOND_FORECAST_RANGE` 는
-          그 일자 항목이 전부 같은 사유일 때만(`dayBeyondForecastReason()`) 한 줄로 접는다
-          — 서버 판정이 날짜만의 함수라 접어도 잃는 것이 없다. **`LOOKUP_FAILED` 재시도는
+          **여기서 말하지 않는다** (#1426) — 예전에는 일자마다 한 줄이었는데 날짜만의 함수라
+          일정 상단 안내가 한 번 말하고, 이 일자는 제목 옆 칩이 가리킨다. **`LOOKUP_FAILED` 재시도는
           문장이 아니라 버튼만 낸다** — 서버 문장은 각 행이 이미 보여 준다.
         */}
         {walkSafety.failed ? (
@@ -278,10 +307,6 @@ export function PlanDaySection({
             headingLevel={3}
             className="px-0 py-4 md:px-0"
           />
-        ) : walkSafety.beyondForecastReason !== null ? (
-          <p className="text-caption text-fg-muted mt-2 pb-4 font-medium">
-            {walkSafety.beyondForecastReason}
-          </p>
         ) : (
           walkSafety.hasLookupFailed && (
             /*

@@ -264,7 +264,6 @@ export const planDayVisit: PlanDayVisit = {
  */
 export const planDayWalkSafety: PlanDayWalkSafety = {
   of: () => undefined,
-  beyondForecastReason: null,
   failed: false,
   hasLookupFailed: false,
   onRetry: () => undefined,

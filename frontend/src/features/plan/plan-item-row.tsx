@@ -18,6 +18,7 @@ import { planItemIllustration } from '@/lib/plan/illustration'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { formatStartTime } from '@/lib/plan/start-time'
 import type { TimeOrderIssue } from '@/lib/plan/time-order'
+import { travelDurationLabel } from '@/lib/plan/travel-time'
 import { visitToggleForm } from '@/lib/plan/visit-toggle'
 import { walkCourseMetaLine } from '@/lib/plan/walk-course-meta'
 import { itemWalkSafetyView } from '@/lib/plan/walk-safety'
@@ -609,6 +610,10 @@ function PlanItemTimeChip({
  * **"직선" 을 반드시 붙인다.** 제주는 산간·해안도로가 많아 직선거리와 주행거리가 크게
  * 다르다 — `4.1km` 만 쓰면 주행거리로 읽힌다 (D3).
  *
+ * **직전 항목 기준이면 예상 이동 시간을 함께 말한다** (#1426 · D27-3). 거리만으로는 얼마나
+ * 걸리는지 판단할 수 없었다. 값은 AI 초안 담기의 근사(`travelDurationLabel`)와 같은 함수다 —
+ * 숙소 기준 첫 줄에는 붙이지 않는다(이슈가 말한 것은 항목 사이 이동이다).
+ *
  * 30km 이상이면 **그 행만** 경고 톤이다. 별도 경고 배지를 만들지 않는다 — 행 자체가
  * 말하는 것이 편집 동기를 만든다 (아트보드 01 주석). 색만으로 전달하지 않으려고
  * 문장(`— 하루 이동이 길어요.`)이 함께 간다.
@@ -630,7 +635,9 @@ function PlanItemDistance({ model }: { model: PlanItemRowModel }) {
         long ? 'text-metric-low-700' : 'text-fg-muted',
       )}
     >
-      {template.replace('{distance}', distance)}
+      {template
+        .replace('{distance}', distance)
+        .replace('{duration}', travelDurationLabel(model.distanceMeters))}
       {long && messages.plan.longTripSuffix}
     </p>
   )

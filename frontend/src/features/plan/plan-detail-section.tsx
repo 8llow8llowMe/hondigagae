@@ -10,6 +10,7 @@ import { PlanBriefingBanner } from '@/features/plan/plan-briefing-banner'
 import { PlanDayEditor } from '@/features/plan/plan-day-editor'
 import { PlanDayMoveAddModal } from '@/features/plan/plan-day-move-add-modal'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
+import { PlanForecastNotice } from '@/features/plan/plan-forecast-notice'
 import { PlanItemRow, timeChipFocusKey } from '@/features/plan/plan-item-row'
 import { PlanItemTimeModal } from '@/features/plan/plan-item-time-modal'
 import { PlanManageMenu } from '@/features/plan/plan-manage-menu'
@@ -42,6 +43,7 @@ import {
   type PlanItemRowModel,
   toItemRows,
 } from '@/lib/plan/detail'
+import { planForecastNotice } from '@/lib/plan/forecast-notice'
 import { packingPlacement } from '@/lib/plan/packing-promotion'
 import { isReviewSectionVisible } from '@/lib/plan/review'
 import { planStatusActionLayout } from '@/lib/plan/status-action'
@@ -138,6 +140,25 @@ export function PlanDetailSection({
     다른 항목의 판정이 붙는다 (D15-6).
   */
   const walkSafetyMap = walkSafetyByItemId(walkSafetyItems)
+  // 일자 → 그날 항목의 산책 위험도 (도착한 것만). 예보 밖 접기 · 조회 실패 판정이 같이 쓴다
+  const dayWalkSafety = new Map(
+    days.map((group) => [
+      group.day,
+      group.items
+        .map((item) => walkSafetyMap.get(item.planItemId))
+        .filter((entry): entry is PlanItemWalkSafetyItem => entry !== undefined),
+    ]),
+  )
+  /*
+    **예보 밖 안내는 일정에 한 번이다** (#1426 · D27-1). 일자마다 같은 두 문장이 서던 것을
+    일자 열 맨 위 안내 하나로 접고, 일자에는 `forecastPending` 칩만 내린다.
+  */
+  const forecastNotice = planForecastNotice({
+    verdicts: weather?.days ?? [],
+    walkBeyondByDay: new Map(
+      [...dayWalkSafety].map(([day, entries]) => [day, dayBeyondForecastReason(entries)]),
+    ),
+  })
 
   /**
    * **한 번에 한 일자만 편집한다** — 일괄 교체 단위가 일자다 (E0).
@@ -487,6 +508,8 @@ export function PlanDetailSection({
         */}
         <PlanRouteCard totalDays={plan.totalDays} days={days} />
 
+        {forecastNotice !== null && <PlanForecastNotice sentences={forecastNotice.sentences} />}
+
         {days.map((group, index) => (
           <PlanDaySection
             key={group.day}
@@ -540,24 +563,16 @@ export function PlanDetailSection({
               }),
             }}
             itemTime={{ onOpen: (planItemId) => openItemTime(group.day, planItemId) }}
+            forecastPending={forecastNotice?.pendingByDay.get(group.day) ?? null}
             walkSafety={{
               of: (planItemId) => walkSafetyMap.get(planItemId),
-              beyondForecastReason: dayBeyondForecastReason(
-                group.items
-                  .map((item) => walkSafetyMap.get(item.planItemId))
-                  .filter((entry): entry is PlanItemWalkSafetyItem => entry !== undefined),
-              ),
               /*
                 **전체 5xx 는 일정 전체에 한 번뿐이다** — 첫 일자 카드에만 낸다
                 (D15-7 "재시도 버튼은 일자마다가 아니라 한 번"). 나머지 일자는 항목만
                 보여 준다.
               */
               failed: walkSafetyFailed && index === 0,
-              hasLookupFailed: dayHasLookupFailed(
-                group.items
-                  .map((item) => walkSafetyMap.get(item.planItemId))
-                  .filter((entry): entry is PlanItemWalkSafetyItem => entry !== undefined),
-              ),
+              hasLookupFailed: dayHasLookupFailed(dayWalkSafety.get(group.day) ?? []),
               onRetry: onRetryWalkSafety,
             }}
             editor={

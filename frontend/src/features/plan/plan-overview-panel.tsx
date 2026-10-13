@@ -419,25 +419,17 @@ function PlanVerdictToc({
   const hidden = verdicts.length - shown.length
 
   /*
-    세울 줄이 하나도 없으면 목차가 아니라 한 문장이다 (#847).
+    **세울 줄이 하나도 없으면 구획을 내지 않는다** (#1426 · D27-2 — #847 의 "한 문장" 을 걷었다).
 
-    **`nav` 를 내고 `ul` 만 비우지 않는다** — 링크가 없는 랜드마크는 링크 목록에도 로터에도
-    잡히지 않으면서 이름만 차지한다. 구획 자체는 남긴다: 섹션 머리를 지우면 목차가 조용히
-    사라져 "여기 있던 요약이 어디 갔나" 가 되고, 남기면 **요약할 것이 없다는 사실**을
-    요약이 말한다.
+    #847 은 섹션 머리 + `적합도를 확인할 수 있는 날이 없어요.` 를 남겨 "요약이 어디 갔나" 를 막았다.
+    그런데 이 갈래에 떨어지는 대표 경우(먼 여행 — 전부 예보 밖)에서 그 두 줄은 아무것도 요약하지
+    않았다: 이유는 일자 열 맨 위 예보 안내가 한 번 말하고, 날마다의 상태는 일자 제목 옆 칩
+    (`예보 전`)과 일자 카드가 말한다. 지난 일정 · 장소 없는 날도 일자 카드가 각자 말한다.
 
-    **`정보 없음` 줄을 일곱 개 세우는 것보다 짧다** — 353px 이 두 줄로 줄어든다 (D18-2).
+    **치르는 값**: 판정을 기다리는 동안 선 골격이 응답 뒤 사라진다 — 일정 일수만큼 칩/줄이 서
+    있다가 빠지는 것이라, 개요 카드가 본문 위인 1024 미만에서 그만큼 위로 당겨진다.
   */
-  if (shown.length === 0) {
-    return (
-      <div className="border-border border-t pt-4">
-        <p className="text-caption text-fg-muted mb-1 font-medium">
-          {messages.plan.verdictTocTitle}
-        </p>
-        <p className="text-body-2 text-fg-muted">{messages.plan.verdictTocAllUnavailable}</p>
-      </div>
-    )
-  }
+  if (shown.length === 0) return null
 
   return (
     <nav aria-labelledby={PLAN_VERDICT_TOC_TITLE_ID} className="border-border border-t pt-4">

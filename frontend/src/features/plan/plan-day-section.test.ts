@@ -55,7 +55,7 @@ function buttonCount(markup: string): number {
 }
 
 describe('PlanDaySection — 항목 산책 위험도 (#625)', () => {
-  it('BEYOND_FORECAST_RANGE 는 일자에 문장이 한 번만 나온다 — 항목 수와 무관하다', () => {
+  it('BEYOND_FORECAST_RANGE 문장은 일자 카드에 없다 — 일정 상단이 한 번 말한다 (#1426)', () => {
     const sentence =
       '산책 위험도는 시각별 예보로만 안내할 수 있고, 그 예보는 오늘부터 5일까지입니다. 이 날짜는 아직 알려 드릴 수 없습니다.'
     const rows = [
@@ -65,10 +65,21 @@ describe('PlanDaySection — 항목 산책 위험도 (#625)', () => {
 
     const markup = renderDaySection({
       rows,
-      walkSafety: { ...planDayWalkSafety, beyondForecastReason: sentence },
+      forecastPending: 'walk',
+      walkSafety: {
+        ...planDayWalkSafety,
+        of: (planItemId: string) =>
+          planItemWalkSafety({
+            planItemId,
+            walkSafetyLevel: null,
+            unavailableReasonCode: 'BEYOND_FORECAST_RANGE',
+            unavailableReason: sentence,
+          }),
+      },
     })
 
-    expect(markup.split(sentence)).toHaveLength(2) // 한 번만 등장 — split 결과가 둘이다
+    expect(markup).not.toContain(sentence)
+    expect(markup).toContain(`>${messages.plan.walkForecastPendingChip}</span>`)
   })
 
   it('전체 5xx 는 오류 문구와 재시도 버튼을 하나만 낸다', () => {
@@ -221,5 +232,56 @@ describe('PlanDaySection — 시각 역행 · 겹침 경고 칩 (#1424)', () => 
 
     expect(markup).not.toContain(messages.plan.itemTimeBackward)
     expect(markup).not.toContain(messages.plan.itemTimeOverlap)
+  })
+})
+
+/**
+ * 예보 밖인 날 — 이슈 #1426 · 명세 D27-1.
+ *
+ * 3일 일정이면 판정 자리의 `예보는 오늘부터 …` 와 산책 위험도 문장이 여섯 번 섰다. 일자 카드는
+ * 이제 제목 옆 `예보 전` 칩 하나만 갖는다.
+ */
+describe('PlanDaySection — 예보 전 칩 (#1426)', () => {
+  const VERDICT_BEYOND = '예보는 오늘부터 11일까지만 제공되어 이 날짜는 아직 알려 드릴 수 없습니다.'
+  const beyondVerdict = {
+    ...planVerdict,
+    score: null,
+    suitabilityLevel: null,
+    unavailableReasonCode: 'BEYOND_FORECAST_RANGE',
+    unavailableReason: VERDICT_BEYOND,
+  }
+
+  it('`all` 이면 판정 문장 없이 `예보 전` 칩만 선다', () => {
+    const markup = renderDaySection({ verdict: beyondVerdict, forecastPending: 'all' })
+
+    expect(markup).toContain(`>${messages.plan.forecastPendingChip}</span>`)
+    expect(markup).not.toContain(VERDICT_BEYOND)
+  })
+
+  it('칩은 제목 줄에 선다 — 일자 이름 뒤, 첫 항목 앞', () => {
+    const markup = renderDaySection({ verdict: beyondVerdict, forecastPending: 'all' })
+
+    const title = markup.indexOf(messages.plan.dayLabel.replace('{day}', '1'))
+    const chip = markup.indexOf(`>${messages.plan.forecastPendingChip}</span>`)
+    const firstItem = markup.indexOf('김창열미술관')
+    expect(title).toBeLessThan(chip)
+    expect(chip).toBeLessThan(firstItem)
+  })
+
+  it('예보 밖이 아니면 칩이 없고 판정 자리는 예전대로 서버 문장을 말한다', () => {
+    const markup = renderDaySection({ verdict: beyondVerdict })
+
+    expect(markup).not.toContain(`>${messages.plan.forecastPendingChip}</span>`)
+    expect(markup).toContain(VERDICT_BEYOND)
+  })
+
+  it('판정 조회가 실패했으면 `all` 이어도 오류 · 재시도가 선다', () => {
+    const markup = renderDaySection({
+      verdict: beyondVerdict,
+      forecastPending: 'all',
+      verdictFailed: true,
+    })
+
+    expect(markup).toContain(messages.plan.verdictErrorTitle)
   })
 })
