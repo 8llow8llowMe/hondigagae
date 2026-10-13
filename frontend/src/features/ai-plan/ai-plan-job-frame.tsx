@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 
+import { messages } from '@/lib/messages'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
@@ -70,11 +71,17 @@ export function AiPlanJobCondition({
   inset,
   label,
   summary,
+  note = null,
 }: {
   inset: Inset
   /** `만드는 조건`(진행) · `그대로 남아 있는 조건`(실패·취소) */
   label: string
   summary: string | null
+  /**
+   * 사용자가 쓴 요청 문구 (#1431). 지금은 진행 화면만 넘긴다. **작업 조회 응답에 있을 때만** 값이고
+   * 없으면 줄째 없다 — "요청 없음" 같은 자리를 채우지 않는다.
+   */
+  note?: string | null
 }) {
   if (summary === null) return null
 
@@ -82,6 +89,16 @@ export function AiPlanJobCondition({
     <AiPlanJobBlock inset={inset} className="gap-1">
       <p className="text-caption text-fg-muted">{label}</p>
       <p className="text-body-2 text-fg">{summary}</p>
+      {note !== null && (
+        /*
+          **세 줄에서 자른다.** 요청은 500자까지라 그대로 두면 375 에서 `그만두기` 를 접힘 아래로
+          민다 — 이 줄은 "무엇을 부탁했나" 를 떠올리게 하는 자리지 원문을 다시 읽는 자리가 아니다.
+          띄어쓰기 없는 긴 낱말(URL 등)이 폭을 넘지 않게 `break-words` 를 함께 건다.
+        */
+        <p className="text-body-2 text-fg-muted line-clamp-3 break-words">
+          {messages.aiPlan.jobConditionNote.replace('{note}', note)}
+        </p>
+      )}
     </AiPlanJobBlock>
   )
 }

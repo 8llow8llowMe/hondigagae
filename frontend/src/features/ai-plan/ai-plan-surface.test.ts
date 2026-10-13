@@ -67,9 +67,12 @@ describe('/ai-plans/new — 페이지가 바닥과 쌓기를 가른다 (#473)', 
   })
 
   /* `?from` · `today` 를 서버에서 만드는 규약은 표면 전환으로 바뀌지 않는다 */
-  it('서버가 만들던 값(from · today)을 그대로 내려보낸다', () => {
-    expect(newPage).toContain('const { from } = await searchParams')
-    expect(newPage).toContain('<AiPlanCreateView fromJobId={from ?? null} today={today} />')
+  it('서버가 만들던 값(from · pet · today)을 그대로 내려보낸다', () => {
+    expect(newPage).toContain('const { from, pet } = await searchParams')
+    expect(newPage).toContain('fromJobId={singleParam(from)}')
+    // `?pet=<id>` — 링크가 지목한 아이를 미리 고른다 (#1431)
+    expect(newPage).toContain('requestedPetId={singleParam(pet)}')
+    expect(newPage).toContain('today={today}')
   })
 })
 

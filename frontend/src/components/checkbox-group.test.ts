@@ -33,6 +33,23 @@ describe('CheckboxGroup — 여러 개를 고른다', () => {
     expect(markup).toContain('초코')
   })
 
+  /* 값은 숫자 id 라 이름이 될 수 없다 — 이름은 라벨 글자, 근거는 설명이다 (#1431) */
+  it('각 체크박스의 이름은 라벨 글자를, 설명은 보조 설명을 가리킨다', () => {
+    const markup = render()
+    const box = /<input type="checkbox" id="petIds-1"[^>]*>/.exec(markup)?.[0] ?? ''
+
+    expect(box).toContain('aria-labelledby="petIds-1-label"')
+    expect(box).toContain('aria-describedby="petIds-1-description"')
+    expect(markup).toContain('<span id="petIds-1-description"')
+  })
+
+  it('보조 설명이 없으면 설명 연결도 없다', () => {
+    const markup = render({ options: [{ value: '1', label: '몽실이' }] })
+
+    expect(markup).toContain('aria-labelledby="petIds-1-label"')
+    expect(markup).not.toContain('aria-describedby')
+  })
+
   it('여러 개가 동시에 체크된다 — 라디오가 아니다', () => {
     const markup = render({ values: ['1', '2'] })
 
@@ -59,9 +76,12 @@ describe('오류 배선 — RadioGroup 과 같다', () => {
 
   it('오류가 없으면 그 속성들이 없다', () => {
     const markup = render()
+    // 그룹(fieldset)의 속성이다 — 각 체크박스의 설명 연결(#1431)과 다르다
+    const fieldset = /<fieldset[^>]*>/.exec(markup)?.[0] ?? ''
 
+    expect(fieldset).toContain('<fieldset')
     expect(markup).not.toContain('aria-invalid')
-    expect(markup).not.toContain('aria-describedby')
+    expect(fieldset).not.toContain('aria-describedby')
   })
 
   it('그룹 라벨은 legend 다 — 체크박스 그룹은 labelable 이 아니다', () => {
@@ -78,7 +98,10 @@ describe('CheckboxGroup — 라벨 옆 trailing 슬롯', () => {
   const TRAILING = createElement('button', { type: 'button', 'aria-label': '선택 기준' }, '?')
 
   it('슬롯이 없으면 이름을 legend 에 맡긴다 — 기존 동작 그대로', () => {
-    expect(render()).not.toContain('aria-labelledby')
+    const fieldset = /<fieldset[^>]*>/.exec(render())?.[0] ?? ''
+
+    expect(fieldset).toContain('<fieldset')
+    expect(fieldset).not.toContain('aria-labelledby')
   })
 
   it('슬롯을 legend 안, 라벨 뒤에 그린다', () => {

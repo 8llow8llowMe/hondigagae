@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatElapsed, stepElapsedMsOf } from '@/lib/ai-plan/elapsed'
+import { formatElapsed, stepElapsedMsOf, waitElapsedMs } from '@/lib/ai-plan/elapsed'
 
 describe('formatElapsed — 지난 시간만 말한다 (#710)', () => {
   it('1분 미만은 초로 적는다', () => {
@@ -81,5 +81,21 @@ describe('stepElapsedMsOf — 이 단계에서 지난 시간 (#1057)', () => {
     const skewed = stepElapsedMsOf(STARTED, startedMs - 3_000)
     expect(skewed).toBe(-3_000)
     expect(formatElapsed(skewed ?? 0)).toBeNull()
+  })
+})
+
+describe('waitElapsedMs — 대기 화면의 시계는 하나다 (#1431)', () => {
+  it('단계 경과가 없으면 구독 경과다', () => {
+    expect(waitElapsedMs(8_000, null)).toBe(8_000)
+  })
+
+  /* 새로고침 직후 — 구독 경과는 0 부터 다시 세고 단계 경과는 서버 시각이라 이어진다 */
+  it('둘 중 큰 값이다 — 둘 다 실제 경과의 하한이다', () => {
+    expect(waitElapsedMs(2_000, 66_000)).toBe(66_000)
+    expect(waitElapsedMs(68_000, 66_000)).toBe(68_000)
+  })
+
+  it('단계 경과가 음수(기기 시계가 늦다)면 구독 경과다', () => {
+    expect(waitElapsedMs(5_000, -3_000)).toBe(5_000)
   })
 })

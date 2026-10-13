@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { snapshotFromConditions } from '@/lib/ai-plan/conditions'
+import { requestNoteOf, snapshotFromConditions } from '@/lib/ai-plan/conditions'
 import type { AiPlanJobConditions } from '@/types/ai-plan'
 
 /**
@@ -98,5 +98,22 @@ describe('snapshotFromConditions — 서버 조건으로 담기를 되살린다 
   */
   it('petIds 가 비면 복원하지 않는다 — 어느 아이인지 알 수 없다', () => {
     expect(snapshotFromConditions({ ...CONDITIONS, petIds: [] }, nameOf)).toBeNull()
+  })
+})
+
+describe('requestNoteOf — 대기 화면의 요청 문구 (#1431)', () => {
+  it('서버 조건에 있는 문구를 그대로 준다', () => {
+    expect(requestNoteOf(CONDITIONS)).toBe('산책 위주로 부탁해요')
+  })
+
+  it('앞뒤 공백을 걷는다', () => {
+    expect(requestNoteOf({ ...CONDITIONS, requestNote: '  바다 산책  ' })).toBe('바다 산책')
+  })
+
+  /* 없으면 지어내지 않는다 — 줄째 그리지 않는다 */
+  it('조건이 없거나 문구가 비면 null 이다', () => {
+    expect(requestNoteOf(null)).toBeNull()
+    expect(requestNoteOf({ ...CONDITIONS, requestNote: null })).toBeNull()
+    expect(requestNoteOf({ ...CONDITIONS, requestNote: '   ' })).toBeNull()
   })
 })

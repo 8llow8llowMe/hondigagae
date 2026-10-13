@@ -27,14 +27,14 @@ export const metadata: Metadata = {
 export default async function AiPlanNewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string }>
+  searchParams: Promise<{ from?: string | string[]; pet?: string | string[] }>
 }) {
   /*
     `?from={jobId}` — 실패 화면의 `조건 바꾸기` 가 조건을 되살리기 위해 붙인다.
     **조건 자체를 URL 에 담지 않는다** (명세 S8 미결 2) — `jobId` 만 넘기고 값은
     `sessionStorage` 에서 읽는다.
   */
-  const { from } = await searchParams
+  const { from, pet } = await searchParams
 
   /*
     **`today` 를 서버에서 만들어 내려보낸다.** 달력이 "오늘" 을 표시하는데, 클라이언트가
@@ -77,8 +77,22 @@ export default async function AiPlanNewPage({
         */}
         <h1 className="sr-only">{messages.aiPlan.createTitle}</h1>
 
-        <AiPlanCreateView fromJobId={from ?? null} today={today} />
+        {/*
+          `?pet=<id>` — 들어온 링크가 지목한 아이를 미리 고른다 (#1431). 반려견 목록에 없는 id 면
+          무시되고 지금 규칙(헤더 선택 → 대표견)으로 떨어진다(`defaultAiPlanPetIds`). 키가 두 번
+          붙은 배열은 어느 쪽을 믿을지 모르므로 없는 것으로 읽는다.
+        */}
+        <AiPlanCreateView
+          fromJobId={singleParam(from)}
+          requestedPetId={singleParam(pet)}
+          today={today}
+        />
       </SurfaceStack>
     </Canvas>
   )
+}
+
+/** 검색 파라미터 하나 — 빈 값 · 여러 번 붙은 키는 없는 것으로 읽는다 */
+function singleParam(value: string | string[] | undefined): string | null {
+  return typeof value === 'string' && value !== '' ? value : null
 }
