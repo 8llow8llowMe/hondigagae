@@ -119,6 +119,17 @@ describe('경로 조립', () => {
     expect(walkSafetyPath('123', toPetCondition(pet))).not.toContain('targetDate')
   })
 
+  /* 적합도도 같은 규칙이다 (#1450) — 일정 맥락이 없으면 날짜를 만들지 않는다 */
+  it('적합도는 일정 날짜를 targetDate 로 싣는다', () => {
+    expect(suitabilityPath('123', null, '2026-11-06')).toBe(
+      '/places/123/suitability?targetDate=2026-11-06',
+    )
+    const withPet = suitabilityPath('123', toPetCondition(pet), '2026-11-06')
+    expect(withPet).toContain('targetDate=2026-11-06')
+    expect(withPet).toContain('petSociality=HIGH')
+    expect(suitabilityPath('123', toPetCondition(pet))).not.toContain('targetDate')
+  })
+
   /* 적합도가 실제로 이 값을 달고 나가는지 — 조립 단계만 보면 경로에서 빠져도 모른다 */
   it('적합도 경로에 사회성이 실린다', () => {
     expect(suitabilityPath('123', toPetCondition(pet))).toContain('petSociality=HIGH')

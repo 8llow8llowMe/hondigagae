@@ -204,6 +204,12 @@ export const placeMessages = {
   /** `{date}` · `{name}` 치환. 예보 시각과 반려견이 바뀌면 값이 달라지기 때문에 붙인다 */
   detailSuitabilityBasis: '{date} 예보 기준 · {name} 기준',
   detailSuitabilityBasisNoPet: '{date} 예보 기준',
+  /**
+   * 일정에서 들어왔을 때 (#1450 · 장소상세-세부명세 D1-5-3). `{date}` 는 `11/6` 모양이다
+   * (`shortDateLabel`). 산책의 `detailWalkSafetyTripBasisWithPet` 처럼 **반려견을 앞에 둔다** —
+   * 이 진입에서 확인하려는 것은 "헤더의 아이가 아니라 이 일정의 아이로 판정했나" 다.
+   */
+  detailSuitabilityTripBasis: '{name} 기준 · {date} 예보',
 
   /** 판정 조회만 실패한 경우. 화면 전체를 에러로 덮지 않는다 */
   detailSuitabilityErrorTitle: '적합도를 불러오지 못했어요',

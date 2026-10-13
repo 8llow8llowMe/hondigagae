@@ -21,8 +21,11 @@ export const insightKeys = {
     targetDate === null
       ? ([...insightKeys.all, 'walk-safety', placeId, conditionKey] as const)
       : ([...insightKeys.all, 'walk-safety', placeId, conditionKey, targetDate] as const),
-  suitability: (placeId: string, conditionKey: string) =>
-    [...insightKeys.all, 'suitability', placeId, conditionKey] as const,
+  /** 산책 위험도와 같은 규칙이다 (#1450) — 일정 기준 날짜가 있을 때만 끝에 붙는다 */
+  suitability: (placeId: string, conditionKey: string, targetDate: string | null = null) =>
+    targetDate === null
+      ? ([...insightKeys.all, 'suitability', placeId, conditionKey] as const)
+      : ([...insightKeys.all, 'suitability', placeId, conditionKey, targetDate] as const),
   /**
    * 장소 추천 (#1380). 장소 축이 없고 **조건과 개수**가 응답을 가른다 — 개수가 다르면 다양성
    * 규칙(같은 유형은 `limit` 의 절반까지)이 달라져 앞 몇 곳도 달라질 수 있다.

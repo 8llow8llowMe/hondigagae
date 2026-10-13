@@ -82,6 +82,55 @@ describe('PlaceSuitabilityPanel — 화자와 점수', () => {
   })
 })
 
+/* 일정에서 들어왔을 때 (#1450 · 장소상세-세부명세 D1-5-3) */
+describe('PlaceSuitabilityPanel — 일정 기준', () => {
+  it('반려견을 앞에 두고 응답의 판정 날짜를 짧게 쓴다', () => {
+    const markup = render({
+      data: { ...suitability, targetDate: '2026-11-06' },
+      petName: '보리',
+      trip: true,
+    })
+
+    expect(markup).toContain(
+      messages.place.detailSuitabilityTripBasis.replace('{name}', '보리').replace('{date}', '11/6'),
+    )
+    expect(markup).toContain('보리에게')
+    expect(markup).not.toContain('2026-11-06 예보 기준')
+  })
+
+  it('일정 맥락이 없으면 지금 동작의 기준 줄이다', () => {
+    const markup = render({ data: { ...suitability, targetDate: '2026-11-06' } })
+
+    expect(markup).toContain('2026-11-06 예보 기준 · 몽실이 기준')
+  })
+
+  it('판정 날짜를 못 읽으면 지금 동작의 문장으로 물러선다', () => {
+    const markup = render({ data: { ...suitability, targetDate: 'garbage' }, trip: true })
+
+    expect(markup).toContain(
+      messages.place.detailSuitabilityBasis
+        .replace('{date}', 'garbage')
+        .replace('{name}', '몽실이'),
+    )
+  })
+
+  it('예보 범위 밖 여행일(INSUFFICIENT)도 점수를 0 으로 채우지 않고 기준 줄을 남긴다', () => {
+    const markup = render({
+      data: { ...suitabilityInsufficient, targetDate: '2026-12-24' },
+      petName: '보리',
+      trip: true,
+    })
+
+    expect(markup).not.toContain(messages.place.detailScoreUnit)
+    expect(markup).toContain(suitabilityInsufficient.suitabilityLevel.name)
+    expect(markup).toContain(
+      messages.place.detailSuitabilityTripBasis
+        .replace('{name}', '보리')
+        .replace('{date}', '12/24'),
+    )
+  })
+})
+
 describe('PlaceSuitabilityPanel — INSUFFICIENT 은 "나쁨" 이 아니라 "모름" 이다', () => {
   it('score 가 null 이면 0 으로 렌더하지 않는다', () => {
     const markup = render({ data: suitabilityInsufficient })

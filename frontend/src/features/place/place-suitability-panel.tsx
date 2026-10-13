@@ -11,6 +11,7 @@ import { displayTemperature, supportingTemperatures } from '@/lib/insight/temper
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { petCreateHref } from '@/lib/pet/return-to'
+import { shortDateLabel } from '@/lib/place/plan-context'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { DailyWeatherItem, PlaceSuitabilityResponse } from '@/types/insight'
@@ -35,6 +36,11 @@ export type PlaceSuitabilityPanelProps = {
   petName: string | null
   /** 로그인 여부. 게스트 CTA 를 로그인으로 보낼지 반려견 등록으로 보낼지 가른다 */
   authed: boolean
+  /**
+   * 일정에서 들어왔다 (#1450 · 장소상세-세부명세 D1-5). 기준 줄이 반려견을 앞에 두고 여행일을
+   * 짧게 쓴다 — `petName` 은 호출부가 이미 그 일정의 기준 반려견으로 바꿔 넘긴다.
+   */
+  trip?: boolean
 }
 
 /**
@@ -57,6 +63,7 @@ export function PlaceSuitabilityPanel({
   onRetry,
   petName,
   authed,
+  trip = false,
 }: PlaceSuitabilityPanelProps) {
   if (loading) return <PanelSkeleton />
 
@@ -120,14 +127,40 @@ export function PlaceSuitabilityPanel({
         }))}
       />
 
-      <p className="text-caption text-fg-muted font-medium tabular-nums">
-        {messages.place.detailSuitabilityBasis
-          .replace('{date}', data.targetDate)
-          .replace('{name}', petName)}
-      </p>
+      <BasisLine targetDate={data.targetDate} petName={petName} trip={trip} />
 
       <IndoorAlternatives data={data} />
     </div>
+  )
+}
+
+/**
+ * 언제 · 누구 기준인지 한 줄.
+ *
+ * **날짜는 응답의 `targetDate` 에서 읽는다** — 요청한 날짜가 아니라 서버가 실제로 판정한
+ * 날짜다. 산책 패널의 `BasisLine` 과 같은 판단이고, 못 읽으면 지금 동작의 문장으로 물러선다.
+ */
+function BasisLine({
+  targetDate,
+  petName,
+  trip,
+}: {
+  targetDate: string
+  petName: string
+  trip: boolean
+}) {
+  const date = trip ? shortDateLabel(targetDate) : null
+
+  return (
+    <p className="text-caption text-fg-muted font-medium tabular-nums">
+      {date === null
+        ? messages.place.detailSuitabilityBasis
+            .replace('{date}', targetDate)
+            .replace('{name}', petName)
+        : messages.place.detailSuitabilityTripBasis
+            .replace('{name}', petName)
+            .replace('{date}', date)}
+    </p>
   )
 }
 
