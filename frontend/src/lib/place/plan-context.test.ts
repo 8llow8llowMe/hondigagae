@@ -5,9 +5,11 @@ import {
   parsePlanContext,
   pickTripCongestions,
   placeHrefFromPlan,
+  type PlanBasisState,
   planBasisState,
   resolvePlanBasis,
   shortDateLabel,
+  tripOfBasis,
 } from '@/lib/place/plan-context'
 import { congestion } from '@/test/fixtures/insight'
 import { pet, planDetail, secondPet } from '@/test/fixtures/plan'
@@ -18,6 +20,9 @@ import type { PlanDetail } from '@/types/plan'
  */
 
 const params = (query: string) => new URLSearchParams(query)
+
+/** 픽스처 여행(2026-09-12 ~ 14)의 첫날 — 모든 일차가 오늘이거나 앞날이다 */
+const TODAY = '2026-09-12'
 
 const twoPetPlan: PlanDetail = {
   ...planDetail,
@@ -71,22 +76,38 @@ describe('placeHrefFromPlan', () => {
 
 describe('resolvePlanBasis — 날짜', () => {
   it('일차를 여행 시작일에서 센다', () => {
-    const basis = resolvePlanBasis({ plan: planDetail, day: 2, basisPetId: null, pets: [pet] })
+    const basis = resolvePlanBasis({
+      plan: planDetail,
+      day: 2,
+      basisPetId: null,
+      pets: [pet],
+      today: TODAY,
+    })
     expect(basis?.date).toBe('2026-09-13')
   })
 
   it('여행 날짜 전체를 함께 준다', () => {
-    const basis = resolvePlanBasis({ plan: planDetail, day: 1, basisPetId: null, pets: [pet] })
+    const basis = resolvePlanBasis({
+      plan: planDetail,
+      day: 1,
+      basisPetId: null,
+      pets: [pet],
+      today: TODAY,
+    })
     expect(basis?.tripDates).toEqual(['2026-09-12', '2026-09-13', '2026-09-14'])
   })
 
   it('일차가 여행 기간을 넘으면 null 이다 — 없는 날을 판정하지 않는다', () => {
-    expect(resolvePlanBasis({ plan: planDetail, day: 4, basisPetId: null, pets: [pet] })).toBeNull()
+    expect(
+      resolvePlanBasis({ plan: planDetail, day: 4, basisPetId: null, pets: [pet], today: TODAY }),
+    ).toBeNull()
   })
 
   it('기간을 못 읽으면 null 이다', () => {
     const broken = { ...planDetail, startDate: 'x' }
-    expect(resolvePlanBasis({ plan: broken, day: 1, basisPetId: null, pets: [pet] })).toBeNull()
+    expect(
+      resolvePlanBasis({ plan: broken, day: 1, basisPetId: null, pets: [pet], today: TODAY }),
+    ).toBeNull()
   })
 })
 
@@ -97,6 +118,7 @@ describe('resolvePlanBasis — 반려견', () => {
       day: 1,
       basisPetId: secondPet.petId,
       pets: [pet, secondPet],
+      today: TODAY,
     })
     expect(basis?.pet.petId).toBe(secondPet.petId)
   })
@@ -107,6 +129,7 @@ describe('resolvePlanBasis — 반려견', () => {
       day: 1,
       basisPetId: null,
       pets: [secondPet, pet],
+      today: TODAY,
     })
     expect(basis?.pet.petId).toBe(pet.petId)
   })
@@ -117,6 +140,7 @@ describe('resolvePlanBasis — 반려견', () => {
       day: 1,
       basisPetId: secondPet.petId,
       pets: [pet, secondPet],
+      today: TODAY,
     })
     expect(basis?.pet.petId).toBe(pet.petId)
   })
@@ -127,12 +151,15 @@ describe('resolvePlanBasis — 반려견', () => {
       day: 1,
       basisPetId: null,
       pets: [secondPet],
+      today: TODAY,
     })
     expect(basis?.pet.petId).toBe(secondPet.petId)
   })
 
   it('동행 반려견을 하나도 못 찾으면 null 이다', () => {
-    expect(resolvePlanBasis({ plan: planDetail, day: 1, basisPetId: null, pets: [] })).toBeNull()
+    expect(
+      resolvePlanBasis({ plan: planDetail, day: 1, basisPetId: null, pets: [], today: TODAY }),
+    ).toBeNull()
   })
 })
 
@@ -170,19 +197,37 @@ describe('planBasisState', () => {
 
   it('맥락이 없으면 none 이다', () => {
     expect(
-      planBasisState({ context: null, plan: pending, weatherBasisPetId: undefined, pets: pending }),
+      planBasisState({
+        context: null,
+        plan: pending,
+        weatherBasisPetId: undefined,
+        pets: pending,
+        today: TODAY,
+      }),
     ).toEqual({ status: 'none' })
   })
 
   it('일정을 못 읽으면 none 이다 — 남의 일정 · 지운 일정', () => {
     expect(
-      planBasisState({ context, plan: failed, weatherBasisPetId: null, pets: ok([pet]) }),
+      planBasisState({
+        context,
+        plan: failed,
+        weatherBasisPetId: null,
+        pets: ok([pet]),
+        today: TODAY,
+      }),
     ).toEqual({ status: 'none' })
   })
 
   it('반려견 목록을 못 읽으면 none 이다', () => {
     expect(
-      planBasisState({ context, plan: ok(planDetail), weatherBasisPetId: null, pets: failed }),
+      planBasisState({
+        context,
+        plan: ok(planDetail),
+        weatherBasisPetId: null,
+        pets: failed,
+        today: TODAY,
+      }),
     ).toEqual({ status: 'none' })
   })
 
@@ -193,6 +238,7 @@ describe('planBasisState', () => {
         plan: ok(planDetail),
         weatherBasisPetId: undefined,
         pets: ok([pet]),
+        today: TODAY,
       }),
     ).toEqual({ status: 'pending' })
   })
@@ -203,6 +249,7 @@ describe('planBasisState', () => {
       plan: ok(planDetail),
       weatherBasisPetId: null,
       pets: ok([pet]),
+      today: TODAY,
     })
     expect(state.status).toBe('ready')
     expect(state.status === 'ready' && state.basis.date).toBe('2026-09-12')
@@ -215,13 +262,77 @@ describe('planBasisState', () => {
         plan: ok(planDetail),
         weatherBasisPetId: null,
         pets: ok([pet]),
+        today: TODAY,
       }),
     ).toEqual({ status: 'none' })
   })
 })
 
+/*
+  지난 여행(다녀온 일정)의 항목에서 들어오면 지난 날짜로 물었다 — dev 에서 산책은 `UNKNOWN`, 적합도는
+  `INSUFFICIENT`, 근거는 "내일 일정으로 확인해 주세요" 가 왔다. 날짜만 오늘로 물러서고 반려견은 그
+  일정의 아이 그대로다 (#1476 · D1-5-5).
+*/
+describe('지난 여행일 — 날짜는 오늘로 물러선다 (#1476)', () => {
+  const resolve = (day: number, today: string) =>
+    resolvePlanBasis({
+      plan: twoPetPlan,
+      day,
+      basisPetId: secondPet.petId,
+      pets: [pet, secondPet],
+      today,
+    })
+
+  it('오늘보다 앞선 일차는 past 다', () => {
+    expect(resolve(1, '2026-09-13')?.past).toBe(true)
+    expect(resolve(3, '2026-10-13')?.past).toBe(true)
+  })
+
+  it('오늘과 앞날은 past 가 아니다 — 여행 중의 오늘 일차는 그날로 판정한다', () => {
+    expect(resolve(2, '2026-09-13')?.past).toBe(false)
+    expect(resolve(3, '2026-09-13')?.past).toBe(false)
+    expect(resolve(1, '2026-09-01')?.past).toBe(false)
+  })
+
+  /** 테스트 입력이 기간 안이라 늘 고른다 — 못 고르면 테스트가 틀린 것이다 */
+  const ready = (day: number, today: string): PlanBasisState => {
+    const basis = resolve(day, today)
+    if (basis === null) throw new Error('기준을 못 골랐다')
+    return { status: 'ready', basis }
+  }
+
+  it('지난 여행일이면 판정 날짜가 없다(오늘 판정) — 반려견은 그 일정의 아이 그대로다', () => {
+    const state = ready(1, '2026-10-13')
+
+    expect(tripOfBasis(state)).toBeNull()
+    expect(basisPetOf(state, pet)).toBe(secondPet)
+  })
+
+  it('오늘 · 앞날 일차는 그 여행일로 판정한다', () => {
+    expect(tripOfBasis(ready(2, '2026-09-13'))?.date).toBe('2026-09-13')
+  })
+
+  it('기준이 없거나 정하는 중이면 여행 날짜가 없다', () => {
+    expect(tripOfBasis({ status: 'none' })).toBeNull()
+    expect(tripOfBasis({ status: 'pending' })).toBeNull()
+  })
+
+  it('planBasisState 가 오늘을 그대로 넘긴다', () => {
+    const state = planBasisState({
+      context: { planId: twoPetPlan.planId, day: 1 },
+      plan: { data: twoPetPlan, pending: false, failed: false },
+      weatherBasisPetId: null,
+      pets: { data: [pet, secondPet], pending: false, failed: false },
+      today: '2026-10-13',
+    })
+
+    expect(state.status).toBe('ready')
+    expect(tripOfBasis(state)).toBeNull()
+  })
+})
+
 describe('basisPetOf — 화면 전체가 쓰는 기준 반려견 (#1459)', () => {
-  const basis = { pet: secondPet, date: '2026-09-12', tripDates: ['2026-09-12'] }
+  const basis = { pet: secondPet, date: '2026-09-12', tripDates: ['2026-09-12'], past: false }
 
   it('일정 기준이 정해졌으면 헤더에서 고른 아이가 아니라 그 아이다', () => {
     expect(basisPetOf({ status: 'ready', basis }, pet)).toBe(secondPet)

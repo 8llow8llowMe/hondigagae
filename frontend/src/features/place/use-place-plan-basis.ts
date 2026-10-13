@@ -15,10 +15,12 @@ import { parsePlanContext, type PlanBasisState, planBasisState } from '@/lib/pla
  * **key 를 일정 상세 화면과 공유한다** (`planKeys.detail` · `planKeys.weather` · `petKeys.list`) —
  * 일정 상세에서 항목을 누르고 들어오면 셋 다 캐시에 있어 요청이 나가지 않는다.
  *
+ * `today` 는 서버 페이지가 내려준 오늘이다 — 지난 여행일을 가른다(#1476).
+ *
  * **미로그인이면 부르지 않는다** — 일정은 보호 리소스라 403 이 정해져 있다. 그때는 `none`
  * (지금 동작)이다. 공유받은 링크를 다른 사람이 열어도 같은 갈래로 물러선다.
  */
-export function usePlacePlanBasis(authed: boolean): PlanBasisState {
+export function usePlacePlanBasis(authed: boolean, today: string): PlanBasisState {
   const searchParams = useSearchParams()
   const context = authed ? parsePlanContext(searchParams) : null
   const enabled = context !== null
@@ -43,5 +45,6 @@ export function usePlacePlanBasis(authed: boolean): PlanBasisState {
     plan: { data: plan.data, pending: plan.isPending, failed: plan.isError },
     weatherBasisPetId,
     pets: { data: pets.data?.pets, pending: pets.isPending, failed: pets.isError },
+    today,
   })
 }
