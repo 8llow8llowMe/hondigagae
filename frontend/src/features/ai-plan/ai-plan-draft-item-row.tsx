@@ -42,6 +42,17 @@ export type AiPlanDraftItemRowProps = {
    * 사라진다 — 계산과 그 판정은 `lib/ai-plan/draft-distance.ts` 가 한다 (#100).
    */
   distanceMeters?: number | null
+  /**
+   * **담으면 들어갈 시각** `HH:mm` (#1432 · 명세 S11-1). 담기와 같은 함수(`draftDayPreviewTimes`)가
+   * 낸 값이다 — 행이 계산하지 않는다. 담기가 싣지 않는 항목 · 20:00 을 넘는 자리 · 이미 담은
+   * 초안이면 `null` 이고 그때 줄이 사라진다.
+   */
+  startTime?: string | null
+  /**
+   * 행을 눌러 장소 요약 시트를 연다 (#1432 · 명세 S11-2). **장소가 없는 항목(`placeId` null)에는
+   * 주지 않는다** — 열어 보여 줄 장소가 없다. 없으면 행은 누를 수 없다.
+   */
+  onSelect?: () => void
 }
 
 /**
@@ -64,11 +75,14 @@ export function AiPlanDraftItemRow({
   delisted = false,
   excluded = false,
   distanceMeters = null,
+  startTime = null,
+  onSelect,
 }: AiPlanDraftItemRowProps) {
   const typeLabel = itemTypeLabel(item.itemType)
   // **`title`/`note` 는 nullable 이다** — 서버 DTO 에 제약이 없다 (`types/ai-plan.ts`)
   const title = (item.title ?? '').trim()
   const note = (item.note ?? '').trim()
+  const titleLabel = title === '' ? messages.aiPlan.itemTitleUnknown : title
   /*
     **사진이 없다고 확정된 뒤에만 일러스트를 고른다.** 보강 중에 먼저 그리면 사진이 있는
     장소가 일러스트 → 사진으로 깜박인다. 초안의 `itemType` 은 LLM 산출 raw string 이라
@@ -85,7 +99,8 @@ export function AiPlanDraftItemRow({
   return (
     <li
       className={cn(
-        'flex gap-3 py-3',
+        // `relative` — 제목 버튼의 늘린 면(`::after`)이 행을 덮는 기준이다 (#1432)
+        'relative flex gap-3 py-3',
         INSET_CLASS.card,
         // 빼기로 표시한 항목은 취소선으로 남긴다 — 지우면 무엇을 뺐는지 알 수 없다
         excluded && 'opacity-60',
@@ -105,9 +120,43 @@ export function AiPlanDraftItemRow({
       />
 
       <div className="min-w-0 flex-1">
+        {/*
+          **시각은 제목 위 캡션 한 줄이다** — 일정 상세 행(D14-3)과 같은 자리 · 같은 모양이라 담기
+          전과 담은 뒤가 같은 얼굴이다 (#1432). 보이는 글자는 숫자뿐이고 "추천" 이라는 사실은
+          스크린리더 낱말과 담기 안내가 말한다.
+        */}
+        {startTime !== null && (
+          <p className="text-caption text-fg-muted mb-1 font-medium tabular-nums">
+            <span className="sr-only">{messages.aiPlan.itemTimeSrLabel} </span>
+            <time dateTime={startTime}>{startTime}</time>
+          </p>
+        )}
+
         <div className="flex flex-wrap items-center gap-2">
-          <p className={cn('text-body-1 text-fg font-medium', excluded && 'line-through')}>
-            {title === '' ? messages.aiPlan.itemTitleUnknown : title}
+          <p
+            className={cn(
+              // 공백 없는 긴 장소명이 375 에서 넘치지 않게 — PlaceRow · 일정 상세 행과 같은 규칙
+              'text-body-1 text-fg min-w-0 font-medium break-words',
+              excluded && 'line-through',
+            )}
+          >
+            {onSelect === undefined ? (
+              titleLabel
+            ) : (
+              /*
+                **늘린 버튼** (#1432) — 일정 상세 행의 늘린 링크(#1028)와 같은 모양이다. `::after` 가
+                행 면을 덮어 행 어디를 눌러도 시트가 열리고, 초점 링도 행 면을 두른다. 행 전체를
+                `<button>` 으로 감싸지 않는다 — 버튼 안에는 문단(`p`)을 둘 수 없다.
+              */
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                onClick={onSelect}
+                className="focus-visible:after:ring-brand-500 text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2"
+              >
+                {titleLabel}
+              </button>
+            )}
           </p>
           {typeLabel !== null && (
             <Badge tone="neutral" size="sm">

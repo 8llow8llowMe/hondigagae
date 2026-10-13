@@ -1,6 +1,11 @@
 import { draftDayStartTimes } from '@/lib/ai-plan/draft-schedule'
 import type { LatLng } from '@/lib/geo/coord'
-import type { AiPlanDraft, AiPlanRequestSnapshot, AiPlanScheduleItem } from '@/types/ai-plan'
+import type {
+  AiPlanDayItem,
+  AiPlanDraft,
+  AiPlanRequestSnapshot,
+  AiPlanScheduleItem,
+} from '@/types/ai-plan'
 import {
   PLAN_ITEM_TYPES,
   type PlanCreatePayload,
@@ -129,29 +134,14 @@ export function toDraftItems(
   const items: PlanItemRequest[] = []
 
   for (const dayItem of draft.days) {
-    // `@Min(1)` — 0 이나 음수를 보내면 그 항목 때문에 요청 전체가 400 이다
-    if (!Number.isInteger(dayItem.day) || dayItem.day < 1) continue
-    // `Plan.containsDay()` — 기간을 넘는 일차 하나가 `PLAN_002` 로 저장 전체를 막는다
-    if (totalDays !== null && dayItem.day > totalDays) continue
-
     /*
-      **걸러낸 뒤에 시각을 잇는다.** 원본 인덱스로 이으면 제외된 항목 자리에 구멍이 생겨 화면 순서와
-      저장 순서가 어긋나고, 빠진 장소까지의 이동 시간이 남는다. sequence 도 걸러낸 뒤 다시 매긴다.
+      **시각은 미리보기와 같은 함수로 잇는다** (#1432) — `scheduledDayItems` 가 거르기 · 시각 잇기를
+      한 번에 한다. 기간 밖 일차면 `null` 이다.
     */
-    const kept = keptDayItems(dayItem.items, excludedPlaceIds)
+    const scheduled = scheduledDayItems(dayItem, totalDays, excludedPlaceIds, coords)
+    if (scheduled === null) continue
 
-    /*
-      **초안에는 시각이 없지만 비워 보내지 않는다** (#1383 · 일정상세-세부명세 D24). 비우면 항목 산책
-      위험도가 `NO_START_TIME` 으로 꺼진다. 예전에는 순서 슬롯(10:00 · 12:30 · 15:00)이라 날마다 같은
-      템플릿이었다 — 이제 **앞 시각 + 머무는 시간 + 직선거리 이동 시간**이다 (#1424). 20:00 을
-      넘는 자리는 키를 뺀다.
-    */
-    const startTimes = draftDayStartTimes(
-      kept.map((entry) => ({ itemType: entry.itemType, placeId: entry.placeId })),
-      coords,
-    )
-
-    kept.forEach((entry, sequence) => {
+    scheduled.forEach(({ entry, startTime }, sequence) => {
       items.push({
         day: dayItem.day,
         sequence,
@@ -168,7 +158,7 @@ export function toDraftItems(
         ...(entry.placeId === null ? {} : { targetId: entry.placeId }),
         title: entry.title.slice(0, ITEM_TITLE_MAX),
         ...(entry.memo === '' ? {} : { memo: entry.memo }),
-        ...withStartTime(startTimes[sequence]),
+        ...withStartTime(startTime),
       })
     })
   }
@@ -177,6 +167,8 @@ export function toDraftItems(
 }
 
 type KeptDraftItem = {
+  /** 그날 원본 배열에서의 자리 — 미리보기가 걸러진 목록의 시각을 원본 행에 되돌려 놓는다 (#1432) */
+  sourceIndex: number
   itemType: PlanItemTypeCode
   placeId: string | null
   title: string
@@ -193,22 +185,101 @@ export function keptDayItems(
 ): KeptDraftItem[] {
   const kept: KeptDraftItem[] = []
 
-  for (const item of dayItems) {
+  dayItems.forEach((item, sourceIndex) => {
     // **`title`/`note` 는 nullable 이다** — `.trim()` 을 바로 부르면 던진다
     const itemTitle = (item.title ?? '').trim()
-    if (itemTitle === '') continue
-    if (!isPlanItemType(item.itemType)) continue
-    if (item.placeId !== null && excludedPlaceIds?.has(item.placeId) === true) continue
+    if (itemTitle === '') return
+    if (!isPlanItemType(item.itemType)) return
+    if (item.placeId !== null && excludedPlaceIds?.has(item.placeId) === true) return
 
     kept.push({
+      sourceIndex,
       itemType: item.itemType,
       placeId: item.placeId,
       title: itemTitle,
       memo: (item.note ?? '').trim().slice(0, ITEM_MEMO_MAX),
     })
-  }
+  })
 
   return kept
+}
+
+/**
+ * 담기가 받아 주는 일차인가.
+ *
+ * - `@Min(1)` — 0 이나 음수를 보내면 그 항목 때문에 요청 전체가 400 이다
+ * - `Plan.containsDay()` — 기간을 넘는 일차 하나가 `PLAN_002` 로 저장 전체를 막는다.
+ *   기간을 모르면(`null`) 거르지 않는다
+ */
+function isSavableDay(day: number, totalDays: number | null): boolean {
+  if (!Number.isInteger(day) || day < 1) return false
+  return totalDays === null || day <= totalDays
+}
+
+type ScheduledDraftItem = { entry: KeptDraftItem; startTime: string | undefined }
+
+/**
+ * 그날 담기가 싣는 항목과 그 시각. **담기(`toDraftItems`)와 미리보기(`draftDayPreviewTimes`)가 이것
+ * 하나를 쓴다** (#1432) — 둘이 따로 거르고 따로 이으면 "미리 본 시각" 과 "저장된 시각" 이 갈린다.
+ * 담기가 받지 않는 일차면 `null` 이다.
+ */
+function scheduledDayItems(
+  dayItem: AiPlanDayItem,
+  totalDays: number | null,
+  excludedPlaceIds: ReadonlySet<string> | undefined,
+  coords: ReadonlyMap<string, LatLng> | undefined,
+): ScheduledDraftItem[] | null {
+  if (!isSavableDay(dayItem.day, totalDays)) return null
+
+  /*
+    **걸러낸 뒤에 시각을 잇는다.** 원본 인덱스로 이으면 제외된 항목 자리에 구멍이 생겨 화면 순서와
+    저장 순서가 어긋나고, 빠진 장소까지의 이동 시간이 남는다. sequence 도 걸러낸 뒤 다시 매긴다.
+  */
+  const kept = keptDayItems(dayItem.items, excludedPlaceIds)
+
+  /*
+    **초안에는 시각이 없지만 비워 보내지 않는다** (#1383 · 일정상세-세부명세 D24). 비우면 항목 산책
+    위험도가 `NO_START_TIME` 으로 꺼진다. 예전에는 순서 슬롯(10:00 · 12:30 · 15:00)이라 날마다 같은
+    템플릿이었다 — 이제 **앞 시각 + 머무는 시간 + 직선거리 이동 시간**이다 (#1424). 20:00 을
+    넘는 자리는 키를 뺀다.
+  */
+  const startTimes = draftDayStartTimes(
+    kept.map((entry) => ({ itemType: entry.itemType, placeId: entry.placeId })),
+    coords,
+  )
+
+  return kept.map((entry, index) => ({ entry, startTime: startTimes[index] }))
+}
+
+export type DraftDayPreviewOptions = {
+  totalDays: number | null
+  excludedPlaceIds?: ReadonlySet<string> | undefined
+  coords?: ReadonlyMap<string, LatLng> | undefined
+}
+
+/**
+ * 미리보기 행마다 **담으면 들어갈 시각** (서버 형식 `HH:mm:ss`) — #1432 · 공통명세 S11-1.
+ *
+ * 입력 `dayItem.items` 와 **같은 길이 · 같은 순서**로 돌려준다. 담기가 싣지 않는 행(빈 제목 · 모르는
+ * 유형 · 빼기로 표시한 장소 · 기간 밖 일차)과 20:00 을 넘는 자리는 `undefined` 다 — 그 행에는 시각
+ * 줄이 없다. 값은 `toDraftItems` 가 싣는 `startTime` 과 같다(같은 `scheduledDayItems` 를 쓴다).
+ */
+export function draftDayPreviewTimes(
+  dayItem: AiPlanDayItem,
+  { totalDays, excludedPlaceIds, coords }: DraftDayPreviewOptions,
+): (string | undefined)[] {
+  const times: (string | undefined)[] = dayItem.items.map(() => undefined)
+
+  for (const { entry, startTime } of scheduledDayItems(
+    dayItem,
+    totalDays,
+    excludedPlaceIds,
+    coords,
+  ) ?? []) {
+    times[entry.sourceIndex] = startTime
+  }
+
+  return times
 }
 
 function withStartTime(startTime: string | undefined): { startTime?: string } {
