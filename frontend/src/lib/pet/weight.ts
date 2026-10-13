@@ -10,6 +10,8 @@
  * | `GET /places` 의 `petWeightKg` | **`Integer`** | 소수를 못 받는다 |
  */
 
+import { messages } from '@/lib/messages'
+
 /** 백엔드 `@DecimalMin("0.1")` */
 export const MIN_PET_WEIGHT_KG = 0.1
 /** 백엔드 `@DecimalMax("99.9")` */
@@ -41,6 +43,16 @@ export function isValidWeightInput(raw: string): boolean {
 
   const value = Number(normalized)
   return value >= MIN_PET_WEIGHT_KG && value <= MAX_PET_WEIGHT_KG
+}
+
+/**
+ * 체중 칸을 떠날 때 세울 오류 문구 (#1430).
+ *
+ * 유효하면 `undefined`(오류 없음). 타이핑 중에는 부르지 않는다 — `3.` 은 아직 쓰는 중이다.
+ * 값이 다시 바뀌면 호출부가 `undefined` 로 걷는다(`pet-form.tsx` 의 `onChange`).
+ */
+export function weightBlurMessage(raw: string): string | undefined {
+  return isValidWeightInput(raw) ? undefined : messages.pet.weightInvalid
 }
 
 /** 폼 문자열 → 요청 값. 빈 값이거나 읽을 수 없으면 `null`(= 보내지 않음) */

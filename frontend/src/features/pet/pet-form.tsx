@@ -20,7 +20,7 @@ import { messages } from '@/lib/messages'
 import { BIRTH_YM_LENGTH, formatBirthYmInput } from '@/lib/pet/birth-ym'
 import { toPetSavePayload } from '@/lib/pet/form'
 import { sizeChangeForWeight } from '@/lib/pet/size'
-import { isValidWeightInput } from '@/lib/pet/weight'
+import { weightBlurMessage } from '@/lib/pet/weight'
 import { INSET_BLEED_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { Pet, PetFormValues } from '@/types/pet'
@@ -441,11 +441,7 @@ export function PetForm({ initialValues, submitLabel, onSave, onSaved }: PetForm
         onSubmit={() => void submit()}
         onRetry={() => void submit()}
         weightBlurError={weightBlurError}
-        onWeightBlur={() =>
-          setWeightBlurError(
-            isValidWeightInput(values.weightKg) ? undefined : messages.pet.weightInvalid,
-          )
-        }
+        onWeightBlur={() => setWeightBlurError(weightBlurMessage(values.weightKg))}
       />
     </div>
   )
