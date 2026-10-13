@@ -10,6 +10,8 @@ import {
 } from '@/features/pet/pet-row-skeleton'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
+import { aiPlanForPetHref, petListDescription, registeredPet } from '@/lib/pet/next-step'
+import { withCompanionParticle } from '@/lib/text/korean'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
@@ -20,6 +22,11 @@ export type PetListSectionProps = {
   loading: boolean
   errorStatus: number | null
   onRetry: () => void
+  /**
+   * 방금 등록한 반려견 id — 목록 주소의 `?registered=` (#1430). 목록에 있으면 그 아이로
+   * AI 일정 만들기를 권하는 줄이 선다. 없거나 목록에 없으면 아무것도 그리지 않는다.
+   */
+  registeredPetId?: string | null
 }
 
 /**
@@ -39,6 +46,7 @@ export function PetListSection({
   loading,
   errorStatus,
   onRetry,
+  registeredPetId = null,
 }: PetListSectionProps) {
   const limitReached = totalCount >= MAX_PET_COUNT
 
@@ -57,7 +65,12 @@ export function PetListSection({
       lead
       titleId="pet-list-heading"
       title={messages.pet.listTitle}
-      description={<p className="text-body-2 text-fg-muted">{messages.pet.listDescription}</p>}
+      /* 반려견 수에 따라 갈린다 (#1430) — 셀 수 없으면(로딩·오류) 기본 문장이다 */
+      description={
+        <p className="text-body-2 text-fg-muted">
+          {petListDescription(loading || errorStatus !== null ? null : totalCount)}
+        </p>
+      }
       /*
         **등록은 머리의 액션이다** — 장소 목록의 `ViewToggle`(#439)이 선 자리와 같다.
         2a 때는 개수 줄과 한 덩어리로 목록 위에 있었는데, 3a 에서 목록 위 줄은 **목록을
@@ -97,6 +110,7 @@ export function PetListSection({
         loading={loading}
         errorStatus={errorStatus}
         onRetry={onRetry}
+        registeredPetId={registeredPetId}
       />
     </Surface>
   )
@@ -109,7 +123,14 @@ export function PetListSection({
  * 안이다 — 카드 밖 호출자가 있는 `PlaceListSection` 과 다르다 (#462 에서 같은 판단).
  * 네 상태가 **같은 축**에 서는 것은 그대로다 (#451).
  */
-function PetListBody({ pets, totalCount, loading, errorStatus, onRetry }: PetListSectionProps) {
+function PetListBody({
+  pets,
+  totalCount,
+  loading,
+  errorStatus,
+  onRetry,
+  registeredPetId = null,
+}: PetListSectionProps) {
   const inset = 'card'
 
   if (loading) {
@@ -152,8 +173,12 @@ function PetListBody({ pets, totalCount, loading, errorStatus, onRetry }: PetLis
     )
   }
 
+  const registered = registeredPet(pets, registeredPetId ?? undefined)
+
   return (
     <>
+      {registered !== null && <PetNextStep petId={registered.petId} name={registered.name} />}
+
       {/*
         **기준 줄** — 목록이 무엇을 얼마나 담고 있는지 말한다 (긴급 목록 #461 과 같은 자리).
         아래에 선을 그어 목록의 시작을 표시한다: 여백만 두면 이 줄이 첫 번째 행처럼 읽힌다.
@@ -180,5 +205,37 @@ function PetListBody({ pets, totalCount, loading, errorStatus, onRetry }: PetLis
         ))}
       </SurfaceList>
     </>
+  )
+}
+
+/**
+ * 등록 직후의 다음 행동 (#1430). 등록하면 목록으로만 돌아가 할 일이 끊겼다.
+ *
+ * **토스트 액션이 아니라 목록 안의 줄이다.** 토스트는 6초 뒤 사라지고 그 액션은 "결과를
+ * 확인하는 링크만" 담는 자리다(`toast.tsx`) — 다음 일을 권하는 것은 결과 확인이 아니고,
+ * 사라지는 UI 에 두면 읽기 느린 사람은 누를 수 없다. 등록 알림은 토스트가 그대로 맡는다.
+ *
+ * **기준 줄 위, 목록 맨 앞이다.** 방금 한 일에 바로 이어지는 행동이라 먼저 보여야 한다.
+ * 카드 안 L2 항목이라 자기 면을 칠하지 않고 아래 선으로만 가른다 (`DESIGN.md §0`).
+ */
+function PetNextStep({ petId, name }: { petId: string; name: string }) {
+  return (
+    <div
+      className={cn(
+        'border-border flex flex-col gap-3 border-b pt-3 pb-4 md:flex-row md:items-center md:justify-between',
+        INSET_CLASS.card,
+      )}
+    >
+      <p className="text-body-2 text-fg-muted">{messages.pet.nextStepDescription}</p>
+      {/*
+        **이름은 20자까지라 375 에서 버튼 한 줄을 넘는다**(카드 안 343). 버튼 높이가 고정(44)이라
+        줄바꿈하면 글자가 버튼 밖으로 흐르므로 말줄임한다 — 접근 이름은 잘리지 않는다.
+      */}
+      <ButtonLink href={aiPlanForPetHref(petId)} className="max-w-full min-w-0">
+        <span className="truncate">
+          {messages.pet.nextStepAction.replace('{name}', withCompanionParticle(name))}
+        </span>
+      </ButtonLink>
+    </div>
   )
 }

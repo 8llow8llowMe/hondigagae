@@ -140,3 +140,23 @@ describe('sizeChangeForWeight — 자동 선택 (#369)', () => {
     expect(sizeChangeForWeight(weight, from)).toBe(expected)
   })
 })
+
+/*
+  **유효한 체중일 때만 크기를 맞춘다** (#1430). 범위·형식 밖(`0.0` · `100` · `20220312`)은 저장할
+  수 없는 값이라 그 값으로 크기를 옮기면 라디오가 거짓을 보여준다 — 체중 칸이 오류를 말하는
+  동안 크기는 그대로 둔다.
+*/
+describe('sizeChangeForWeight — 유효할 때만 (#1430)', () => {
+  it.each(['0', '0.0', '100', '20220312', '3.55'])(
+    '범위·형식 밖 %s 에는 반응하지 않는다',
+    (raw) => {
+      expect(sizeChangeForWeight(raw, '')).toBeNull()
+      expect(sizeChangeForWeight(raw, 'MEDIUM')).toBeNull()
+    },
+  )
+
+  it('경계 0.1 · 99.9 는 유효하다', () => {
+    expect(sizeChangeForWeight('0.1', '')).toBe('SMALL')
+    expect(sizeChangeForWeight('99.9', 'SMALL')).toBe('LARGE')
+  })
+})

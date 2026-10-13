@@ -7,6 +7,7 @@ import { petListPath } from '@/lib/api/pet'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
+import { REGISTERED_PET_PARAM } from '@/lib/pet/next-step'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import type { PetList } from '@/types/pet'
 
@@ -15,7 +16,18 @@ export const metadata = {
   description: messages.pet.listDescription,
 }
 
-export default async function PetsPage() {
+export default async function PetsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  /*
+    방금 등록한 반려견 (#1430) — 등록 화면이 `/pets?registered=<id>` 로 돌려보낸다. 목록에 있는
+    id 인지는 섹션이 판정한다(`registeredPet`). 배열 값은 받지 않는다.
+  */
+  const registeredParam = (await searchParams)[REGISTERED_PET_PARAM]
+  const registeredPetId = typeof registeredParam === 'string' ? registeredParam : null
+
   // 보호 리소스다. proxy.ts 가 세션 쿠키 존재를 이미 확인했지만, 프리페치에는
   // access token 이 필요하다 — 없으면 프리페치를 건너뛰고 클라이언트가 조회한다
   // (BFF 가 401 → 재발급 흐름을 처리한다).
@@ -59,7 +71,7 @@ export default async function PetsPage() {
         <h1 className="sr-only">{messages.pet.listTitle}</h1>
 
         <HydrationBoundary state={dehydrate(queryClient)}>
-          <PetListView />
+          <PetListView registeredPetId={registeredPetId} />
         </HydrationBoundary>
       </SurfaceStack>
     </Canvas>

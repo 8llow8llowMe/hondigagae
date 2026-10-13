@@ -20,6 +20,7 @@ import { messages } from '@/lib/messages'
 import { BIRTH_YM_LENGTH, formatBirthYmInput } from '@/lib/pet/birth-ym'
 import { toPetSavePayload } from '@/lib/pet/form'
 import { sizeChangeForWeight } from '@/lib/pet/size'
+import { isValidWeightInput } from '@/lib/pet/weight'
 import { INSET_BLEED_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { Pet, PetFormValues } from '@/types/pet'
@@ -67,6 +68,13 @@ export type PetFormFieldsProps = {
   onValueChange: <K extends keyof PetFormValues>(key: K, value: PetFormValues[K]) => void
   onSubmit: () => void
   onRetry: () => void
+  /**
+   * 체중 칸을 떠날 때 잡은 오류 (#1430). **`errors.fields` 와 따로 둔다** — 그쪽은 제출 실패의
+   * 기록이라 위의 요약(`확인이 필요한 항목이 N개`)과 포커스 이동이 그것을 센다. 칸을 떠난 것만으로
+   * 요약 알림이 뜨면 제출하지도 않은 폼이 "실패했다" 고 말한다.
+   */
+  weightBlurError?: string | undefined
+  onWeightBlur?: () => void
 }
 
 /**
@@ -84,7 +92,11 @@ export function PetFormFields({
   onValueChange,
   onSubmit,
   onRetry,
+  weightBlurError,
+  onWeightBlur,
 }: PetFormFieldsProps) {
+  // 제출 오류가 있으면 그쪽이 이긴다 — 같은 규칙(`isValidWeightInput`)이라 문구도 같다
+  const weightError = errors.fields.weightKg ?? weightBlurError
   /*
     **제출 실패를 필드 밖에서도 말한다** (#538). 아홉 필드가 375 에서 네 화면이라, 틀린
     필드가 접힘 아래면 빨간 글자가 화면에 없어 **무엇이 잘못됐는지 알 수 없었다.**
@@ -201,7 +213,7 @@ export function PetFormFields({
         <Field
           id="weightKg"
           label={labels.weightKg}
-          error={errors.fields.weightKg}
+          error={weightError}
           hint={messages.pet.hints.weightKg}
         >
           {/* `type="number"` 를 쓰지 않는다 — 휠·화살표로 값이 바뀌고 로케일에 따라
@@ -221,7 +233,8 @@ export function PetFormFields({
             suffix={messages.pet.weightUnit}
             value={values.weightKg}
             onValueChange={(value) => onValueChange('weightKg', value)}
-            invalid={errors.fields.weightKg !== undefined}
+            onBlur={onWeightBlur}
+            invalid={weightError !== undefined}
           />
         </Field>
 
@@ -343,6 +356,12 @@ export type PetFormProps = {
  */
 export function PetForm({ initialValues, submitLabel, onSave, onSaved }: PetFormProps) {
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
+  /*
+    **체중은 칸을 떠날 때 검증한다** (#1430). `20220312` 가 입력 중에는 아무 말 없이 통과하고
+    제출할 때만 오류가 났다 — 아홉 필드를 다 채운 뒤에야 위로 돌아와 고쳐야 했다. 타이핑 중에는
+    말하지 않는다(`3.` 은 아직 쓰는 중이다). 다시 고치기 시작하면 걷는다.
+  */
+  const [weightBlurError, setWeightBlurError] = useState<string | undefined>(undefined)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const { values, errors, isSubmitting, isDirty, setValue, setErrors, submit, submitCount } =
@@ -408,15 +427,25 @@ export function PetForm({ initialValues, submitLabel, onSave, onSaved }: PetForm
             방금 만진 필드를 화면이 되돌리면 폼과 씨름하는 느낌이 된다.
 
             **읽을 수 없는 값은 `null` 이라 라디오가 타이핑 도중에 튀지 않는다**
-            (`1.` · `` · `abc`). 판정은 `lib/pet/size.ts` 한 곳이 갖는다.
+            (`1.` · `` · `abc`). **저장할 수 없는 값(`0.0` · `20220312`)에도 옮기지 않는다**
+            (#1430) — 체중 칸이 오류를 말하는 동안 크기는 마지막 유효값에 남는다.
+            판정은 `lib/pet/size.ts` 한 곳이 갖는다.
           */
           if (key !== 'weightKg') return
+
+          setWeightBlurError(undefined)
 
           const derived = sizeChangeForWeight(value as string, values.sizeType)
           if (derived !== null) setValue('sizeType', derived)
         }}
         onSubmit={() => void submit()}
         onRetry={() => void submit()}
+        weightBlurError={weightBlurError}
+        onWeightBlur={() =>
+          setWeightBlurError(
+            isValidWeightInput(values.weightKg) ? undefined : messages.pet.weightInvalid,
+          )
+        }
       />
     </div>
   )

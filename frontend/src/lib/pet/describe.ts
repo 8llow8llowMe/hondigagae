@@ -1,3 +1,4 @@
+import { messages } from '@/lib/messages'
 import type { Pet } from '@/types/pet'
 
 /**
@@ -19,6 +20,17 @@ export function petAgeText(age: number | null): string | null {
 }
 
 /**
+ * 체중 한 조각 — `3.5kg` (#1430). 단위는 `messages.pet.weightUnit` 과 같은 `kg` 다.
+ *
+ * **모르면 `null` 이다.** 체중은 선택 입력이라 `null` 은 "모름" 이지 0 이 아니다 —
+ * `0kg` 로 그리면 틀린 사실이 된다. 호출부가 그 조각을 뺀다.
+ */
+export function petWeightText(weightKg: number | null): string | null {
+  if (weightKg === null || !Number.isFinite(weightKg)) return null
+  return `${weightKg}${messages.pet.weightUnit}`
+}
+
+/**
  * 반려견 한 줄 소개.
  *
  * **크기를 넣는 자리와 빼는 자리가 다르다.**
@@ -26,7 +38,7 @@ export function petAgeText(age: number | null): string | null {
  * - 일정 필터 레일 · 만들기 폼(`말티즈 · 4살`) — 여기서는 두 마리를 구별하기만 하면 되고
  *   280 레일에 세 조각은 잘린다. 아트보드 `여행 일정` 05 도 두 조각만 쓴다
  *
- * 체중은 어디서도 쓰지 않는다 — 백엔드 `Pet` 에 필드가 없다.
+ * 체중은 여기 넣지 않는다 — 반려견 목록 행만 따로 보여준다(`petWeightText`, #1430).
  *
  * 조각이 하나도 없으면 **빈 문자열이 아니라 `null`** 이다. 호출부가 빈 줄을 렌더해
  * 자리만 차지하는 것을 막는다.
