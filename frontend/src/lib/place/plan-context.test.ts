@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  basisPetOf,
   parsePlanContext,
   pickTripCongestions,
   placeHrefFromPlan,
@@ -216,5 +217,22 @@ describe('planBasisState', () => {
         pets: ok([pet]),
       }),
     ).toEqual({ status: 'none' })
+  })
+})
+
+describe('basisPetOf — 화면 전체가 쓰는 기준 반려견 (#1459)', () => {
+  const basis = { pet: secondPet, date: '2026-09-12', tripDates: ['2026-09-12'] }
+
+  it('일정 기준이 정해졌으면 헤더에서 고른 아이가 아니라 그 아이다', () => {
+    expect(basisPetOf({ status: 'ready', basis }, pet)).toBe(secondPet)
+  })
+
+  it('맥락이 없거나 물러서면(none) 헤더에서 고른 아이다', () => {
+    expect(basisPetOf({ status: 'none' }, pet)).toBe(pet)
+    expect(basisPetOf({ status: 'none' }, null)).toBeNull()
+  })
+
+  it('기준을 정하는 동안(pending)은 아무 아이도 아니다 — 헤더 아이를 먼저 그렸다가 바꾸지 않는다', () => {
+    expect(basisPetOf({ status: 'pending' }, pet)).toBeNull()
   })
 })

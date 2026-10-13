@@ -17,6 +17,7 @@ import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { toPetCondition } from '@/lib/api/insight'
 import { CONGESTION_DEFAULT_DAYS, type CongestionDays } from '@/lib/insight/congestion'
 import { writeRecentPlaceId } from '@/lib/insight/recent-place'
+import { basisPetOf } from '@/lib/place/plan-context'
 import { placeItemTypeOf } from '@/lib/plan/day-items'
 
 /**
@@ -54,7 +55,12 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
   */
   const planBasis = usePlacePlanBasis(authed)
   const trip = planBasis.status === 'ready' ? planBasis.basis : null
-  const basisPet = trip?.pet ?? pet
+  /*
+    **동반 조건 절도 같은 아이로 대조한다** (#1459 · D1-5-4). 판정은 "보리에게" 인데 크기 대조가
+    헤더의 "몽" 이면 한 화면이 두 아이를 말한다. 하단 바 · 담기 시트는 반려견을 표기하지 않아
+    맞출 것이 없다.
+  */
+  const basisPet = basisPetOf(planBasis, pet)
   /*
     조건을 한 번만 만들어 두 판정에 넘긴다 — 두 key 가 같은 `conditionKey` 로 갈려야 반려견
     전환이 두 판정에 동시에 반영된다. 산책 위험도(#197)는 **적합도와 별도 query 다** —
@@ -141,9 +147,9 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
           onDaysChange: setCongestionDays,
           tripDates: trip?.tripDates ?? null,
         }}
-        petName={pet?.name ?? null}
-        petSizeCode={pet?.sizeType.code ?? null}
-        petSizeName={pet?.sizeType.name ?? null}
+        petName={basisPet?.name ?? null}
+        petSizeCode={basisPet?.sizeType.code ?? null}
+        petSizeName={basisPet?.sizeType.name ?? null}
         actions={{
           authed,
           saved: favorite.saved,

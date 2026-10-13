@@ -149,6 +149,23 @@ export function pickTripCongestions(
 export type PlanBasisState =
   { status: 'none' } | { status: 'pending' } | { status: 'ready'; basis: PlanBasis }
 
+/**
+ * 장소 상세 **한 화면이 쓰는 기준 반려견** (#1459 · 장소상세-세부명세 D1-5-4).
+ *
+ * 적합도 · 산책 위험도 · 동반 조건 절이 모두 이 값 하나를 쓴다. 한 화면에 "보리에게" 판정과
+ * "몽은 소형견이라…" 대조가 함께 보이면 어느 아이 기준의 답인지 알 수 없다.
+ *
+ * - `ready` → 그 일정의 기준 반려견 (헤더에서 고른 아이보다 먼저다)
+ * - `none` → 헤더에서 고른 아이 (지금 동작)
+ * - `pending` → `null`. 헤더 아이로 먼저 그렸다가 일정 아이로 바꾸면 문장이 한 번 뒤바뀐다 —
+ *   판정 패널이 스켈레톤으로 기다리는 것과 같은 이유다
+ */
+export function basisPetOf(state: PlanBasisState, selected: Pet | null): Pet | null {
+  if (state.status === 'ready') return state.basis.pet
+  if (state.status === 'pending') return null
+  return selected
+}
+
 type Source<T> = { data: T | undefined; pending: boolean; failed: boolean }
 
 /**
