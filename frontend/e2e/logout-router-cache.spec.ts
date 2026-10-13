@@ -195,4 +195,55 @@ test.describe('로그아웃 뒤 라우터 캐시 (#1099)', () => {
     expect(await previousUserSightings(page)).toEqual([])
     expect(await stayedInDocument(page)).toBe(true)
   })
+
+  /*
+    **로그아웃 뒤 보호 API 를 다시 부르지 않는다** (#1421). 캐시를 바로 비우면 지금 화면이 한 번 더 그려질 때
+    (확인 창 닫기 · `setLoggingOut(false)`) `useQuery` 가 비워진 캐시를 보고 쿼리를 새로 만들어 세션 없이
+    불렀다 — 마이페이지 로그아웃은 `members/me` · `members/me/pets` · `favorites/places` 401 세 건(운영 E2E
+    #1418), 헤더 로그아웃은 `members/me` 401 한 건. 캐시는 이제 떠나는 컴포넌트가 내려갈 때 비운다
+    (`useClearCacheOnLeave`). 뒤로가기 테스트(위)가 "다음 화면에 이전 사용자가 보이지 않는다" 를 지키므로,
+    여기는 "나가는 화면이 다시 부르지 않는다" 만 본다. 홈의 공개 API(날씨 · 추천 등)는 세지 않는다.
+  */
+  function watchProtectedAfterLogout(page: Page) {
+    const state = { loggedOut: false, requests: [] as string[] }
+    page.on('response', (response) => {
+      if (new URL(response.url()).pathname === '/api/bff/auth/logout') state.loggedOut = true
+    })
+    page.on('request', (request) => {
+      const path = new URL(request.url()).pathname
+      if (state.loggedOut && /^\/api\/bff\/(members|favorites|plans)(\/|$)/.test(path)) {
+        state.requests.push(`${request.method()} ${path}`)
+      }
+    })
+    return state
+  }
+
+  test('마이페이지 로그아웃 뒤 보호 API 를 다시 부르지 않는다', async ({ page }) => {
+    await page.goto('/mypage')
+    await routerMounted(page)
+    await expect(page.getByText('제주댕댕', { exact: true })).toBeVisible()
+    const watched = watchProtectedAfterLogout(page)
+
+    await page.locator('main').getByRole('button', { name: '로그아웃' }).click()
+    await page.getByRole('alertdialog').getByRole('button', { name: '로그아웃' }).click()
+    await expect(page).toHaveURL(/\/login$/)
+    await expect(page.locator('#email')).toBeVisible()
+
+    expect(watched.loggedOut).toBe(true)
+    expect(watched.requests).toEqual([])
+  })
+
+  test('헤더 계정 메뉴 로그아웃 뒤에도 보호 API 를 다시 부르지 않는다', async ({ page }) => {
+    await page.goto('/mypage')
+    await expect(page.getByText('제주댕댕', { exact: true })).toBeVisible()
+    const watched = watchProtectedAfterLogout(page)
+
+    await openAccountMenuItem(page, '로그아웃')
+    await expect(
+      page.locator('header').getByRole('link', { name: '로그인', exact: true }).first(),
+    ).toBeVisible()
+
+    expect(watched.loggedOut).toBe(true)
+    expect(watched.requests).toEqual([])
+  })
 })

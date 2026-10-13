@@ -3,8 +3,7 @@
 import { useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { useQueryClient } from '@tanstack/react-query'
-
+import { useClearCacheOnLeave } from '@/features/member/use-clear-cache-on-leave'
 import { clearSavedLoginEmail, forgetsSavedLoginEmail } from '@/lib/auth/saved-login-email'
 
 /**
@@ -31,15 +30,20 @@ export type ReauthReason = 'password-changed' | 'password-removed' | 'withdrawn'
  * `queryClient.clear()` 가 필수다. 남겨 두면 다음 로그인 계정이 **이전 사용자의 캐시**를
  * 잠시 본다 — 개인정보 유출이다.
  *
+ * **비우기는 떠나는 화면이 내려간 뒤다** (#1421 · `useClearCacheOnLeave`). 바로 비우면 호출부가 그
+ * 뒤에 바꾸는 상태(확인 창 닫기 · `setSubmitting(false)` 등)로 지금 화면이 다시 그려지며 보호 API 를
+ * 세션 없이 다시 불렀다. 호출부마다 "나간 뒤에는 상태를 바꾸지 말라" 를 지키게 하는 쪽은 버렸다 —
+ * 넷(로그아웃 · 탈퇴 · 비밀번호 변경 · 소셜 전용 전환) 다 어기고 있었고, 다섯째가 또 어긴다.
+ *
  * `replace` 를 쓴다. 뒤로가기로 방금 떠난 보호 화면에 되돌아가지 않게 한다.
  */
 export function useSessionExit() {
   const router = useRouter()
-  const queryClient = useQueryClient()
+  const clearCacheOnLeave = useClearCacheOnLeave()
 
   return useCallback(
     (reason?: ReauthReason) => {
-      queryClient.clear()
+      clearCacheOnLeave()
       /*
         **탈퇴 · 소셜 전용 전환이면 기억한 이메일을 지운다** (#1081). 그 이메일로는 더 이상
         이메일 로그인을 할 수 없다. 로그인 화면이 `?reauth=` 를 보고 지우지 않는 이유:
@@ -58,6 +62,6 @@ export function useSessionExit() {
       */
       router.refresh()
     },
-    [queryClient, router],
+    [clearCacheOnLeave, router],
   )
 }

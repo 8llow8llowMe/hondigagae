@@ -3,10 +3,9 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { useQueryClient } from '@tanstack/react-query'
-
 import { Menu, MenuAnchor, type MenuItem } from '@/components/menu'
 import { ProfileAvatar } from '@/features/member/profile-avatar'
+import { useClearCacheOnLeave } from '@/features/member/use-clear-cache-on-leave'
 import { useHeaderMyInfo } from '@/features/member/use-my-info'
 import { ACCOUNT_MENU_ITEMS } from '@/features/nav/menu-items'
 import { logout } from '@/lib/api/auth'
@@ -38,7 +37,7 @@ export function AccountMenu({
   variant?: 'header' | 'island'
 } = {}) {
   const router = useRouter()
-  const queryClient = useQueryClient()
+  const clearCacheOnLeave = useClearCacheOnLeave()
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -63,7 +62,8 @@ export function AccountMenu({
    * 안내할 이유가 없다. 홈은 미로그인에도 성립하는 화면이라 그대로 보낼 수 있다.
    *
    * `queryClient.clear()` 가 필수다. 남겨 두면 다음 로그인 계정이 **이전 사용자의 캐시**를
-   * 잠시 본다 — 개인정보 유출이다.
+   * 잠시 본다 — 개인정보 유출이다. **이 메뉴가 내려갈 때 비운다** (#1421 · `useClearCacheOnLeave`) —
+   * 바로 비우면 아래 `setLoggingOut(false)` 리렌더에서 `useHeaderMyInfo` 가 세션 없이 다시 불러 401 이 났다.
    *
    * `replace` 를 쓴다. 뒤로가기로 방금 떠난 보호 화면에 되돌아가지 않게 한다.
    * `refresh` 는 서버 컴포넌트가 들고 있는 세션 상태(전역 nav 등)까지 다시 그린다.
@@ -86,7 +86,8 @@ export function AccountMenu({
     } finally {
       // 서버 호출이 실패해도 화면을 로그인 상태로 남겨 두지 않는다. 사용자는 이미
       // 나가겠다고 말했고, 세션 쿠키는 BFF 가 응답과 무관하게 만료시킨다.
-      queryClient.clear()
+      // 캐시는 이 메뉴가 내려갈 때 비운다 — `refresh` 뒤 비로그인 헤더로 바뀌며 내려간다 (#1421)
+      clearCacheOnLeave()
       router.replace('/')
       router.refresh()
       setLoggingOut(false)
