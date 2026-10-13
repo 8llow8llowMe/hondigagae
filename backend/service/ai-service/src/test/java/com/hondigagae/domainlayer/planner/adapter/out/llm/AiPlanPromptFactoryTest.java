@@ -9,6 +9,7 @@ import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PetLifeStage;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
+import com.hondigagae.shared.travel.place.AllowedPetSize;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -294,7 +295,7 @@ class AiPlanPromptFactoryTest {
     void candidateLinesUseNumbersInsteadOfIds() {
         String prompt = factory.userPrompt(query(List.of()));
 
-        assertThat(prompt).contains("\n- 1. 장소 | 관광지 | 실내 | 입장크기: 소형견 | 체중제한: 10kg | 분류: 여행지 | 권역: 북부\n");
+        assertThat(prompt).contains("\n- 1. 장소 | 관광지 | 실내 | 입장크기: 소형견만 가능 | 체중제한: 10kg | 분류: 여행지 | 권역: 북부\n");
         assertThat(prompt).doesNotContain("placeId");
         assertThat(prompt).endsWith("2일 일정을 만들어 주세요.");
     }
@@ -578,7 +579,8 @@ class AiPlanPromptFactoryTest {
     void candidateEntranceLimitsAppear() {
         String prompt = factory.userPrompt(query(List.of()));
 
-        assertThat(prompt).contains("입장크기: 소형견");
+        // 입장 크기는 enum 으로 들고 표시명을 싣는다 — 검색 · 내부 조회 어느 경로로 왔든 같은 문구다 (#1420)
+        assertThat(prompt).contains("입장크기: 소형견만 가능");
         assertThat(prompt).contains("체중제한: 10kg");
     }
 
@@ -660,7 +662,7 @@ class AiPlanPromptFactoryTest {
                 .contentTypeName("관광지")
                 .addr("제주")
                 .petAllowanceName("동반 가능")
-                .allowedPetSizeName("소형견")
+                .allowedPetSize(AllowedPetSize.SMALL_ONLY)
                 .maxPetWeightKg(10)
                 .indoor(true)
                 .sourceCategory("여행지")

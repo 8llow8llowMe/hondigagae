@@ -11,6 +11,7 @@ import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.global.properties.AiLlmProperties;
+import com.hondigagae.shared.travel.place.AllowedPetSize;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -198,7 +199,7 @@ class PlanPromptSizeTest {
                 .contentTypeName("음식점")
                 .addr("제주특별자치도 제주시 한림읍 애월해안로 " + (100 + index))
                 .petAllowanceName("동반 가능")
-                .allowedPetSizeName("소형견")
+                .allowedPetSize(AllowedPetSize.SMALL_ONLY)
                 .maxPetWeightKg(10)
                 .indoor(index % 2 == 0)
                 .sourceCategory("반려동물 동반 여행지")

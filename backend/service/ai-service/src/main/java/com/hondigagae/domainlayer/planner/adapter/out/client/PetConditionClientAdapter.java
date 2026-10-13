@@ -72,10 +72,13 @@ public class PetConditionClientAdapter implements PetConditionQueryPort {
     }
 
     private PetCondition toCondition(PetConditionClientResponse body) {
+        PetSizeType sizeType = sizeType(body.sizeType());
         return PetCondition.builder()
             .breed(body.breed())
-            .sizeName(sizeName(body.sizeType()))
+            .sizeName(sizeType == null ? null : sizeType.getDisplayName())
+            .sizeType(sizeType)
             .weightText(weightText(body.weightKg()))
+            .weightKg(body.weightKg())
             .ageText(ageText(body.ageMonths()))
             .lifeStage(PetLifeStage.fromAgeMonths(body.ageMonths()))
             .heatSensitive(body.heatSensitive())
@@ -105,9 +108,10 @@ public class PetConditionClientAdapter implements PetConditionQueryPort {
         return weightKg == null ? null : weightKg.stripTrailingZeros().toPlainString();
     }
 
-    private String sizeName(String sizeType) {
+    /** 모르는 코드 · null 이면 null. 표기({@code sizeName})와 입장 판정(#1420)이 이 한 값에서 나온다. */
+    private PetSizeType sizeType(String sizeType) {
         try {
-            return PetSizeType.valueOf(sizeType).getDisplayName();
+            return PetSizeType.valueOf(sizeType);
         } catch (RuntimeException exception) {
             return null;
         }

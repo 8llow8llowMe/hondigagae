@@ -28,6 +28,10 @@ public interface PlaceCandidateClient {
      * @param lat 기준 위도. {@code lng} 와 함께 주면 그 점에서 가까운 순이고, 둘 다 null 이면 {@code placeId} 순이다 (#1312).
      *            하나만 주면 tour-service 가 400(PLACE_109)을 낸다
      * @param lng 기준 경도
+     * @param petSizeType 동행견 중 가장 큰 크기({@code PetSizeType} 이름). 받아 주지 않는 것으로 확인된 곳을 뺀다 —
+     *                    정보 없음인 곳은 남는다. null 이면 크기로 거르지 않는다 (#1420)
+     * @param petWeightKg 동행견 중 가장 무거운 유효 체중의 올림(kg, 1~100). 상한이 그보다 낮은 곳을 뺀다. null 이면 체중으로 거르지 않는다 (#1420).
+     *                    거리순({@code lat} · {@code lng})이어도 같은 필터가 걸린다
      */
     @GetMapping("/api/v1/places")
     Response<PlaceSliceClientResponse> searchPlaces(
@@ -39,6 +43,8 @@ public interface PlaceCandidateClient {
         @RequestParam(value = "sourceCategory", required = false) String sourceCategory,
         @RequestParam(value = "contentType", required = false) String contentType,
         @RequestParam(value = "lat", required = false) Double lat,
-        @RequestParam(value = "lng", required = false) Double lng
+        @RequestParam(value = "lng", required = false) Double lng,
+        @RequestParam(value = "petSizeType", required = false) String petSizeType,
+        @RequestParam(value = "petWeightKg", required = false) Integer petWeightKg
     );
 }

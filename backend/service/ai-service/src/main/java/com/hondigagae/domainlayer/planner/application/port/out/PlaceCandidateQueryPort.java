@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.planner.application.port.out;
 
+import com.hondigagae.domainlayer.planner.application.model.PetAdmission;
 import com.hondigagae.domainlayer.planner.application.port.out.query.PlaceCandidateQueryResult;
 import java.util.List;
 
@@ -12,6 +13,10 @@ import java.util.List;
  *
  * <p>사후에 검증하는 방식보다 낫다. 검증은 틀린 답을 걸러낼 뿐이지만, 후보를 주는 방식은
  * 애초에 틀릴 자리를 없앤다 (services/ai-service.md 의 환각 방지 항목).
+ *
+ * <p><b>검색 메서드는 마지막 인자 {@link PetAdmission} 으로 동행견이 들어갈 수 없는 장소를 검색 단계에서 거른다 (#1420).</b>
+ * 크기 · 체중 제한이 맞지 않는 장소가 후보 자리를 차지하지 않게 한다 — 동반 가능 숙박 중 중형견 15kg 이 들어갈 수 있는 곳은
+ * 27곳, 대형견 30kg 은 17곳뿐이다. 아이디 조회({@link #findCandidatesByIds})는 거르지 않는다 — 호출한 쪽이 메모리에서 거른다.
  */
 public interface PlaceCandidateQueryPort {
 
@@ -20,8 +25,9 @@ public interface PlaceCandidateQueryPort {
      * @param sigunguCode 관광 시군구코드. null 이면 지역 전체다. 좁히면 후보 풀도 좁아지므로
      *                    <b>넓히는 폴백을 두지 않는다</b> — 조건을 무시한 일정이 되기 때문이다
      * @param size        후보 개수. 프롬프트 토큰과 선택지 다양성의 절충이다
+     * @param admission   동행견 입장 기준. {@link PetAdmission#ANY} 면 크기 · 체중으로 거르지 않는다
      */
-    List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, String sigunguCode, int size);
+    List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, String sigunguCode, int size, PetAdmission admission);
 
     /**
      * 사용자 요청(실내 · 카페)에 맞는 동반 가능 장소 (#1170).
@@ -31,9 +37,9 @@ public interface PlaceCandidateQueryPort {
      * 필터를 구현하지 않아도 생성이 깨지지 않게 한다. 운영 어댑터는 필터를 검색에 넘긴다.
      */
     default List<PlaceCandidateQueryResult> findRequestedCandidates(
-        String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory
+        String areaCode, String sigunguCode, int size, Boolean indoor, String sourceCategory, PetAdmission admission
     ) {
-        return findPetFriendlyCandidates(areaCode, sigunguCode, size);
+        return findPetFriendlyCandidates(areaCode, sigunguCode, size, admission);
     }
 
     /**
@@ -42,7 +48,7 @@ public interface PlaceCandidateQueryPort {
      * <p>기본 구현은 빈 목록이다 — 테스트 대역이 구현하지 않으면 숙박을 더 싣지 않을 뿐 생성은 그대로다.
      * {@link #findRequestedCandidates} 처럼 일반 검색으로 대신하면 숙박이 아닌 장소가 숙박 몫으로 들어간다.
      */
-    default List<PlaceCandidateQueryResult> findLodgingCandidates(String areaCode, String sigunguCode, int size) {
+    default List<PlaceCandidateQueryResult> findLodgingCandidates(String areaCode, String sigunguCode, int size, PetAdmission admission) {
         return List.of();
     }
 
@@ -50,7 +56,7 @@ public interface PlaceCandidateQueryPort {
      * 동반 가능 음식점(카페 포함) (#1245). 후보 풀에 식사 자리를 권역마다 싣는 데 쓴다 — 지역 검색 상위 N 에는
      * 음식점이 하나도 들지 않았다. 기본 구현은 빈 목록이다({@link #findLodgingCandidates} 와 같은 이유).
      */
-    default List<PlaceCandidateQueryResult> findRestaurantCandidates(String areaCode, String sigunguCode, int size) {
+    default List<PlaceCandidateQueryResult> findRestaurantCandidates(String areaCode, String sigunguCode, int size, PetAdmission admission) {
         return List.of();
     }
 
@@ -60,23 +66,30 @@ public interface PlaceCandidateQueryPort {
      *
      * <p>기본 구현은 빈 목록이다({@link #findLodgingCandidates} 와 같은 이유). 시군구는 걸지 않는다 — 제주 전체 요청에만 쓴다.
      */
-    default List<PlaceCandidateQueryResult> findNearbyCandidates(String areaCode, double lat, double lng, int size) {
+    default List<PlaceCandidateQueryResult> findNearbyCandidates(String areaCode, double lat, double lng, int size, PetAdmission admission) {
         return List.of();
     }
 
     /** 한 점에서 가까운 순의 동반 가능 숙박 (#1312). 기본 구현은 빈 목록이다. */
-    default List<PlaceCandidateQueryResult> findNearbyLodgingCandidates(String areaCode, double lat, double lng, int size) {
+    default List<PlaceCandidateQueryResult> findNearbyLodgingCandidates(
+        String areaCode, double lat, double lng, int size, PetAdmission admission
+    ) {
         return List.of();
     }
 
     /** 한 점에서 가까운 순의 동반 가능 음식점(카페 포함) (#1312). 기본 구현은 빈 목록이다. */
-    default List<PlaceCandidateQueryResult> findNearbyRestaurantCandidates(String areaCode, double lat, double lng, int size) {
+    default List<PlaceCandidateQueryResult> findNearbyRestaurantCandidates(
+        String areaCode, double lat, double lng, int size, PetAdmission admission
+    ) {
         return List.of();
     }
 
     /**
      * 아이디로 후보를 직접 가져온다 — 사용자가 필수 포함으로 지정한 장소는 검색 상위 N 에
      * 없어도 후보에 넣어야 하기 때문이다. 노출 불가 장소는 결과에서 빠진다.
+     *
+     * <p>입장 기준으로 거르지 않는다 — 필수 포함은 사용자가 직접 고른 곳이라 남겨야 하고, 즐겨찾기는 호출한 쪽이
+     * 후보 풀을 다 모은 뒤 한곳에서 거른다 (#1420).
      */
     List<PlaceCandidateQueryResult> findCandidatesByIds(List<Long> placeIds);
 }
