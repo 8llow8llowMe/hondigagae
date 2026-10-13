@@ -103,3 +103,45 @@ export function visitsToRestore(before: PlanItemDetail[], after: PlanItemDetail[
 
   return ids
 }
+
+/**
+ * 메모 모달이 가리키는 항목의 **연 시점 스냅숏** (#1460 리뷰).
+ *
+ * **모달을 지금 상세에서 찾아 열지 않는다.** 저장은 일괄 교체라 응답이 캐시에 들어가는 순간 그
+ * 일자의 `planItemId` 가 전부 바뀐다 — 지금 상세에서 찾으면 모달이 되살리기 · 재조회 도중에
+ * 언마운트돼 초점이 `body` 로 떨어지고 잠금 없는 틈이 생긴다. 열 때 제목 · 메모 · 자리를 적어
+ * 두고 `onSaved`(또는 닫기)까지 이것으로 그린다.
+ */
+export type ItemMemoTarget = {
+  day: number
+  /** 연 시점의 id — 저장 본문은 지금 상세에서 이 id 를 찾는다(없으면 stale) */
+  planItemId: string
+  /** 그 일자 안 순번. 저장 뒤 초점을 돌려줄 자리다 — 메모 저장은 순서를 바꾸지 않는다 */
+  index: number
+  title: string
+  memo: string | null
+}
+
+export function itemMemoTargetOf(
+  day: number,
+  items: PlanItemDetail[],
+  planItemId: string,
+): ItemMemoTarget | null {
+  const index = items.findIndex((item) => item.planItemId === planItemId)
+  const item = items[index]
+  if (item === undefined) return null
+
+  return { day, planItemId, index, title: item.title, memo: item.memo }
+}
+
+/** 모달이 그릴 것 — **스냅숏만 본다.** 상세가 바뀌어도 닫히지 않는다 */
+export function itemMemoModalProps(target: ItemMemoTarget | null): {
+  open: boolean
+  key: string
+  title: string
+  initial: string | null
+} {
+  if (target === null) return { open: false, key: 'closed', title: '', initial: null }
+
+  return { open: true, key: target.planItemId, title: target.title, initial: target.memo }
+}

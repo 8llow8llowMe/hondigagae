@@ -46,6 +46,11 @@ import {
   toItemRows,
 } from '@/lib/plan/detail'
 import { planForecastNotice } from '@/lib/plan/forecast-notice'
+import {
+  itemMemoModalProps,
+  type ItemMemoTarget,
+  itemMemoTargetOf,
+} from '@/lib/plan/item-memo-edit'
 import { packingPlacement } from '@/lib/plan/packing-promotion'
 import { isReviewSectionVisible } from '@/lib/plan/review'
 import { planStatusActionLayout } from '@/lib/plan/status-action'
@@ -227,14 +232,16 @@ export function PlanDetailSection({
   }, [clearTimeFailure])
 
   /*
-    항목 메모 (#1460 · `일정상세-세부명세.md` D30). **모달은 화면에 하나다** — 어느 일자의 어느 항목인지만
-    기억한다. 저장이 성공하면 닫는다.
+    항목 메모 (#1460 · `일정상세-세부명세.md` D30). **모달은 화면에 하나다.** 저장이 성공하면 닫는다.
 
-    **저장 뒤 초점은 같은 자리의 `메모 수정` 으로 돌려준다.** 메모 저장은 일괄 교체라 `planItemId` 가
-    새로 발급돼 모달을 연 버튼이 다시 마운트된다 — 시간 칩(#1028)이 겪은 것과 같다. 지워서 버튼이
-    사라졌으면 같은 행의 시간 칩으로 간다(같은 `일자:순서` 표식이다).
+    **연 시점 스냅숏으로 모달을 그린다** (`ItemMemoTarget` 주석). 교체 응답이 캐시에 들어가면
+    `planItemId` 가 전부 바뀌는데, 지금 상세에서 찾으면 저장 도중(되살리기 · 재조회) 모달이
+    언마운트된다. `onSaved` 까지 열어 둔다.
+
+    **저장 뒤 초점은 같은 자리의 `메모 수정` 으로 돌려준다.** 교체로 행이 다시 마운트돼 모달을 연
+    버튼은 사라졌다 — 같은 `일자:순서` 의 새 버튼을 찾는다. 지워서 버튼이 없으면 같은 행의 시간 칩이다.
   */
-  const [memoTarget, setMemoTarget] = useState<{ day: number; planItemId: string } | null>(null)
+  const [memoTarget, setMemoTarget] = useState<ItemMemoTarget | null>(null)
   const memoFocusKeyRef = useRef<string | null>(null)
   const closeMemoModal = useCallback(() => {
     setMemoTarget(null)
@@ -267,7 +274,10 @@ export function PlanDetailSection({
     교체가 먼저 끝나 `planItemId` 가 바뀌어 시각 저장이 `PLAN_005` 가 된다. 방문 체크는 되싣는
     값이 아니라 교체가 어차피 초기화하므로(D9-2) 이 잠금 밖이다.
   */
-  // 메모 저장(#1460)도 같은 일괄 교체라 이 잠금에 든다
+  /*
+    메모 저장(#1460)도 같은 일괄 교체라 이 잠금에 든다. `saving` 은 `다녀옴` 되살리기 · 재조회까지
+    남는다 — 그 틈에 순서 편집이 다시 교체하면 되살리기가 `PLAN_005` 다 (`use-plan-item-memo.ts`).
+  */
   const dayItemsBusy = addPlace.adding || addMove.adding || itemTime.saving || itemMemo.saving
 
   function openItemTime(day: number, planItemId: string) {
@@ -287,15 +297,11 @@ export function PlanDetailSection({
 
   function openItemMemo(day: number, planItemId: string) {
     itemMemo.clearFailure()
-    setMemoTarget({ day, planItemId })
+    // 상세에 없는 항목이면 열지 않는다 — 낡은 행을 누른 것이다
+    setMemoTarget(itemMemoTargetOf(day, days[day - 1]?.items ?? [], planItemId))
   }
 
-  // 시간 모달과 같다 — 상세가 바뀌어 항목이 사라졌으면 모달을 열지 않는다
-  const memoGroup = memoTarget === null ? undefined : days[memoTarget.day - 1]
-  const memoItem =
-    memoTarget === null
-      ? undefined
-      : memoGroup?.items.find((item) => item.planItemId === memoTarget.planItemId)
+  const memoModal = itemMemoModalProps(memoTarget)
 
   function openMoveAdd(day: number) {
     addMove.clearFailure()
@@ -308,6 +314,14 @@ export function PlanDetailSection({
     잠금이 없고 진행·실패를 `planItemId` 로 든다.
   */
   const visit = usePlanVisit({ planId: plan.planId })
+
+  /*
+    **진행 중인 `다녀옴` 토글이 그 일자에 있으면 메모 저장을 잠근다** (#1460 리뷰). 토글은 지금 id 로
+    나가는데 교체가 id 를 바꾸면 그 토글이 `PLAN_005` 가 되고, 되살리기는 토글 전 상태로 판정한다.
+  */
+  const memoDayVisitPending =
+    memoTarget !== null &&
+    (days[memoTarget.day - 1]?.items.some((item) => visit.pending.has(item.planItemId)) ?? false)
 
   /*
     상태 전이 (#653). **진입점이 둘로 갈려서 상태를 여기서 든다** — 정방향은 개요 아래
@@ -328,6 +342,8 @@ export function PlanDetailSection({
 
   /** 편집 중이면 먼저 묻는다. 아니면 바로 연다 */
   function requestEditor(day: number) {
+    // 일자 저장(담기 · 이동 추가 · 시각 · 메모)이 도는 중이면 낡은 목록으로 열린다 (F6)
+    if (dayItemsBusy) return
     if (editingDay !== null && edit.dirty) {
       setPendingDay(day)
       setDiscarding(true)
@@ -646,10 +662,15 @@ export function PlanDetailSection({
                   onClearFocus={edit.clearFocus}
                   onMove={edit.move}
                   onToggleRemoved={edit.toggle}
-                  onSave={() => edit.save(group.day)}
+                  onSave={() => {
+                    // 다른 일자 저장이 id 를 바꾸는 중이면 편집 목록이 낡았다 (F6)
+                    if (!dayItemsBusy) edit.save(group.day)
+                  }}
                   onCancel={requestCancel}
                   timeRealign={edit.timeRealign}
-                  onSaveWithTimes={(realign) => edit.saveWithTimes(group.day, realign)}
+                  onSaveWithTimes={(realign) => {
+                    if (!dayItemsBusy) edit.saveWithTimes(group.day, realign)
+                  }}
                 />
               )
             }
@@ -789,29 +810,29 @@ export function PlanDetailSection({
       />
 
       <PlanItemMemoModal
-        // 여는 항목마다 새로 마운트한다 — 입력이 그 항목 메모에서 시작한다 (모달 주석)
-        key={memoItem?.planItemId ?? 'closed'}
-        open={memoItem !== undefined}
-        title={memoItem?.title ?? ''}
-        initial={memoItem?.memo ?? null}
+        // 여는 항목마다 새로 마운트한다 — 열쇠는 **연 시점 id** 라 교체 뒤에도 그대로다
+        key={memoModal.key}
+        open={memoModal.open}
+        title={memoModal.title}
+        initial={memoModal.initial}
         formError={
-          memoItem !== undefined && itemMemo.failure?.planItemId === memoItem.planItemId
+          memoTarget !== null && itemMemo.failure?.planItemId === memoTarget.planItemId
             ? itemMemo.failure.error.message
             : null
         }
         saving={itemMemo.saving}
-        blocked={addPlace.adding || addMove.adding || itemTime.saving}
+        blocked={addPlace.adding || addMove.adding || itemTime.saving || memoDayVisitPending}
         onSave={(memo) => {
-          if (memoTarget === null || memoGroup === undefined || memoItem === undefined) return
-          memoFocusKeyRef.current = memoEditFocusKey(
-            memoTarget.day,
-            memoGroup.items.findIndex((item) => item.planItemId === memoItem.planItemId),
-          )
-          // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1 · D30)
+          if (memoTarget === null) return
+          memoFocusKeyRef.current = memoEditFocusKey(memoTarget.day, memoTarget.index)
+          /*
+            **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1 · D30). 연 시점 id 가 지금
+            상세에 없으면(다른 탭이 바꿨다) 보내지 않고 stale 로 말한다 (`runItemMemoSave`).
+          */
           itemMemo.save({
             day: memoTarget.day,
-            dayItems: memoGroup.items,
-            planItemId: memoItem.planItemId,
+            dayItems: days[memoTarget.day - 1]?.items ?? [],
+            planItemId: memoTarget.planItemId,
             memo,
           })
         }}
