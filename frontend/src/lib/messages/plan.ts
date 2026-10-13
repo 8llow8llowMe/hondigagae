@@ -517,6 +517,19 @@ export const planMessages = {
   confirmUnlocksShare: '확정하면 링크로 일정을 공유할 수 있어요.',
   statusConfirmError: '확정하지 못했어요. 잠시 후 다시 시도해 주세요.',
   /**
+   * 확정 전 점검 시트 (#1425 · 명세 D26-2). 문제가 있을 때만 선다 — 확인 대화상자가 아니다.
+   * 시각 사유는 일정 상세 경고 칩의 낱말(`itemTimeBackward` · `itemTimeOverlap`)을 그대로 쓴다.
+   */
+  confirmCheckTitle: '확정 전에 살펴볼 곳이 있어요',
+  confirmCheckDescription: '고치러 가거나, 그대로 확정할 수 있어요.',
+  confirmCheckNoTime: '시각이 비어 있어요',
+  confirmCheckNoMeal: '식사 일정이 없어요',
+  confirmCheckFix: '고치러 가기',
+  /** 일자마다 하나라 접근 가능한 이름이 일자로 갈린다 — 보이는 `고치러 가기` 를 품는다 (WCAG 2.5.3) */
+  confirmCheckFixLabel: '{day}일차 고치러 가기',
+  confirmCheckProceed: '그대로 확정',
+  confirmCheckClose: '닫기',
+  /**
    * 확정을 되돌린다 (#565). **확인 대화상자를 붙이지 않는 근거가 이 문구 자체다** —
    * 되돌릴 수 있는 동작에 확인을 붙이면 되돌릴 수 없다는 거짓말이 된다. 삭제만
    * `되돌릴 수 없어요` 로 확인을 받는다.

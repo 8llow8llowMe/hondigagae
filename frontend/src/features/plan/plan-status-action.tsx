@@ -1,9 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
+import { PlanConfirmCheckModal } from '@/features/plan/plan-confirm-check-modal'
+import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { PlanShareModal } from '@/features/plan/plan-share-modal'
 import { PlanStatusActionPanel } from '@/features/plan/plan-status-action-panel'
+import type { PlanConfirmCheckDay } from '@/lib/plan/confirm-check'
 import {
   PLAN_STATUS_ACTION_LABELS,
   PLAN_STATUS_ACTION_NOTES,
@@ -52,6 +55,12 @@ import {
  * 확정의 이유가 공유인데 그 문은 `⋯` 메뉴 안에만 있었다. 결과 안내 아래 버튼이 **같은
  * `PlanShareModal`** 을 연다 — 메뉴의 것과 조회 키가 같아 발급 상태를 두 곳이 같이 본다.
  * 모달 상태는 여기서 든다: 메뉴와 나누려고 위로 올리면 메뉴의 진입점까지 이 화면 구조에 묶인다.
+ *
+ * ## 확정 전에 점검한다 (#1425 · 명세 D26)
+ *
+ * `확정하기` 를 누르면 `confirmCheck` 가 비지 않을 때만 점검 시트를 먼저 연다. 비면 지금처럼
+ * 바로 확정한다 — 시트는 확인 대화상자가 아니다(위 #565 판단 그대로). **버튼 자리는 옮기지
+ * 않았다** — 검토 없이 누르는 문제는 자리가 아니라 이 시트가 받는다 (D26-3).
  */
 export function PlanStatusAction({
   planId,
@@ -60,6 +69,7 @@ export function PlanStatusAction({
   saving,
   failure,
   result,
+  confirmCheck,
   onAction,
 }: {
   planId: string
@@ -75,9 +85,28 @@ export function PlanStatusAction({
   failure: PlanStatusFailure | null
   /** `usePlanStatus().result` 그대로 — 패널의 포커스 effect 가 이 값의 동일성에 걸려 있다 */
   result: PlanStatusResult | null
+  /**
+   * 확정 전 점검 결과 — `planConfirmCheck(days)` (D26-1). 비면 `확정하기` 가 바로 확정한다.
+   * **지금의 결과**를 받는다: 상세가 다시 조회돼 문제가 사라지면 시트도 그만큼 줄고, 다 사라지면 닫힌다.
+   */
+  confirmCheck: readonly PlanConfirmCheckDay[]
   onAction: (action: PlanStatusActionSpec) => void
 }) {
   const [shareOpen, setShareOpen] = useState(false)
+  const [checkOpen, setCheckOpen] = useState(false)
+  const [fixDay, setFixDay] = useState<number | null>(null)
+
+  /*
+    **일자로의 이동은 시트가 닫힌 뒤다** (D26-2). 시트가 닫힐 때 `useOverlay` 가 포커스를 확정
+    버튼으로 되돌리며 그 자리로 화면을 굴린다 — 같은 클릭 안에서 먼저 굴리면 그 복귀가 되감는다.
+    React 는 한 커밋에서 모든 effect cleanup(시트의 포커스 복귀)을 setup 보다 먼저 돌리므로 이
+    effect 가 늘 뒤다.
+  */
+  useEffect(() => {
+    if (fixDay === null) return
+    focusPlanDay(fixDay)
+    setFixDay(null)
+  }, [fixDay])
   // 맞으면 같은 객체를 넘긴다 — 패널의 포커스 effect 가 동일성에 걸려 있다
   const shownResult =
     result !== null && statusResultMatches(result.kind, statusCode) ? result : null
@@ -93,9 +122,46 @@ export function PlanStatusAction({
         resultMessages={PLAN_STATUS_RESULT_MESSAGES}
         onShare={() => setShareOpen(true)}
         saving={saving}
-        onAction={onAction}
+        onAction={(next) => {
+          // 점검은 `확정하기` 에만 건다 — 완료 · 되돌리기는 일정 내용을 바꾸지 않는다 (D26-2)
+          if (next.kind === 'confirm' && confirmCheck.length > 0) {
+            setCheckOpen(true)
+            return
+          }
+          onAction(next)
+        }}
+      />
+      <PlanConfirmCheckModal
+        // 그사이 상태가 바뀌어 버튼이 `확정하기` 가 아니면 닫는다 — `그대로 확정` 이 다른 전이를 부르지 않게
+        open={checkOpen && confirmCheck.length > 0 && action?.kind === 'confirm'}
+        days={confirmCheck}
+        onClose={() => setCheckOpen(false)}
+        onFix={(day) => {
+          setCheckOpen(false)
+          setFixDay(day)
+        }}
+        onProceed={() => {
+          setCheckOpen(false)
+          if (action?.kind === 'confirm') onAction(action)
+        }}
       />
       <PlanShareModal planId={planId} open={shareOpen} onClose={() => setShareOpen(false)} />
     </>
   )
+}
+
+/**
+ * 그 일자 제목으로 굴리고 포커스를 옮긴다 (D26-2 `고치러 가기`).
+ *
+ * 제목(`h2`)은 원래 포커스를 받지 않는다 — `tabindex="-1"` 을 붙여 프로그램으로만 받게 한다.
+ * 포커스를 옮기지 않으면 키보드 사용자의 다음 Tab 이 확정 버튼 뒤에서 이어진다. 굴림은
+ * `scrollIntoView` 가 하고(제목의 `scroll-mt-28` 이 고정 헤더 몫을 낸다) 포커스는 `preventScroll`
+ * 로 준다 — 둘이 다른 위치로 굴리지 않게 한다.
+ */
+function focusPlanDay(day: number): void {
+  const heading = document.getElementById(planDayAnchorId(day))
+  if (heading === null) return
+  if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1')
+  heading.scrollIntoView({ block: 'start' })
+  heading.focus({ preventScroll: true })
 }
