@@ -483,6 +483,54 @@ class AiPlanPromptFactoryTest {
             .contains("4일차 남동부");
     }
 
+    @Test
+    @DisplayName("요청 문구에 지역이 있으면 요청 지역 줄을 싣고 권역 순서 제안은 싣지 않는다 — 고정 순서가 요청을 덮었다 (#1423)")
+    void requestedRegionReplacesZoneOrder() {
+        String prompt = factory.userPrompt(islandQuery("2026-10-13", "2026-10-15")
+            .requestNote("성산 쪽 위주로 다니고 싶어요").build());
+
+        assertThat(prompt).contains("- 사용자 요청: 성산 쪽 위주로 다니고 싶어요\n"
+            + "- 요청 지역: 성산 — 장소와 숙소를 북동부 권역 위주로 고르고, 모자라면 맞닿은 권역에서 고를 것\n");
+        assertThat(prompt).doesNotContain("권역 순서 제안");
+        // 권역 이름은 후보 줄의 "권역:" 과 같은 표기다
+        assertThat(prompt).contains("| 권역: 북동부 · 구좌읍");
+    }
+
+    @Test
+    @DisplayName("요청 지역이 여러 권역이면 선언 순서로 가운뎃점을 잇고, 실내 · 카페 줄 뒤에 온다 (#1423)")
+    void requestedRegionListsZonesAfterIndoorLine() {
+        String prompt = factory.userPrompt(islandQuery("2026-10-13", "2026-10-15")
+            .requestNote("서쪽 해안에서 실내 카페 가고 싶어요").build());
+
+        assertThat(prompt).contains("- 요청 지역: 서쪽 — 장소와 숙소를 북서부 · 남서부 권역 위주로 고르고, 모자라면 맞닿은 권역에서 고를 것\n");
+        assertThat(prompt.indexOf("- 위 요청의 실내·카페는")).isLessThan(prompt.indexOf("- 요청 지역:"));
+        assertThat(prompt).doesNotContain("권역 순서 제안");
+    }
+
+    @Test
+    @DisplayName("맞닿은 권역까지가 섬 전체인 요청은 요청 지역 줄을 싣되 권역 순서 제안도 그대로 둔다 — 풀도 좁히지 않는다 (#1423)")
+    void keepsZoneOrderWhenTheRegionDoesNotNarrow() {
+        String prompt = factory.userPrompt(islandQuery("2026-10-13", "2026-10-15")
+            .requestNote("애월이랑 남원에서 쉬고 싶어요").build());
+
+        assertThat(prompt).contains("- 요청 지역: 애월, 남원 — 장소와 숙소를 북서부 · 남동부 권역 위주로 고르고, 모자라면 맞닿은 권역에서 고를 것\n");
+        assertThat(prompt).contains("- 권역 순서 제안: 1일차 북서부 → 2일차 남서부 → 3일차 남부.");
+    }
+
+    @Test
+    @DisplayName("지역이 없는 요청과 하루 재생성에는 요청 지역 줄이 없다 — 지역 없는 요청은 권역 순서 제안 그대로다 (#1423)")
+    void noRequestedRegionLineWithoutRegionOrOnRegeneration() {
+        String plain = factory.userPrompt(islandQuery("2026-10-13", "2026-10-15")
+            .requestNote("바다 보며 산책하고 싶어요").build());
+        PlanOutline outline = PlanOutline.builder().planId(7L)
+            .days(List.of(PlanOutline.PlanOutlineDay.builder().day(1).items(List.of()).build())).build();
+        String regenerated = factory.userPrompt(islandQuery("2026-10-13", "2026-10-15")
+            .requestNote("성산 쪽 위주로 다니고 싶어요").regenerateDay(2).planOutline(outline).build());
+
+        assertThat(plain).doesNotContain("요청 지역").contains("- 권역 순서 제안: 1일차 북서부 → 2일차 남서부 → 3일차 남부.");
+        assertThat(regenerated).doesNotContain("요청 지역").doesNotContain("권역 순서 제안");
+    }
+
     /** 6권역에 하나씩 후보가 있는 질의 — 섬 전체를 덮는다. */
     private static AiPlanGenerationQuery.AiPlanGenerationQueryBuilder islandQuery(String start, String end) {
         return AiPlanGenerationQuery.builder()
@@ -583,6 +631,9 @@ class AiPlanPromptFactoryTest {
             .build());
 
         assertThat(noted).contains("사용자 요청: 오후엔 실내 카페에서 쉬고 싶어요");
+        // 하루에만 넣고 나머지 날을 야외로 채우지 않게 "날마다" 를 함께 적는다 (#1423)
+        assertThat(noted).contains("- 위 요청의 실내·카페는 후보의 실내 여부와 분류로만 맞추고, 날마다 맞는 후보를 하나 이상 넣을 것. "
+            + "숙소는 대신하지 말 것. 맞는 후보가 없으면 넣었다고 적지 말 것\n");
         assertThat(noted).contains("숙소는 대신하지 말 것");
         assertThat(plain).contains("사용자 요청: 바다 보며 산책하고 싶어요");
         assertThat(plain).doesNotContain("숙소는 대신하지 말 것");

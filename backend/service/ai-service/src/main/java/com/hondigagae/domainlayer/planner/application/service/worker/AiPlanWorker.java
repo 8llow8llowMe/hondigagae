@@ -11,9 +11,11 @@ import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.application.model.RequestNoteConstraints;
+import com.hondigagae.domainlayer.planner.application.model.RequestedRegion;
 import com.hondigagae.domainlayer.planner.application.service.CandidateZonePolicy;
 import com.hondigagae.domainlayer.planner.application.service.CandidateZonePolicy.Kind;
 import com.hondigagae.domainlayer.planner.application.service.RequestNoteCandidatePolicy;
+import com.hondigagae.domainlayer.planner.application.service.RequestNoteDraftPolicy;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobEventPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobMetricsPort;
@@ -135,7 +137,8 @@ public class AiPlanWorker {
 
             current.set(advanceTo(current.get(), AiPlanJobStep.DRAFTING, stepTimer));
             // LLM 포트는 domain model을 주고, 잡에도 domain 그대로 저장한다. Info 변환은 응답 조립 시점(Processor)에 한다.
-            AiPlanDraft draft = RequestNoteCandidatePolicy.disclose(aiLlmPort.generatePlanDraft(query), query);
+            // 명시 요청(실내 · 카페 · 지역)을 초안에 맞추고 근거 맨 앞에서 맞췄는지 말한다 — 추가 LLM 호출 없이 (#1423)
+            AiPlanDraft draft = RequestNoteDraftPolicy.apply(aiLlmPort.generatePlanDraft(query), query);
             log.info("AI plan draft generated jobId={} days={}", running.jobId(),
                 draft.days() == null ? 0 : draft.days().size());
 
@@ -314,8 +317,10 @@ public class AiPlanWorker {
         List<Long> pinnedPlaceIds = parseIdList(params.get("pinnedPlaceIds"));
         List<Long> favoritePlaceIds = loadFavoritePlaceIds(params.get("preferFavorites"), memberId);
         boolean zoneBalanced = isZoneBalanced(areaCode, sigunguCode, regenerateDay);
+        // 하루 재생성은 기존 일정이 앞뒤 동선을 정하므로 요청 문구의 지역을 읽지 않는다 (#1423)
+        RequestedRegion region = regenerateDay == null ? RequestedRegion.from(params.get("requestNote")) : RequestedRegion.NONE;
         List<PlaceCandidate> placeCandidates = loadCandidates(
-            areaCode, sigunguCode, zoneBalanced, pinnedPlaceIds, favoritePlaceIds, params.get("requestNote"));
+            areaCode, sigunguCode, zoneBalanced, pinnedPlaceIds, favoritePlaceIds, params.get("requestNote"), region);
 
         onStep.accept(AiPlanJobStep.WEATHER);
         List<DayWeatherOutlook> weatherOutlook =
@@ -451,10 +456,10 @@ public class AiPlanWorker {
      */
     private List<PlaceCandidate> loadCandidates(
         String areaCode, String sigunguCode, boolean zoneBalanced, List<Long> pinnedPlaceIds,
-        List<Long> favoritePlaceIds, String requestNote
+        List<Long> favoritePlaceIds, String requestNote, RequestedRegion region
     ) {
-        List<PlaceCandidate> pool =
-            assembleCandidates(areaCode, sigunguCode, zoneBalanced, pinnedPlaceIds, favoritePlaceIds, requestNote);
+        List<PlaceCandidate> pool = assembleCandidates(
+            areaCode, sigunguCode, zoneBalanced, pinnedPlaceIds, favoritePlaceIds, requestNote, region);
         log.info("AI plan candidate pool size={} zoneBalanced={} areaCode={} sigunguCode={} zones={}",
             pool.size(), zoneBalanced, areaCode, sigunguCode, CandidateZonePolicy.describe(pool));
         return pool;
@@ -462,13 +467,13 @@ public class AiPlanWorker {
 
     private List<PlaceCandidate> assembleCandidates(
         String areaCode, String sigunguCode, boolean zoneBalanced, List<Long> pinnedPlaceIds,
-        List<Long> favoritePlaceIds, String requestNote
+        List<Long> favoritePlaceIds, String requestNote, RequestedRegion region
     ) {
         List<PlaceCandidate> searched = placeCandidateQueryPort
             .findPetFriendlyCandidates(areaCode, sigunguCode, aiLlmProperties.placeCandidateSize()).stream()
             .map(this::toCandidate)
             .toList();
-        searched = reserveRequested(areaCode, sigunguCode, searched, requestNote);
+        searched = reserveRequested(areaCode, sigunguCode, searched, requestNote, region);
         ZoneAnchoredCandidates anchored = zoneBalanced && !searched.isEmpty()
             ? loadZoneAnchored(areaCode)
             : ZoneAnchoredCandidates.NONE;
@@ -479,6 +484,7 @@ public class AiPlanWorker {
         }
         searched = spreadByZone(Kind.LODGING, areaCode, sigunguCode, searched, anchored.lodgings(), visitFloor);
         searched = spreadByZone(Kind.RESTAURANT, areaCode, sigunguCode, searched, anchored.restaurants(), visitFloor);
+        searched = focusOnRequestedRegion(searched, zoneBalanced ? anchored.all() : List.of(), region);
         if (sigunguCode != null && searched.isEmpty()) {
             // 지역 전체로 넓히지 않는다. 사용자가 "제주시만" 이라고 한 요청에 서귀포 장소를
             // 섞으면 조건을 무시한 일정이 되고, 그 사실이 응답에 드러나지도 않는다.
@@ -508,9 +514,13 @@ public class AiPlanWorker {
     /**
      * 실내 · 카페 요청이 있으면 그 장소를 후보 앞에 둔다 (#1170).
      * 맞는 곳이 없어도 생성은 계속한다 — 없다는 말은 초안 요약이 한다.
+     *
+     * <p><b>요청 지역이 풀을 좁히면 그 범위(맞닿은 권역까지) 안을 먼저 고른다 (#1423).</b> 권역을 돌아가며 고르면 8곳이 섬
+     * 전체에 흩어진다. 범위 안이 모자라면 밖에서 채운다 — 거르지 않는 것은, 범위 안 방문 장소가 모자라 풀을 좁히지 않을 때
+     * ({@link CandidateZonePolicy#focus}) 요청 후보까지 비지 않게 하려는 것이다. 실제로 좁히면 focus 가 범위 밖을 뺀다.
      */
     private List<PlaceCandidate> reserveRequested(
-        String areaCode, String sigunguCode, List<PlaceCandidate> searched, String requestNote
+        String areaCode, String sigunguCode, List<PlaceCandidate> searched, String requestNote, RequestedRegion region
     ) {
         RequestNoteConstraints constraints = RequestNoteConstraints.from(requestNote);
         if (!constraints.asksAnything()) {
@@ -526,12 +536,28 @@ public class AiPlanWorker {
             .filter(constraints::matches)
             .toList();
         // placeId 순 앞에서 자르면 한 권역에 몰린다 — dev 실내 카페 앞 8곳 중 5곳이 북서부였다 (#1245)
-        List<PlaceCandidate> matches = CandidateZonePolicy.acrossZones(found, quota);
+        List<PlaceCandidate> matches = pickRequested(found, quota, region);
         if (matches.isEmpty()) {
             log.info("AI plan request has no matching candidates cafe={} indoor={} areaCode={} sigunguCode={}",
                 constraints.cafe(), constraints.indoor(), areaCode, sigunguCode);
         }
         return RequestNoteCandidatePolicy.reserve(matches, searched, aiLlmProperties.placeCandidateSize());
+    }
+
+    /**
+     * 요청 조건 후보를 권역을 돌아가며 {@code quota} 곳 고른다 (#1245). 요청 지역이 풀을 좁히면 맞닿은 권역까지 안의 것을
+     * 먼저 고르고, 모자란 만큼 밖에서 채운다 (#1423).
+     */
+    private static List<PlaceCandidate> pickRequested(List<PlaceCandidate> found, int quota, RequestedRegion region) {
+        if (!region.narrows()) {
+            return CandidateZonePolicy.acrossZones(found, quota);
+        }
+        Set<JejuZone> reach = region.reach();
+        Map<Boolean, List<PlaceCandidate>> byReach = found.stream()
+            .collect(Collectors.partitioningBy(candidate -> reach.contains(JejuZone.of(candidate.lat(), candidate.lng()))));
+        List<PlaceCandidate> picked = new ArrayList<>(CandidateZonePolicy.acrossZones(byReach.get(true), quota));
+        picked.addAll(CandidateZonePolicy.acrossZones(byReach.get(false), quota - picked.size()));
+        return List.copyOf(picked);
     }
 
     /**
@@ -575,6 +601,40 @@ public class AiPlanWorker {
             kind, found.size(), searched.stream().filter(kind::matches).count(),
             spread.stream().filter(kind::matches).count(), areaCode, sigunguCode);
         return spread;
+    }
+
+    /**
+     * 요청 지역 위주로 풀을 좁힌다 (#1423, {@link CandidateZonePolicy#focus}). 권역 몫을 다 실은 뒤, 필수 포함 · 즐겨찾기를
+     * 합치기 전이다 — 사용자가 고른 장소는 지역 밖이어도 남는다.
+     *
+     * <p><b>새 조회를 하지 않는다.</b> 요청 권역을 채울 것은 이미 찾은 권역 대표점 거리순 결과({@code extra})다 — 18회 예산
+     * (#1312) 안이다. 시군구 지정 요청은 그 결과가 없어 거르기만 한다.
+     *
+     * @param extra 권역 대표점 기준 거리순 결과(방문 · 음식점 · 숙박). 제주 전체 요청이 아니면 비어 있다
+     */
+    private List<PlaceCandidate> focusOnRequestedRegion(
+        List<PlaceCandidate> searched, List<PlaceCandidate> extra, RequestedRegion region
+    ) {
+        if (!region.asksAnything()) {
+            return searched;
+        }
+        if (!region.narrows()) {
+            log.info("AI plan requested region covers the whole island, pool kept words={} zones={} size={}",
+                region.words(), region.zones(), searched.size());
+            return searched;
+        }
+        List<PlaceCandidate> focused =
+            CandidateZonePolicy.focus(searched, extra, region, aiLlmProperties.placeCandidateSize());
+        if (focused == searched) {
+            // 맞닿은 권역까지 방문 장소가 모자라 모으지 않았다 — 초안 근거가 다른 지역도 넣었다고 밝힌다
+            log.info("AI plan requested region not focused - too few visits in reach words={} zones={} visitsInReach={} min={}",
+                region.words(), region.zones(), CandidateZonePolicy.visitsWithin(searched, region.reach()),
+                CandidateZonePolicy.FOCUS_MIN_VISITS);
+            return searched;
+        }
+        log.info("AI plan candidates focused on requested region words={} zones={} before={} after={} extra={}",
+            region.words(), region.zones(), searched.size(), focused.size(), extra.size());
+        return focused;
     }
 
     /**
@@ -678,6 +738,14 @@ public class AiPlanWorker {
         List<PlaceCandidate> visits, List<PlaceCandidate> lodgings, List<PlaceCandidate> restaurants
     ) {
         private static final ZoneAnchoredCandidates NONE = new ZoneAnchoredCandidates(List.of(), List.of(), List.of());
+
+        /** 요청 지역을 채울 때 쓰는 전부 (#1423) — 방문 → 음식점 → 숙박 순. 종류 안은 권역 선언 순서, 가까운 순이다. */
+        private List<PlaceCandidate> all() {
+            List<PlaceCandidate> all = new ArrayList<>(visits);
+            all.addAll(restaurants);
+            all.addAll(lodgings);
+            return List.copyOf(all);
+        }
     }
 
     /**

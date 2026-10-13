@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.planner.application.service;
 import com.hondigagae.domainlayer.planner.application.model.JejuZone;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.RequestNoteConstraints;
+import com.hondigagae.domainlayer.planner.application.model.RequestedRegion;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,6 +34,9 @@ import java.util.Set;
  * <p><b>제주 전체 일정은 방문 장소도 권역마다 하한을 둔다 (#1312)</b> — {@link #ensureVisits}. 권역 순서 제안이 남동부에
  * 날을 줘도 풀에 남동부 방문 후보가 없으면 모델이 다른 권역으로 그날을 채웠다. 하한을 지키는 방문 장소는 숙박 · 음식점을
  * 실을 때도 덜어 내지 않는다({@code visitFloor}).
+ *
+ * <p><b>요청 지역이 있으면 마지막에 그 권역 위주로 좁힌다 (#1423)</b> — {@link #focus}. 고르게 깐 풀은 "성산 쪽 위주로"
+ * 같은 요청에도 섬 전체를 내밀었다.
  *
  * <p>필수 포함 · 즐겨찾기는 이 다음에 워커가 합친다 — 그 장소는 상한과 무관하게 들어가야 하므로 여기서 세지 않는다.
  */
@@ -79,7 +83,124 @@ public final class CandidateZonePolicy {
      */
     public static final int VISITS_PER_ZONE = 3;
 
+    /**
+     * 요청 지역(#1423)으로 풀을 좁히려면 맞닿은 권역까지 남은 방문 장소가 이만큼은 있어야 한다. 2박 3일이 하루 2~3곳이면
+     * 6~9곳이라 그보다 적게 남기면 모델이 같은 곳을 되풀이하거나 고를 것이 없다 — 그때는 풀을 그대로 두고, 맞추지 못한
+     * 사실은 초안 근거({@code RequestNoteDraftPolicy})가 밝힌다.
+     */
+    public static final int FOCUS_MIN_VISITS = 6;
+
+    /**
+     * 요청 권역마다 채울 방문 장소 수 (#1423). 이미 남은 것도 센다. 3일 일정을 한 권역에서 날마다 2~3곳 고를 수 있는 양이다 —
+     * 제주 전체 풀의 권역 하한({@link #VISITS_PER_ZONE}=3)은 하루치라 한 권역 위주 일정에는 모자란다.
+     */
+    public static final int FOCUS_VISITS_PER_ZONE = 8;
+
+    /** 요청 권역마다 채울 음식점 수 (#1423). 하루 한 끼 자리를 3일. */
+    public static final int FOCUS_RESTAURANTS_PER_ZONE = 3;
+
+    /** 요청 권역마다 채울 숙박 수 (#1423). 숙소 재배치 가드({@code AiPlanRouteGuard})가 비교할 거리가 남게 둘보다 하나 더. */
+    public static final int FOCUS_LODGINGS_PER_ZONE = 3;
+
     private CandidateZonePolicy() {
+    }
+
+    /**
+     * 요청 지역 위주로 풀을 좁힌다 (#1423). "성산 쪽 위주로" 라고 적어도 제주 전체 풀은 6권역에 고르게 깔려(#1312) 모델이
+     * 섬을 돌았다.
+     *
+     * <ol>
+     *   <li>좁히지 않는 요청({@link RequestedRegion#narrows()} 가 아니다)이면 풀 그대로다</li>
+     *   <li>맞닿은 권역까지({@link RequestedRegion#reach()}) 안의 후보만 남긴다. 권역을 모르는 후보도 뺀다</li>
+     *   <li>남은 방문 장소가 {@link #FOCUS_MIN_VISITS} 곳보다 적으면 <b>풀을 그대로 돌려준다</b> — 모으지 않는다. 고를 것이
+     *       없는 일정보다 섬을 도는 일정이 낫고, 못 맞춘 사실은 초안 근거가 밝힌다</li>
+     *   <li>{@code extra} 에서 <b>요청 권역({@link RequestedRegion#zones()}, 맞닿은 권역 아님)</b>의 것으로 채운다 — 방문 →
+     *       음식점 → 숙박 순, 권역마다 {@link #FOCUS_VISITS_PER_ZONE} · {@link #FOCUS_RESTAURANTS_PER_ZONE} ·
+     *       {@link #FOCUS_LODGINGS_PER_ZONE} 곳까지(남은 것 포함). 남은 순서를 지키고 더한 것은 뒤에 붙인다. 상한을 넘지
+     *       않고, 칸이 모자라면 권역을 돌아가며 줄인다({@link #acrossZones})</li>
+     * </ol>
+     *
+     * @param pool   지금까지 모은 후보(요청 조건 + 일반 검색 + 권역 몫)
+     * @param extra  권역 대표점 기준 거리순으로 찾은 후보(#1312). 시군구 지정 요청이면 비어 있다 — 거르기만 한다
+     * @param region 요청 지역
+     * @param limit  후보 상한({@code ai-llm.place-candidate-size})
+     */
+    public static List<PlaceCandidate> focus(
+        List<PlaceCandidate> pool, List<PlaceCandidate> extra, RequestedRegion region, int limit
+    ) {
+        List<PlaceCandidate> base = pool == null ? List.of() : pool;
+        if (region == null || !region.narrows() || limit <= 0) {
+            return base;
+        }
+        Set<JejuZone> reach = region.reach();
+        List<PlaceCandidate> kept = base.stream()
+            .filter(candidate -> reach.contains(zoneOf(candidate)))
+            .toList();
+        if (visitsWithin(kept, reach) < FOCUS_MIN_VISITS) {
+            return base;
+        }
+
+        Map<JejuZone, int[]> held = new EnumMap<>(JejuZone.class);
+        region.zones().forEach(zone -> held.put(zone, new int[FocusKind.values().length]));
+        Set<Long> present = new HashSet<>();
+        for (PlaceCandidate candidate : kept) {
+            present.add(candidate.placeId());
+            int[] counts = held.get(zoneOf(candidate));
+            if (counts != null) {
+                counts[FocusKind.of(candidate).ordinal()]++;
+            }
+        }
+
+        List<PlaceCandidate> focused = new ArrayList<>(kept);
+        for (FocusKind kind : FocusKind.values()) {
+            List<PlaceCandidate> eligible = new ArrayList<>();
+            for (PlaceCandidate candidate : extra == null ? List.<PlaceCandidate>of() : extra) {
+                int[] counts = held.get(zoneOf(candidate));
+                if (counts == null || FocusKind.of(candidate) != kind || present.contains(candidate.placeId())
+                    || counts[kind.ordinal()] >= kind.perZone) {
+                    continue;
+                }
+                counts[kind.ordinal()]++;
+                present.add(candidate.placeId());
+                eligible.add(candidate);
+            }
+            int room = Math.max(0, limit - focused.size());
+            // 칸이 모자라면 앞에서 자르지 않는다 — extra 는 권역 선언 순서라 뒤 권역부터 빈다
+            focused.addAll(eligible.size() <= room ? eligible : acrossZones(eligible, room));
+        }
+        return List.copyOf(focused);
+    }
+
+    /** 풀에서 {@code zones} 안의 방문 장소 수. 권역을 모르는 후보는 세지 않는다. */
+    public static int visitsWithin(List<PlaceCandidate> pool, Set<JejuZone> zones) {
+        int count = 0;
+        for (PlaceCandidate candidate : pool == null ? List.<PlaceCandidate>of() : pool) {
+            JejuZone zone = zoneOf(candidate);
+            if (zone != null && zones.contains(zone) && isVisit(candidate)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /** 요청 지역을 채우는 종류. 선언 순서가 채우는 순서다 — 뒤가 잘리면 다른 결과가 대신할 수 없는 방문 장소를 먼저 지킨다. */
+    private enum FocusKind {
+        VISIT(FOCUS_VISITS_PER_ZONE),
+        RESTAURANT(FOCUS_RESTAURANTS_PER_ZONE),
+        LODGING(FOCUS_LODGINGS_PER_ZONE);
+
+        private final int perZone;
+
+        FocusKind(int perZone) {
+            this.perZone = perZone;
+        }
+
+        private static FocusKind of(PlaceCandidate candidate) {
+            if (Kind.LODGING.matches(candidate)) {
+                return LODGING;
+            }
+            return Kind.RESTAURANT.matches(candidate) ? RESTAURANT : VISIT;
+        }
     }
 
     /** 방문 장소인가 — 숙박도 음식점도 아니다. */
