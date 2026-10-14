@@ -13,8 +13,8 @@ import { parseDay, todayUtc, weekdayOf } from '@/lib/date/day'
  * `today` 를 **로컬 getter(`getFullYear` · `getMonth` · `getDate`)로 읽는다.** 시각이 아니라
  * 그 시각이 실행 환경의 시간대에서 떨어지는 **달력의 칸**만 본다.
  *
- * - **화면은 서버가 정한 칸을 로컬 정오로 세워 넘긴다** — 서버 페이지가 `todayDay(new Date())`
- *   로 `YYYY-MM-DD` 를 만들어 내려보내고, 클라이언트가 `todayFromDay` (형식이 불확실하면
+ * - **화면은 서버가 정한 칸을 로컬 정오로 세워 넘긴다** — 서버 페이지가 `serviceTodayDay(new Date())`
+ *   로 서울의 `YYYY-MM-DD` 를 만들어 내려보내고, 클라이언트가 `todayFromDay` (형식이 불확실하면
  *   `dayToLocalNoon`)로 `Date` 를 세운다 (`lib/date/day.ts`). 홈 · 일정 목록 · 상세 · 일자
  *   재생성이 이 경로다.
  * - **서버가 만든 시각(`new Date()` · ISO 문자열)을 클라이언트로 넘기지 않는다.** 브라우저

@@ -9,7 +9,7 @@ import { walkTimesPath } from '@/lib/api/insight'
 import { paths } from '@/lib/api/paths'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
-import { todayDay, weekdayOf } from '@/lib/date/day'
+import { serviceTodayDay, weekdayOf } from '@/lib/date/day'
 import { conditionKey, insightKeys } from '@/lib/insight/queries'
 import { WALK_TIMES_PREFETCH_POSITION } from '@/lib/insight/walk-times-position'
 import { messages } from '@/lib/messages'
@@ -92,9 +92,10 @@ export default async function HomePage() {
   /*
     **오늘은 서버가 정한다.** 클라이언트에서 `new Date()` 를 부르면 하이드레이션이
     어긋난다 — 기준 줄의 날짜뿐 아니라 "다가오는 일정" 이 고르는 일정까지 갈린다
-    (`lib/date/day.ts` `dayToLocalNoon`).
+    (`lib/date/day.ts` `dayToLocalNoon`). 칸은 서울의 칸(`serviceTodayDay`)이다 (#1507) —
+    기준 줄의 요일도 이 칸 문자열에서 읽으므로(`weekdayOf`) 컨테이너 `TZ` 와 무관하다.
   */
-  const todayIso = todayDay(new Date())
+  const todayIso = serviceTodayDay(new Date())
 
   /*
     **소개 카드는 서버가 정한다** (#950). 비로그인이고 소개를 본 적이 없을 때만 선다 —

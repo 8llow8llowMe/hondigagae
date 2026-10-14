@@ -9,7 +9,7 @@ import { ApiError } from '@/lib/api/error'
 import { planDetailPath } from '@/lib/api/plan'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
-import { todayDay } from '@/lib/date/day'
+import { serviceTodayDay } from '@/lib/date/day'
 import { messages } from '@/lib/messages'
 import { pickBriefingDate } from '@/lib/plan/briefing'
 import { getServerQueryClient } from '@/lib/query/query-client'
@@ -80,9 +80,10 @@ export default async function PlanBriefingPage({ params }: { params: Params }) {
     400 이라(`PlanBriefingProcessor.resolveDay`), 고를 수 없으면 요청 자체를 하지 않는다.
 
     **오늘을 서버가 만든다** — 클라이언트가 `new Date()` 를 부르면 자정을 걸쳐 서버 렌더와
-    하이드레이션이 다른 날을 고를 수 있다 (`dayToLocalNoon` 주석과 같은 이유).
+    하이드레이션이 다른 날을 고를 수 있다 (`dayToLocalNoon` 주석과 같은 이유). 서울의 칸
+    (`serviceTodayDay`)이라 백엔드(`Asia/Seoul` 고정 `Clock`)와 같은 기준이다 (#1507).
   */
-  const target = pickBriefingDate(plan.startDate, plan.endDate, todayDay(new Date()))
+  const target = pickBriefingDate(plan.startDate, plan.endDate, serviceTodayDay(new Date()))
 
   /*
     **3층 표면** (`DESIGN.md §0`). 바닥(`Canvas`)만 여기서 칠하고 **배치는 뷰가 정한다** (D14-2) —

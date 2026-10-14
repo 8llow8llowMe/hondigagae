@@ -31,6 +31,15 @@ import { defineConfig, devices } from '@playwright/test'
  * (`app/api/bff/[...path]/route.ts` · `src/lib/api/server.ts`). 그래서 `page.route()` 로
  * 브라우저 요청만 가로채는 방식과 달리 서버 렌더까지 같은 fixture 를 본다.
  */
+/*
+  **스펙의 오늘을 서울로 고정한다** (#1507). 서버 페이지 · mock · 클라이언트 `useToday` 는 실행
+  환경과 무관하게 서울의 칸(`serviceTodayDay`)을 오늘로 쓴다. 스펙은 `new Date()` 의 로컬
+  getter 로 오늘을 세는데(Node 쪽 `dayLabel` · 브라우저 쪽 `page.evaluate`), CI 러너는 UTC 라
+  KST 00–09시면 스펙만 하루 이르다. 워커가 상속하도록 설정 로드 시점에 `TZ` 를, 브라우저는
+  `timezoneId` 로 맞춘다.
+*/
+process.env.TZ = 'Asia/Seoul'
+
 const PORT = Number(process.env.E2E_PORT ?? 5175)
 const BASE_URL = `http://127.0.0.1:${PORT}`
 
@@ -47,6 +56,7 @@ export default defineConfig({
 
   use: {
     baseURL: BASE_URL,
+    timezoneId: 'Asia/Seoul',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },

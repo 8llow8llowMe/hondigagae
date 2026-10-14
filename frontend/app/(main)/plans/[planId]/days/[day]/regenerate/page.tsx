@@ -9,7 +9,7 @@ import { ApiError } from '@/lib/api/error'
 import { planDetailPath } from '@/lib/api/plan'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
-import { todayDay } from '@/lib/date/day'
+import { serviceTodayDay } from '@/lib/date/day'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import type { PlanDetail } from '@/types/plan'
@@ -72,10 +72,10 @@ export default async function PlanDayRegeneratePage({ params }: { params: Params
           **`today` 를 서버에서 만들어 내려보낸다.** 클라이언트가 따로 `new Date()` 를
           부르면 자정 근처에서 서버 렌더와 하이드레이션의 판정이 갈린다 (일정 상세와 같은
           결정). 뷰는 이 값으로 재생성이 막힌 일정인지 본다 (`dayRegenerateBlock`).
-          시각이 아니라 달력의 칸(`todayDay`)을 넘긴다 — 시각은 브라우저 시간대가 날짜를
-          다시 정한다 (#1490).
+          시각이 아니라 달력의 칸을 넘긴다 — 시각은 브라우저 시간대가 날짜를
+          다시 정한다 (#1490). 칸은 서울의 칸(`serviceTodayDay`)이다 (#1507).
         */}
-        <PlanDayRegenerateView planId={planId} day={day} today={todayDay(new Date())} />
+        <PlanDayRegenerateView planId={planId} day={day} today={serviceTodayDay(new Date())} />
       </HydrationBoundary>
     </Canvas>
   )

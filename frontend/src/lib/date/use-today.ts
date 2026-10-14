@@ -15,11 +15,11 @@ import { serviceTodayDay } from '@/lib/date/day'
  *
  * - **서버가 그린 적 없는 트리에만 쓴다.** 장소 상세 · 산책 코스의 `담기` 시트는 사용자가
  *   열기 전까지 렌더되지 않아(`BottomSheet` 가 닫힌 동안 `null`) 비교될 서버 출력 자체가 없다.
- *   서버가 렌더하는 트리라면 서버 페이지가 `todayDay(new Date())` 로 칸을 내리고 클라이언트가
+ *   서버가 렌더하는 트리라면 서버 페이지가 `serviceTodayDay(new Date())` 로 칸을 내리고 클라이언트가
  *   `todayFromDay` 로 세운다 (#1490).
  * - **값은 서울의 칸이다** (#1499). 브라우저 로컬 날짜(`todayDay(new Date())`)를 쓰면 브라우저가
- *   UTC 이고 KST 00–09시일 때 KST 기준 어제가 출발일 하한이 됐다. 서버 페이지(프로세스 시간대
- *   서울) · 백엔드(`Asia/Seoul` 고정 `Clock`)와 같은 기준이 되도록 `serviceTodayDay` 로 읽는다.
+ *   UTC 이고 KST 00–09시일 때 KST 기준 어제가 출발일 하한이 됐다. 서버 페이지(#1507 부터
+ *   `serviceTodayDay`) · 백엔드(`Asia/Seoul` 고정 `Clock`)와 같은 기준이 되도록 `serviceTodayDay` 로 읽는다.
  * - **판정 함수에 `Date` 로 넘길 때는 `todayFromDay(useToday())` 로 세운다.** 판정 함수는 로컬
  *   getter 를 읽으므로 `new Date()` 를 그대로 넘기면 다시 브라우저 시간대가 날짜를 정한다.
  *

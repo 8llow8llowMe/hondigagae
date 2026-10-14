@@ -8,7 +8,7 @@ import { readSourceWithoutComments as source } from '@/test/source'
  * 판정 함수(`planPhaseOf` · `tripPhaseOf` · `dayRegenerateBlock` …)는 `today` 를 로컬 getter 로
  * 읽는다(`lib/plan/date.ts` 머리 규약). 서버가 `new Date()` 를 시각 그대로 넘기면 브라우저
  * 시간대가 날짜를 다시 정해 홈(`오늘 1일차`)과 목록 · 상세(`D-1`)가 갈렸다. 그래서 페이지는
- * **달력의 칸(`todayDay`)** 을 넘기고, 뷰가 `todayFromDay` 로 로컬 정오를 세운다.
+ * **달력의 칸(`serviceTodayDay` — 서울, #1507)** 을 넘기고, 뷰가 `todayFromDay` 로 로컬 정오를 세운다.
  *
  * ### 왜 소스 단언인가
  *
@@ -38,7 +38,7 @@ describe.each(SCREENS)('$name 의 오늘 (#1490)', ({ page, view }) => {
   const VIEW = source(view)
 
   it('페이지는 시각이 아니라 서버가 정한 달력의 칸을 넘긴다', () => {
-    expect(PAGE).toContain('today={todayDay(new Date())}')
+    expect(PAGE).toContain('today={serviceTodayDay(new Date())}')
     expect(PAGE).not.toContain('toISOString()')
     expect(PAGE).not.toContain('today={new Date()}')
   })
