@@ -60,7 +60,7 @@ area_visitor_stat                             (Redis 캐시 기본, weather_fore
 | pet_allowance_type | VARCHAR(20) | N | (가공) | enum `PetAllowanceType`: ALLOWED / PARTIALLY_ALLOWED / NOT_ALLOWED / UNKNOWN, default UNKNOWN |
 | source_created_at | DATETIME | Y | createdtime | 원천 등록일 (`yyyyMMddHHmmss` 파싱) |
 | source_modified_at | DATETIME | Y | modifiedtime | 원천 수정일 — **증분 동기화 기준** |
-| indoor / outdoor | BOOLEAN | N | (문화정보원) | 실내·실외 여부. 비 오는 날 대안 추천 근거 |
+| indoor / outdoor | BOOLEAN | Y | (문화정보원) | 반려견이 머물 수 있는 실내·실외 여부. 비 오는 날 대안 추천 근거. NULL 은 모름 — 관광 API · 식약처는 원천에 없고, 문화정보원도 동반 불가 행은 모름이다 (#753 · #1434) |
 | pet_only | BOOLEAN | N | (문화정보원) | 반려동물 전용 시설 |
 | allowed_pet_size | VARCHAR(20) | N | (가공) | enum `AllowedPetSize` |
 | pet_restriction | VARCHAR(500) | Y | (문화정보원) | 제한사항 원문 |
