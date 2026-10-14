@@ -45,6 +45,10 @@
   `다른 곳이 더 나아요` · `기상특보가 있어 바깥 활동을 줄이는 게 좋아요`). 오늘 판정은 특보를 붙일지와 같은 한 번의 `targetDate.equals(LocalDate.now())` 다.
   반려견 이름은 넣지 않는다(화면이 `오늘 몽과` 로 붙인다). **산책 위험도에는 headline 을 두지 않는다** — 지도 미리보기(#1233 ⑤)는 산책을
   결론이 아니라 근거 사실 한 줄(`walkSafetyLevel.name` · 체감온도)로만 쓴다. 결론은 적합도 하나가 말한다
+  **`indoorAlternatives[]`(`AlternativePlaceItem`)** 는 `placeId` · `title` · `lat` · `lng` · `distanceMeters` · `petAllowanceType` ·
+  `allowedPetSize` · **`contentType` · `sourceCategory`**(#1461)다. 뒤 둘은 `PlaceItem` 과 같은 뜻 · 같은 값이고(유형을 모르면
+  `contentType` null — `ContentType.findByCode`, 응답을 깨지 않는다), 프론트가 대안을 일정에 담을 때 음식점이면 식사(`MEAL`)로 저장하는
+  판정(#1447 `placeItemTypeOf`)에 쓴다. 추천 항목도 같은 DTO 다. **FE 후속**: 실내 대안 담기에 `placeItemTypeOf` 적용(#1516)
 - `GET /api/v1/places/recommendations` — 장소 추천 "오늘 가기 좋은 곳" (#1368). 적합도와 같은 반려견 조건 파라미터 + `limit`(기본 3, 1~10,
   밖이면 `INSIGHT_105`). 지역은 받지 않는다(`insight.recommendation.area-code`, 기본 39). 각 항목은 목록 카드 요약(`PlaceItem` 과 같은 뜻)
   + 적합도 판정(`score` · `suitabilityLevel` · `headline` · `reasons` · `weather` · `congestion` · `indoorAlternatives`)이고, 특보와 날씨 출처는
@@ -53,6 +57,8 @@
   뺀 등급으로 가르므로 목록이 비지 않고 카드 점수만 60 아래일 수 있다. 추천할 곳이 없으면 `items: []`(200) — 경보 날은 0점이라
   빈 목록이고, 특보는 목록 머리가 말한다. 리터럴 경로라 `/{placeId}` 로
   잡히지 않는다(`PlaceRecommendationRouteTest`). 후보 · 정렬 · 다양성 · 캐시 규칙은 `weather-insight-integration.md` §6-5.
+  실내 대안에 `contentTypeId` · `sourceCategory` 를 더할 때(#1461) 결과 캐시 키는 바꾸지 않았다 — 서비스 ObjectMapper 가 없는 칸을
+  null 로 읽어 옛 항목은 두 칸만 빈 채 최대 TTL(600초) 동안 나간다(`RedisPlaceRecommendationCacheAdapterTest`, 규칙은 `weather-insight-integration.md` §6-5 "캐시 값에 칸을 더할 때").
   **예열 스케줄(#1388)** — `PlaceRecommendationPrewarmScheduler` 가 단기예보 격자 캐시 만료(발표시각 H:40) 5분 뒤
   (`0 45 2,5,8,11,14,17,20,23 * * *`, Asia/Seoul)에 기본 조건(오늘 · 반려견 조건 없음 · 3곳) 추천을 결과 캐시를 읽지 않고 계산해,
   날씨 격자 캐시와 기본 결과 캐시를 미리 채운다. Redis 작업 잠금으로 회차당 한 인스턴스만 돌고, 실패는 WARN 으로 삼킨다.
@@ -146,7 +152,12 @@
 - `GET /internal/v1/places/visible-ids?placeIds=` — (내부 전용) 일정 항목 검증용 벌크 존재 확인.
   게이트웨이가 라우팅하지 않으며, delisted 를 제외해 새 일정 항목이 사라진 장소를 참조하지 못하게 한다
 - `GET /internal/v1/places/candidates?placeIds=` — (내부 전용) 아이디로 후보 요약 조회.
-  ai-service 의 필수 포함 장소를 프롬프트 후보에 합칠 때 쓴다. enum 은 표시명으로 변환해 준다
+  ai-service 의 필수 포함 장소를 프롬프트 후보에 합칠 때 쓴다. enum 은 표시명으로 변환해 준다.
+  plan-service 도 일정 상세 장소 요약 · 즐겨찾기 · 응급 브리핑 · 출발 전 브리핑(대표 장소 좌표)에 쓴다. **`contentTypeCode` 만 예외로 enum 이름**(`RESTAURANT` 등)이고,
+  `contentTypeDescription`(`ContentType` 설명)을 함께 준다(#1461, 유형이 없으면 셋 다 null) — 표시명(`contentTypeName`)은 문구라 판정에
+  못 쓰고, plan-service 가 일정 항목 장소 요약에 공개 API 와 같은 `contentType {code, name, description}` 을 실어야 프론트가 이미 담긴
+  음식점을 식사로 센다. 내부 DTO 라 metadata 를 세 값으로 펴서 준다(`fitsActivityLevels` 와 같은 이유). 소비 DTO 셋(plan `PlanPlaceClientResponse` ·
+  `FavoritePlaceClientResponse`, ai `PlaceCandidateInternalClientResponse`)은 `@JsonIgnoreProperties(ignoreUnknown = true)` 라 칸을 더해도 깨지지 않는다
 - `GET /internal/v1/walk-courses/candidates?walkCourseIds=` — (내부 전용) 아이디로 산책 코스 요약 조회 (#619).
   plan-service 가 일정 상세의 `WALK` 항목에 이름표·거리·소요시간·대표 이미지를 붙일 때 쓴다.
   **없는 아이디는 조용히 빠진다** — plan-service 의 `WALK` `targetId` 는 저장 시 검증되지 않아 없는 코스를

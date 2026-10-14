@@ -60,7 +60,7 @@
     요약만 비우고(사용자가 담아 둔 자료다), 저장은 그 상태를 새로 만들지 않도록 거절한다. 포트
     javadoc 이 두 의미를 함께 적고 있다.
   - `targetId` 가 null 인 항목은 **묻지 않는다** — 장소 경로와 같은 처리다(대상 없이 제목만 있는 줄).
-- **일정 상세 항목에 장소 요약이 붙는다** (`addr1` · `indoor` · `firstImage` · `lat` · `lng`).
+- **일정 상세 항목에 장소 요약이 붙는다** (`addr1` · `indoor` · `firstImage` · `lat` · `lng` · `contentType` · `sourceCategory`).
   tour-service 내부 후보 API(`GET /internal/v1/places/candidates`)를 **한 번** 부르고 중복
   아이디는 제거한다 — 프론트가 항목마다 `GET /places/{placeId}` 를 부르던 것을 없애기 위한
   것이라, 같은 문제를 백엔드로 옮기면 의미가 없다.
@@ -74,6 +74,11 @@
     없는 브리핑이 "가까운 병원이 없다" 는 착각을 준다.
   - **원천에서 사라진(delisted) 장소는 요약만 null 이고 항목은 남는다.** 사용자가 담아 둔 자료다.
   - `indoor` 의 null 은 "실외" 가 아니라 "원천에 정보 없음" 이다. `false` 로 바꾸지 않는다.
+  - **`contentType`(`PlanItemPlaceItem`) · `sourceCategory` 는 장소 목록(`PlaceItem`)과 같은 이름 · 같은 값이다** (#1461). 내부 후보 API 의
+    `contentTypeCode`(enum 이름) · `contentTypeName` · `contentTypeDescription` 세 값을 `{code, name, description}` 으로 다시 씌운다.
+    code 가 없으면 객체 통째로 null. 이미 받는 응답의 칸이라 원격 호출은 늘지 않는다. 이미 `PLACE` 로 담긴 음식점을 프론트가 식사로
+    세는 판정(#1447 `placeItemTypeOf`)에 쓴다. 공유 응답에도 실린다 — 공개 장소 상세가 인증 없이 내리는 값이라 아래 공유 링크 절의
+    "한계 노출량 0" 기준을 통과한다. **FE 후속**: 기존 `PLACE` 음식점을 식사로 세기(#1516)
 - **일정 상세의 `WALK` 항목에 산책 코스 요약이 붙는다** (#619, `courseLabel` · `distanceKm` ·
   `durationText` · `durationMaxMinutes` · `firstImage` · `lat` · `lng` · `fitsActivityLevels`).
   `WALK` 의 `targetId` 는 `walk_course.id` 라 장소 요약 경로에서 빠지고, 그래서 산책 항목만
@@ -998,6 +1003,11 @@ WHERE p.deleted = FALSE
   **정상**이라(예보는 약 11일), 전체를 성공/실패로 나누면 그 차이를 표현할 수 없다.
 - 날씨 때문에 항목을 바꾸는 것은 이 API 가 아니라 일자별 항목 교체 API 로 명시적으로 한다
   (`api-design-guide.md` §8 의 부수효과 분리 원칙).
+- **`indoorAlternatives[]`(`PlanAlternativePlaceItem`)** 는 `placeId` · `title` · `lat` · `lng` · `distanceMeters` · **`contentType` ·
+  `sourceCategory`**(#1461)다. 뒤 둘은 tour-service 실내 대안 그대로다 — `{code, name, description}` 을 QueryResult · Info 에서 세
+  값으로 폈다가 Presenter 가 다시 씌우고(Feign DTO 를 포트 계약에 두지 않는다), 원천이 유형을 주지 않으면 `contentType` 은 null 이다.
+  프론트가 대안을 일정에 담을 때 음식점이면 식사(`MEAL`)로 저장하는 판정(#1447 `placeItemTypeOf`)에 쓴다.
+  **FE 후속**: 실내 대안 담기에 `placeItemTypeOf` 적용(#1516)
 - Feign 조회 실패는 예외로 올리지 않고 빈 값으로 바꾼다. 날씨는 부가 정보이고,
   tour-service 가 흔들렸다고 사용자가 자기 일정을 못 보게 되면 안 된다.
 - 항목 단위 판정이 필요해지는 순간은 **산책 위험도**다. 그것은 시각에 따라 갈리므로 같은
