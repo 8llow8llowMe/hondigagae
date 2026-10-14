@@ -22,6 +22,7 @@ import com.hondigagae.domainlayer.insight.domain.model.SuitabilityHeadline;
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityScore;
 import com.hondigagae.domainlayer.insight.domain.model.WeatherWarning;
 import com.hondigagae.global.properties.InsightProperties;
+import com.hondigagae.shared.travel.insight.SuitabilityLevel;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -108,11 +109,12 @@ public class PlaceRecommendationProcessor {
             // 날씨를 못 받은 격자가 있으면 그 장소들이 빠진 결과다. 캐시하면 원천이 돌아온 뒤에도 TTL 동안
             // 빠진 결과를 계속 준다 — 다음 요청이 다시 계산하게 둔다.
             log.info("Place recommendation not cached, weather degraded date={} limit={}", targetDate, limit);
-        } else if (computation.info().places().isEmpty()) {
-            // 빈 결과도 캐시하지 않는다. 단기예보만 실패하면 dailyForecastsAt 이 실패를 삼키고 중기예보로 계속해
-            // 격자 실패로 잡히지 않지만, 오늘은 중기예보가 덮지 않아 모든 장소가 점수 없음이 된다. 그 빈 목록을
-            // TTL 동안 주지 않게 한다. 정말 추천할 곳이 없는 날의 비용은 재계산 한 번뿐이다.
-            log.info("Place recommendation not cached, empty result date={} limit={}", targetDate, limit);
+        } else if (computation.scoredCount() == 0) {
+            // 점수를 낸 곳이 하나도 없으면 캐시하지 않는다. 단기예보만 실패하면 dailyForecastsAt 이 실패를 삼키고
+            // 중기예보로 계속해 격자 실패로 잡히지 않지만, 오늘은 중기예보가 덮지 않아 모든 장소가 점수 없음이 된다.
+            // 그 빈 목록을 TTL 동안 주지 않게 한다. 정말 추천할 곳이 없는 날의 비용은 재계산 한 번뿐이다.
+            // 점수는 냈는데 전부 '주의 필요' 라 빈 것은 그날의 답이라 캐시한다(#1434) — 특보 날 홈마다 다시 계산하지 않게.
+            log.info("Place recommendation not cached, no scored place date={} limit={}", targetDate, limit);
         } else {
             placeRecommendationCachePort.put(cacheKey,
                 insightMapper.toRecommendationQueryResult(computation.info()),
@@ -130,17 +132,23 @@ public class PlaceRecommendationProcessor {
             .toList();
         if (candidates.isEmpty()) {
             log.info("Place recommendation has no candidates areaCode={} contentTypeIds={}", settings.areaCode(), settings.contentTypeIds());
-            return new Computation(emptyInfo(targetDate, warning), false);
+            return new Computation(emptyInfo(targetDate, warning), false, 0);
         }
 
         Map<Long, CongestionSnapshot> congestions = congestionForecastPort.findByPlacesAndDate(
             candidates.stream().map(RecommendationCandidate::placeId).toList(), targetDate);
         WeatherMemo weatherMemo = new WeatherMemo();
 
-        List<ScoredCandidate> ranked = candidates.stream()
+        List<ScoredCandidate> scoredCandidates = candidates.stream()
             .map(candidate -> score(candidate, pet, targetDate, warning, congestions, weatherMemo))
             // 점수를 못 낸 곳(예보 범위 밖 · 날씨 없음)은 "가기 좋은 곳" 이라고 말할 근거가 없다.
-            .filter(scored -> scored.score().score() != null)
+            .filter(entry -> entry.score().score() != null)
+            .toList();
+        // '주의 필요'(LOW, 60점 미만)도 "가기 좋은 곳" 이 아니다 (#1434). 홈 "오늘 갈 만한 곳" 에 55점 제주항일기념관이 나왔다.
+        // 정렬이 이미 점수 내림차순이라 내리기만으로는 바뀌지 않는다 — 60점 이상이 limit 보다 적은 날에만 나오므로 뺀다.
+        // 가르는 등급은 admissionLevel 이다 — 주의보 날은 특보 감점을 뺀 등급이라 목록이 비지 않고, 경보 날은 0점이라 빈다.
+        List<ScoredCandidate> ranked = scoredCandidates.stream()
+            .filter(entry -> entry.admissionLevel() != SuitabilityLevel.LOW)
             .sorted(RANKING)
             .toList();
         List<ScoredCandidate> selected = selectDiverse(ranked, limit);
@@ -149,11 +157,13 @@ public class PlaceRecommendationProcessor {
             .map(scored -> toInfo(scored, pet, warning, today))
             .toList();
 
-        log.info("Place recommendation computed date={} candidates={} scored={} selected={} weatherKeys={} weatherFailedKeys={}",
-            targetDate, candidates.size(), ranked.size(), places.size(), weatherMemo.size(), weatherMemo.failedCount());
+        log.info("Place recommendation computed date={} candidates={} scored={} lowExcluded={} selected={} weatherKeys={} "
+                + "weatherFailedKeys={}",
+            targetDate, candidates.size(), scoredCandidates.size(), scoredCandidates.size() - ranked.size(), places.size(), weatherMemo.size(),
+            weatherMemo.failedCount());
         return new Computation(
             PlaceRecommendationInfo.builder().targetDate(targetDate).weatherWarning(warning).places(places).build(),
-            weatherMemo.failedCount() > 0);
+            weatherMemo.failedCount() > 0, scoredCandidates.size());
     }
 
     private ScoredCandidate score(
@@ -170,7 +180,27 @@ public class PlaceRecommendationProcessor {
         CongestionSnapshot congestion = congestions.getOrDefault(candidate.placeId(), CongestionSnapshot.unknown(targetDate));
 
         SuitabilityScore score = placeSuitabilityProcessor.score(place, pet, daily, coverage, congestion, warning);
-        return new ScoredCandidate(candidate, score, daily, congestion);
+        return new ScoredCandidate(candidate, score, daily, congestion,
+            admissionLevel(score, place, pet, daily, coverage, congestion, warning));
+    }
+
+    /**
+     * '주의 필요' 로 뺄지 가르는 등급 (#1434).
+     *
+     * <p><b>주의보는 추천을 막지 않는다</b> — 추천 억제 판정은 {@link WeatherWarning#suppressesRecommendation}(경보만) 한 곳이다
+     * (weather-insight-integration.md §6-4). 주의보는 종류와 상관없이 45점을 깎아 모든 후보가 55점 이하가 되므로, 표시 점수의
+     * 등급으로 가르면 제주에 잦은 풍랑 · 건조 주의보만으로 목록이 빈다. 그래서 주의보 날에는 <b>특보 감점을 뺀 점수의 등급</b>으로
+     * 가른다 — 장소 자체가 주의 필요인 곳만 빠진다. 카드의 점수 · 결론은 그대로 특보를 반영한 값이다.
+     * 경보 날과 특보 없는 날은 표시 점수의 등급 그대로다(경보는 0점이라 빈 목록).
+     */
+    private SuitabilityLevel admissionLevel(
+        SuitabilityScore score, PlaceCondition place, PetCondition pet, DailyWeather daily, ForecastCoverage coverage,
+        CongestionSnapshot congestion, WeatherWarning warning
+    ) {
+        if (warning == null || WeatherWarning.suppressesRecommendation(warning)) {
+            return score.level();
+        }
+        return placeSuitabilityProcessor.score(place, pet, daily, coverage, congestion, null).level();
     }
 
     /**
@@ -276,12 +306,17 @@ public class PlaceRecommendationProcessor {
         }
     }
 
-    /** 점수를 매긴 후보. 판정에 쓴 그날 날씨와 혼잡도를 응답까지 그대로 들고 간다. */
+    /**
+     * 점수를 매긴 후보. 판정에 쓴 그날 날씨와 혼잡도를 응답까지 그대로 들고 간다.
+     *
+     * @param admissionLevel '주의 필요' 로 뺄지 가르는 등급 — 주의보 날에는 특보 감점을 뺀 등급이다({@code admissionLevel()})
+     */
     record ScoredCandidate(
         RecommendationCandidate candidate,
         SuitabilityScore score,
         DailyWeather daily,
-        CongestionSnapshot congestion
+        CongestionSnapshot congestion,
+        SuitabilityLevel admissionLevel
     ) {
 
         Double congestionRate() {
@@ -289,7 +324,8 @@ public class PlaceRecommendationProcessor {
         }
     }
 
-    private record Computation(PlaceRecommendationInfo info, boolean weatherDegraded) {
+    /** @param scoredCount 점수를 낸 후보 수 — '주의 필요' 로 빠진 곳도 센다. 0 이면 원천 문제일 수 있어 캐시하지 않는다 */
+    private record Computation(PlaceRecommendationInfo info, boolean weatherDegraded, int scoredCount) {
 
     }
 }

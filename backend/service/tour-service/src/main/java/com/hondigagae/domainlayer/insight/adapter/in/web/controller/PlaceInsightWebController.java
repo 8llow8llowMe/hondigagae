@@ -105,6 +105,9 @@ public class PlaceInsightWebController {
             + "같은 날짜 · 같은 반려견 조건이면 추천 카드와 그 장소 적합도가 같은 값을 말합니다.\n\n"
             + "후보는 동반 가능(ALLOWED) · 일부 허용(PARTIALLY_ALLOWED)이고 대표 사진과 좌표가 있는 관광지 · 문화시설 · 레포츠입니다. "
             + "점수를 못 낸 장소(예보 범위 밖 · 날씨를 받지 못한 곳)는 추천하지 않으므로 items 의 score 는 비지 않습니다. "
+            + "'주의 필요'(60점 미만) 장소도 추천하지 않으므로 items 는 limit 보다 적거나 빈 배열일 수 있습니다. "
+            + "주의보 날은 특보 감점을 뺀 점수로 가르므로 목록이 비지 않고(카드 점수는 특보를 반영해 60 아래일 수 있습니다), "
+            + "경보 날은 모든 장소가 0점이라 items 가 빈 배열입니다. "
             + "순서는 점수 높은 순이고, 같은 점수면 동반 가능 → 덜 붐비는 곳 순입니다. 같은 유형은 limit 의 절반(올림)까지 먼저 담고, "
             + "자리가 남을 때만 같은 유형으로 채웁니다. 추천할 곳이 없으면 items 는 빈 배열입니다(200).\n\n"
             + "특보(weatherWarning)와 날씨 출처는 지역 공통이라 목록 머리에 한 번 옵니다. 결과는 같은 조건에서 몇 분간 재사용될 수 있습니다.\n\n"
@@ -139,7 +142,8 @@ public class PlaceInsightWebController {
         @Parameter(description = "[선택] 사회성. LOW 면 혼잡도 감점을 키웁니다. 보통/높음은 판정에 영향이 없습니다", example = "LOW")
         @RequestParam(required = false) SocialityLevel petSociality,
 
-        @Parameter(description = "[선택, 기본 3] 추천 개수 (1~10). 후보가 모자라면 그보다 적게 옵니다", example = "3")
+        @Parameter(description = "[선택, 기본 3] 추천 개수 (1~10). 후보가 모자라거나 '주의 필요'를 빼고 나면 그보다 적게(0개도) 옵니다",
+            example = "3")
         @Min(value = 1, message = InsightValidationMessage.RECOMMENDATION_LIMIT_RANGE_INVALID)
         @Max(value = 10, message = InsightValidationMessage.RECOMMENDATION_LIMIT_RANGE_INVALID)
         @RequestParam(defaultValue = "" + PlaceRecommendationQuery.DEFAULT_LIMIT) int limit

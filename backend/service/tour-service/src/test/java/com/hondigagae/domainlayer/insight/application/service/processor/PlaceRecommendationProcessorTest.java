@@ -27,6 +27,7 @@ import com.hondigagae.domainlayer.insight.application.port.out.PlaceProfileQuery
 import com.hondigagae.domainlayer.insight.application.port.out.PlaceRecommendationCachePort;
 import com.hondigagae.domainlayer.insight.application.port.out.query.CachedPlaceRecommendationQueryResult;
 import com.hondigagae.domainlayer.insight.application.service.processor.PlaceRecommendationProcessor.ScoredCandidate;
+import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.enums.PrecipitationType;
 import com.hondigagae.domainlayer.insight.domain.enums.WeatherWarningLevel;
 import com.hondigagae.domainlayer.insight.domain.enums.WeatherWarningType;
@@ -39,6 +40,7 @@ import com.hondigagae.domainlayer.insight.domain.model.SuitabilityScore;
 import com.hondigagae.domainlayer.insight.domain.model.WeatherWarning;
 import com.hondigagae.global.properties.InsightProperties;
 import com.hondigagae.shared.travel.insight.ForecastSource;
+import com.hondigagae.shared.travel.insight.SuitabilityLevel;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -296,12 +298,54 @@ class PlaceRecommendationProcessorTest {
 
         verify(weatherWarningProcessor, times(1)).heaviestWarning();
         assertThat(info.weatherWarning()).isEqualTo(typhoon);
-        // 경보는 점수를 0 으로 누른다(적합도와 같은 규칙). 0 은 점수가 있는 것이라 추천에서 빠지지 않는다.
-        assertThat(info.places()).isNotEmpty().allSatisfy(place -> {
-            assertThat(place.score().score()).isZero();
-            assertThat(place.headline()).isEqualTo("기상특보가 있어 오늘은 바깥 활동을 줄이는 게 좋아요");
-        });
+        // 경보는 점수를 0 으로 누른다(적합도와 같은 규칙). 0점은 '주의 필요' 라 추천에서 빠진다(#1434) — 특보는 응답 머리가 말한다.
+        assertThat(info.places()).isEmpty();
         verify(cachePort).find(argThat(key -> key.today() && typhoon.equals(key.warning())));
+        // 점수는 냈으니(0점) 원천 문제로 빈 것이 아니라 그날의 답이다 — 캐시해서 특보 날 홈마다 다시 계산하지 않는다.
+        verify(cachePort).put(argThat(key -> typhoon.equals(key.warning())), any(), any());
+    }
+
+    @Test
+    @DisplayName("주의보 날은 특보 감점을 뺀 등급으로 가른다 — 목록이 비지 않고, 장소 자체가 주의 필요인 곳만 빠진다 (#1434)")
+    void advisoryDoesNotEmptyRecommendations() {
+        WeatherWarning windWave = WeatherWarning.builder()
+            .type(WeatherWarningType.WIND_WAVE).level(WeatherWarningLevel.ADVISORY).sourceText("풍랑주의보").build();
+        when(weatherWarningProcessor.heaviestWarning()).thenReturn(Optional.of(windWave));
+        RecommendationCandidate good = candidate(1L, TOURIST_SPOT, 33.40d);
+        RecommendationCandidate caution = candidate(2L, CULTURE, 33.50d, PetAllowanceType.PARTIALLY_ALLOWED);
+        givenCandidates(good, caution);
+        givenWeather(33.40d, mild(today));
+        givenWeather(33.50d, rainy(today));
+
+        PlaceRecommendationInfo info = processor.recommend(query(today, 3));
+
+        // 주의보는 추천을 막지 않는다(§6-4) — 감점 45 로 표시 점수는 60 아래지만 장소 자체는 좋은 곳이라 남는다.
+        assertThat(info.weatherWarning()).isEqualTo(windWave);
+        assertThat(info.places()).extracting(RecommendedPlaceInfo::placeId).containsExactly(1L);
+        // 카드의 점수 · 결론은 특보를 반영한 그대로다.
+        assertThat(info.places().get(0).score().score()).isLessThan(60);
+        assertThat(info.places().get(0).headline()).isEqualTo("기상특보가 있어 오늘은 바깥 활동을 줄이는 게 좋아요");
+    }
+
+    @Test
+    @DisplayName("'주의 필요'(60점 미만)는 점수가 있어도 추천하지 않는다 (#1434)")
+    void excludesCautionLevel() {
+        RecommendationCandidate good = candidate(1L, TOURIST_SPOT, 33.40d);
+        RecommendationCandidate caution = candidate(2L, CULTURE, 33.50d, PetAllowanceType.PARTIALLY_ALLOWED);
+        givenCandidates(good, caution);
+        givenWeather(33.40d, mild(today));
+        givenWeather(33.50d, rainy(today));
+        // 전제: 부분 허용 + 비 예보는 점수가 있는 '주의 필요' 다 — 점수 없음(null)으로 빠지는 경우와 구분한다.
+        SuitabilityScore cautionScore = placeSuitabilityProcessor.score(caution.place(), PetCondition.unspecified(),
+            rainy(today), ForecastCoverage.AVAILABLE, CongestionSnapshot.unknown(today), null);
+        assertThat(cautionScore.score()).isNotNull();
+        assertThat(cautionScore.level()).isEqualTo(SuitabilityLevel.LOW);
+
+        PlaceRecommendationInfo info = processor.recommend(query(today, 3));
+
+        // 정렬이 점수 내림차순이라 limit 이 남는 날에만 '주의 필요' 가 끼어들었다 — 자리가 남아도 넣지 않는다.
+        assertThat(info.places()).extracting(RecommendedPlaceInfo::placeId).containsExactly(1L);
+        verify(cachePort).put(any(), any(), any());
     }
 
     @Test
@@ -388,7 +432,8 @@ class PlaceRecommendationProcessorTest {
             CongestionSnapshot congestion = congestionRate == null
                 ? CongestionSnapshot.unknown(today)
                 : CongestionSnapshot.of(today, congestionRate);
-            return new ScoredCandidate(candidate, SuitabilityScore.scored(score, List.of(), true, congestion.isKnown()), null, congestion);
+            SuitabilityScore scored = SuitabilityScore.scored(score, List.of(), true, congestion.isKnown());
+            return new ScoredCandidate(candidate, scored, null, congestion, scored.level());
         }
     }
 
@@ -401,6 +446,10 @@ class PlaceRecommendationProcessorTest {
     }
 
     private static RecommendationCandidate candidate(long id, String contentTypeId, double lat) {
+        return candidate(id, contentTypeId, lat, PetAllowanceType.ALLOWED);
+    }
+
+    private static RecommendationCandidate candidate(long id, String contentTypeId, double lat, PetAllowanceType allowance) {
         return RecommendationCandidate.builder()
             .place(PlaceCondition.builder()
                 .placeId(id)
@@ -408,7 +457,7 @@ class PlaceRecommendationProcessorTest {
                 .sigunguCode("4")
                 .lat(lat)
                 .lng(126.53d)
-                .petAllowanceType(PetAllowanceType.ALLOWED)
+                .petAllowanceType(allowance)
                 .outdoor(true)
                 .build())
             .contentTypeId(contentTypeId)

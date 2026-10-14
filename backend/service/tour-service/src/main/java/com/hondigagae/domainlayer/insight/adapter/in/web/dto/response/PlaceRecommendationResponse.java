@@ -23,7 +23,8 @@ public record PlaceRecommendationResponse(
     String weatherProviderName,
 
     @Schema(
-        description = "발효 중인 기상특보. 기준 일자가 오늘일 때만 붙고, 없으면 null 이다. 경보면 각 장소 점수가 0 이 된다",
+        description = "발효 중인 기상특보. 기준 일자가 오늘일 때만 붙고, 없으면 null 이다. "
+            + "경보면 모든 장소가 0점(주의 필요)이라 items 가 빈다. 주의보면 점수는 깎이지만 추천은 막지 않는다",
         nullable = true)
     WeatherWarningItem weatherWarning,
 

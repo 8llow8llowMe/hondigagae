@@ -58,7 +58,7 @@ public class PlaceEntity extends BaseEntity {
     private String sourceKey;
 
     @Column(length = 50)
-    @Comment("원천의 원본 분류 (문화정보원 카테고리3: 펜션·카페·박물관 등). contentTypeId 로 뭉개기 전 값을 보존한다")
+    @Comment("원천의 원본 분류 (문화정보원 카테고리3: 펜션·카페·박물관 등, 식약처 업종 — 휴게음식점 중 이름이 카페인 곳은 카페). contentTypeId 로 뭉개기 전 값을 보존한다")
     private String sourceCategory;
 
     @Comment("TourAPI 콘텐츠 아이디 (문화정보원 원천이면 null)")
