@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.plan.adapter.in.web.dto.item;
 
+import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemPlaceInfo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -30,7 +31,17 @@ public record PlanItemPlaceItem(
     Double lat,
 
     @Schema(description = "경도", example = "126.4106264", nullable = true)
-    Double lng
+    Double lng,
+
+    @Schema(
+        description = "콘텐츠 타입 metadata. tour-service 장소 목록(PlaceItem.contentType)과 같은 값이다. 유형을 모르면 객체 통째로 null",
+        example = "{\"code\":\"RESTAURANT\",\"name\":\"음식점\",\"description\":\"음식점, 카페\"}", nullable = true)
+    CodeNameDescriptionMetadata contentType,
+
+    @Schema(
+        description = "원본 분류 (원천이 준 값 그대로 — 문화정보원 카테고리, 식약처 업종. 휴게음식점 중 이름이 카페인 곳은 '카페'). 없으면 null",
+        example = "카페", nullable = true)
+    String sourceCategory
 ) {
 
     /**
@@ -55,6 +66,19 @@ public record PlanItemPlaceItem(
             .firstImage(place.firstImage())
             .lat(place.lat())
             .lng(place.lng())
+            .contentType(toContentTypeMetadata(place))
+            .sourceCategory(place.sourceCategory())
             .build();
+    }
+
+    /**
+     * 내부 후보 API 가 편 세 값을 공개 장소 API({@code PlaceItem.contentType})와 같은 metadata 로 다시 씌운다 (#1461).
+     * 판정 키(code)가 없으면 null 이다 — 표시명만 든 metadata 는 화면이 분기할 수 없다.
+     */
+    private static CodeNameDescriptionMetadata toContentTypeMetadata(PlanItemPlaceInfo place) {
+        if (place.contentTypeCode() == null) {
+            return null;
+        }
+        return CodeNameDescriptionMetadata.of(place.contentTypeCode(), place.contentTypeName(), place.contentTypeDescription());
     }
 }

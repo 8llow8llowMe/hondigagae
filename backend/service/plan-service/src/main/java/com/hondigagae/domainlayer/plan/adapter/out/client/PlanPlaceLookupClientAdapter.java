@@ -44,6 +44,10 @@ public class PlanPlaceLookupClientAdapter implements PlanPlaceLookupPort {
                 .firstImage(item.firstImage())
                 .lat(item.lat())
                 .lng(item.lng())
+                .contentTypeCode(item.contentTypeCode())
+                .contentTypeName(item.contentTypeName())
+                .contentTypeDescription(item.contentTypeDescription())
+                .sourceCategory(item.sourceCategory())
                 .build())
             .toList();
     }

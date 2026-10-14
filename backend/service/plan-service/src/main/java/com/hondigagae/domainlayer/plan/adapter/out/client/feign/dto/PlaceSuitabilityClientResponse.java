@@ -49,9 +49,14 @@ public record PlaceSuitabilityClientResponse(
 
     }
 
+    /**
+     * 실내 대안 한 곳. {@code contentType} · {@code sourceCategory} 는 원천({@code AlternativePlaceItem})의 같은 이름 칸이다
+     * (#1461). 원천이 유형을 모르거나 그 칸이 없는 옛 버전이면 null 로 온다.
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record AlternativeClientResponse(
-        String placeId, String title, double lat, double lng, int distanceMeters
+        String placeId, String title, double lat, double lng, int distanceMeters,
+        MetadataClientResponse contentType, String sourceCategory
     ) {
 
     }

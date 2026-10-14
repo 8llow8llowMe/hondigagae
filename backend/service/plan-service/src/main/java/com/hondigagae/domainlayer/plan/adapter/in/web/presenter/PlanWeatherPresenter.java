@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.plan.adapter.in.web.presenter;
 
+import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
 import com.hondigagae.common.dto.metadata.ScoreMetricMetadata;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanAlternativePlaceItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanDailyWeatherItem;
@@ -130,7 +131,18 @@ public class PlanWeatherPresenter {
                 .lat(alternative.lat())
                 .lng(alternative.lng())
                 .distanceMeters(alternative.distanceMeters())
+                .contentType(toContentTypeMetadata(alternative))
+                .sourceCategory(alternative.sourceCategory())
                 .build())
             .toList();
+    }
+
+    /** 원천이 유형을 주지 않았으면 null 이다. code 없는 빈 metadata 를 만들면 화면이 "유형 있음" 으로 읽는다 (#1461). */
+    private CodeNameDescriptionMetadata toContentTypeMetadata(PlanDaySuitabilityInfo.AlternativeInfo alternative) {
+        if (alternative.contentTypeCode() == null) {
+            return null;
+        }
+        return CodeNameDescriptionMetadata.of(
+            alternative.contentTypeCode(), alternative.contentTypeName(), alternative.contentTypeDescription());
     }
 }

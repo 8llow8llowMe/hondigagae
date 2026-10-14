@@ -54,8 +54,15 @@ public record PlanDaySuitabilityInfo(
 
     }
 
+    /**
+     * 실내 대안 한 곳. 장소 유형 세 값은 원천 metadata 를 편 것이고 Presenter 가 다시 metadata 로 씌운다.
+     * 원천이 유형을 주지 않으면 null 이다 (#1461).
+     */
     @Builder
-    public record AlternativeInfo(long placeId, String title, double lat, double lng, int distanceMeters) {
+    public record AlternativeInfo(
+        long placeId, String title, double lat, double lng, int distanceMeters,
+        String contentTypeCode, String contentTypeName, String contentTypeDescription, String sourceCategory
+    ) {
 
     }
 }

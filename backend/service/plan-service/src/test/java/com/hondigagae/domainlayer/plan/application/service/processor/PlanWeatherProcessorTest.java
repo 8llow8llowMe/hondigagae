@@ -4,6 +4,7 @@ import java.util.Collection;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlanItemCountQueryResult;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.hondigagae.domainlayer.plan.application.info.PlanDaySuitabilityInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo.PetSuitabilityInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo.PlanDayWeatherInfo;
@@ -132,6 +133,38 @@ class PlanWeatherProcessorTest {
         assertThat(day.petSuitabilities())
             .extracting(PetSuitabilityInfo::levelScoreDescription)
             .containsOnly(SCORE_DESCRIPTION);
+    }
+
+    /**
+     * 실내 대안의 장소 유형 · 원본 분류가 out-port 계약에서 application 표현까지 건너오는지 고정한다 (#1461).
+     *
+     * <p>프론트는 이 두 값으로 음식점 대안을 식사로 담는다. 여기서 옮기지 않으면 어디서도 실패하지 않은 채 null 로 남는다.
+     */
+    @Test
+    @DisplayName("실내 대안의 장소 유형 · 원본 분류가 그대로 건너오고, 원천이 안 주면 null 이다")
+    void alternativeContentTypeCrossesThePortBoundary() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        placeSuitabilityQueryPort.alternatives = List.of(
+            PlaceSuitabilityQueryResult.AlternativeQueryResult.builder()
+                .placeId(200L).title("오설록 티뮤지엄").lat(33.3058).lng(126.2895).distanceMeters(2340)
+                .contentTypeCode("RESTAURANT").contentTypeName("음식점").contentTypeDescription("음식점, 카페")
+                .sourceCategory("카페")
+                .build(),
+            PlaceSuitabilityQueryResult.AlternativeQueryResult.builder()
+                .placeId(300L).title("유형 없는 곳").lat(33.3).lng(126.3).distanceMeters(4100)
+                .build());
+
+        PlanDayWeatherInfo day = firstDay(processor.brief(1L, plan(), List.of(MONGSIL)));
+
+        assertThat(day.suitability().indoorAlternatives()).hasSize(2);
+        PlanDaySuitabilityInfo.AlternativeInfo cafe = day.suitability().indoorAlternatives().get(0);
+        assertThat(cafe.contentTypeCode()).isEqualTo("RESTAURANT");
+        assertThat(cafe.contentTypeName()).isEqualTo("음식점");
+        assertThat(cafe.contentTypeDescription()).isEqualTo("음식점, 카페");
+        assertThat(cafe.sourceCategory()).isEqualTo("카페");
+        PlanDaySuitabilityInfo.AlternativeInfo unknown = day.suitability().indoorAlternatives().get(1);
+        assertThat(unknown.contentTypeCode()).isNull();
+        assertThat(unknown.sourceCategory()).isNull();
     }
 
     @Test
@@ -585,6 +618,8 @@ class PlanWeatherProcessorTest {
         private Map<Long, Function<PetConditionQueryResult, Integer>> scoreAtPlace = Map.of();
         private Set<Long> failingPlaces = Set.of();
         private BiPredicate<Long, PetConditionQueryResult> failingCondition = (placeId, condition) -> false;
+        /** 판정마다 함께 돌려줄 실내 대안. 기본은 없음 */
+        private List<PlaceSuitabilityQueryResult.AlternativeQueryResult> alternatives = List.of();
         private final List<Long> placeIds = new ArrayList<>();
 
         @Override
@@ -603,7 +638,7 @@ class PlanWeatherProcessorTest {
                 .levelName(score == null ? null : score >= 70 ? "여행 적합" : "주의")
                 .levelScoreDescription(score == null ? null : SCORE_DESCRIPTION)
                 .reasons(List.of())
-                .indoorAlternatives(List.of())
+                .indoorAlternatives(alternatives)
                 .build());
         }
     }

@@ -273,9 +273,25 @@ public class PlanInsightClientAdapter
         }
         return body.indoorAlternatives().stream()
             .filter(alternative -> alternative.placeId() != null && !alternative.placeId().isBlank())
-            .map(alternative -> new PlaceSuitabilityQueryResult.AlternativeQueryResult(
-                toPlaceId(alternative.placeId()), alternative.title(),
-                alternative.lat(), alternative.lng(), alternative.distanceMeters()))
+            .map(this::toAlternative)
             .toList();
+    }
+
+    /** 장소 유형 metadata 는 세 값으로 펴서 옮긴다. 원천이 유형을 주지 않으면 셋 다 null 이다 (#1461). */
+    private PlaceSuitabilityQueryResult.AlternativeQueryResult toAlternative(
+        PlaceSuitabilityClientResponse.AlternativeClientResponse alternative
+    ) {
+        PlaceSuitabilityClientResponse.MetadataClientResponse contentType = alternative.contentType();
+        return PlaceSuitabilityQueryResult.AlternativeQueryResult.builder()
+            .placeId(toPlaceId(alternative.placeId()))
+            .title(alternative.title())
+            .lat(alternative.lat())
+            .lng(alternative.lng())
+            .distanceMeters(alternative.distanceMeters())
+            .contentTypeCode(contentType == null ? null : contentType.code())
+            .contentTypeName(contentType == null ? null : contentType.name())
+            .contentTypeDescription(contentType == null ? null : contentType.description())
+            .sourceCategory(alternative.sourceCategory())
+            .build();
     }
 }

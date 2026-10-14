@@ -55,8 +55,19 @@ public record PlaceSuitabilityQueryResult(
 
     }
 
+    /**
+     * 실내 대안 한 곳.
+     *
+     * <p>장소 유형은 원천 metadata 를 세 값으로 펴서 옮긴다 — 이 계약에 Feign DTO 를 두지 않으려는 것이고(architecture-guide §3),
+     * 등급 · 예보 출처와 같은 방식이다. 원천이 유형을 주지 않으면 셋 다 null 이다 (#1461).
+     *
+     * @param contentTypeCode 장소 유형 코드(enum 이름, 예 {@code RESTAURANT}). 프론트가 음식점이면 식사로 담는 판정 키다
+     * @param sourceCategory  원천의 원본 분류(카페 등). 같은 음식점 유형 안에서 카페를 가른다
+     */
+    @Builder
     public record AlternativeQueryResult(
-        long placeId, String title, double lat, double lng, int distanceMeters
+        long placeId, String title, double lat, double lng, int distanceMeters,
+        String contentTypeCode, String contentTypeName, String contentTypeDescription, String sourceCategory
     ) {
 
     }
