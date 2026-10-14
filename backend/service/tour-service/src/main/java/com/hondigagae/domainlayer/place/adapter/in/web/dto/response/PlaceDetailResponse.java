@@ -75,7 +75,8 @@ public record PlaceDetailResponse(
     @Schema(description = "실내 여부. null 이면 원천에 정보가 없다", example = "true", nullable = true)
     Boolean indoor,
 
-    @Schema(description = "원본 분류 (원천이 준 값 그대로)", example = "카페", nullable = true)
+    @Schema(description = "원본 분류 (원천이 준 값 그대로. 단 식약처 휴게음식점 중 이름이 카페인 곳과 "
+        + "관광정보 신분류가 카페(FD05)인 곳 · 신분류가 없을 때 구분류 A05020900 인 곳은 카페)", example = "카페", nullable = true)
     String sourceCategory,
 
     @Schema(description = "정보 출처", example = "문화정보원")
