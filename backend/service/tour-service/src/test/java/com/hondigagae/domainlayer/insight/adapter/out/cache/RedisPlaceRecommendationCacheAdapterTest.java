@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.hondigagae.domainlayer.insight.application.info.AlternativePlaceInfo;
 import com.hondigagae.domainlayer.insight.application.info.PlaceRecommendationInfo;
 import com.hondigagae.domainlayer.insight.application.info.RecommendedPlaceInfo;
@@ -65,6 +67,35 @@ class RedisPlaceRecommendationCacheAdapterTest {
                 objectMapper.readValue(json, CachedPlaceRecommendationQueryResult.class));
 
             assertThat(restored).isEqualTo(original);
+            // 실내 대안의 장소 유형 · 원본 분류(#1461)도 왕복한다 — 위 동등 비교가 이미 보지만, 빠지면 어디가 빠졌는지 바로 읽히게 한다.
+            AlternativePlaceInfo alternative = restored.places().getFirst().indoorAlternatives().getFirst();
+            assertThat(alternative.contentTypeId()).isEqualTo("39");
+            assertThat(alternative.sourceCategory()).isEqualTo("카페");
+        });
+    }
+
+    /**
+     * 실내 대안에 칸을 더한 배포(#1461) 직후에는 칸이 없는 옛 항목이 Redis 에 남아 있다(최대 TTL 600초).
+     *
+     * <p>그 항목을 읽지 못하면 어댑터가 캐시 미스로 삼켜 겉으로는 아무 일도 없다 — 그래서 여기서 직접 읽어 본다.
+     * 키 버전을 올리지 않는 근거가 이 테스트다: 옛 항목은 새 칸만 null 인 채로 읽힌다.
+     */
+    @Test
+    @DisplayName("새 칸이 없는 옛 캐시 항목도 읽힌다 — 실내 대안의 장소 유형 · 원본 분류만 null 이다")
+    void readsEntryWrittenBeforeAlternativeContentType() {
+        contextRunner.run(context -> {
+            ObjectMapper objectMapper = context.getBean(ObjectMapper.class);
+            JsonNode tree = objectMapper.valueToTree(insightMapper.toRecommendationQueryResult(sampleInfo()));
+            ObjectNode oldAlternative = (ObjectNode) tree.path("places").path(0).path("indoorAlternatives").path(0);
+            oldAlternative.remove(List.of("contentTypeId", "sourceCategory"));
+
+            CachedPlaceRecommendationQueryResult cached =
+                objectMapper.readValue(objectMapper.writeValueAsString(tree), CachedPlaceRecommendationQueryResult.class);
+
+            CachedPlaceRecommendationQueryResult.Alternative alternative = cached.places().getFirst().indoorAlternatives().getFirst();
+            assertThat(alternative.title()).isEqualTo("오설록 티뮤지엄");
+            assertThat(alternative.contentTypeId()).isNull();
+            assertThat(alternative.sourceCategory()).isNull();
         });
     }
 
@@ -159,8 +190,9 @@ class RedisPlaceRecommendationCacheAdapterTest {
                 .build())
             .congestion(CongestionSnapshot.of(date, 42.5d))
             .indoorAlternatives(List.of(AlternativePlaceInfo.builder()
-                .placeId(1L).title("제주현대미술관").lat(33.3d).lng(126.3d).distanceMeters(2340)
-                .petAllowanceType(PetAllowanceType.ALLOWED).allowedPetSize(AllowedPetSize.SMALL_ONLY).build()))
+                .placeId(1L).title("오설록 티뮤지엄").lat(33.3d).lng(126.3d).distanceMeters(2340)
+                .petAllowanceType(PetAllowanceType.ALLOWED).allowedPetSize(AllowedPetSize.SMALL_ONLY)
+                .contentTypeId("39").sourceCategory("카페").build()))
             .petConditionApplied(true)
             .build();
 

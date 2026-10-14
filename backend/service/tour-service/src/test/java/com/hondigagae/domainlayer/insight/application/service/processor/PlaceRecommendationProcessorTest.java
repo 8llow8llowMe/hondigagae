@@ -213,6 +213,29 @@ class PlaceRecommendationProcessorTest {
         verify(placeProfileQueryPort, times(2)).findIndoorAlternatives(any());
     }
 
+    /**
+     * 대안 변환은 적합도 한 곳 판정과 같은 {@code PlaceSuitabilityProcessor.findIndoorAlternativesIfRainy} 다 — 여기서 찍으면
+     * 두 응답(적합도 · 추천)이 같이 고정된다. 프론트는 이 값으로 음식점 대안을 식사로 담는다 (#1447, #1461).
+     */
+    @Test
+    @DisplayName("실내 대안이 장소 유형 코드와 원본 분류를 싣는다 (#1461)")
+    void indoorAlternativeCarriesContentTypeAndSourceCategory() {
+        givenCandidates(candidate(1L, TOURIST_SPOT, 33.40d));
+        givenWeather(33.40d, rainy(today));
+        when(placeProfileQueryPort.findIndoorAlternatives(any())).thenReturn(List.of(PlaceCondition.builder()
+            .placeId(9L).title("오설록 티뮤지엄").lat(33.41d).lng(126.53d)
+            .petAllowanceType(PetAllowanceType.ALLOWED).indoor(true)
+            .contentTypeId("39").sourceCategory("카페")
+            .build()));
+
+        PlaceRecommendationInfo info = processor.recommend(query(today, 1));
+
+        assertThat(info.places().getFirst().indoorAlternatives()).singleElement().satisfies(alternative -> {
+            assertThat(alternative.contentTypeId()).isEqualTo("39");
+            assertThat(alternative.sourceCategory()).isEqualTo("카페");
+        });
+    }
+
     @Test
     @DisplayName("캐시에 있으면 계산하지 않고 그대로 돌려준다")
     void cacheHitSkipsComputation() {

@@ -4,6 +4,7 @@ import com.hondigagae.common.dto.metadata.CodeNameDescribable;
 import com.hondigagae.domainlayer.place.application.exception.PlaceErrorCode;
 import com.hondigagae.domainlayer.place.application.exception.PlaceException;
 import java.util.Arrays;
+import java.util.Optional;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -28,9 +29,16 @@ public enum ContentType implements CodeNameDescribable {
     private final String description;
 
     public static ContentType fromCode(String code) {
+        return findByCode(code).orElseThrow(() -> new PlaceException(PlaceErrorCode.CONTENT_TYPE_INVALID));
+    }
+
+    /**
+     * 모르는 코드거나 null 이면 비어 있다. 장소 하나의 유형을 몰라도 응답 전체가 깨지면 안 되는 부가 칸(실내 대안 등, #1461)에
+     * 쓴다 — 요청 값 검증처럼 틀린 코드를 거절해야 하는 자리는 {@link #fromCode} 를 쓴다.
+     */
+    public static Optional<ContentType> findByCode(String code) {
         return Arrays.stream(values())
             .filter(type -> type.code.equals(code))
-            .findFirst()
-            .orElseThrow(() -> new PlaceException(PlaceErrorCode.CONTENT_TYPE_INVALID));
+            .findFirst();
     }
 }
