@@ -11,6 +11,7 @@ import com.hondigagae.domainlayer.placeimport.domain.model.ImportedEmergencyFaci
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedCultureFacility;
 import com.hondigagae.domainlayer.placeimport.domain.model.OperatingHoursParser;
 import com.hondigagae.domainlayer.placeimport.domain.model.PetFieldParser;
+import com.hondigagae.domainlayer.placeimport.domain.model.PetStayArea;
 import com.hondigagae.domainlayer.placeimport.domain.model.PlaceIdFactory;
 import com.hondigagae.shared.travel.schedule.WeeklySchedule;
 import java.io.BufferedReader;
@@ -273,6 +274,8 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
         boolean petAvailable = PetFieldParser.parseYn(value(values, header, COL_PET_AVAILABLE));
         String petSizeRaw = value(values, header, COL_PET_SIZE);
         String petOnlyRaw = value(values, header, COL_PET_ONLY);
+        // 실내 · 실외 칸은 시설 형태가 아니라 반려견이 머물 수 있는 구역이다 — 동반 불가 행은 모름(null) (#1434)
+        PetStayArea stayArea = PetStayArea.fromCultureColumns(petAvailable, value(values, header, COL_INDOOR), value(values, header, COL_OUTDOOR));
 
         return ImportedCultureFacility.builder()
             .sourceKey(PlaceIdFactory.sourceKeyOf(name, address))
@@ -292,8 +295,8 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
             .petAvailable(petAvailable)
             // 이 원천에는 "전구역/일부구역" 문구가 없어 제한사항 문구로 부분 동반 여부를 가늠한다.
             .petAllowanceType(PetFieldParser.parseAllowanceType(petAvailable, value(values, header, COL_PET_RESTRICTION)))
-            .indoor(PetFieldParser.parseYn(value(values, header, COL_INDOOR)))
-            .outdoor(PetFieldParser.parseYn(value(values, header, COL_OUTDOOR)))
+            .indoor(stayArea.indoor())
+            .outdoor(stayArea.outdoor())
             .petOnly(petOnlyRaw != null && petOnlyRaw.contains("전용"))
             .allowedPetSize(PetFieldParser.parseAllowedPetSize(petSizeRaw))
             .maxPetWeightKg(PetFieldParser.parseMaxWeightKg(petSizeRaw))

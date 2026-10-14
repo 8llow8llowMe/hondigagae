@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.hondigagae.domainlayer.placeimport.application.model.PetAllowanceReflectOutcome;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PlacePetAllowanceReflectProcessor;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,7 +53,8 @@ class JdbcPlacePetAllowanceAdapterTest {
                 allowed_pet_size VARCHAR(20) NOT NULL,
                 CONSTRAINT uk_place_pet_info_place_id UNIQUE (place_id)
             )""");
-        processor = new PlacePetAllowanceReflectProcessor(new JdbcPlacePetAllowanceAdapter(jdbcTemplate));
+        // 보정 없음 — 보정 행을 거르는 규칙은 PlacePetAllowanceReflectProcessorTest 가 본다 (#1434)
+        processor = new PlacePetAllowanceReflectProcessor(new JdbcPlacePetAllowanceAdapter(jdbcTemplate), List::of);
     }
 
     @AfterEach

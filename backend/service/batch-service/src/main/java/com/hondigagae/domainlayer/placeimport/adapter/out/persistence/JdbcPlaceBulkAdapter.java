@@ -381,8 +381,9 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
                     ps.setString(index++, facility.overview());
                     ps.setBoolean(index++, facility.petAvailable());
                     ps.setString(index++, facility.petAllowanceType());
-                    ps.setBoolean(index++, facility.indoor());
-                    ps.setBoolean(index++, facility.outdoor());
+                    // 동반 불가 행은 실내외를 모른다(null) — 재적재가 예전의 false 를 NULL 로 되돌린다 (#1434, PetStayArea)
+                    setNullableBoolean(ps, index++, facility.indoor());
+                    setNullableBoolean(ps, index++, facility.outdoor());
                     ps.setBoolean(index++, facility.petOnly());
                     ps.setString(index++, facility.allowedPetSize());
                     setNullableInt(ps, index++, facility.maxPetWeightKg());
@@ -417,7 +418,7 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
                     int index = 1;
                     ps.setLong(index++, restaurant.placeId());
                     ps.setString(index++, restaurant.sourceKey());
-                    ps.setString(index++, restaurant.businessType());
+                    ps.setString(index++, restaurant.sourceCategory());
                     ps.setString(index++, ImportedPetRestaurant.CONTENT_TYPE_RESTAURANT);
                     ps.setString(index++, restaurant.name());
                     ps.setString(index++, restaurant.address());
@@ -516,6 +517,14 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             return;
         }
         ps.setInt(index, value);
+    }
+
+    private void setNullableBoolean(PreparedStatement ps, int index, Boolean value) throws SQLException {
+        if (value == null) {
+            ps.setNull(index, Types.BOOLEAN);
+            return;
+        }
+        ps.setBoolean(index, value);
     }
 
     private void setNullableDecimal(PreparedStatement ps, int index, java.math.BigDecimal value) throws SQLException {

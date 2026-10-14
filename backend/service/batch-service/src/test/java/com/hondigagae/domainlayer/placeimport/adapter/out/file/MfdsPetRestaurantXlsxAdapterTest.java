@@ -80,4 +80,27 @@ class MfdsPetRestaurantXlsxAdapterTest {
     void readNationwide() {
         assertThat(adapter().readPetRestaurants(null)).hasSize(2610);
     }
+
+    @Test
+    @DisplayName("휴게음식점 중 이름이 카페인 곳만 원천 분류를 '카페' 로 싣고, 업종 원문은 그대로 둔다 (#1434)")
+    void classifiesCafeNamedRestFoodBusinessesAsCafe() {
+        List<ImportedPetRestaurant> restaurants = adapter().readPetRestaurants("제주");
+
+        List<String> cafes = restaurants.stream()
+            .filter(restaurant -> "카페".equals(restaurant.sourceCategory()))
+            .map(ImportedPetRestaurant::name)
+            .sorted()
+            .toList();
+        // 2026-08 고정물 기준 제주 휴게음식점 38곳 중 9곳. 이름에 신호가 없는 곳(해피라떼클럽 등)은 휴게음식점으로 남는다
+        assertThat(cafes).containsExactly(
+            "내노키카페", "멜로우베이킹카페", "주식회사하소로커피", "카페오복(cafeObok)", "카페요아정 제주중문점", "커피냅로스터스제주",
+            "커피빈제주애월DT점", "택하다커피", "현자커피");
+        assertThat(restaurants).filteredOn(restaurant -> "카페".equals(restaurant.sourceCategory()))
+            .allSatisfy(restaurant -> assertThat(restaurant.businessType()).isEqualTo("휴게음식점"));
+
+        Map<String, Long> bySourceCategory = restaurants.stream()
+            .collect(Collectors.groupingBy(ImportedPetRestaurant::sourceCategory, Collectors.counting()));
+        assertThat(bySourceCategory).containsOnly(
+            Map.entry("일반음식점", 56L), Map.entry("휴게음식점", 29L), Map.entry("카페", 9L), Map.entry("제과점영업", 8L));
+    }
 }

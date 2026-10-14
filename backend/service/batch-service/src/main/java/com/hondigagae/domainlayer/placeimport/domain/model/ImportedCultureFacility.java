@@ -31,8 +31,9 @@ public record ImportedCultureFacility(
     String overview,
     boolean petAvailable,
     String petAllowanceType,
-    boolean indoor,
-    boolean outdoor,
+    // 반려견이 머물 수 있는 구역(시설 형태 아님). 동반 불가 행은 null — 모름 (#1434, PetStayArea)
+    Boolean indoor,
+    Boolean outdoor,
     boolean petOnly,
     String allowedPetSize,
     // 원문에 kg 숫자가 있으면 보존한다. enum 은 10kg 경계로 뭉개져 체중 필터에 못 쓴다.

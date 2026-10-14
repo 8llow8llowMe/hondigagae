@@ -8,7 +8,8 @@ import java.util.List;
  * TourAPI 장소의 동반 가능 여부 · 크기 제한을 근거에서 다시 채우는 계약 (#886).
  *
  * <p>대상은 TourAPI 노출 행뿐이다({@code source='TOUR_API' AND merged_into_id IS NULL AND delisted_at IS NULL}).
- * 문화정보원 · 식약처 행의 두 컬럼은 각 원천 적재가 소유한다.
+ * 문화정보원 · 식약처 행의 두 컬럼은 각 원천 적재가 소유한다. 동반 구분을 보정한 행은 이 포트가 읽어 주고, 걸러 내는 것은
+ * 프로세서다(#1434, 판정 {@code PlaceOverride.appliesTo}).
  */
 public interface PlacePetAllowanceCommandPort {
 

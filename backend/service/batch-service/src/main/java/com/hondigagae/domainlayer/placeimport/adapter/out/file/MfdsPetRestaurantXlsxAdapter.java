@@ -4,6 +4,7 @@ import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportE
 import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportException;
 import com.hondigagae.domainlayer.placeimport.application.port.out.PetRestaurantCatalogPort;
 import com.hondigagae.domainlayer.placeimport.domain.enums.RegionCodeMapping;
+import com.hondigagae.domainlayer.placeimport.domain.model.CafeNamePolicy;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPetRestaurant;
 import com.hondigagae.domainlayer.placeimport.domain.model.PlaceIdFactory;
 import com.hondigagae.global.properties.MfdsPetRestaurantProperties;
@@ -107,6 +108,8 @@ public class MfdsPetRestaurantXlsxAdapter implements PetRestaurantCatalogPort {
             .sourceKey(PlaceIdFactory.sourceKeyOf(name, address))
             .name(name)
             .businessType(businessType)
+            // 원천은 업종만 준다 — 카페 라벨 · 카페 필터 · AI 카페 요청이 sourceCategory=카페 만 보므로 이름으로 가린다 (#1434)
+            .sourceCategory(CafeNamePolicy.sourceCategoryOf(businessType, name))
             .address(address)
             .areaCode(RegionCodeMapping.toAreaCode(RegionCodeMapping.toSidoName(region)))
             // 원천이 시군구를 따로 주지 않아 주소 문자열에서 읽는다.

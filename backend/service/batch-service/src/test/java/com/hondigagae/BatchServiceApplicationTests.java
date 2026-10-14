@@ -50,13 +50,26 @@ class BatchServiceApplicationTests {
     }
 
     /**
-     * 동반 가능 여부 재계산(#886)은 한 스텝 정의를 두 잡이 마지막 단계로 붙인다. 한쪽에서 빠지면 그 잡만 단독으로
-     * 돌렸을 때 반영되지 않는데, 컴파일도 컨텍스트 로딩도 그 누락을 잡지 못한다.
+     * 동반 가능 여부 재계산(#886)은 한 스텝 정의를 두 잡이 적재 · 병합 바로 뒤에 붙인다. 한쪽에서 빠지면 그 잡만 단독으로
+     * 돌렸을 때 반영되지 않는데, 컴파일도 컨텍스트 로딩도 그 누락을 잡지 못한다. 그 뒤에 보정 스텝이 온다(아래).
      */
     @Test
     void petAllowanceReflectStepFollowsPetTourImportAndMerge() {
-        assertThat(stepNamesOf("petTourImportJob")).containsExactly("petTourImportStep", "placePetAllowanceReflectStep");
-        assertThat(stepNamesOf("placeMergeJob")).containsExactly("placeMergeStep", "placePetAllowanceReflectStep");
+        assertThat(stepNamesOf("petTourImportJob")).containsSubsequence("petTourImportStep", "placePetAllowanceReflectStep");
+        assertThat(stepNamesOf("placeMergeJob")).containsSubsequence("placeMergeStep", "placePetAllowanceReflectStep");
+    }
+
+    /**
+     * 장소 보정(#1434)은 보정 칸(indoor · outdoor · pet_allowance_type · pet_available)을 다시 쓰는 스텝들 <b>뒤</b>에 와야 살아남는다.
+     * 그런 스텝을 가진 잡 넷의 마지막 단계가 보정이어야 하고, 그 칸을 쓰지 않는 TourAPI 목록 적재 잡에는 붙지 않는다.
+     */
+    @Test
+    void placeOverrideStepRunsLastInJobsThatRewriteOverriddenColumns() {
+        assertThat(stepNamesOf("cultureFacilityImportJob")).containsExactly("cultureFacilityImportStep", "placeOverrideStep");
+        assertThat(stepNamesOf("petRestaurantImportJob")).containsExactly("petRestaurantImportStep", "placeOverrideStep");
+        assertThat(stepNamesOf("placeMergeJob")).containsExactly("placeMergeStep", "placePetAllowanceReflectStep", "placeOverrideStep");
+        assertThat(stepNamesOf("petTourImportJob")).containsExactly("petTourImportStep", "placePetAllowanceReflectStep", "placeOverrideStep");
+        assertThat(stepNamesOf("placeImportJob")).doesNotContain("placeOverrideStep");
     }
 
     private Collection<String> stepNamesOf(String jobName) {

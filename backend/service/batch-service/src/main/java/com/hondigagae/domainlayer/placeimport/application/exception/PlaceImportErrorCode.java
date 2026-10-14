@@ -44,7 +44,10 @@ public enum PlaceImportErrorCode {
     TOUR_API_QUOTA_EXCEEDED("PLACE_IMPORT_022", "TourAPI 일일 호출 한도를 초과했습니다. (%s)"),
     // 전량 적재 건수가 기대 범위를 벗어났다 (#726). 하한 미달은 원천 필터가 조용히 어긋난 것이고,
     // 상한 초과는 지역 필터가 풀려 전국이 들어온 것이다 — 둘 다 성공으로 끝나면 안 된다.
-    IMPORT_VOLUME_OUT_OF_RANGE("PLACE_IMPORT_023", "적재 건수가 기대 범위를 벗어났습니다. (%s)");
+    IMPORT_VOLUME_OUT_OF_RANGE("PLACE_IMPORT_023", "적재 건수가 기대 범위를 벗어났습니다. (%s)"),
+    // 장소 보정 파일(place-overrides.yml)이 읽히지 않거나 항목이 규칙을 어겼다 (#1434). 일부만 적용하지 않고 스텝을 실패시킨다 —
+    // 근거 없는 보정이 조용히 들어가거나 보정이 조용히 빠지는 것보다 잡이 FAILED 로 드러나는 편이 낫다.
+    PLACE_OVERRIDE_INVALID("PLACE_IMPORT_024", "장소 보정 파일이 올바르지 않습니다. (%s)");
 
     /**
      * 한 곳의 실패로 넘기지 않고 스텝을 즉시 끝내야 하는 오류. 셋 다 <b>남은 대상을 다 돌아도

@@ -11,6 +11,8 @@ dependencies {
     // TourAPI 등 공공 데이터 수집용 WebClient
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
+    // 장소 보정 파일(place-overrides.yml, #1434)을 읽는다. 버전은 Spring Boot BOM 이 정하고 런타임 클래스패스에는 이미 있다(swagger-core 경유)
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'

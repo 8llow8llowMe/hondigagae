@@ -37,9 +37,11 @@ public class PetRestaurantImportJobConfig {
     private static final String STEP_NAME = "petRestaurantImportStep";
 
     @Bean
-    public Job petRestaurantImportJob(JobRepository jobRepository, Step petRestaurantImportStep) {
+    public Job petRestaurantImportJob(JobRepository jobRepository, Step petRestaurantImportStep, Step placeOverrideStep) {
         return new JobBuilder(JOB_NAME, jobRepository)
             .start(petRestaurantImportStep)
+            // 적재가 식약처 행의 동반 칸을 원천 값으로 덮었으니 보정을 다시 얹는다 (#1434, PlaceOverrideStepConfig)
+            .next(placeOverrideStep)
             .build();
     }
 

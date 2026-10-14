@@ -20,6 +20,8 @@ import org.springframework.stereotype.Component;
  * <p><b>이 세 컬럼의 TourAPI 행 소유자는 이 어댑터다.</b> TourAPI 적재({@code JdbcPlaceBulkAdapter.UPSERT_SQL})는 INSERT
  * 리터럴({@code 'UNKNOWN'} · {@code false})만 넣고 UPDATE 절에 세 컬럼을 두지 않으며, 병합은 세 컬럼을 옮기지 않는다
  * ({@code JdbcPlaceBulkAdapterSqlTest} 가 둘 다 고정한다). 그래서 재적재 · 재병합이 여기서 채운 값을 지우지 않는다.
+ * 예외는 보정 파일이 동반 구분을 고친 행이다(#1434) — 프로세서가 읽은 근거에서 걸러 내므로 이 어댑터가 쓰지 않는다. 제목 대조를
+ * SQL 에 두지 않는 것은 MySQL 콜레이션(대소문자 · 뒤 공백 무시)과 보정 스텝의 Java 판정이 갈라지지 않게 하기 위해서다.
  *
  * <p><b>대상이 TourAPI 노출 행뿐인 것은 병합의 전제에 기댄다</b> — {@code PlaceMergeProcessor} 는 survivor 를 TOUR_API,
  * 흡수 대상을 CULTURE_PORTAL 로 고정한다. 병합 조합이 넓어지면(예: 식약처 흡수, 문화정보원 survivor) 흡수 행을 받은
