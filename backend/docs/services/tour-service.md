@@ -67,6 +67,8 @@
   체감온도는 기상청 산식으로 계산하며 폭염특보 기준(33/35℃)이 판정 임계다. NOAA 열지수는 참고로 병기하고,
   두 값 모두 계산 근거 문구(feelsLikeBasis/heatIndexBasis)를 함께 내린다
   단두종 · 더위 민감 규칙은 적합도와 같은 반려견 기준(기온과 체감온도 중 큰 값 ≥ 28℃)으로 켜진다 (#977)
+  안전 시간대(`saferWindowStart/End`)는 기준 시각 이후 가장 이른 안전·주의 창 **안의 가장 긴 안전 구간**(같으면 이른 것,
+  안전 칸이 없으면 창 그대로)이다 — 골든타임 헤드라인(FE #1428)과 같은 규칙 (#1479). 세부는 `weather-insight-integration.md` §6-2
 - `GET /api/v1/walk-courses` — 산책 코스 목록. `petActivityLevel` 로 반려견 활동량 필터
   (LOW 4시간·MEDIUM 6시간 이하 — `WalkCourseActivityFit` 이 상한의 단일 출처), 거리 필터·정렬.
   **좌표가 있는 코스는 `/api/v1/insights/walk-times?lat=&lng=` 로 이어진다** — 골든타임을 코스
