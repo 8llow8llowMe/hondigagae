@@ -78,7 +78,9 @@ public class PlaceWebController {
         @Min(value = 1, message = PlaceValidationMessage.PET_WEIGHT_RANGE_INVALID)
         @Max(value = 100, message = PlaceValidationMessage.PET_WEIGHT_RANGE_INVALID)
         @RequestParam(required = false) Integer petWeightKg,
-        @Parameter(description = "[선택] 원천 분류명 (펜션·카페·박물관·여행지 등. 식약처 휴게음식점 중 이름이 카페인 곳도 카페). 콘텐츠 타입으로는 갈리지 않는 구분에 씁니다. 생략하면 필터 없음", example = "카페")
+        @Parameter(description = "[선택] 원천 분류명 (펜션·카페·박물관·여행지 등. 식약처 휴게음식점 중 이름이 카페인 곳과 "
+            + "관광정보 신분류가 카페(FD05)인 곳 · 신분류가 없을 때 구분류 A05020900 인 곳도 카페). "
+            + "콘텐츠 타입으로는 갈리지 않는 구분에 씁니다. 생략하면 필터 없음", example = "카페")
         @RequestParam(required = false) String sourceCategory,
         @Parameter(description = "[선택] 장소명 또는 주소 검색. 공백으로 나눈 단어를 AND로 검색하며 각 단어는 이름 또는 주소에 부분 일치. 공백/빈 값은 필터 없음. 최대 50자·5단어", example = "성산 고성리")
         @Size(max = PlaceKeyword.MAX_LENGTH, message = PlaceValidationMessage.KEYWORD_MAX_INVALID)
@@ -161,7 +163,8 @@ public class PlaceWebController {
         @Min(value = 1, message = PlaceValidationMessage.PET_WEIGHT_RANGE_INVALID)
         @Max(value = 100, message = PlaceValidationMessage.PET_WEIGHT_RANGE_INVALID)
         @RequestParam(required = false) Integer petWeightKg,
-        @Parameter(description = "[선택] 원천 분류명 (카페·펜션·일반음식점 등. 식약처 휴게음식점 중 이름이 카페인 곳도 카페). 생략하면 필터 없음", example = "카페")
+        @Parameter(description = "[선택] 원천 분류명 (카페·펜션·일반음식점 등. 식약처 휴게음식점 중 이름이 카페인 곳과 "
+            + "관광정보 신분류가 카페(FD05)인 곳 · 신분류가 없을 때 구분류 A05020900 인 곳도 카페). 생략하면 필터 없음", example = "카페")
         @RequestParam(required = false) String sourceCategory,
         @Parameter(description = "[선택] 장소명 또는 주소 검색. 공백으로 나눈 단어를 AND로 검색하며 각 단어는 이름 또는 주소에 부분 일치. 공백/빈 값은 필터 없음. 최대 50자·5단어", example = "성산 고성리")
         @Size(max = PlaceKeyword.MAX_LENGTH, message = PlaceValidationMessage.KEYWORD_MAX_INVALID)
