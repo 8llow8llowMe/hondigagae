@@ -45,6 +45,9 @@ export function planItemPlace(overrides: Partial<PlanItemPlace> = {}): PlanItemP
     firstImage: null,
     lat: 33.3608276172,
     lng: 126.7818122232,
+    // 유형을 모르는 장소가 기본이다 — 식사 판정(#1516)을 켜려면 덮어쓴다
+    contentType: null,
+    sourceCategory: null,
     ...overrides,
   }
 }
@@ -329,6 +332,8 @@ export function planAlternative(
     lat: 33.3608276172,
     lng: 126.7818122232,
     distanceMeters: 12_400,
+    contentType: { code: 'CULTURE', name: '문화시설', description: '박물관, 미술관 등 문화시설' },
+    sourceCategory: '미술관',
     ...overrides,
   }
 }

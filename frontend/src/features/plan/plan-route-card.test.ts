@@ -31,7 +31,15 @@ const HYEOPJAE: LatLng = { lat: 33.394, lng: 126.2396 }
 const OSULLOC: LatLng = { lat: 33.3057, lng: 126.2896 }
 
 function placeAt(coord: LatLng): PlanItemPlace {
-  return { addr1: null, indoor: null, firstImage: null, lat: coord.lat, lng: coord.lng }
+  return {
+    addr1: null,
+    indoor: null,
+    firstImage: null,
+    lat: coord.lat,
+    lng: coord.lng,
+    contentType: null,
+    sourceCategory: null,
+  }
 }
 
 function courseAt(coord: LatLng): PlanItemWalkCourse {

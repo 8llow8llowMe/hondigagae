@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { planConfirmCheck } from '@/lib/plan/confirm-check'
-import { planItem } from '@/test/fixtures/plan'
-import type { PlanItemDetail } from '@/types/plan'
+import { planItem, planItemPlace } from '@/test/fixtures/plan'
+import type { PlanItemDetail, PlanItemPlace } from '@/types/plan'
 
 /**
  * 확정 전 점검 — 이슈 #1425 · 명세 D26-1.
@@ -154,6 +154,63 @@ describe('planConfirmCheck — 식사가 없는 날', () => {
     })
 
     expect(planConfirmCheck([{ day: 1, items: [restaurantAsPlace] }])).toEqual([
+      { day: 1, issues: [{ kind: 'no-meal' }] },
+    ])
+  })
+
+  /*
+    #1516: 실내 대안 담기 · #1447 이전 담기로 `PLACE` 로 저장된 음식점이 있다. 상세의 장소 요약에
+    `contentType` 이 실리면서 점검이 장소를 보고 식사로 센다 — 판정은 담기와 같은 `placeItemTypeOf`.
+  */
+  const restaurant = { code: 'RESTAURANT', name: '음식점', description: '음식점, 카페' }
+
+  function placeItem(
+    title: string,
+    contentType: PlanItemPlace['contentType'],
+    sourceCategory: string | null = null,
+  ) {
+    return {
+      ...item(1, 'PLACE', '12:00:00', title),
+      place: planItemPlace({ contentType, sourceCategory }),
+    }
+  }
+
+  it('PLACE 로 저장된 음식점은 식사로 센다 (#1516)', () => {
+    const days = [
+      { day: 1, items: [item(1, 'PLACE', '10:00:00'), placeItem('도라지식당', restaurant)] },
+    ]
+
+    expect(planConfirmCheck(days)).toEqual([])
+  })
+
+  it('PLACE 로 저장된 카페는 식사로 세지 않는다 — 원천 분류 · 장소명 모두 (#1516)', () => {
+    const bySource = placeItem('델문도', restaurant, '카페')
+    const byTitle = placeItem('커피템플', restaurant)
+
+    expect(planConfirmCheck([{ day: 1, items: [bySource] }])).toEqual([
+      { day: 1, issues: [{ kind: 'no-meal' }] },
+    ])
+    expect(planConfirmCheck([{ day: 1, items: [byTitle] }])).toEqual([
+      { day: 1, issues: [{ kind: 'no-meal' }] },
+    ])
+  })
+
+  it('장소 유형을 모르거나(null) 장소가 없는 PLACE 는 식사로 세지 않는다 (#1516)', () => {
+    const unknown = placeItem('도라지식당', null)
+    const delisted = { ...item(1, 'PLACE', '18:00:00', '삼대국수회관'), place: null }
+
+    expect(planConfirmCheck([{ day: 1, items: [unknown, delisted] }])).toEqual([
+      { day: 1, issues: [{ kind: 'no-meal' }] },
+    ])
+  })
+
+  it('PLACE 가 아닌 항목은 장소가 음식점이어도 식사로 세지 않는다 — 숙박에 딸린 식당 등', () => {
+    const lodging = {
+      ...item(1, 'LODGING', '20:00:00', '도라지식당'),
+      place: planItemPlace({ contentType: restaurant }),
+    }
+
+    expect(planConfirmCheck([{ day: 1, items: [item(1, 'PLACE', '10:00:00'), lodging] }])).toEqual([
       { day: 1, issues: [{ kind: 'no-meal' }] },
     ])
   })

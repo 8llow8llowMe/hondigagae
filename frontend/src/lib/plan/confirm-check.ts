@@ -1,3 +1,4 @@
+import { placeItemTypeOf } from '@/lib/plan/day-items'
 import { formatStartTime } from '@/lib/plan/start-time'
 import { timeOrderIssues } from '@/lib/plan/time-order'
 import type { PlanItemDetail } from '@/types/plan'
@@ -24,7 +25,7 @@ export type PlanConfirmIssue =
 
 export type PlanConfirmCheckDay = { day: number; issues: PlanConfirmIssue[] }
 
-type CheckedItem = Pick<PlanItemDetail, 'planItemId' | 'itemType' | 'title' | 'startTime'>
+type CheckedItem = Pick<PlanItemDetail, 'planItemId' | 'itemType' | 'title' | 'startTime' | 'place'>
 
 /**
  * **`MOVE` 의 빈 시각은 문제가 아니다.** `이동·휴식 추가` 는 시각을 받지 않는다
@@ -41,13 +42,22 @@ const TIME_OPTIONAL_TYPES: ReadonlySet<string> = new Set(['MOVE'])
 const OUTING_TYPES: ReadonlySet<string> = new Set(['PLACE', 'MEAL', 'WALK'])
 
 /**
- * 식사 판정은 **`itemType.code` 하나**다. 한국어 `name` 으로 가르지 않는다 (api-integration-guide §6).
+ * 식사 판정은 **`itemType.code`** 로 한다. 한국어 `name` 으로 가르지 않는다 (api-integration-guide §6).
  *
- * 상세의 `place` 에는 `contentType` 이 없어 여기서 음식점을 가를 수 없다 — 그래서 **담는 쪽이 음식점을
- * `MEAL` 로 싣는다** (`placeItemTypeOf` · `appendPlaceItemPayload`, #1447 · 명세 D26-5). 실내 대안 담기만
- * 장소 유형을 몰라 `PLACE` 로 남는다.
+ * 담기는 음식점을 `MEAL` 로 싣는다 (`placeItemTypeOf` · `appendPlaceItemPayload`, #1447 · 명세 D26-5).
+ * 그 전에 담겼거나 유형을 모른 채 담긴 음식점은 `PLACE` 로 남아 있다 — **`PLACE` 는 장소 요약의
+ * `contentType` 으로 담기와 같은 판정(`placeItemTypeOf`)을 다시 내 센다** (#1516). 유형이 null 이거나
+ * 장소가 없으면(delisted) 세지 않는다.
  */
 const MEAL_TYPE = 'MEAL'
+
+function isMealItem(item: CheckedItem): boolean {
+  const code = item.itemType.code
+  if (code === MEAL_TYPE) return true
+  if (code !== 'PLACE' || item.place === null) return false
+  // 이름 어림(`isCafeLikePlace`)은 항목 제목으로 본다 — 담을 때 장소명을 복사한 값이다
+  return placeItemTypeOf({ ...item.place, title: item.title }) === MEAL_TYPE
+}
 
 function checkDay(items: readonly CheckedItem[]): PlanConfirmIssue[] {
   const order = timeOrderIssues(items.map((item) => item.startTime))
@@ -70,7 +80,7 @@ function checkDay(items: readonly CheckedItem[]): PlanConfirmIssue[] {
   })
 
   const codes = items.map((item) => item.itemType.code)
-  if (codes.some((code) => OUTING_TYPES.has(code)) && !codes.includes(MEAL_TYPE)) {
+  if (codes.some((code) => OUTING_TYPES.has(code)) && !items.some(isMealItem)) {
     issues.push({ kind: 'no-meal' })
   }
 

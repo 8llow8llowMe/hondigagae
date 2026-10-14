@@ -438,6 +438,12 @@ export function mockSuitability(placeId: string): PlaceSuitabilityResponse {
               name: '소형견',
               description: '소형견만 동반 가능합니다.',
             },
+            contentType: {
+              code: 'CULTURE',
+              name: '문화시설',
+              description: '박물관, 미술관 등 문화시설',
+            },
+            sourceCategory: '미술관',
           },
         ],
     weatherApplied: true,

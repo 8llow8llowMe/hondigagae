@@ -41,6 +41,8 @@ const PLAN: SharedPlan = {
         firstImage: null,
         lat: 33.24,
         lng: 126.55,
+        contentType: null,
+        sourceCategory: null,
       },
     },
     /* 장소 요약이 통째로 비는 항목 — 행이 사라지면 안 된다 (공통명세 S8) */
@@ -60,7 +62,15 @@ const PLAN: SharedPlan = {
       targetId: '212481712381923999',
       title: '한림 카페',
       startTime: '12:00:00',
-      place: { addr1: '제주시 한림읍', indoor: true, firstImage: null, lat: null, lng: null },
+      place: {
+        addr1: '제주시 한림읍',
+        indoor: true,
+        firstImage: null,
+        lat: null,
+        lng: null,
+        contentType: null,
+        sourceCategory: null,
+      },
     },
   ],
 }
