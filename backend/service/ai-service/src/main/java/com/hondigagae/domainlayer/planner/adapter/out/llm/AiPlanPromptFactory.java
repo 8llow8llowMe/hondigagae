@@ -100,14 +100,18 @@ public class AiPlanPromptFactory {
         return SYSTEM_PROMPT;
     }
 
-    /** 준비물 생성용 시스템 프롬프트. 일정 생성과 같은 이유로 상수 고정(프롬프트 캐싱)이다. */
+    /**
+     * 준비물 생성용 시스템 프롬프트. 일정 생성과 같은 이유로 상수 고정(프롬프트 캐싱)이다. 여행마다 다른 계절 · 입도 · 섬은
+     * 사용자 프롬프트의 "여행 정보" 줄로 싣고, 여기에는 그것도 사실이라는 것(규칙 2 · 11)과 제주 · 섬 여행의 이동장은 서버 몫이라는
+     * 것(규칙 8)만 적는다 (#1435). 규칙 12 의 예시는 이동장이 아닌 품목으로 든다 — 이동장은 서버 몫일 수 있다.
+     */
     private static final String PACKING_SYSTEM_PROMPT = """
         당신은 반려견 동반 여행의 준비물을 챙겨 주는 전문가입니다.
 
         지켜야 할 규칙:
         1. 제공된 일정·날씨 전망·반려견 특성에서 근거를 찾을 수 있는 준비물을 우선합니다.
         2. 이유는 "이 여행의 사실 → 그래서 이 물건이 하는 일" 순서로 적습니다. 사실은 제공된 일정의 일차·장소,
-           날씨 전망 수치, 반려견 특성 중 하나입니다 - "1일차 강수확률 70%라 젖은 발을 닦아요" 처럼.
+           날씨 전망 수치, 반려견 특성, 여행 계절, 섬 도항·제주 입도 중 하나입니다 - "1일차 강수확률 70%라 젖은 발을 닦아요" 처럼.
            장소는 위 일정에 있는 이름만 씁니다.
            어느 사실도 가리키지 않는 이유("있으면 편해요")는 쓰지 않습니다.
         3. 제공되지 않은 정보(숙소 시설, 차량 유무 등)는 가정하지 않습니다.
@@ -118,15 +122,17 @@ public class AiPlanPromptFactory {
         7. 반려견의 생애 단계는 입력에 적힌 표현만 씁니다. 입력에 없는 "노령견", "노견",
            "어린 강아지" 같은 단정을 덧붙이지 않습니다.
         8. 배변봉투, 물그릇, 리드줄, 하네스, 사료와 간식은 서버가 넣습니다. 적지 않습니다.
-        9. 우비, 쿨매트, 옷 같은 날씨 대비 물건도 서버가 예보 수치로 정합니다. 적지 않습니다.
+           제주 여행이거나 배로 들어가는 섬이 있으면 이동장은 서버가 넣습니다. 적지 않습니다.
+        9. 우비, 쿨매트, 옷 같은 날씨 대비 물건도 서버가 예보 수치로(예보가 없으면 계절로) 정합니다. 적지 않습니다.
         10. 그 밖에 이 여행의 일정·반려견 특성에서 근거를 찾을 수 있는 물건만 적습니다. 실제로 파는
-            반려견 여행 용품(물티슈, 이동장, 담요, 진드기 기피제, 인식표 등)만 씁니다. 사람용 물건이나
+            반려견 여행 용품(물티슈, 담요, 멀미약, 진드기 기피제, 인식표 등)만 씁니다. 사람용 물건이나
             없는 물건("방충망 장갑", "반려견 우산")은 적지 않습니다.
         11. 이유의 날씨 문장은 전망 수치와 맞아야 합니다. 강수확률 60% 미만인 날 비를, 최고기온
             31℃(더위에 민감한 아이는 28℃) 미만인 날 더위를, 최저기온 5℃(추위에 민감한 아이는 10℃)
-            초과인 날 추위를 이유로 들지 않습니다. 물건과 이유가 서로 맞아야 합니다.
-        12. 사실과 물건이 실제 쓰임으로 이어져야 합니다. 그늘이 필요하다고 담요를, 물에 젖는다고 이동장을 적지
-            않습니다. 이을 사실이 없으면 그 물건을 적지 않습니다.
+            초과인 날 추위를 이유로 들지 않습니다. 예보가 없으면 계절을 근거로 들 수 있지만 여행 계절과
+            맞아야 합니다. 물건과 이유가 서로 맞아야 합니다.
+        12. 사실과 물건이 실제 쓰임으로 이어져야 합니다. 그늘이 필요하다고 담요를, 해변에 간다고 진드기 기피제를
+            적지 않습니다. 이을 사실이 없으면 그 물건을 적지 않습니다.
         """;
 
     /**
@@ -163,6 +169,7 @@ public class AiPlanPromptFactory {
         StringBuilder prompt = new StringBuilder();
         prompt.append("여행 정보\n");
         prompt.append("- 기간: ").append(query.startDate()).append(" ~ ").append(query.endDate()).append('\n');
+        appendTripContextLines(prompt, PackingTripContext.of(query));
 
         appendPetSection(prompt, query.safePetConditions(), PACKING_MULTI_PET_RULE);
         appendWeatherLines(prompt, query.safeWeatherOutlook(), parseDateOrNull(query.startDate()));
@@ -174,6 +181,21 @@ public class AiPlanPromptFactory {
 
         prompt.append("\n위 여행에 필요한 반려견 준비물 목록을 만들어 주세요.");
         return prompt.toString();
+    }
+
+    /**
+     * 준비물의 여행 맥락 줄 (#1435) — 계절, 제주 입도, 배로 들어가는 섬. 준비물 규칙이 사실로 인정하는 것과 같은 판정
+     * ({@link PackingTripContext})이라, 모델이 이 줄을 근거로 든 이유가 규칙에서 버려지지 않는다. 예보가 없는 여행은 계절이
+     * 모델이 기댈 유일한 날씨 사실이다. 입도 수단은 일정에 없어 정해지지 않았다고 적는다 — 모델이 "비행기로" 를 단정하지 않게.
+     */
+    private static void appendTripContextLines(StringBuilder prompt, PackingTripContext trip) {
+        trip.seasonLabel().ifPresent(season -> prompt.append("- 계절: ").append(season).append('\n'));
+        if (trip.jeju()) {
+            prompt.append("- 입도: 제주는 비행기나 배로 들어갑니다. 이동 수단은 정해지지 않았습니다.\n");
+        }
+        if (!trip.islands().isEmpty()) {
+            prompt.append("- 배로 들어가는 섬: ").append(trip.islandLabel(", ")).append('\n');
+        }
     }
 
     /**
