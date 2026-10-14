@@ -35,18 +35,21 @@ import lombok.extern.slf4j.Slf4j;
  *   <li><b>기본 품목은 서버가 넣는다.</b> 배변봉투 · 물그릇 · 리드줄 · 하네스 · 사료와 간식은 어느 여행에나
  *       필요하고 근거를 따질 일이 아니다. 모델이 같은 것을 적으면 버리고 서버 문장을 쓴다</li>
  *   <li><b>날씨 품목은 수치로 정한다.</b> 우비 · 쿨매트 · 옷은 예보가 임계값을 넘을 때만 서버가 넣고,
- *       이유에 그 수치를 적는다. 모델이 조건 밖에서 적은 같은 종류는 버린다</li>
+ *       이유에 그 수치를 적는다. 모델이 조건 밖에서 적은 같은 종류는 버린다. <b>여행 어느 날에도 예보가 없으면
+ *       계절로 정한다 (#1435)</b> — 12~2월 · 11 · 3월은 옷, 7 · 8월은 쿨매트. 계절 품목도 날씨 품목과 똑같이 다룬다</li>
+ *   <li><b>여행 맥락 품목도 서버가 넣는다 (#1435).</b> 제주 여행이거나 배로 들어가는 섬이 일정에 있으면 이동장을 넣고
+ *       이유에 섬 도항 · 제주 입도와 탑승 조건 확인을 적는다. 그때 모델이 적은 이동장 류는 버린다</li>
  *   <li><b>그 밖의 품목은 목록 안에서만 받는다.</b> 실제로 파는 반려견 여행 용품의 낱말 목록
  *       ({@link #EXTRAS})에 걸리지 않으면 버린다. 걸려도 이유의 날씨 문장이 예보와 어긋나면 그 문장을 걷고,
  *       걷은 뒤 남는 이유가 없으면 품목을 버린다</li>
- *   <li><b>이유는 이 여행의 사실에서 그 물건이 하는 일로 이어져야 한다 (#1336).</b> 이유가 일정(일차 · 장소) ·
- *       예보 수치 · 반려견 특성 중 아무것도 가리키지 않으면 버린다 — 이유가 없는 품목도 같다. 가리켜도 그 물건의
- *       쓰임({@link #PURPOSES})과 이어지는 말이 없으면 버린다. prod 의 "2일차 중문색달해수욕장에서 그늘이 필요하므로
- *       담요", "해수욕장에서 물에 젖을 수 있으니 이동장" 은 사실을 가리키지만 물건과 이어지지 않는다</li>
+ *   <li><b>이유는 이 여행의 사실에서 그 물건이 하는 일로 이어져야 한다 (#1336).</b> 이유가 일정(일차 · 장소 · 섬) ·
+ *       예보 수치 · 반려견 특성 · 여행 계절 · 제주 입도 수단 중 아무것도 가리키지 않으면 버린다 — 이유가 없는 품목도
+ *       같다. 가리켜도 그 물건의 쓰임({@link #PURPOSES})과 이어지는 말이 없으면 버린다. prod 의 "2일차 중문색달해수욕장에서
+ *       그늘이 필요하므로 담요", "해수욕장에서 물에 젖을 수 있으니 이동장" 은 사실을 가리키지만 물건과 이어지지 않는다</li>
  * </ol>
  *
- * <p><b>순서는 이 여행에만 해당하는 것부터다</b> — 날씨 품목, 모델 품목, 기본 품목. 일정 상세의 요약 카드가
- * 앞 5개만 보여 주는데, 기본 품목을 앞에 두면 모든 여행에서 그 5줄이 똑같아진다.
+ * <p><b>순서는 이 여행에만 해당하는 것부터다</b> — 날씨 품목(계절 포함), 여행 맥락 품목, 모델 품목, 기본 품목. 일정
+ * 상세의 요약 카드가 앞 5개만 보여 주는데, 기본 품목을 앞에 두면 모든 여행에서 그 5줄이 똑같아진다.
  *
  * <p>강수 60% · 최고기온 31℃ 는 일정 프롬프트의 배치 지시와 같은 값이다. 더위 민감 28℃, 최저기온 5℃,
  * 추위 민감 10℃ 는 준비물에서 새로 정한 값이다. 반려견 특성은 문턱을 낮출 뿐이다 — 그 아이에게 먼저 오는
@@ -68,6 +71,18 @@ final class PackingListRules {
     static final double HOT_DAY_MAX_TEMPERATURE_FOR_HEAT_SENSITIVE = 28.0d;
     static final double COLD_DAY_MIN_TEMPERATURE = 5.0d;
     static final double COLD_DAY_MIN_TEMPERATURE_FOR_COLD_SENSITIVE = 10.0d;
+
+    /*
+      계절 품목의 달 (#1435). 여행 어느 날에도 예보가 없을 때만 쓴다 — 예보가 하나라도 있으면 수치가 낫다. 4 · 5 · 6 · 9 · 10월은
+      계절만으로 부를 품목이 없다. 이유의 달은 여행 날짜 중 그 조건을 처음 만족하는 날의 달이다.
+     */
+    static final Set<Integer> COLD_SEASON_MONTHS = Set.of(12, 1, 2);
+    static final Set<Integer> CHILLY_SEASON_MONTHS = Set.of(11, 3);
+    static final Set<Integer> HOT_SEASON_MONTHS = Set.of(7, 8);
+    private static final String SEASONAL_NOTE = "아직 예보가 없어 계절 기준으로 넣었어요.";
+
+    /** 여행 맥락 품목의 마지막 문장. 입도 수단과 예약처를 모르므로 규정 확인을 맡긴다. */
+    private static final String BOARDING_NOTE = "항공사·선사마다 반려견 탑승 조건(이동장 규격·무게·서류)이 달라 예약한 곳의 규정을 미리 확인해요.";
 
     /** 강수가 없다는 뜻의 강수형태 표시명. tour-service {@code PrecipitationType} 의 NONE · UNKNOWN 이다. */
     private static final Set<String> NO_PRECIPITATION = Set.of("없음", "정보 없음");
@@ -96,13 +111,20 @@ final class PackingListRules {
         "쿨\\s*매트|쿨\\s*조끼|냉감|아이스\\s*(팩|조끼|매트|방석)|쿨링|쿨토시");
     private static final Pattern WARM_GEAR = Pattern.compile("옷|방한|패딩|재킷|자켓|점퍼|조끼|니트|보온");
 
+    /*
+      이동장 류 (#1435). 여행 맥락 품목이 들어가면 서버가 이 자리를 맡으므로 모델이 적은 것은 버린다. 슬링백 · 개모차 · 유모차는
+      탑승 규정의 이동장이 아니라 다른 물건이라 여기 넣지 않는다 — 모델 품목으로 그대로 검사한다.
+     */
+    private static final String CARRIER_WORDS = "이동장|켄넬|(펫|반려견|강아지)\\s*캐리어|이동\\s*가방";
+    private static final Pattern CARRIER = Pattern.compile(CARRIER_WORDS);
+
     /**
      * 모델이 더할 수 있는 품목. <b>실제로 파는 반려견 여행 용품의 낱말</b>이다. 여기에 없으면 버린다 —
      * {@code 방충망 장갑} 같은 것이 여기서 걸러진다. 목록에 없는 좋은 물건이 버려지는 것이 존재하지 않는
      * 물건이 나가는 것보다 덜 나쁘다. 사용자는 직접 더할 수 있다.
      */
     private static final Pattern EXTRAS = Pattern.compile(String.join("|",
-        "물티슈", "수건", "타월", "배변\\s*패드", "이동장", "켄넬", "(펫|반려견|강아지)\\s*캐리어", "이동\\s*가방", "슬링백",
+        "물티슈", "수건", "타월", "배변\\s*패드", CARRIER_WORDS, "슬링백",
         "카시트", "안전\\s*벨트", "드라이브", "담요", "방석", "매트", "빗", "브러시", "구급", "상비약", "반창고",
         "소독", "진드기", "해충", "벌레", "기피제", "인식표", "이름표", "접종", "장난감", "노즈워크",
         "개모차", "유모차", "발\\s*세정", "발\\s*클리너", "신발", "발\\s*보호", "멀미", "그루밍", "샴푸",
@@ -164,6 +186,33 @@ final class PackingListRules {
             Pattern.compile("호텔|펜션|리조트|스테이|민박|게스트하우스|숙소")));
 
     /**
+     * 제주 입도 수단을 가리키는 말 (#1435). 제주 여행일 때만 사실이다 — 수단이 일정에 없어도 비행기나 배로 들어가는 것은
+     * 사실이다. 한 글자 {@code 배} 는 넣지 않는다 — "배탈" · "배를 채워" 에 걸린다. 배는 {@code 배를 타} 처럼 서술로 잡는다.
+     */
+    private static final Pattern TRANSPORT_MENTION = Pattern.compile("비행기|항공|기내|여객선|배편|선박|도항|입도|배를\\s*타");
+
+    /**
+     * 달 언급. 앞에 숫자가 붙지 않아야 한다 — "11월" 안의 "1월" 을 1월로 읽지 않는다. "3개월" 은 달이 아니다. 범위도 읽는다 —
+     * "12~2월" · "12월~2월" 의 앞 달을 놓치면 1월 여행의 이유가 다른 계절로 버려진다. 연말을 넘는 범위는 펼쳐서 본다.
+     */
+    private static final Pattern MONTH_MENTION =
+        Pattern.compile("(?<!\\d)(1[0-2]|[1-9])\\s*(?:월\\s*)?(?:~\\s*(1[0-2]|[1-9])\\s*)?월");
+
+    /**
+     * 계절 낱말과 그 낱말이 가리킬 수 있는 달 (#1435). 낱말은 앞에 한글이 붙지 않을 때만 계절이다 — "돌봄" 의 {@code 봄} 은
+     * 아니다. 계절의 달(3~5 봄, 6~8 여름, 9~11 가을, 12~2 겨울)에 <b>앞뒤 한 달씩</b>을 더해 본다 — 9월 초 여행의 "여름",
+     * 3월 여행의 "겨울", 11월 말의 "초겨울" 은 틀린 말이 아니다. {@code 초} · {@code 늦} 이 붙은 꼴도 같은 범위다. 그래도 11월
+     * 여행의 "여름"(5~9월)은 다른 계절이다. {@code 한여름} · {@code 한겨울} 은 한가운데라 그 계절의 달만 본다.
+     */
+    private static final List<SeasonWord> SEASON_WORDS = List.of(
+        new SeasonWord(Pattern.compile("(?<![가-힣])(?:초|늦)?봄"), Set.of(2, 3, 4, 5, 6)),
+        new SeasonWord(Pattern.compile("(?<![가-힣])(?:초|늦)?여름"), Set.of(5, 6, 7, 8, 9)),
+        new SeasonWord(Pattern.compile("(?<![가-힣])한여름"), Set.of(6, 7, 8)),
+        new SeasonWord(Pattern.compile("(?<![가-힣])(?:초|늦)?가을"), Set.of(8, 9, 10, 11, 12)),
+        new SeasonWord(Pattern.compile("(?<![가-힣])(?:초|늦)?겨울"), Set.of(11, 12, 1, 2, 3)),
+        new SeasonWord(Pattern.compile("(?<![가-힣])한겨울"), Set.of(12, 1, 2)));
+
+    /**
      * 품목 종류 → 그 물건이 하는 일과 이어지는 말. 이유에 이 말이 하나도 없으면 사실과 물건이 이어지지 않은 것이다.
      * 종류 낱말 자체는 지우고 본다 — "이동장이 필요해요" 의 {@code 이동} 이 쓰임으로 읽히면 안 된다.
      *
@@ -173,16 +222,19 @@ final class PackingListRules {
      *
      * <p>목록에 없는 종류(인식표 · 구급 · 장난감 …)는 쓰임을 보지 않는다. 쓰임이 넓어 낱말로 묶이지 않는다.
      * 낱말이 모자라 좋은 이유가 버려지면(로그 {@code LLM packing item replaced or dropped}) 낱말을 더한다.
+     *
+     * <p>{@code 섬} 은 "섬세" · "섬유" · "섬뜩" 에 걸리지 않게 좁힌다 (#1435).
      */
     private static final List<Purpose> PURPOSES = List.of(
         new Purpose(Pattern.compile("담요|방석|매트"), Pattern.compile(String.join("|",
             "보온", "따뜻", "체온", "추위", "추운", "쌀쌀", "바람", "쉬게", "쉬어", "쉴", "쉼", "휴식", "잠자", "잠들",
             "잠을", "낮잠", "눕", "깔", "바닥", "차량", "차 안", "차에서", "이동\\s*중", "낯선", "익숙", "냄새", "안정",
             "편하", "편안"))),
-        new Purpose(Pattern.compile("이동장|켄넬|(펫|반려견|강아지)\\s*캐리어|이동\\s*가방|슬링백|개모차|유모차"),
+        new Purpose(Pattern.compile(CARRIER_WORDS + "|슬링백|개모차|유모차"),
             Pattern.compile(String.join("|",
                 "이동", "차량", "차 안", "차에", "차로", "차를", "자동차", "렌터카", "드라이브", "버스", "비행기", "항공",
-                "기내", "여객선", "선박", "배편", "배를", "탑승", "대중교통", "실내", "카페", "식당", "숙소", "매장", "입장",
+                "기내", "여객선", "선박", "배편", "배를", "도항", "입도", "섬(?![세유뜩])", "탑승", "대중교통", "실내", "카페",
+                "식당", "숙소", "매장", "입장",
                 "안정", "쉬게", "쉬어", "쉴", "쉼", "휴식", "안아", "오래 걷", "많이 걷", "지치", "체력", "장거리",
                 "이동\\s*거리", "먼\\s*거리", "km", "킬로",
                 "관절", "낯선", "붐비", "혼잡", "사람이 많"))),
@@ -205,7 +257,7 @@ final class PackingListRules {
             "햇볕", "햇빛", "해변", "야외", "그늘", "피부", "코(?!스)", "털", "맑", "한낮"))),
         new Purpose(Pattern.compile("멀미"), Pattern.compile(String.join("|",
             "차량", "차 안", "차에", "차로", "자동차", "렌터카", "드라이브", "버스", "이동", "비행기", "여객선", "선박",
-            "배편", "배를", "장거리", "우도", "가파도", "마라도"))));
+            "배편", "배를", "장거리", "우도", "비양도", "가파도", "마라도", "추자도", "차귀도", "도항", "섬(?![세유뜩])"))));
 
     private final PackingChecklistQuery query;
     private final LocalDate startDate;
@@ -213,27 +265,43 @@ final class PackingListRules {
     private final Set<String> placeNames;
     /** 반려견 특성을 가리키는 말. 특성이 있는 것만 담는다 — 더위 민감이 아닌 아이의 "더위" 는 사실이 아니다. */
     private final List<Pattern> petFacts;
+    /** 여행 날짜가 걸친 달 · 제주 여행인가 · 배로 들어가는 섬 (#1435). 프롬프트와 같은 판정이다. */
+    private final PackingTripContext trip;
+    /**
+     * 일정의 섬 이름. 두 글자 이름은 앞에 한글이 붙지 않을 때만 섬이다 — "비우도록" 의 {@code 우도} 는 아니다. 세 글자 이름은
+     * 다른 낱말 안에 들어갈 일이 드물고, "상추자도" 처럼 앞에 붙는 섬 이름이 있어 경계를 걸지 않는다.
+     */
+    private final List<Pattern> islandFacts;
 
     PackingListRules(PackingChecklistQuery query) {
         this.query = query;
         this.startDate = parseOrNull(query.startDate());
         this.placeNames = placeNames(query.planOutline());
         this.petFacts = petFacts(query.safePetConditions());
+        this.trip = PackingTripContext.of(query);
+        this.islandFacts = trip.islands().stream()
+            .map(visit -> Pattern.compile((visit.name().length() <= 2 ? "(?<![가-힣])" : "") + Pattern.quote(visit.name())))
+            .toList();
     }
 
     List<PackingItem> apply(List<PackingItem> modelItems) {
+        // 계절은 예보를 대신할 때만 쓴다. 수치 품목이 먼저고, 없을 때 계절이 그 자리에 선다 (#1435).
+        boolean seasonal = trip.knowsDates() && !trip.hasForecastWithinTrip(query.safeWeatherOutlook());
         Optional<String> rain = rainReason();
-        Optional<String> heat = heatReason();
-        Optional<String> cold = coldReason();
+        Optional<String> heat = heatReason().or(() -> seasonal ? seasonalHeatReason() : Optional.<String>empty());
+        Optional<String> cold = coldReason().or(() -> seasonal ? seasonalColdReason() : Optional.<String>empty());
+        Optional<String> carrier = carrierReason();
 
         List<PackingItem> result = new ArrayList<>();
         rain.ifPresent(reason -> result.add(item(CATEGORY_WEATHER, "반려견 우비", reason)));
         heat.ifPresent(reason -> result.add(item(CATEGORY_WEATHER, "쿨매트", reason)));
         cold.ifPresent(reason -> result.add(item(CATEGORY_WEATHER, "반려견 옷", reason)));
+        carrier.ifPresent(reason -> result.add(item(CATEGORY_MOVING, "이동장", reason)));
 
+        ServerItems server = new ServerItems(rain.isPresent(), heat.isPresent(), cold.isPresent(), carrier.isPresent());
         int dropped = 0;
         for (PackingItem modelItem : modelItems) {
-            PackingItem kept = keepExtra(modelItem, rain.isPresent(), heat.isPresent(), cold.isPresent());
+            PackingItem kept = keepExtra(modelItem, server);
             if (kept == null) {
                 dropped++;
                 log.info("LLM packing item replaced or dropped by server rules name={} reason={}",
@@ -248,21 +316,25 @@ final class PackingListRules {
         ESSENTIALS.forEach(kind -> result.add(item(CATEGORY_ESSENTIAL, kind.name(), kind.reason())));
         result.add(item(CATEGORY_ESSENTIAL, "사료와 간식", foodReason()));
         if (dropped > 0) {
-            log.warn("LLM packing list corrected by server rules modelItems={} dropped={} rainy={} hot={} cold={}",
-                modelItems.size(), dropped, rain.isPresent(), heat.isPresent(), cold.isPresent());
+            log.warn("LLM packing list corrected by server rules modelItems={} dropped={} rainy={} hot={} cold={} seasonal={} carrier={}",
+                modelItems.size(), dropped, rain.isPresent(), heat.isPresent(), cold.isPresent(), seasonal, carrier.isPresent());
         }
         return result;
     }
 
-    /** 모델 품목 하나. 서버가 맡는 종류이거나 목록 밖이거나 이유가 남지 않으면 null 이다. */
-    private PackingItem keepExtra(PackingItem modelItem, boolean rainy, boolean hot, boolean cold) {
+    /**
+     * 모델 품목 하나. 서버가 맡는 종류이거나 목록 밖이거나 이유가 남지 않으면 null 이다. 이동장 류는 서버가 여행 맥락 품목을
+     * 넣었을 때만 서버 몫이다 — 제주도 섬도 아닌 여행이면 모델 품목으로 검사한다.
+     */
+    private PackingItem keepExtra(PackingItem modelItem, ServerItems server) {
         String name = modelItem.name().strip();
         boolean serverKind = !NOT_SERVER_KIND.matcher(name).find()
             && (ESSENTIALS.stream().anyMatch(kind -> kind.pattern().matcher(name).find())
                 || FOOD.matcher(name).find()
                 || RAIN_GEAR.matcher(name).find()
                 || COOLING_GEAR.matcher(name).find()
-                || WARM_GEAR.matcher(name).find());
+                || WARM_GEAR.matcher(name).find()
+                || (server.carrier() && CARRIER.matcher(name).find()));
         if (serverKind || !EXTRAS.matcher(name).find()) {
             return null;
         }
@@ -270,10 +342,11 @@ final class PackingListRules {
         if (modelItem.reason() == null || modelItem.reason().isBlank()) {
             return null;
         }
+        // 계절 품목도 날씨 품목이다 — 11월 여행에 옷이 들어갔으면 모델 이유의 "쌀쌀해요" 는 걷지 않는다 (#1435).
         String reason = keepSentences(modelItem.reason(), sentence ->
-            (!rainy && RAIN_CLAIM.matcher(sentence).find())
-                || (!hot && HEAT_CLAIM.matcher(sentence).find())
-                || (!cold && COLD_CLAIM.matcher(sentence).find()));
+            (!server.rainy() && RAIN_CLAIM.matcher(sentence).find())
+                || (!server.hot() && HEAT_CLAIM.matcher(sentence).find())
+                || (!server.cold() && COLD_CLAIM.matcher(sentence).find()));
         if (reason == null || !pointsAtTripFact(reason) || !fitsPurpose(name, reason)) {
             return null;
         }
@@ -283,13 +356,73 @@ final class PackingListRules {
         return item(category, name, reason);
     }
 
-    /** 이유가 일정(일차 · 장소) · 예보 수치 · 반려견 특성 중 하나라도 가리키는가. */
+    /**
+     * 이유가 일정(일차 · 장소 · 섬) · 예보 수치 · 반려견 특성 · 여행 계절 · 제주 입도 수단 중 하나라도 가리키는가. 일정에 없는
+     * 장소 종류나 여행과 다른 계절을 말하면 다른 사실을 함께 가리켜도 아니다.
+     */
     private boolean pointsAtTripFact(String reason) {
-        if (mentionsAbsentPlaceKind(reason)) {
+        SeasonMention season = seasonMention(reason);
+        if (season == SeasonMention.OTHER || mentionsAbsentPlaceKind(reason)) {
             return false;
         }
-        return mentionsTripDay(reason) || mentionsPlace(reason) || mentionsWeather(reason)
-            || petFacts.stream().anyMatch(fact -> fact.matcher(reason).find());
+        return season == SeasonMention.TRIP || mentionsTripDay(reason) || mentionsPlace(reason) || mentionsIsland(reason)
+            || mentionsTripTransport(reason) || mentionsWeather(reason) || petFacts.stream().anyMatch(fact -> fact.matcher(reason).find());
+    }
+
+    /** 일정의 섬 이름을 가리키는가. 두 글자 "우도" 도 섬이다 — 장소 이름의 최소 길이와 무관하다. */
+    private boolean mentionsIsland(String reason) {
+        return islandFacts.stream().anyMatch(island -> island.matcher(reason).find());
+    }
+
+    /** 제주 여행의 입도 수단을 가리키는가. */
+    private boolean mentionsTripTransport(String reason) {
+        return trip.jeju() && TRANSPORT_MENTION.matcher(reason).find();
+    }
+
+    /**
+     * 이유의 달 · 계절 낱말이 여행의 것인가 (#1435). 예보가 없을 때 모델이 기댈 수 있는 사실이다. 여행 날짜를 모르면
+     * 판정하지 않는다. 하나라도 여행의 달 · 계절이면 사실이고, 언급이 있는데 모두 다른 달 · 계절이면 지어낸 말이다 —
+     * 11월 여행의 "여름이라" · "7월".
+     */
+    private SeasonMention seasonMention(String reason) {
+        List<Integer> tripMonths = trip.months();
+        if (tripMonths.isEmpty()) {
+            return SeasonMention.NONE;
+        }
+        boolean mentioned = false;
+        Matcher month = MONTH_MENTION.matcher(reason);
+        while (month.find()) {
+            mentioned = true;
+            int from = Integer.parseInt(month.group(1));
+            int to = month.group(2) == null ? from : Integer.parseInt(month.group(2));
+            if (monthRangeHits(from, to, tripMonths)) {
+                return SeasonMention.TRIP;
+            }
+        }
+        for (SeasonWord word : SEASON_WORDS) {
+            if (word.pattern().matcher(reason).find()) {
+                mentioned = true;
+                if (word.months().stream().anyMatch(tripMonths::contains)) {
+                    return SeasonMention.TRIP;
+                }
+            }
+        }
+        return mentioned ? SeasonMention.OTHER : SeasonMention.NONE;
+    }
+
+    /** {@code from} 부터 {@code to} 까지의 달(연말을 넘으면 12 → 1 로 이어서) 중 여행의 달이 있는가. 12번 안에 끝난다. */
+    private static boolean monthRangeHits(int from, int to, List<Integer> tripMonths) {
+        int month = from;
+        for (int step = 0; step < 12; step++) {
+            if (tripMonths.contains(month)) {
+                return true;
+            }
+            if (month == to) {
+                return false;
+            }
+            month = month % 12 + 1;
+        }
+        return false;
     }
 
     private boolean mentionsTripDay(String reason) {
@@ -449,6 +582,41 @@ final class PackingListRules {
             .map(outlook -> dayLabel(outlook) + "최저기온이 " + temperature(outlook.minTemperature()) + "℃예요.");
     }
 
+    /**
+     * 예보가 없는 추운 달의 이유 (#1435). 12~2월이 걸치면 기온이 낮다고, 아니면 11 · 3월이 걸칠 때 아침저녁이 쌀쌀하다고 쓴다.
+     * 사용성 테스트(11/6~8, 열흘 뒤라 예보 없음)에서 옷이 빠졌던 자리다.
+     */
+    private Optional<String> seasonalColdReason() {
+        return trip.firstMonthIn(COLD_SEASON_MONTHS)
+            .map(month -> month + "월 여행이라 기온이 낮아요. " + SEASONAL_NOTE)
+            .or(() -> trip.firstMonthIn(CHILLY_SEASON_MONTHS)
+                .map(month -> month + "월 여행이라 아침저녁이 쌀쌀할 수 있어요. " + SEASONAL_NOTE));
+    }
+
+    /** 예보가 없는 더운 달의 이유 (#1435). */
+    private Optional<String> seasonalHeatReason() {
+        return trip.firstMonthIn(HOT_SEASON_MONTHS).map(month -> month + "월 여행이라 한낮 더위가 심할 수 있어요. " + SEASONAL_NOTE);
+    }
+
+    /**
+     * 여행 맥락 품목(이동장)의 이유 (#1435). 섬 도항 → 제주 입도 → 탑승 조건 확인 순으로 잇는다. 제주 여행도 아니고 배로 들어가는
+     * 섬도 없으면 비어 있다. 입도 수단은 일정에 없어 단정하지 않는다 — "비행기나 배".
+     */
+    private Optional<String> carrierReason() {
+        if (!trip.jeju() && trip.islands().isEmpty()) {
+            return Optional.empty();
+        }
+        StringBuilder reason = new StringBuilder();
+        if (!trip.islands().isEmpty()) {
+            // 섬 이름은 모두 '도' 로 끝난다 — 조사는 '는' 이다 (PackingTripContext#ISLANDS).
+            reason.append(trip.islandLabel(" · ")).append("는 배를 타고 들어가요. ");
+        }
+        if (trip.jeju()) {
+            reason.append("제주는 비행기나 배로 들어가요. ");
+        }
+        return Optional.of(reason.append(BOARDING_NOTE).toString());
+    }
+
     private List<PetCondition> pets() {
         return query.safePetConditions();
     }
@@ -513,5 +681,17 @@ final class PackingListRules {
     }
 
     private record Purpose(Pattern kind, Pattern use) {
+    }
+
+    private record SeasonWord(Pattern pattern, Set<Integer> months) {
+    }
+
+    /** 서버가 넣은 품목. 모델 품목의 같은 종류를 버리고, 이유의 날씨 문장을 걷을지 정한다. */
+    private record ServerItems(boolean rainy, boolean hot, boolean cold, boolean carrier) {
+    }
+
+    /** 이유의 달 · 계절 언급. 없음 · 여행의 것 · 다른 것. */
+    private enum SeasonMention {
+        NONE, TRIP, OTHER
     }
 }

@@ -619,6 +619,57 @@ class AiPlanPromptFactoryTest {
     }
 
     @Test
+    @DisplayName("준비물 프롬프트의 여행 정보에 계절 · 제주 입도 · 배로 들어가는 섬이 실린다 — 식당 이름의 섬은 아니다 (#1435)")
+    void packingPromptCarriesTripContext() {
+        PackingChecklistQuery query = PackingChecklistQuery.builder()
+            .startDate("2026-11-06")
+            .endDate("2026-11-08")
+            .planOutline(PlanOutline.builder()
+                .planId(7L).areaCode("39")
+                .days(List.of(
+                    PlanOutline.PlanOutlineDay.builder().day(1).items(List.of(
+                        PlanOutline.PlanOutlineItem.builder().title("비양도").itemType("PLACE").placeId(11L).build())).build(),
+                    PlanOutline.PlanOutlineDay.builder().day(3).items(List.of(
+                        PlanOutline.PlanOutlineItem.builder().title("마라도횟집").itemType("MEAL").placeId(12L).build(),
+                        PlanOutline.PlanOutlineItem.builder().title("우도봉").itemType("PLACE").placeId(13L).build())).build()))
+                .build())
+            .build();
+
+        String prompt = factory.packingUserPrompt(query);
+
+        assertThat(prompt).startsWith("""
+            여행 정보
+            - 기간: 2026-11-06 ~ 2026-11-08
+            - 계절: 11월(가을)
+            - 입도: 제주는 비행기나 배로 들어갑니다. 이동 수단은 정해지지 않았습니다.
+            - 배로 들어가는 섬: 1일차 비양도, 3일차 우도
+            """);
+    }
+
+    @Test
+    @DisplayName("달을 걸치면 계절을 처음~끝으로 적고(연말연초 포함), 제주 · 섬이 아니면 그 줄이 없고, 날짜를 모르면 계절 줄이 없다 (#1435)")
+    void packingPromptTripContextEdges() {
+        String spanning = factory.packingUserPrompt(PackingChecklistQuery.builder().startDate("2027-02-27").endDate("2027-03-02").build());
+        String newYear = factory.packingUserPrompt(PackingChecklistQuery.builder().startDate("2026-12-30").endDate("2027-01-02").build());
+        String unknown = factory.packingUserPrompt(PackingChecklistQuery.builder().endDate("2027-03-02").build());
+
+        assertThat(spanning).contains("- 계절: 2월(겨울)~3월(봄)\n").doesNotContain("입도").doesNotContain("배로 들어가는 섬");
+        assertThat(newYear).contains("- 계절: 12월(겨울)~1월(겨울)\n");
+        assertThat(unknown).doesNotContain("계절:");
+    }
+
+    @Test
+    @DisplayName("준비물 시스템 프롬프트 — 계절 · 입도도 사실이고, 제주 · 섬 여행의 이동장은 서버 몫이고, 계절은 여행과 맞아야 한다 (#1435)")
+    void packingSystemPromptCoversTripContext() {
+        assertThat(factory.packingSystemPrompt())
+            .contains("반려견 특성, 여행 계절, 섬 도항·제주 입도 중 하나입니다")
+            .contains("제주 여행이거나 배로 들어가는 섬이 있으면 이동장은 서버가 넣습니다. 적지 않습니다.")
+            .contains("예보가 없으면 계절을 근거로 들 수 있지만 여행 계절과")
+            // 규칙 12 의 예시가 이동장을 들면 서버 몫인 물건을 모델에게 다시 떠올리게 한다
+            .doesNotContain("젖는다고 이동장을");
+    }
+
+    @Test
     @DisplayName("실내·카페 요청은 후보의 사실로만 맞추라고 적는다 (#1170)")
     void requestNotePinsIndoorCafeToCandidateFacts() {
         String noted = factory.userPrompt(AiPlanGenerationQuery.builder()
