@@ -118,8 +118,38 @@ class PlanShareLinkPresenterTest {
         assertThat(componentNamesOf(PlanItemWalkCourseItem.class)).containsExactlyInAnyOrder(
             "name", "courseLabel", "distanceKm", "durationText", "durationMaxMinutes",
             "lat", "lng", "firstImage", "fitsActivityLevels");
+        // contentType · sourceCategory(#1461)는 공개 장소 상세(GET /api/v1/places/{placeId})가 인증 없이 내리는 값이고,
+        // 공유 응답에는 이미 targetId(= place.id)가 있어 한계 노출량이 0 이다 — walkCourse(#719)와 같은 기준으로 통과시켰다.
         assertThat(componentNamesOf(PlanItemPlaceItem.class)).containsExactlyInAnyOrder(
-            "addr1", "indoor", "firstImage", "lat", "lng");
+            "addr1", "indoor", "firstImage", "lat", "lng", "contentType", "sourceCategory");
+    }
+
+    /**
+     * 공유 응답의 장소 요약도 {@code PlanItemPlaceItem.from} 하나로 만든다. 소유자 상세만 채우면 "공유 링크로 열면 음식점이
+     * 식사로 안 세어진다" 로 나타난다 (#1461).
+     */
+    @Test
+    @DisplayName("공유 응답의 장소 요약에도 장소 유형 metadata 와 원본 분류가 실리고, 코드가 없으면 contentType 은 null 이다")
+    void sharedPlaceSummaryCarriesContentType() {
+        PlanItemPlaceItem cafe = PlanItemPlaceItem.from(PlanItemPlaceInfo.builder()
+            .addr1("제주특별자치도 서귀포시 안덕면")
+            .contentTypeCode("RESTAURANT").contentTypeName("음식점").contentTypeDescription("음식점, 카페")
+            .sourceCategory("카페")
+            .build());
+        PlanItemPlaceItem unknown = PlanItemPlaceItem.from(PlanItemPlaceInfo.builder()
+            .addr1("제주특별자치도 제주시").contentTypeName("음식점").contentTypeDescription("음식점, 카페")
+            .build());
+
+        // tour-service 장소 목록(PlaceItem.contentType)과 같은 세 값이다.
+        assertThat(cafe.contentType()).isEqualTo(CodeNameDescriptionMetadata.of("RESTAURANT", "음식점", "음식점, 카페"));
+        assertThat(cafe.sourceCategory()).isEqualTo("카페");
+        // 판정 키(code)가 없으면 표시명만 있어도 객체를 만들지 않는다 — code 없는 metadata 는 화면이 분기할 수 없다.
+        assertThat(unknown.contentType()).isNull();
+        assertThat(unknown.sourceCategory()).isNull();
+
+        SharedPlanItemItem shared = presenter.toSharedPlanResponse(filledPlanInfo()).items().getFirst();
+        assertThat(shared.place().contentType()).isEqualTo(CodeNameDescriptionMetadata.of("TOURIST_SPOT", "관광지", "자연·문화 관광지"));
+        assertThat(shared.place().sourceCategory()).isEqualTo("폭포");
     }
 
     private static Set<String> componentNamesOf(Class<?> recordType) {
@@ -233,6 +263,10 @@ class PlanShareLinkPresenterTest {
                         .firstImage("http://tong.visitkorea.or.kr/cms/resource/1.jpg")
                         .lat(33.2469)
                         .lng(126.5543)
+                        .contentTypeCode("TOURIST_SPOT")
+                        .contentTypeName("관광지")
+                        .contentTypeDescription("자연·문화 관광지")
+                        .sourceCategory("폭포")
                         .build())
                     .build(),
                 PlanItemInfo.builder()

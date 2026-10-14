@@ -20,7 +20,12 @@ public record PlanPlaceSummaryQueryResult(
     Boolean indoor,
     String firstImage,
     Double lat,
-    Double lng
+    Double lng,
+    // 장소 유형(enum 이름 · 표시명 · 설명)과 원천의 원본 분류. 일정 상세 장소 요약만 쓴다 (#1461). 원천에 없으면 null.
+    String contentTypeCode,
+    String contentTypeName,
+    String contentTypeDescription,
+    String sourceCategory
 ) {
 
     /** 검색 중심점으로 쓸 수 있는가. 원천에 좌표가 없는 장소가 실제로 있다 */

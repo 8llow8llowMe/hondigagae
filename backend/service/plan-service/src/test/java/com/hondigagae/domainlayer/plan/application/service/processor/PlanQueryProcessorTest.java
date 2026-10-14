@@ -116,6 +116,30 @@ class PlanQueryProcessorTest {
         assertThat(itemAt(info, 0).place().lng()).isEqualTo(126.4106264);
     }
 
+    /**
+     * 이미 PLACE 로 담긴 음식점을 프론트가 식사로 셀 수 있게 장소 유형 · 원본 분류를 붙인다 (#1461). 받는 응답은 그대로라
+     * 원격 호출이 늘지 않는다 — 아래 "한 번만 부른다" 테스트가 그것을 지킨다.
+     */
+    @Test
+    @DisplayName("장소 요약에 장소 유형 코드 · 표시명 · 설명 · 원본 분류가 붙는다")
+    void detailCarriesPlaceContentType() {
+        planItemRepositoryPort.items = List.of(
+            item(0, PlanItemType.PLACE, MUSEUM_ID, "김창열미술관"),
+            item(1, PlanItemType.PLACE, CAFE_ID, "오설록"));
+
+        PlanInfo info = processor.getPlanDetailInfo(plan());
+
+        assertThat(itemAt(info, 0).place().contentTypeCode()).isEqualTo("CULTURE");
+        assertThat(itemAt(info, 0).place().contentTypeName()).isEqualTo("문화시설");
+        assertThat(itemAt(info, 0).place().contentTypeDescription()).isEqualTo("박물관, 미술관 등 문화시설");
+        assertThat(itemAt(info, 0).place().sourceCategory()).isEqualTo("미술관");
+        assertThat(itemAt(info, 1).place().contentTypeCode()).isEqualTo("RESTAURANT");
+        assertThat(itemAt(info, 1).place().contentTypeName()).isEqualTo("음식점");
+        assertThat(itemAt(info, 1).place().contentTypeDescription()).isEqualTo("음식점, 카페");
+        assertThat(itemAt(info, 1).place().sourceCategory()).isEqualTo("카페");
+        assertThat(planPlaceLookupPort.calls).isEqualTo(1);
+    }
+
     @Test
     @DisplayName("항목이 여러 개여도 tour-service 를 한 번만 부른다")
     void looksUpOnce() {
@@ -526,11 +550,19 @@ class PlanQueryProcessorTest {
                         .firstImage("https://example.test/museum.jpg")
                         .lat(33.3608276172)
                         .lng(126.4106264)
+                        .contentTypeCode("CULTURE")
+                        .contentTypeName("문화시설")
+                        .contentTypeDescription("박물관, 미술관 등 문화시설")
+                        .sourceCategory("미술관")
                         .build()
                     : PlanPlaceSummaryQueryResult.builder()
                         .placeId(placeId)
                         .title("오설록")
                         .addr("제주특별자치도 서귀포시 안덕면")
+                        .contentTypeCode("RESTAURANT")
+                        .contentTypeName("음식점")
+                        .contentTypeDescription("음식점, 카페")
+                        .sourceCategory("카페")
                         .build())
                 .toList();
         }

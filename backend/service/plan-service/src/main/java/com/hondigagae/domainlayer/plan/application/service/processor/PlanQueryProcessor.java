@@ -329,6 +329,11 @@ public class PlanQueryProcessor {
             .firstImage(summary.firstImage())
             .lat(summary.lat())
             .lng(summary.lng())
+            // 이미 받는 내부 후보 응답의 칸이라 원격 호출은 늘지 않는다 (#1461)
+            .contentTypeCode(summary.contentTypeCode())
+            .contentTypeName(summary.contentTypeName())
+            .contentTypeDescription(summary.contentTypeDescription())
+            .sourceCategory(summary.sourceCategory())
             .build();
     }
 

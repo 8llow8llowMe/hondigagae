@@ -10,6 +10,12 @@ import lombok.Builder;
  *
  * <p>필드는 전부 nullable 이다. 원천이 주지 않는 값이 흔하고, 특히 {@code indoor} 의 null 은
  * <b>"실외"가 아니라 "원천에 정보 없음"</b> 이다.
+ *
+ * @param contentTypeCode 장소 유형 코드(enum 이름, 예 {@code RESTAURANT}). 이미 PLACE 로 담긴 음식점을 프론트가 식사로 세는
+ *                        판정 키다 (#1461)
+ * @param contentTypeName 장소 유형 표시명(예 {@code 음식점})
+ * @param contentTypeDescription 장소 유형 설명(예 {@code 음식점, 카페}). 공개 장소 API 의 {@code contentType.description} 과 같은 값
+ * @param sourceCategory  원천의 원본 분류(카페 등). 같은 음식점 유형 안에서 카페를 가른다
  */
 @Builder
 public record PlanItemPlaceInfo(
@@ -17,7 +23,11 @@ public record PlanItemPlaceInfo(
     Boolean indoor,
     String firstImage,
     Double lat,
-    Double lng
+    Double lng,
+    String contentTypeCode,
+    String contentTypeName,
+    String contentTypeDescription,
+    String sourceCategory
 ) {
 
 }

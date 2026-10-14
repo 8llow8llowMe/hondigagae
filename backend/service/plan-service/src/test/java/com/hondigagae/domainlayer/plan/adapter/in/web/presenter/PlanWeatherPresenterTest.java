@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.plan.adapter.in.web.presenter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanAlternativePlaceItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanDayWeatherItem;
 import com.hondigagae.domainlayer.plan.application.info.PlanDaySuitabilityInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo.PetSuitabilityInfo;
@@ -135,5 +136,44 @@ class PlanWeatherPresenterTest {
             .build());
 
         assertThat(item.suitabilityLevel().scoreDescription()).isNull();
+    }
+
+    /**
+     * 실내 대안을 일정에 담을 때 프론트가 음식점이면 식사로 저장한다 (#1447). 판정은 장소 목록과 같은
+     * {@code contentType.code} · {@code sourceCategory} 를 보므로 tour-service 실내 대안과 같은 모양으로 내린다 (#1461).
+     */
+    @Test
+    @DisplayName("실내 대안이 장소 유형 metadata 와 원본 분류를 싣고, 유형이 없으면 contentType 은 null 이다")
+    void alternativeCarriesContentTypeAndSourceCategory() {
+        PlanDayWeatherItem item = presenter.toDayItem(PlanDayWeatherInfo.builder()
+            .day(1).date(DATE)
+            .suitability(PlanDaySuitabilityInfo.builder()
+                .placeId(100L).targetDate(DATE)
+                .score(40).levelCode("LOW").levelName("주의 필요")
+                .reasons(List.of())
+                .indoorAlternatives(List.of(
+                    PlanDaySuitabilityInfo.AlternativeInfo.builder()
+                        .placeId(200L).title("오설록 티뮤지엄").lat(33.3058).lng(126.2895).distanceMeters(2340)
+                        .contentTypeCode("RESTAURANT").contentTypeName("음식점").contentTypeDescription("음식점, 카페")
+                        .sourceCategory("카페")
+                        .build(),
+                    PlanDaySuitabilityInfo.AlternativeInfo.builder()
+                        .placeId(300L).title("유형 없는 곳").lat(33.3).lng(126.3).distanceMeters(4100)
+                        .build()))
+                .build())
+            .petSuitabilities(List.of())
+            .build());
+
+        PlanAlternativePlaceItem cafe = item.indoorAlternatives().get(0);
+        assertThat(cafe.placeId()).isEqualTo("200");
+        assertThat(cafe.contentType().code()).isEqualTo("RESTAURANT");
+        assertThat(cafe.contentType().name()).isEqualTo("음식점");
+        assertThat(cafe.contentType().description()).isEqualTo("음식점, 카페");
+        assertThat(cafe.sourceCategory()).isEqualTo("카페");
+
+        // 빈 metadata 를 만들지 않는다 — code 가 빈 객체는 화면이 "유형 있음" 으로 읽는다.
+        PlanAlternativePlaceItem unknown = item.indoorAlternatives().get(1);
+        assertThat(unknown.contentType()).isNull();
+        assertThat(unknown.sourceCategory()).isNull();
     }
 }
