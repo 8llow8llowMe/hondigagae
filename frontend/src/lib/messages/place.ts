@@ -337,6 +337,11 @@ export const placeMessages = {
 
   /** `{start}` · `{end}` 치환. **없으면 줄 자체를 렌더하지 않는다** — 지어내지 않는다 */
   detailSaferWindow: '더 안전한 시간대는 {start} – {end}',
+  /**
+   * 한 시각짜리 구간(`start == end`, #1519). `11:00 – 11:00` 은 0분짜리 구간처럼 읽혀 고장으로
+   * 보인다 — 골든타임 `goldenSingleHour` 와 같은 판단이고, 길이를 지어내지 않는다.
+   */
+  detailSaferWindowSingle: '더 안전한 시간대는 {time}쯤이에요',
 
   // ── 장소 상세 · 반려견 동반 정보 ─────────────────────────────────────────
 

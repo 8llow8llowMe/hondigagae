@@ -82,9 +82,7 @@ export function previewVerdictFacts(
     const safer =
       walk.saferWindowStart === null || walk.saferWindowEnd === null
         ? null
-        : messages.map.previewFactSaferWindow
-            .replace('{start}', walk.saferWindowStart.slice(0, 5))
-            .replace('{end}', walk.saferWindowEnd.slice(0, 5))
+        : saferWindowText(walk.saferWindowStart.slice(0, 5), walk.saferWindowEnd.slice(0, 5))
     const tone = walkSafetyTone(walk.walkSafetyLevel.code)
 
     facts.push({
@@ -119,4 +117,11 @@ export function previewVerdictFacts(
     ...facts.filter((fact) => fact.tone === null),
     ...facts.filter((fact) => fact.tone !== null),
   ]
+}
+
+/** 한 시각짜리 구간(`start == end`)은 범위로 잇지 않는다 (#1519) — 상세 패널 `SaferWindow` 와 같은 판단 */
+function saferWindowText(start: string, end: string): string {
+  return start === end
+    ? messages.map.previewFactSaferWindowSingle.replace('{time}', start)
+    : messages.map.previewFactSaferWindow.replace('{start}', start).replace('{end}', end)
 }

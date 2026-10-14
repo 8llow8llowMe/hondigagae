@@ -325,17 +325,21 @@ function BasisLine({
 /**
  * 더 안전한 시간대. **같은 날 안에서만 제안된다** (백엔드 스키마).
  *
- * 둘 중 하나만 와도 렌더하지 않는다 — 반쪽 구간은 시간대가 아니다.
+ * 둘 중 하나만 와도 렌더하지 않는다 — 반쪽 구간은 시간대가 아니다. **한 시각짜리 구간
+ * (`start == end`)은 범위로 잇지 않는다** (#1519).
  */
 function SaferWindow({ data }: { data: WalkSafetyResponse }) {
   if (data.saferWindowStart === null || data.saferWindowEnd === null) return null
 
+  const start = data.saferWindowStart.slice(0, 5)
+  const end = data.saferWindowEnd.slice(0, 5)
+
   return (
     <p className="bg-metric-high-100 text-metric-high-700 text-body-2 flex items-center gap-2 rounded-md p-3 tabular-nums">
       <ClockIcon size={20} className="shrink-0" />
-      {messages.place.detailSaferWindow
-        .replace('{start}', data.saferWindowStart.slice(0, 5))
-        .replace('{end}', data.saferWindowEnd.slice(0, 5))}
+      {start === end
+        ? messages.place.detailSaferWindowSingle.replace('{time}', start)
+        : messages.place.detailSaferWindow.replace('{start}', start).replace('{end}', end)}
     </p>
   )
 }

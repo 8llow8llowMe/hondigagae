@@ -404,6 +404,19 @@ describe('PlaceWalkSafetyPanel — 더 안전한 시간대', () => {
 
     expect(markup).not.toContain('더 안전한 시간대')
   })
+
+  /*
+    #1519: 서버가 창 안의 가장 긴 안전 구간을 주면서(#1479) 한 시각뿐인 날이 생긴다(start == end).
+    `11:00 – 11:00` 은 0분짜리 구간처럼 읽혀 고장으로 보인다 — 골든타임 `goldenSingleHour` 와 같은 판단.
+  */
+  it('한 시각짜리 구간은 범위로 잇지 않고 시각 하나로 적는다 (#1519)', () => {
+    const markup = render({
+      data: { ...walkSafety, saferWindowStart: '11:00:00', saferWindowEnd: '11:00:00' },
+    })
+
+    expect(markup).toContain('더 안전한 시간대는 11:00쯤이에요')
+    expect(markup).not.toContain('11:00 – 11:00')
+  })
 })
 
 describe('PlaceWalkSafetyPanel — 기상특보', () => {

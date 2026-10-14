@@ -60,6 +60,14 @@ describe('previewVerdictFacts — 근거 사실 (#1233 D2 ⑤)', () => {
     expect(walk?.tone).toBe('critical')
   })
 
+  it('더 안전한 시간대가 한 시각이면 범위로 잇지 않는다 (#1519)', () => {
+    const single = { ...walkSafety, saferWindowStart: '11:00:00', saferWindowEnd: '11:00:00' }
+    const walk = previewVerdictFacts(null, single)[0]
+
+    expect(walk?.text).toContain('11:00쯤이 더 좋아요')
+    expect(walk?.text).not.toContain('11:00~11:00')
+  })
+
   it('붐빔은 등급 · 집중률, 정보가 없으면(UNKNOWN) 줄이 없다', () => {
     expect(previewVerdictFacts(clearDay, null).at(-1)?.text).toBe('붐빔 · 집중률 81%')
     expect(previewVerdictFacts(suitability, null).some((fact) => fact.key === 'congestion')).toBe(
