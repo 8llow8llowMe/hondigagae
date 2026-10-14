@@ -167,6 +167,8 @@ export const mapMessages = {
   /** 근거 사실 — 산책 줄. `{value}` 는 상세 요약과 같은 `{grade} · 체감 {feelsLike}℃` */
   previewFactWalk: '지금 산책 {value}',
   previewFactSaferWindow: '{start}~{end} 이 더 좋아요',
+  /** 한 시각짜리 구간(`start == end`, #1519) — 범위로 잇지 않는다 (`detailSaferWindowSingle`) */
+  previewFactSaferWindowSingle: '{time}쯤이 더 좋아요',
   previewFactCongestion: '{grade} · 집중률 {rate}%',
   /** 주의 쪽 사실의 스크린리더 앞말 — 톤을 색만으로 말하지 않는다 (명세 D5) */
   previewFactCaution: '주의',
