@@ -87,8 +87,7 @@ public final class WalkSafetyEvaluator {
             ? Optional.empty()
             : findSaferWindow(hourly, pet, thresholds, at, latitude);
         saferWindow.ifPresent(window -> reasons.add(WalkSafetyReason.of(WalkSafetyReasonCode.SAFE_WINDOW,
-            "같은 날 %s~%s 는 조건이 나아 산책하기 낫습니다."
-                .formatted(window.start().toString(), window.end().toString()))));
+            "같은 날 %s 는 조건이 나아 산책하기 낫습니다.".formatted(window.label()))));
 
         return WalkSafetyAssessment.builder()
             .level(level)
@@ -246,11 +245,6 @@ public final class WalkSafetyEvaluator {
     }
 
     /**
-     * 같은 날 안에서 더 안전한 연속 시간대를 찾는다.
-     *
-     * <p>기준 시각 <b>이후</b>만 본다. 이미 지나간 아침 시간대를 제안하는 것은 조언이 아니다.
-     */
-    /**
      * 남은 시간대별 안전 등급 곡선.
      *
      * <p>{@code evaluate} 가 한 시각을 판정하는 것과 달리 <b>하루의 모양</b>을 준다.
@@ -294,12 +288,47 @@ public final class WalkSafetyEvaluator {
             forecast.windSpeed(), forecast.forecastAt(), latitude);
     }
 
+    /**
+     * 같은 날 안에서 더 안전한 시간대를 찾는다. 두 단계다.
+     *
+     * <ol>
+     *   <li><b>창</b> — 기준 시각 <b>이후</b> 안전·주의가 이어지는 <b>가장 이른</b> 연속 구간. 이미 지나간
+     *       아침을 제안하는 것은 조언이 아니고, "지금 위험하니 조금 뒤에 나가라"는 가까운 미래일수록 쓸모 있다</li>
+     *   <li><b>창 안의 안전 구간</b> — 창 안에서 안전 칸만 이어지는 구간 중 <b>가장 긴 것(칸 수)</b>, 같으면
+     *       <b>이른 것</b>. 끝은 마지막 안전 칸의 시각 그대로다. 안전 칸이 없으면 <b>창 그대로</b> 낸다</li>
+     * </ol>
+     *
+     * <p><b>창을 그대로 내지 않는 이유 (#1479).</b> 창은 주의 시각을 품는다. 그대로 내면 화면이 "더 안전한
+     * 시간대 12:00 – 23:00" 이라 적고 그 첫 칸이 주의다. 홈·산책 코스·브리핑의 골든타임 헤드라인은 같은 문제를
+     * 창 안의 안전 구간으로 고쳤고(FE #1428 {@code headlineGoldenSpan}), 장소 상세는 시각별 판정을 받지 않아
+     * 화면이 고칠 수 없었다 — 같은 장소 같은 날 화면마다 안전 시간대가 달랐다. 규칙을 서버에 두어 맞춘다.
+     *
+     * <p><b>안전 칸이 없어도 창을 지우지 않는다.</b> 그날 "좋은" 구간은 없지만 창은 지금보다 "나은" 구간이고,
+     * 지우면 조언이 사라진다. FE #1428 의 폴백과 같다.
+     *
+     * <p>고르는 순서(안전 → 긴 것 → 이른 것)는 {@link GoldenWalkWindow#from} 과 같은 관례다. 다만 길이를
+     * <b>칸 수</b>로 잰다 — FE #1428 과 같은 단위다. {@code GoldenWalkWindow} 는 시각 차(분)로 재서, 기온 없는
+     * 행이 빠져 시각이 비는 날에는 둘이 갈릴 수 있다. 그래서 공용으로 묶지 않았다.
+     */
     private static Optional<SaferWindow> findSaferWindow(
         List<WeatherForecast> hourly, PetCondition pet, SuitabilityThresholds thresholds,
         LocalDateTime at, double latitude
     ) {
-        if (hourly == null || hourly.isEmpty()) {
+        List<WindowCell> window = earliestAcceptableRun(hourly, pet, thresholds, at, latitude);
+        if (window.isEmpty()) {
             return Optional.empty();
+        }
+        SaferWindow whole = new SaferWindow(window.getFirst().time(), window.getLast().time());
+        return Optional.of(longestSafeRun(window).orElse(whole));
+    }
+
+    /** 기준 시각 이후 안전·주의가 이어지는 가장 이른 연속 구간의 칸들. 판단 근거 부족(UNKNOWN)은 받아들이지 않는다. */
+    private static List<WindowCell> earliestAcceptableRun(
+        List<WeatherForecast> hourly, PetCondition pet, SuitabilityThresholds thresholds,
+        LocalDateTime at, double latitude
+    ) {
+        if (hourly == null || hourly.isEmpty()) {
+            return List.of();
         }
 
         List<WeatherForecast> upcoming = hourly.stream()
@@ -308,24 +337,48 @@ public final class WalkSafetyEvaluator {
             .sorted(Comparator.comparing(WeatherForecast::forecastAt))
             .toList();
 
-        LocalTime start = null;
-        LocalTime end = null;
+        List<WindowCell> run = new ArrayList<>();
         for (WeatherForecast forecast : upcoming) {
             WalkSafetyLevel level = quickLevel(forecast, pet, thresholds, latitude);
             boolean acceptable = level.getSeverity() <= SAFER_WINDOW_MAX_LEVEL.getSeverity()
                 && level != WalkSafetyLevel.UNKNOWN;
             if (acceptable) {
-                LocalTime time = forecast.forecastAt().toLocalTime();
-                if (start == null) {
-                    start = time;
-                }
-                end = time;
-            } else if (start != null) {
-                // 연속 구간이 끊겼다. 가장 이른 구간을 제안한다 - 가까운 미래일수록 쓸모 있다.
+                run.add(new WindowCell(forecast.forecastAt().toLocalTime(), level));
+            } else if (!run.isEmpty()) {
+                // 연속 구간이 끊겼다. 가장 이른 구간을 창으로 삼는다 - 가까운 미래일수록 쓸모 있다.
                 break;
             }
         }
-        return start == null ? Optional.empty() : Optional.of(new SaferWindow(start, end));
+        return run;
+    }
+
+    /**
+     * 창 안에서 안전 칸만 이어지는 가장 긴 구간. 길이가 같으면 이른 것이다.
+     *
+     * <p>구간이 자라는 동안 지금까지의 최장보다 <b>길어질 때만</b> 바꾼다 — 같은 길이의 늦은 구간은 이른 구간을
+     * 이기지 못하고, 창 끝에 붙은 구간도 루프 밖에서 닫을 필요 없이 후보가 된다.
+     */
+    private static Optional<SaferWindow> longestSafeRun(List<WindowCell> window) {
+        SaferWindow best = null;
+        int bestCells = 0;
+        LocalTime start = null;
+        int cells = 0;
+        for (WindowCell cell : window) {
+            if (cell.level() != WalkSafetyLevel.SAFE) {
+                start = null;
+                cells = 0;
+                continue;
+            }
+            if (start == null) {
+                start = cell.time();
+            }
+            cells += 1;
+            if (cells > bestCells) {
+                best = new SaferWindow(start, cell.time());
+                bestCells = cells;
+            }
+        }
+        return Optional.ofNullable(best);
     }
 
     /**
@@ -360,7 +413,20 @@ public final class WalkSafetyEvaluator {
         return level;
     }
 
+    /** 창의 한 칸 — 예보 시각과 그 시각의 간이 판정 등급. */
+    private record WindowCell(LocalTime time, WalkSafetyLevel level) {
+
+    }
+
+    /** 끝은 마지막 칸의 시각 그대로다(+1시간 하지 않는다). 한 칸짜리면 시작과 끝이 같다. */
     private record SaferWindow(LocalTime start, LocalTime end) {
 
+        /**
+         * 근거 문장에 넣을 표기. 한 칸짜리는 {@code 11:00~11:00} 으로 잇지 않는다 — 0분짜리 구간처럼 읽혀
+         * 고장으로 보인다 (FE #200 과 같은 판단).
+         */
+        private String label() {
+            return start.equals(end) ? start.toString() : "%s~%s".formatted(start, end);
+        }
     }
 }
