@@ -73,6 +73,10 @@ export function pickBriefingDate(
  * **화면과 조회가 같은 상수를 본다.** 재시도 버튼을 다는 판단(`plan-briefing-section.tsx`)과
  * 곡선을 부를지의 판단(`plan-briefing-view.tsx`)은 같은 판단의 두 표현이라, 리터럴을 양쪽에
  * 두면 서버가 코드명을 바꿀 때 한쪽만 고쳐져 둘이 어긋난다.
+ *
+ * **아래 둘은 일자 판정 · 항목 산책 위험도의 같은 문자열과 별개 계약이라 합치지 않는다
+ * (#1506).** 브리핑 사유는 `PlanBriefingWalkTimesUnavailableReason` enum 이고, 서버가 일자
+ * 날씨 · 항목 사유 enum 과 값이 겹쳐도 일부러 나눠 둔다 (사유 집합이 달라서).
  */
 export const BRIEFING_REASON_LOOKUP_FAILED = 'LOOKUP_FAILED'
 

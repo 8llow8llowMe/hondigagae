@@ -19,6 +19,10 @@ import {
  * 첫째 `PAST_DATE` (#1500) 와 넷째 `BEYOND_FORECAST_RANGE` (#1491) 는 여기서 다시 선언하지
  * 않는다 — 일자 판정과 같은 문자열이라 `@/types/plan` 의 `PAST_DATE_REASON_CODE` ·
  * `BEYOND_FORECAST_RANGE_REASON_CODE` 하나를 같이 쓴다.
+ *
+ * **`LOOKUP_FAILED_CODE` 는 브리핑의 `BRIEFING_REASON_LOOKUP_FAILED` 와 별개 계약이라 합치지
+ * 않는다 (#1506).** 서버가 항목 사유를 일자 판정과 "같은 축" 으로 두는 것과 달리, 브리핑 사유
+ * (`PlanBriefingWalkTimesUnavailableReason`)는 값이 겹쳐도 따로 둔 enum 이다.
  */
 export const NOT_PLACE_TARGET_CODE = 'NOT_PLACE_TARGET'
 export const NO_START_TIME_CODE = 'NO_START_TIME'
