@@ -592,6 +592,11 @@ UPDATE place survivor
 
 - **대상은 TourAPI 노출 행뿐이다** (`source='TOUR_API' AND merged_into_id IS NULL AND delisted_at IS NULL`).
   문화정보원 · 식약처 노출 행은 자기 적재가 두 칸을 소유한다 — 건드리지 않는다.
+- **보정이 이긴다** (#1434, `services/batch-service.md` "장소 보정"). 보정 파일(`place-overrides.yml`)에 `petAllowanceType` 이 적힌 행은
+  읽은 근거에서 **프로세서가 걸러 낸다** — 세 칸을 쓰지 않고 본 시설 후보도 되지 않는다. 판정은 보정 스텝과 같은 `PlaceOverride.appliesTo`
+  (id 와 정확한 제목)다. 제목이 다른 항목은 보정 스텝이 건너뛰므로 재계산도 빼지 않는다 — 둘 다 받지 못한 채 굳는 행이 없다. SQL 에서
+  빼지 않는 것은 MySQL 콜레이션(대소문자 · 뒤 공백 무시)과 `String.equals` 가 갈라지지 않게 하기 위해서다. 보정 파일이 깨졌으면 이 스텝도
+  `PLACE_IMPORT_024` 로 실패한다 — 깨진 파일로 보정된 행을 원천 값으로 되돌리는 것보다 낫다.
 - **근거 셋** — `place_pet_info`(`allowance_scope` FULL_AREA → ALLOWED, PARTIAL · OUTDOOR_ONLY → PARTIALLY_ALLOWED),
   이 행으로 **흡수된 행**(`merged_into_id = 이 행`, delisted 아닌 것)의 값, 그리고 하위 시설이면 **본 시설의 결과 중 제한**
   (아래 "하위 시설", #1340). UNKNOWN 은 근거가 아니다.
@@ -628,12 +633,17 @@ UPDATE place survivor
   TourAPI 장소를 고르지 못하고 상세에 `petAvailable=false` 와 `ALLOWED` 가 함께 나가던 것을 맞춘다.
 - **매 실행 처음부터 다시 계산한다.** 입력이 같으면 두 번째 실행은 0행을 갱신하고, 동반 정보가 지워지거나 흡수 행이
   delist 되면 값이 UNKNOWN 쪽으로 돌아간다. 급변 가드는 없다 — 입력이 이미 가드를 거친 두 테이블이다.
+  보정한 행(지금 다이소 9곳)은 위 규칙대로 대상에서 빠져 `changed` 에 잡히지 않고, 뒤따르는 `placeOverrideStep` 도 쓸 것이 없다 —
+  두 스텝이 서로 되돌리지 않는다. 그 행의 `allowed_pet_size` 는 보정이 쓴다 — 동반 구분을 `UNKNOWN` · `NOT_ALLOWED` 로 보정하면
+  `UNKNOWN` 이다(그대로 두면 이력의 `ALL` 이 남아 `allowedPetSize=ALL` 필터에 잡힌다). 손으로 UPDATE 한 값은 살아남지 못한다 —
+  고칠 값은 보정 파일에 근거와 함께 적는다.
 - **재적재 · 재병합이 결과를 지우지 않는다.** TourAPI upsert 는 세 칸을 INSERT 리터럴로만 쓰고 UPDATE 절에 두지 않으며,
   병합은 세 칸을 옮기지 않는다(`JdbcPlaceBulkAdapterSqlTest` 가 둘 다 고정). 병합이 예전에 하던
   `allowed_pet_size` 채우기(survivor 가 UNKNOWN 일 때만)는 재계산이 흡수 행을 근거로 쓰므로 걷었다.
 
 완료 로그(재계산 뒤 대상 전체의 분포와 이번에 바뀐 행 수):
-`pet allowance reflected. targets=…, changed=…, ALLOWED=…, PARTIALLY_ALLOWED=…, NOT_ALLOWED=…, UNKNOWN=…, sizeRestricted=…, inherited=…`.
+`pet allowance reflected. targets=…, changed=…, ALLOWED=…, PARTIALLY_ALLOWED=…, NOT_ALLOWED=…, UNKNOWN=…, sizeRestricted=…, inherited=…, overridden=…`.
+`overridden` 은 동반 구분 보정이 걸려 걸러 낸 행 수다(#1434). `targets` 는 걸러 낸 뒤의 수다.
 `inherited` 는 본 시설의 제한을 받아 자기 근거만의 값보다 좁아진 하위 시설 수다(#1340) — 매 실행 다시 판정하므로 두 번째 실행에서도
 같은 값이고, 그때 `changed` 는 0 이다. 그런 행마다 한 줄씩 `pet allowance inherited from parent facility. placeId=…, parentIds=[…],
 own=…, inherited=…` 도 남는다.
@@ -893,3 +903,181 @@ SELECT COUNT(*) FROM place WHERE source = 'CULTURE_PORTAL' AND merged_into_id IS
 SELECT COUNT(*) FROM place
  WHERE source = 'TOUR_API' AND (TRIM(title) LIKE '[%' OR content_type_id = '25') AND source_category IS NOT NULL;
 ```
+
+## 13. 동반 불가 행의 실내외 · 식약처 카페 분류 — `indoor` / `outdoor` · `source_category` (#1434)
+
+#1434 로 적재 규칙 둘을 고쳤다.
+
+- 문화정보원 실내 · 실외 열은 시설 형태가 아니라 **반려견이 머물 수 있는 구역**이다. 동반 불가 행은 실내외를 모름(`NULL`)으로 싣는다
+  (`place-data-integration.md` §2 "실내 · 실외 열 실측", 규칙 `PetStayArea`). 예전에는 `false` / `false` 로 실어 실내 박물관이 '야외' 로 보였다.
+- 식약처 휴게음식점 중 이름이 카페인 곳은 `source_category = 카페` 로 싣는다 (`place-data-integration.md` §6-6, 규칙 `CafeNamePolicy`).
+
+코드 배포만으로는 이미 적재된 값이 다 바뀌지 않는다.
+
+- **문화정보원** — 파일이 그대로라 다음 실행이 `atchFileId` 비교로 건너뛴다(§1). `forceImport=true` 가 필요하다.
+- **관광 API 행** — 병합이 흡수 행의 `false` / `false` 를 옮겨 두었다. 병합은 1회성 스냅샷이라(§9) `placeMergeJob` 재실행으로 고쳐지지 않는다.
+  일회성 `UPDATE JOIN` 이 필요하다.
+- **식약처** — 스냅샷 비교 없이 매주 전량을 upsert 하고 UPDATE 절이 `source_category` 를 덮는다. 다음 `petRestaurantImportJob`(파이프라인 주 1회)이
+  반영한다. 기다리지 않으려면 손으로 한 번 돌린다 — VWorld 지오코딩 약 100콜이다(일 한도 40,000).
+
+### 대상 판정 — 관광 API 행의 `false` / `false` 는 동반 불가 행에서만 온다
+
+- 관광 API 적재는 `indoor` / `outdoor` 를 쓰지 않는다(§8). 관광 API 행의 값은 병합(`MERGE_FIELDS_SQL`)과 그것을 옮긴 런북(§8 3) · §12 2-4)이
+  흡수 행에서 `COALESCE` 로 옮긴 것, 그리고 보정 파일(`placeOverrideStep`)이 덮은 것뿐이다.
+- 옛 규칙에서 동반 불가 행은 전부 `false` / `false` 였다(실측 59곳 모두 실내 N · 실외 N). 동반 가능 행 중 두 칸이 모두 N 인 곳은 0곳이다.
+- 그래서 조건은 **"관광 API 행이 `false` / `false` 이고, 동반 불가 문화정보원 행을 흡수했다"** 다. 흡수 행이 여럿이면 실내외를 아는 다른 흡수 행
+  (동반 가능)의 값을 다시 옮긴다.
+- 동반 가능 흡수 행에서 온 값은 건드리지 않는다. 제주항일기념관(실내 N · 실외 Y · "야외만")의 '야외' 는 반려견 기준으로 맞아 그대로 둔다.
+- 보정 파일에 `false` / `false` 항목이 있으면 이 조건에 걸린다. 지금 파일에는 없다(한림공원은 `false` / `true`). 걸려도 다음 `placeOverrideStep` 이
+  다시 덮는다.
+
+### 절차
+
+**코드를 먼저 배포한다.** 옛 코드가 도는 동안 강제 재적재하면 동반 불가 행에 `false` / `false` 가 다시 박힌다.
+
+```sql
+-- 1) 영향 범위를 센다 (읽기 전용). 배포 전에 세어 두면 확인 단계와 비교된다
+-- 1-1) 문화정보원 동반 불가 노출 행 중 실내외가 박힌 행 — 2) 뒤에는 0
+SELECT COUNT(*) FROM place
+ WHERE source = 'CULTURE_PORTAL' AND pet_available = FALSE AND delisted_at IS NULL
+   AND (indoor IS NOT NULL OR outdoor IS NOT NULL);
+
+-- 1-2) 그 값을 옮겨 받은 관광 API 행 (흡수 행이 delist 됐어도 survivor 의 값은 거기서 왔으므로 delist 를 거르지 않는다)
+SELECT s.id, s.title, s.indoor, s.outdoor, a.id AS absorbed_id, a.title AS absorbed_title, a.source_category
+  FROM place s
+  JOIN place a ON a.merged_into_id = s.id
+ WHERE s.source = 'TOUR_API'
+   AND s.indoor = FALSE AND s.outdoor = FALSE
+   AND a.source = 'CULTURE_PORTAL' AND a.pet_available = FALSE;
+```
+
+2) 문화정보원 잡을 **한 번** 강제로 다시 돌린다. 동반 불가 행의 `indoor` / `outdoor` 가 `NULL` 로 바뀌고, 잡 끝의 `placeOverrideStep` 이 보정을 얹는다.
+**forceImport 는 파일에 있는 행만 upsert 한다** — delist 된 동반 불가 행은 옛 `false` / `false` 를 그대로 들고 있다. 노출되지 않는 행이라 1-1 · 5-1 은
+`delisted_at IS NULL` 로 거르고(5-3 과 같은 조건), 3-2 는 동반 가능 흡수 행만 보아 그 값을 다시 옮기지 않는다. 다시 노출되면 그 실행의 upsert 가
+`NULL` 로 덮는다.
+
+```
+--spring.batch.job.name=cultureFacilityImportJob sido=제주특별자치도 forceImport=true runAt=<ISO 시각>
+```
+
+3) 관광 API 행을 바로잡는다. **2) 뒤에 돌린다** — 3-2 는 동반 가능 흡수 행의 값을 옮기는데, 2) 전에는 그 행들도 옛 규칙의 값이다(동반 가능인데
+두 칸이 모두 N 인 행은 옛 규칙에서 `false` / `false`, 새 규칙에서 모름 — 실측 0건이지만 순서로 막는다). `TEMPORARY TABLE` 과 트랜잭션은
+세션 범위라 **한 연결에서 이어 실행한다**(§12 와 같다).
+
+```sql
+START TRANSACTION;
+
+CREATE TEMPORARY TABLE stay_area_fix AS
+SELECT DISTINCT s.id AS survivor_id
+  FROM place s
+  JOIN place a ON a.merged_into_id = s.id
+ WHERE s.source = 'TOUR_API'
+   AND s.indoor = FALSE AND s.outdoor = FALSE
+   AND a.source = 'CULTURE_PORTAL' AND a.pet_available = FALSE;
+
+-- 3-0) 되돌리기용 — 결과(survivor_id 목록)를 저장해 둔다. 모두 지금 false / false 인 행이라 아래 "되돌리기" 한 줄로 원래 값이 돌아온다
+SELECT survivor_id FROM stay_area_fix ORDER BY survivor_id;
+
+-- 3-1) 모름으로 되돌린다
+UPDATE place s
+  JOIN stay_area_fix f ON f.survivor_id = s.id
+   SET s.indoor = NULL, s.outdoor = NULL, s.updated_at = NOW();
+
+-- 3-2 전에) 실내외를 아는 흡수 행이 둘 이상인 survivor 를 센다 (읽기 전용) — 0행이어야 3-2 를 그대로 돌린다.
+--   MySQL 다중 테이블 UPDATE 는 대상 행을 한 번만 갱신해, 흡수 행이 둘이면 한 행의 값만 옮긴다.
+--   행이 나오면 3-2 의 마지막 JOIN 에 `AND a.id = <흡수 행 id>` 를 붙여 흡수 행마다 따로 돌린다
+SELECT s.id, COUNT(*) AS known
+  FROM place s
+  JOIN stay_area_fix f ON f.survivor_id = s.id
+  JOIN place a ON a.merged_into_id = s.id
+ WHERE a.pet_available = TRUE
+   AND (a.indoor IS NOT NULL OR a.outdoor IS NOT NULL)
+ GROUP BY s.id
+HAVING COUNT(*) > 1;
+
+-- 3-2) 다른 동반 가능 흡수 행이 아는 실내외를 다시 옮긴다 — MERGE_FIELDS_SQL 과 같은 규칙.
+--      a.pet_available = TRUE 가 "동반 가능" 이다. 빼면 delist 된 동반 불가 행의 옛 false / false 를 다시 옮겨 온다(2) 설명)
+UPDATE place s
+  JOIN stay_area_fix f ON f.survivor_id = s.id
+  JOIN place a ON a.merged_into_id = s.id
+   SET s.indoor = COALESCE(s.indoor, a.indoor),
+       s.outdoor = COALESCE(s.outdoor, a.outdoor),
+       s.updated_at = NOW()
+ WHERE a.pet_available = TRUE
+   AND (a.indoor IS NOT NULL OR a.outdoor IS NOT NULL);
+
+-- 3-3) COMMIT 전에 5-2(= 1-2 를 다시 돌린 것)를 이 트랜잭션 안에서 돌린다 — 0행이어야 한다
+SELECT s.id, s.title, s.indoor, s.outdoor, a.id AS absorbed_id, a.title AS absorbed_title
+  FROM place s
+  JOIN place a ON a.merged_into_id = s.id
+ WHERE s.source = 'TOUR_API'
+   AND s.indoor = FALSE AND s.outdoor = FALSE
+   AND a.source = 'CULTURE_PORTAL' AND a.pet_available = FALSE;
+
+DROP TEMPORARY TABLE stay_area_fix;
+COMMIT;   -- 3-3 이 0행일 때만. 행이 나오면 COMMIT 대신 ROLLBACK; 하고 원인을 본다
+```
+
+**되돌리기** — COMMIT 뒤에 되돌려야 하면 3-0 에서 저장한 id 로 원래 값을 돌려놓는다. 3) 의 대상은 모두 `false` / `false` 였다.
+
+```sql
+UPDATE place SET indoor = FALSE, outdoor = FALSE, updated_at = NOW() WHERE id IN (<3-0 결과>);
+```
+
+4) **보정을 다시 얹는다 (필수).** 3-1 이 survivor 의 `indoor` / `outdoor` 를 지우므로, 그 행에 실내외 보정이 있었다면 다음 보정 스텝까지 비어 있다.
+`placeMergeJob` 을 한 번 돌린다 — 공공 API 를 부르지 않고(DB 만 본다) 마지막 단계가 `placeOverrideStep` 이다. 병합 · 재계산도 함께 돌지만 둘 다 멱등이고
+매주 파이프라인이 하는 일과 같다.
+
+```
+--spring.batch.job.name=placeMergeJob areaCode=39 runAt=<ISO 시각>
+```
+
+`cultureFacilityImportJob` 을 `forceImport` 없이 돌려도 끝에 보정 스텝이 돌고, 포털이 같은 파일을 주면 적재는 건너뛴다. 그러나 포털 상세 페이지를
+한 번 부르고, **다운로드가 꺼져 있거나(`CULTURE_FACILITY_DOWNLOAD_ENABLED=false`) 포털이 막히면 우회 파일로 실제 적재를 한다** — 보정만 다시 얹으려는
+자리에는 `placeMergeJob` 이 맞다.
+
+식약처 카페 분류를 다음 주 스케줄 전에 보려면 `petRestaurantImportJob` 도 한 번 돌린다(선택). 이 잡도 끝에서 `placeOverrideStep` 이 돈다.
+
+```
+--spring.batch.job.name=petRestaurantImportJob region=제주 runAt=<ISO 시각>
+```
+
+- **3-1 에서 `false` / `false` 를 통째로 비워도 되는 근거** — 위 "대상 판정". 관광 API 적재가 이 칸을 수집하게 되면 이 절차는 그대로 쓸 수 없다.
+- 실내 대안(`indoor = true`) 결과는 바뀌지 않는다. `indoor = false`(실외) 결과에서 동반 불가 박물관 · 미술관에 붙은 관광 API 행이 빠진다 —
+  §8 과 같이 회귀가 아니라 근거 없는 포함이 빠지는 것이다.
+- prod 는 §8 과 같이 **런북으로 사람이 적용**한다. dev 에서 1)~4) 와 확인 5-x 를 돌려 건수를 확인한 뒤 옮긴다.
+
+### 확인
+
+```sql
+-- 5-1) 문화정보원 동반 불가 노출 행에 실내외가 남지 않았다 — 0 이어야 한다
+SELECT COUNT(*) FROM place
+ WHERE source = 'CULTURE_PORTAL' AND pet_available = FALSE AND delisted_at IS NULL
+   AND (indoor IS NOT NULL OR outdoor IS NOT NULL);
+
+-- 5-2) 1-2) 를 다시 돌리면 0행이어야 한다 (3-3 에서 COMMIT 전에 이미 봤다)
+
+-- 5-3) 문화정보원 동반 가능 행의 실내외 — 20250324 원본 기준 (false, true) 83 · (true, false) 9 · (true, true) 77 근처.
+--      (NULL, NULL) 은 0 근처여야 한다. 크게 다르면 원천 판본이 바뀐 것이다
+SELECT indoor, outdoor, COUNT(*) FROM place
+ WHERE source = 'CULTURE_PORTAL' AND pet_available = TRUE AND delisted_at IS NULL
+ GROUP BY indoor, outdoor;
+
+-- 5-4) 식약처 카페 분류 — 2026-08 원본 기준 9곳. 커피빈제주애월DT점이 들어 있어야 한다
+SELECT id, title, source_category FROM place
+ WHERE source = 'MFDS' AND source_category = '카페' AND delisted_at IS NULL ORDER BY title;
+SELECT source_category, COUNT(*) FROM place WHERE source = 'MFDS' AND delisted_at IS NULL GROUP BY source_category;
+
+-- 5-5) 보정이 얹혔다 — 한림공원 false / true, 다이소 9곳 UNKNOWN · allowed_pet_size UNKNOWN · pet_available false
+SELECT id, title, indoor, outdoor, pet_allowance_type, allowed_pet_size, pet_available FROM place
+ WHERE id IN (126455, 2907285, 4026812, 4026821, 4026823, 4026862, 4026870, 4026810, 4026871, 4026872);
+```
+
+5-5 의 `title` 이 `place-overrides.yml` 의 `expectedTitle` 과 다르면 그 항목은 적용되지 않는다. 잡 로그
+`place overrides finished. entries=10, applied=…, changed=…, skippedNotFound=…, skippedTitleMismatch=…` 에서 건너뛴 수를 보고,
+`place override skipped. reason=title_mismatch` 줄의 `actualTitle` 로 같은 장소인지 확인한 뒤 파일을 고쳐 배포한다.
+
+재계산 스텝의 완료 로그에는 `overridden=9` 가 찍힌다(제목이 다른 항목은 걸러지지 않아 9 보다 작다). 보정이 처음 들어간 실행 뒤로는 보정 스텝의 `changed` 가 0 이어야 한다 —
+재계산이 보정된 동반 칸을 쓰지 않으므로(§10 "보정이 이긴다") 다시 덮을 것이 없다. 0 이 아니면 그사이 다른 경로가 그 칸을 바꾼 것이다.
+
+> 장소 API 로 보면 캐시 때문에 잠시 옛 값이 올 수 있다 — §8 과 같이 **확인은 SQL 로 한다.**

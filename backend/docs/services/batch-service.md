@@ -10,11 +10,11 @@
 |-----|------|----------|------|
 | `placeDataPipelineJob` | (자식 잡 6개) | 주 1회 + 수동 | 장소 적재 6단계를 순서대로 잇는 flow job (#377). 수동 실행은 이 한 줄이면 된다 |
 | `placeImportJob` | 국문 관광정보 GW API (TourAPI) | 주 1회 + 수동 | 관광지/음식점/숙박 마스터 + 운영시간(detailIntro2) + 추가 이미지(detailImage2). 상세 두 단계는 실행당 상한 + 증분 선정 |
-| `cultureFacilityImportJob` | 문화정보원 문화시설 (CSV 파일데이터) | 월 1회 | 문화시설 + 긴급 시설. 포털에서 직접 내려받고 갱신됐을 때만 적재 (#379) |
-| `petRestaurantImportJob` | 식약처 반려동물 동반출입 음식점 (xlsx) | 주 1회 | 좌표는 VWorld 지오코딩으로 채운다 |
-| `placeMergeJob` | (DB) | 적재 뒤 1회 | 원천이 다른 같은 장소를 `merged_into_id` 로 묶는다 (#363). 이어서 동반 가능 여부 재계산 스텝을 돈다 (#886) |
+| `cultureFacilityImportJob` | 문화정보원 문화시설 (CSV 파일데이터) | 월 1회 | 문화시설 + 긴급 시설. 포털에서 직접 내려받고 갱신됐을 때만 적재 (#379). 동반 불가 행의 실내외는 모름(#1434). 마지막에 `placeOverrideStep` |
+| `petRestaurantImportJob` | 식약처 반려동물 동반출입 음식점 (xlsx) | 주 1회 | 좌표는 VWorld 지오코딩으로 채운다. 휴게음식점 중 이름이 카페인 곳은 원천 분류 `카페` (#1434). 마지막에 `placeOverrideStep` |
+| `placeMergeJob` | (DB) | 적재 뒤 1회 | 원천이 다른 같은 장소를 `merged_into_id` 로 묶는다 (#363). 이어서 동반 가능 여부 재계산 스텝(#886), 마지막에 `placeOverrideStep`(#1434) |
 | `placeImageBackfillJob` | TourAPI 키워드 검색 | 적재 뒤 1회 | 이미지 없는 문화정보원·식약처 장소에 대표 이미지를 빌려 채운다 |
-| `petTourImportJob` | 반려동물 동반여행 API (KorPetTourService2) | 파이프라인 마지막 | TourAPI 장소에 동반 조건(`place_pet_info`)을 붙인다 (#877). 동기화 목록 1콜로 대상을 좁히고 교집합에만 상세를 부른다. 쿼터는 KorService2 와 따로다. 적재 뒤 재계산 스텝 `placePetAllowanceReflectStep` 이 TourAPI 노출 행의 `pet_allowance_type` · `allowed_pet_size` 를 `place_pet_info` 와 흡수 행에서 다시 계산한다 (#886, 가장 제한적인 값). 하위 시설은 본 시설의 제한도 받는다 (#1340) |
+| `petTourImportJob` | 반려동물 동반여행 API (KorPetTourService2) | 파이프라인 마지막 | TourAPI 장소에 동반 조건(`place_pet_info`)을 붙인다 (#877). 동기화 목록 1콜로 대상을 좁히고 교집합에만 상세를 부른다. 쿼터는 KorService2 와 따로다. 적재 뒤 재계산 스텝 `placePetAllowanceReflectStep` 이 TourAPI 노출 행의 `pet_allowance_type` · `allowed_pet_size` 를 `place_pet_info` 와 흡수 행에서 다시 계산한다 (#886, 가장 제한적인 값). 하위 시설은 본 시설의 제한도 받는다 (#1340). 마지막에 `placeOverrideStep`(#1434) |
 | `congestionImportJob` | 관광지 집중률 방문자 추이 예측 API | 일 1회 | 30일 rolling. **주기가 달라 파이프라인에 넣지 않는다** |
 | `olleCourseImportJob` | 제주올레 공공 CSV + TourAPI 좌표 | 주 1회 + 수동 | 산책 코스 마스터 (#383). 포털에서 내려받고 갱신됐을 때만 적재 (#441). 장소 파이프라인과 별개다 |
 
@@ -117,6 +117,7 @@
   하위 시설(본 시설 이름 + 괄호 수식어, 100m 안)은 본 시설 결과 중 제한만 더 받는다(#1340, 판정 `PlaceIdentityPolicy.isSubFacilityOf`).
   매 실행 처음부터 다시 계산하므로 근거가 사라지면 값도 돌아간다. 적재 · 병합 SQL 은 두 칸을 쓰지 않는다
   (`JdbcPlaceBulkAdapterSqlTest`). 운영 확인은 `data-refresh-guide.md` §10.
+  **예외는 보정 파일에 동반 구분이 적힌 행이다** — 재계산이 대상에서 빼 세 칸을 쓰지 않는다(#1434, 아래 "장소 보정").
 - **`placeDataPipelineJob` 은 자식이 실패해도 다음 단계로 계속 가고, 실패한 자식이 있으면 부모를
   FAILED 로 내린다**(#377). 계속 가는 쪽이 나은 이유는 여섯 잡이 모두 멱등이고 실패해도 기존 데이터를
   지우지 않기 때문이다 — 원천 하나가 죽었다고 병합·이미지 백필까지 멈추면 지난 주 데이터마저 손대지
@@ -125,6 +126,83 @@
   `PipelineRegionParametersValidator` 가 세 값을 같은 areaCode 로 환산해 비교한다.
 - 부분 실패가 전체 적재를 막지 않게 잡 단위로 격리한다.
 - 반려동물 동반 정보가 없는 장소는 삭제하지 않고 `PetAllowanceType.UNKNOWN`으로 적재한다.
+- **`source_category = '카페'` 는 서비스 사이 값 계약이다** (#1434). 문화정보원 카테고리3 원문이고, 식약처 휴게음식점도 이름 규칙
+  (`CafeNamePolicy.CAFE_CATEGORY`)으로 같은 값을 싣는다. 쓰는 곳은 ai-service `RequestNoteConstraints` 의 카페 판정, tour-service 장소 검색의
+  `sourceCategory` 필터, FE `CAFE_SOURCE_CATEGORY` 다. 셋 다 문자열로 맞추므로 철자를 바꾸면 컴파일도 테스트도 통과한 채 **AI 카페 요청이 조용히
+  0건이 된다.** 바꿔야 하면 세 곳을 함께 바꾼다.
+- **개별 장소는 손 UPDATE 가 아니라 보정 파일로 고친다** (#1434). 재계산 스텝과 원천 적재가 칸을 매 실행 다시 써서 손으로 고친 값은 살아남지
+  못한다. 아래 "장소 보정" 절.
+
+## 장소 보정 — `place-overrides.yml` · `placeOverrideStep` (#1434)
+
+원천끼리 어긋나거나 원천이 화면에 틀린 말을 하게 하는 장소를 사람이 근거와 함께 고치는 장치다. 예전에는 없었다 — `placePetAllowanceReflectStep`
+이 `pet_allowance_type` · `allowed_pet_size` · `pet_available` 을 매 실행 처음부터 다시 계산하고, 문화정보원 · 식약처 적재가 자기 행의 칸을 매번
+원천 값으로 덮어 손 UPDATE 는 다음 실행에서 사라졌다.
+
+**파일** — `service/batch-service/src/main/resources/place-overrides.yml`. 배포물에 들어가므로 보정은 코드처럼 리뷰를 거쳐 배포로 바뀐다.
+
+| 칸 | 필수 | 뜻 |
+| --- | --- | --- |
+| `placeId` | O | `place.id` |
+| `expectedTitle` | O | `place.title` 과 정확히 같을 때만 적용한다. 다르면 건너뛰고 WARN — id 가 다른 장소를 가리키는 사고를 막는다 |
+| `indoor` · `outdoor` | | `true` · `false`. 적은 칸만 바꾼다 |
+| `petAllowanceType` | | `ALLOWED` · `PARTIALLY_ALLOWED` · `NOT_ALLOWED` · `UNKNOWN`. 바꾸면 `pet_available` 이 `PetAllowancePolicy.petAvailableOf` 로 따라오고, `UNKNOWN` · `NOT_ALLOWED` 면 `allowed_pet_size` 도 `UNKNOWN` 이 된다 |
+| `reason` | O | 원천 값과 다르게 두는 이유 |
+| `evidence` | O | 근거 목록(원천 · 판본 · 날짜). 하나 이상 |
+
+- **넣는 기준** — 원천과 어긋나는 다른 공식 원천, 또는 현장 확인이 있을 때만 넣는다. 올리브영 · 라이프워크는 관광정보 API 가 '전구역 동반가능'
+  이고 반대 근거가 없어 넣지 않았다. 기준과 제외 이유는 파일 머리 주석에 있다.
+- **읽는 순간 실패한다** — 모르는 칸 이름 · enum 오타 · 같은 칸 두 번 · 같은 `placeId` 두 번 · 빈 `reason` / `evidence` · 바꿀 칸 없음 ·
+  YAML 별칭(`*이름`)은 `PLACE_IMPORT_024`(`PLACE_OVERRIDE_INVALID`)로 스텝을 실패시킨다. 일부만 적용하지 않는다. 별칭을 막은 이유는 Jackson 이
+  별칭을 내용이 아니라 앵커 이름 문자열로 읽어 근거가 조용히 사라지기 때문이다. `PlaceOverrideYamlAdapterTest` 가 **실제 파일**을 CI 에서 읽는다.
+- **스텝이 돌 때마다 읽는다**(기동 시점이 아니다). 파일이 깨져도 보정 스텝 · 재계산 스텝이 든 잡만 FAILED 가 되고, 혼잡도 · 올레 잡과 스케줄러는 산다.
+  **재계산 스텝도 같은 `PLACE_IMPORT_024` 로 실패한다** — 깨진 파일로 재계산이 보정된 행을 원천 값으로 되돌리는 것보다 낫다.
+- 칸을 `NULL`(모름)로 되돌리는 보정은 표현하지 못한다 — 적지 않은 칸은 "그대로" 다.
+- **값은 Java 에서 합치고 SQL 은 그대로 쓴다.** 지금 값에 보정을 얹은 다섯 칸(`PlaceOverride.applyTo`)을 평범한 파라미터로 쓰고, 결과가 지금과
+  같으면 쓰지 않는다. `col = COALESCE(?, col)` 처럼 SQL 에서 합치지 않는 이유는 MySQL 의 `indoor` · `outdoor` · `pet_available` 이 Hibernate 가
+  만든 `BIT(1)` 이라서다 — Connector/J 가 보내는 정수와 `BIT` 의 형 병합이 문자열이 되어 `'0'` 을 `BIT(1)` 에 넣으려다 `ER_DATA_TOO_LONG`(엄격 모드)로
+  실패하거나 1 로 포화될 수 있다. `IF` · `CASE` 도 같다. H2 의 `BOOLEAN` 테스트로는 드러나지 않는다.
+- 원천 · 노출 여부는 보지 않는다. id 로 행 하나를 가리킨다. 보정은 그 행에만 닿는다 — 하위 시설 상속(#1340)으로 번지지 않는다.
+  동반 구분을 보정한 행은 재계산의 본 시설 후보에서도 빠진다. 문화정보원 행을 보정하면 그 행을 흡수한 관광 API 행의 재계산 근거가 된다.
+- **동반 구분을 `UNKNOWN` · `NOT_ALLOWED` 로 보정하면 `allowed_pet_size` 도 `UNKNOWN` 으로 쓴다.** 재계산은 보정 행을 쓰지 않으므로 그대로 두면
+  크기 제한이 이력의 값에서 멈춰(다이소는 `ALL`) `allowedPetSize=ALL` 정확 일치 필터에 잡힌다. `ALLOWED` · `PARTIALLY_ALLOWED` 로 보정하면 크기는
+  지금 값 그대로다. 보정을 지우면 다음 재계산이 세 칸을 원천 근거로 다시 쓴다.
+
+**스텝 배치** — 보정이 살아남으려면 그 칸의 **마지막 쓰기**여야 한다. 그래서 보정 칸을 다시 쓰는 스텝을 가진 잡 넷의 마지막 단계로 같은 스텝
+정의(`PlaceOverrideStepConfig`)를 붙인다. 잡 하나만 손으로 돌려도 보정이 다시 얹힌다. 재계산 스텝은 보정된 동반 칸을 쓰지 않으므로(아래) 두 재계산
+잡에서 보정 스텝이 맡는 것은 병합이 채운 실내외와 처음 적용뿐이다.
+
+| 잡 | 스텝 | 그 잡이 다시 쓰는 칸 |
+| --- | --- | --- |
+| `cultureFacilityImportJob` | `cultureFacilityImportStep` → **`placeOverrideStep`** | 문화정보원 행의 실내외 · 동반 칸 (파일이 같아 건너뛴 실행에서도 보정은 돈다) |
+| `petRestaurantImportJob` | `petRestaurantImportStep` → **`placeOverrideStep`** | 식약처 행의 동반 칸 |
+| `placeMergeJob` | `placeMergeStep` → `placePetAllowanceReflectStep` → **`placeOverrideStep`** | 관광 API 행의 동반 칸(재계산, 보정 행 제외) · 실내외(병합 `COALESCE`) |
+| `petTourImportJob` | `petTourImportStep` → `placePetAllowanceReflectStep` → **`placeOverrideStep`** | 관광 API 행의 동반 칸(재계산, 보정 행 제외) |
+
+`placeImportJob` 에는 붙이지 않는다 — 관광 API upsert 는 보정 칸을 UPDATE 절에서 쓰지 않는다(`JdbcPlaceBulkAdapterSqlTest`). 파이프라인에서는 네 번
+돌지만 파일 읽기 한 번 + 대상 조회 한 번(`IN`) + 바뀐 행만 갱신이라 싸다. 배선은 `BatchServiceApplicationTests` 가 스텝 이름으로 고정한다.
+
+**보정이 이긴다 — 재계산은 보정된 칸을 건드리지 않는다.** `placePetAllowanceReflectStep` 이 같은 보정 파일을 읽어(`PlaceOverrideCatalogPort`)
+동반 구분이 적힌 행을 **읽은 근거에서 걸러 낸다**. 걸러 낸 행은 쓰지 않고 본 시설 후보도 아니다.
+
+- **적용 판정은 도메인 한 곳이다** — `PlaceOverride.appliesTo`(id 와 정확한 제목)와 `overridesPetAllowance`. 보정 스텝과 재계산이 같은 판정을 쓴다.
+  보정 스텝이 제목이 다른 행을 건너뛰므로, 재계산도 그 행은 빼지 않는다 — 둘 다 받지 못한 채 굳는 행이 없다.
+- **SQL 에서 빼지 않는다.** 제목 대조를 SQL 에 두면 MySQL 콜레이션(`utf8mb4_unicode_ci`, 대소문자 · 뒤 공백 무시)과 보정 스텝의 `String.equals` 가
+  갈라져, 보정 스텝은 건너뛰는데 재계산은 빼는 행이 생긴다. 근거 조회는 그대로 두고 프로세서가 거른다(대상 2,300곳 남짓, 보정 수십 건).
+- 그래서 두 스텝이 서로 되돌리지 않는다. 보정이 한 번 들어간 뒤에는 다이소 9곳이 재계산 `changed` 에 잡히지 않고 보정 스텝도 쓸 것이 없다
+  (멱등, `JdbcPlaceOverrideAdapterTest`). 두 스텝 사이에 원천 값이 보이는 틈도 없다. 재계산 완료 로그의 `overridden` 은 걸러 낸 행 수다.
+
+**로그** — 항목마다 한 줄, 끝에 요약 한 줄이다.
+
+```
+place override applied. placeId=126455, title=한림공원, source=TOUR_API, changed=true, indoor=true->false, outdoor=true, petAllowanceType=ALLOWED, allowedPetSize=ALL, petAvailable=true
+place override skipped. reason=title_mismatch, placeId=…, expectedTitle=…, actualTitle=…
+place override skipped. reason=not_found, placeId=…, expectedTitle=…
+place overrides finished. entries=10, applied=…, changed=…, skippedNotFound=…, skippedTitleMismatch=…
+```
+
+`skippedTitleMismatch` 가 0 이 아니면 `actualTitle` 로 같은 장소인지 확인하고 파일의 `expectedTitle` 을 고친다. 처음 넣은 항목(한림공원 · 다이소 9곳)의
+운영 확인 SQL 은 `data-refresh-guide.md` §13 "확인" 5-5.
 
 ## olleCourseImportJob (제주올레 산책 코스)
 

@@ -85,7 +85,7 @@ contentUrl: https://www.data.go.kr/cmm/cmm/fileDownload.do
 | 반려동물 동반 가능정보 | `petAvailable` + `petAllowanceType` | Y/N |
 | 입장 가능 동물 크기 | `allowedPetSize`(신규) | 관광 API `acmpyPsblCpam` 과 같은 파서 사용. "해당없음" 58건은 UNKNOWN |
 | 반려동물 제한사항 | `petRestriction`(신규) | 원문 보존. "야외만 반려동물 동반 가능" 15건은 부분 동반 판정에 쓴다 |
-| 장소(실내)/(실외) 여부 | `indoor` / `outdoor`(신규) | **비 오는 날 대안 추천의 근거** |
+| 장소(실내)/(실외) 여부 | `indoor` / `outdoor`(신규) | **반려견이 머물 수 있는 구역이다(시설 형태 아님).** 동반 N 이면 모름(`NULL`), 동반 Y 면 Y/N 그대로, 동반 Y 인데 두 칸이 모두 N 이면 모름 — 아래 실측 (#1434). 비 오는 날 대안 추천의 근거 |
 | 반려동물 전용 정보 | `petOnly`(신규) | "반려동물 전용" 55건 |
 | 애견 동반 추가 요금 | `petExtraFee`(신규) | 원문 보존. 요금 없음이 "없음" 이라는 낱말로 온다 — 뜻 해석은 tour-service `PetExtraFee` 가 판정 단계에서 한다 (#231) |
 | 기본 정보_장소설명 | `overview` | **설명문이 아니라 "유형 표기[, 이용 메모…]" 다** (#1216). 첫 토막이 유형 표기(`관광지` · `공원` · `애견 동반 펜션` · `…카페` · `박물관` …)면 버리고 메모만 싣는다. 메모가 없으면 `NULL` — 아래 실측 |
@@ -99,6 +99,22 @@ contentUrl: https://www.data.go.kr/cmm/cmm/fileDownload.do
 쉼표(`추가인원 15,000원`, 27건)에서는 자르지 않는다. 규칙의 정본은 `CultureDescriptionParser` 다.
 | 최종작성일 | `sourceModifiedAt` | |
 
+**실내 · 실외 열 실측 (20250324 원본, 제주 여행 카테고리 중복 제거 후, #1434).** 두 열은 시설 형태가 아니라 반려견이 머물 수 있는
+구역을 말한다.
+
+| (실내, 실외, 동반) | 곳 | 내용 | 적재 |
+|---|---:|---|---|
+| (N, N, N) | 59 | 동반 불가 전부 — 박물관 · 미술관 · 문예회관 · 펜션 | `NULL` / `NULL` (모름) |
+| (N, Y, Y) | 83 | 박물관 17곳은 제한사항이 "야외만 반려동물 동반 가능" | `false` / `true` |
+| (Y, N, Y) | 9 | 카페 | `true` / `false` |
+| (Y, Y, Y) | 77 | 한림공원 · 스누피가든 · 펜션 · 카페 | `true` / `true` |
+
+- 동반 불가 행을 `false` / `false` 로 싣던 동안 **실내 박물관이 화면에 '야외' 로 보였다.** #753 이 관광 API 쪽에서 막은 "모름을 실외로
+  뭉갬" 이 이 원천에 남아 있던 것이다. 병합의 `COALESCE(survivor.indoor, absorbed.indoor)` 가 그 값을 관광 API 행에도 옮겼다.
+- 동반 가능 행의 값은 반려견 기준이라 그대로 쓴다. "야외만" 박물관(제주항일기념관)이 '야외' 로 보이는 것은 반려견 기준으로 맞다.
+- 동반 가능인데 두 칸이 모두 N 인 행은 실측 0건이다. 같은 이유로 모름이다.
+- 규칙의 정본은 `PetStayArea` 다. 이미 적재 · 병합된 값을 바로잡는 절차는 `data-refresh-guide.md` §13.
+
 ## 3. place 엔티티 확장
 
 원천이 둘이 되므로 식별자 체계를 바꾼다.
@@ -110,8 +126,8 @@ place  (추가/변경)
 │                                             TourAPI = contentId 문자열
 │                                             문화정보원 = SHA256(시설명|도로명주소) 앞 32자
 ├─ content_id        BIGINT       NULL       변경. TourAPI 전용이라 nullable 로
-├─ indoor            BOOLEAN      NOT NULL   신규. default false
-├─ outdoor           BOOLEAN      NOT NULL   신규. default false
+├─ indoor            BOOLEAN      NULL       신규. NULL 은 모름 — 실외(false)와 다르다 (#753 · #1434)
+├─ outdoor           BOOLEAN      NULL       신규. NULL 은 모름
 ├─ pet_only          BOOLEAN      NOT NULL   신규. default false
 ├─ allowed_pet_size  VARCHAR(20)  NOT NULL   신규. enum AllowedPetSize (기존 place_pet_info 와 동일 enum)
 ├─ pet_restriction   VARCHAR(500) NULL       신규
@@ -313,7 +329,7 @@ CSV 1,191행에 파서를 그대로 돌려 확인한 결과다.
 |------|-----|------|
 | `pet_available` | true | 등록 사실 자체가 근거 |
 | `pet_allowance_type` | ALLOWED | 등록 제도가 전구역/일부구역을 나누지 않는다 |
-| `source_category` | 일반음식점 / 휴게음식점 / 제과점영업 | 원본 업종 보존 |
+| `source_category` | 일반음식점 / 휴게음식점 / 제과점영업 / 카페 | 업종 원문. 단 휴게음식점 중 이름이 카페인 곳은 `카페` 로 바꿔 싣는다 (§6-6, #1434) — 그 행이 원래 휴게음식점이었음은 DB 로 알 수 없다 |
 | `content_type_id` | 39 | 세 업종 모두 관광 API 음식점으로 모은다 |
 | `indoor` / `outdoor` | **NULL** | 원천에 없다. "실외"와 "정보 없음"은 다르다 |
 | `allowed_pet_size` | UNKNOWN | 원천에 없다 |
@@ -354,6 +370,27 @@ INSERT 의 컬럼 목록에서 `indoor`/`outdoor` 를 아예 빼고, UPDATE 절�
 반려견 여행 서비스에서는 맞는 교환이라고 본다.
 
 **카카오는 로그인에만 쓴다.** 지도는 클라이언트에서 JS SDK 로 그리고 서버는 관여하지 않는다.
+
+### 6-6. 휴게음식점 중 카페 — 이름 규칙 (#1434)
+
+화면의 카페 라벨 · 카페 필터 · AI 일정의 카페 요청(`RequestNoteConstraints`)은 모두 `sourceCategory = 카페` 만 본다. 식약처 업종을 그대로
+실으면 `커피빈제주애월DT점` 이 `휴게음식점` 이라 카페로 잡히지 않았다. 이 원천은 연번 · 업소명 · 업종 · 지역 · 업소주소뿐이라 **이름이 유일한
+신호**다.
+
+- **업종이 휴게음식점인 행에만** 적용한다. 일반음식점 · 제과점영업은 이름에 '카페' 가 있어도 원래 업종이다.
+- 이름을 정규화(공백 제거 · 소문자)해 키워드를 부분 문자열로 찾는다. 맞으면 `source_category = 카페`, 아니면 원래 업종 문자열이다.
+- 키워드는 일반 낱말 `카페` · `커피` · `coffee` · `cafe` · `café` · `다방` 과, 이름에 '커피' 가 없는 커피 체인
+  (`스타벅스` · `커피빈` · `투썸` · `이디야` · `메가엠지씨` · `빽다방` · `할리스` · `폴바셋` · `탐앤탐스` · `엔제리너스` · `파스쿠찌` ·
+  `컴포즈` · `블루보틀` · `테라로사` · `더벤티` · `매머드` · `바나프레소` · `드롭탑` 등)이다.
+- 업종 원문(`businessType`)은 **적재 레코드에만 남고 DB 에는 남지 않는다.** `place` 에는 `source_category` 하나뿐이라, `카페` 로 바꾼 행이
+  원래 `휴게음식점` 이었음을 DB 로는 알 수 없다(원천 xlsx 를 다시 봐야 한다). `content_type_id` 는 그대로 39 다.
+- 2026-08 원본 기준 제주 휴게음식점 38곳 중 **9곳**이 카페가 된다 (`내노키카페` · `현자커피` · `커피빈제주애월DT점` …).
+
+**한계.** 부분 문자열이라 '다방' 이 낱말 속에 든 이름(`바다방갈로`)도 카페가 된다. 반대로 이름에 신호가 없는 카페(`해피라떼클럽` ·
+`고양이있어요`)는 휴게음식점으로 남는다. 체인 목록은 한국어 상호만 본다. 규칙의 정본은 `CafeNamePolicy` 다.
+
+식약처 적재는 스냅샷 비교 없이 매주 전량을 upsert 하고 UPDATE 절이 `source_category` 를 덮는다(`JdbcPlaceBulkAdapterSqlTest`).
+그래서 이미 적재된 행도 다음 `petRestaurantImportJob` 에서 바뀐다 — 확인 SQL 은 `data-refresh-guide.md` §13.
 
 ## 7. AI 플래너의 식사 슬롯
 
