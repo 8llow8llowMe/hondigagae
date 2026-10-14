@@ -43,9 +43,12 @@ public class CultureFacilityImportJobConfig {
     private static final String STEP_NAME = "cultureFacilityImportStep";
 
     @Bean
-    public Job cultureFacilityImportJob(JobRepository jobRepository, Step cultureFacilityImportStep) {
+    public Job cultureFacilityImportJob(JobRepository jobRepository, Step cultureFacilityImportStep, Step placeOverrideStep) {
         return new JobBuilder(JOB_NAME, jobRepository)
             .start(cultureFacilityImportStep)
+            // 적재가 문화정보원 행의 실내외 · 동반 칸을 원천 값으로 덮었으니 보정을 다시 얹는다 (#1434, PlaceOverrideStepConfig).
+            // 원천 파일이 같아 적재를 건너뛴 실행에서도 돈다 — 싸고, 보정 파일만 바뀐 배포를 반영한다
+            .next(placeOverrideStep)
             .build();
     }
 

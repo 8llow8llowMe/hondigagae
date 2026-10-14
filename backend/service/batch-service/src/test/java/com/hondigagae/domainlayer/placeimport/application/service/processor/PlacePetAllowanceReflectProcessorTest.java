@@ -1,15 +1,21 @@
 package com.hondigagae.domainlayer.placeimport.application.service.processor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.hondigagae.domainlayer.placeimport.application.model.PetAllowanceReflectOutcome;
+import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportErrorCode;
+import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportException;
+import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceOverrideCatalogPort;
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlacePetAllowanceCommandPort;
 import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlacePetAllowanceEvidenceQueryResult;
+import com.hondigagae.domainlayer.placeimport.domain.model.PlaceOverride;
 import com.hondigagae.domainlayer.placeimport.domain.model.ReflectedPetAllowance;
 import com.hondigagae.shared.travel.place.AllowedPetSize;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
@@ -27,8 +33,12 @@ class PlacePetAllowanceReflectProcessorTest {
     private static final double PARENT_LAT = 33.3195;
     private static final double PARENT_LNG = 126.2390;
 
+    private static final List<String> EVIDENCE = List.of("사용성 테스트 2026-10-13 (#1434)");
+
     private final PlacePetAllowanceCommandPort port = mock(PlacePetAllowanceCommandPort.class);
-    private final PlacePetAllowanceReflectProcessor processor = new PlacePetAllowanceReflectProcessor(port);
+    // 기본은 보정 없음(빈 목록) — 보정과의 관계는 아래 #1434 테스트가 본다
+    private final PlaceOverrideCatalogPort overrideCatalogPort = mock(PlaceOverrideCatalogPort.class);
+    private final PlacePetAllowanceReflectProcessor processor = new PlacePetAllowanceReflectProcessor(port, overrideCatalogPort);
 
     @Test
     @DisplayName("근거 조합마다 가장 제한적인 값을 쓰고, 바뀐 행만 갱신한다")
@@ -175,12 +185,96 @@ class PlacePetAllowanceReflectProcessorTest {
         assertThat(outcome.inherited()).isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("동반 구분 보정이 걸린 행은 읽은 근거에서 걸러 낸다 — 쓰지 않고 대상 수에도 넣지 않는다. 판정은 id · 정확한 제목이다 (#1434)")
+    void filtersRowsWhosePetAllowanceIsOverridden() {
+        when(overrideCatalogPort.readOverrides()).thenReturn(List.of(
+            new PlaceOverride(126455L, "한림공원", false, true, null, "야외 정원", EVIDENCE),
+            new PlaceOverride(2907285L, "다이소 제주연동점", null, null, PetAllowanceType.UNKNOWN, "원천끼리 어긋난다", EVIDENCE),
+            new PlaceOverride(4026812L, "다이소 서귀포중문점", null, null, PetAllowanceType.UNKNOWN, "원천끼리 어긋난다", EVIDENCE),
+            new PlaceOverride(4026821L, "다이소 제주노형점", null, null, PetAllowanceType.UNKNOWN, "원천끼리 어긋난다", EVIDENCE)));
+        when(port.findTourApiEvidences()).thenReturn(List.of(
+            // 제목까지 맞는 보정 행 — 원천은 전구역이지만 재계산하지 않는다(이미 보정 값이라도, 아니라도)
+            evidence(2907285L, "다이소 제주연동점", "ALLOWED", "ALL", true, "FULL_AREA", "ALL"),
+            // 뒤 공백이 다르다 — 보정 스텝이 건너뛰므로 재계산도 빼지 않는다(MySQL 콜레이션이면 같다고 봤을 행)
+            evidence(4026812L, "다이소 서귀포중문점 ", "UNKNOWN", "UNKNOWN", false, "FULL_AREA", "ALL"),
+            // id 가 다른 장소를 가리키게 됐다 — 마찬가지로 재계산한다
+            evidence(4026821L, "올리브영 노형점", "UNKNOWN", "UNKNOWN", false, "FULL_AREA", "ALL"),
+            // 실내외만 보정한 행 — 동반 칸은 재계산 몫이다
+            evidence(126455L, "한림공원", "UNKNOWN", "UNKNOWN", false, "PARTIAL", "ALL")));
+        when(port.updatePetAllowances(anyList())).thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+
+        PetAllowanceReflectOutcome outcome = processor.reflectPetAllowances();
+
+        ArgumentCaptor<List<ReflectedPetAllowance>> written = listCaptor();
+        verify(port).updatePetAllowances(written.capture());
+        assertThat(written.getValue()).containsExactly(
+            new ReflectedPetAllowance(4026812L, PetAllowanceType.ALLOWED, AllowedPetSize.ALL),
+            new ReflectedPetAllowance(4026821L, PetAllowanceType.ALLOWED, AllowedPetSize.ALL),
+            new ReflectedPetAllowance(126455L, PetAllowanceType.PARTIALLY_ALLOWED, AllowedPetSize.ALL));
+        assertThat(outcome.targets()).isEqualTo(3);
+        assertThat(outcome.changed()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("걸러 낸 행은 본 시설 후보도 아니다 — 보정한 본 시설의 원천 제한이 하위 시설로 번지지 않는다 (#1434)")
+    void overriddenRowIsNotParentCandidate() {
+        when(overrideCatalogPort.readOverrides()).thenReturn(List.of(
+            new PlaceOverride(2907285L, "다이소 제주연동점", null, null, PetAllowanceType.UNKNOWN, "원천끼리 어긋난다", EVIDENCE)));
+        when(port.findTourApiEvidences()).thenReturn(List.of(
+            // 본 시설: 원천 근거는 일부구역 — 걸러지지 않았다면 하위 시설이 PARTIALLY_ALLOWED 를 받았다
+            located(2907285L, "다이소 제주연동점", PARENT_LAT, PARENT_LNG, "UNKNOWN", "UNKNOWN", false, "PARTIAL", "ALL", List.of(), List.of()),
+            located(2907286L, "다이소 제주연동점(주차장)", PARENT_LAT + 0.00025, PARENT_LNG, "UNKNOWN", "UNKNOWN", false,
+                "FULL_AREA", "ALL", List.of(), List.of())));
+        when(port.updatePetAllowances(anyList())).thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+
+        PetAllowanceReflectOutcome outcome = processor.reflectPetAllowances();
+
+        ArgumentCaptor<List<ReflectedPetAllowance>> written = listCaptor();
+        verify(port).updatePetAllowances(written.capture());
+        assertThat(written.getValue()).containsExactly(new ReflectedPetAllowance(2907286L, PetAllowanceType.ALLOWED, AllowedPetSize.ALL));
+        assertThat(outcome.inherited()).isZero();
+    }
+
+    @Test
+    @DisplayName("걸러 낸 행만 남으면 쓰기 포트를 부르지 않는다 — 보정이 들어간 뒤 재계산은 그 행으로 changed 가 늘지 않는다 (#1434)")
+    void writesNothingForOverriddenRowsOnly() {
+        when(overrideCatalogPort.readOverrides()).thenReturn(List.of(
+            new PlaceOverride(2907285L, "다이소 제주연동점", null, null, PetAllowanceType.UNKNOWN, "원천끼리 어긋난다", EVIDENCE)));
+        when(port.findTourApiEvidences()).thenReturn(List.of(evidence(2907285L, "다이소 제주연동점", "UNKNOWN", "UNKNOWN", false, "FULL_AREA", "ALL")));
+
+        PetAllowanceReflectOutcome outcome = processor.reflectPetAllowances();
+
+        verify(port, never()).updatePetAllowances(anyList());
+        assertThat(outcome.targets()).isZero();
+        assertThat(outcome.changed()).isZero();
+    }
+
+    @Test
+    @DisplayName("보정 파일이 깨지면 재계산도 PLACE_IMPORT_024 로 실패한다 — 보정된 행을 원천 값으로 되돌리지 않는다 (#1434)")
+    void failsWhenOverrideFileIsInvalid() {
+        when(overrideCatalogPort.readOverrides()).thenThrow(new PlaceImportException(PlaceImportErrorCode.PLACE_OVERRIDE_INVALID, "reason 이 비었다"));
+
+        assertThatThrownBy(processor::reflectPetAllowances)
+            .isInstanceOf(PlaceImportException.class)
+            .extracting(exception -> ((PlaceImportException) exception).getErrorCode())
+            .isEqualTo(PlaceImportErrorCode.PLACE_OVERRIDE_INVALID);
+        verifyNoInteractions(port);
+    }
+
     private static PlacePetAllowanceEvidenceQueryResult evidence(
         long placeId, String currentAllowance, String currentSize, boolean currentPetAvailable, String petInfoScope, String petInfoSize,
         List<String> absorbedAllowances, List<String> absorbedSizes
     ) {
         return located(placeId, "place-" + placeId, null, null, currentAllowance, currentSize, currentPetAvailable, petInfoScope, petInfoSize,
             absorbedAllowances, absorbedSizes);
+    }
+
+    /** 제목이 있는 근거 — 동반 정보만 있고 흡수 행 · 좌표는 없다 (#1434 보정 판정용). */
+    private static PlacePetAllowanceEvidenceQueryResult evidence(
+        long placeId, String title, String currentAllowance, String currentSize, boolean currentPetAvailable, String petInfoScope, String petInfoSize
+    ) {
+        return located(placeId, title, null, null, currentAllowance, currentSize, currentPetAvailable, petInfoScope, petInfoSize, List.of(), List.of());
     }
 
     private static PlacePetAllowanceEvidenceQueryResult located(

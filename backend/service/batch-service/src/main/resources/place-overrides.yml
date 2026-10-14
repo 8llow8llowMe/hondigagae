@@ -1,0 +1,127 @@
+# 장소 보정 파일 (#1434) — placeOverrideStep 이 읽어 place 행에 덮는다. 규칙과 배치 순서는 docs/services/batch-service.md "장소 보정".
+# placePetAllowanceReflectStep 도 이 파일을 읽어 petAllowanceType 이 적힌 행(id · 제목이 맞는 행)을 재계산에서 뺀다 — 보정이 이긴다.
+# 그래서 이 파일이 깨지면 보정 스텝과 재계산 스텝이 함께 PLACE_IMPORT_024 로 실패한다.
+#
+# 넣는 기준
+#   원천과 어긋나는 다른 공식 원천, 또는 현장 확인이 있을 때만 넣는다. 화면이 마음에 들지 않는다는 이유로는 넣지 않는다 —
+#   보정은 원천보다 믿을 근거가 있을 때만 원천을 이긴다. 근거(evidence)에는 원천 이름과 판본 · 확인 날짜를 적는다.
+#
+# 넣지 않은 것
+#   올리브영 · 라이프워크 — 관광정보 API(반려동물 동반여행) acmpyTypeCd 가 '전구역 동반가능' 이고, 그와 어긋나는 다른 공식 원천도
+#   현장 확인도 없다. 의심만으로는 원천 값을 덮지 않는다 (2026-10-13 결정, #1434). 반대 근거가 생기면 그때 넣는다.
+#
+# 항목
+#   placeId           place.id
+#   expectedTitle     place.title 과 정확히 같을 때만 적용한다. 다르면 건너뛰고 WARN 을 남긴다 — id 가 다른 장소를 가리키는 사고 방지
+#   indoor / outdoor  true · false. 적은 칸만 바꾼다
+#   petAllowanceType  ALLOWED · PARTIALLY_ALLOWED · NOT_ALLOWED · UNKNOWN. 바꾸면 pet_available 이 따라온다(ALLOWED · PARTIALLY_ALLOWED 면 true).
+#                     UNKNOWN · NOT_ALLOWED 면 allowed_pet_size 도 UNKNOWN 이 된다
+#   reason            원천 값과 다르게 두는 이유 (필수)
+#   evidence          근거 목록 — 원천 · 판본 · 날짜 (필수, 하나 이상)
+#
+# 모르는 칸 이름 · enum 오타 · 빈 reason/evidence 는 읽는 순간 실패한다. PlaceOverrideYamlAdapterTest 가 이 파일을 CI 에서 읽는다.
+# YAML 앵커(&) · 별칭(*)은 쓰지 않는다 — 같은 문구도 항목마다 그대로 적는다(별칭은 내용이 아니라 앵커 이름으로 읽혀 막아 두었다).
+
+overrides:
+  - placeId: 126455
+    expectedTitle: "한림공원"
+    indoor: false
+    outdoor: true
+    reason: >-
+      원천(문화정보원)은 실내 · 실외 모두 Y 지만 화면은 실내 하나로만 말해 '실내' 로 보였다.
+      대부분 야외 정원이라 날씨 판정 · 표시 모두 야외가 맞다.
+    evidence:
+      - "문화정보원 CSV 20250324 — 한림공원 장소(실내) 여부 Y · 장소(실외)여부 Y, 반려동물 제한사항 '목줄, 배변봉투'"
+      - "사용성 테스트 2026-10-13 (#1434) — 장소 상세에 '실내' 로 표시"
+
+  # 다이소 — 원천끼리 어긋난다. 같은 주소의 문화정보원 행이 있는 6곳
+  - placeId: 2907285
+    expectedTitle: "다이소 제주연동점"
+    petAllowanceType: UNKNOWN
+    reason: >-
+      원천끼리 어긋난다. 관광정보 API(반려동물 동반여행)는 '전구역 동반가능' 인데 문화정보원 '반려동물용품' 행은
+      '반려동물 동반 가능정보 N' 이다. 현장 확인 전까지 동반 가능으로 단정하지 않는다.
+    evidence:
+      - "관광정보 API 반려동물 동반여행 detailPetTour2 — acmpyTypeCd '전구역 동반가능' (운영 확인 2026-10-13)"
+      - "문화정보원 CSV 20250324 반려동물용품 — 같은 주소(신대로 105)의 다이소, 반려동물 동반 가능정보 N"
+
+  - placeId: 4026812
+    expectedTitle: "다이소 서귀포중문점"
+    petAllowanceType: UNKNOWN
+    reason: >-
+      원천끼리 어긋난다. 관광정보 API(반려동물 동반여행)는 '전구역 동반가능' 인데 문화정보원 '반려동물용품' 행은
+      '반려동물 동반 가능정보 N' 이다. 현장 확인 전까지 동반 가능으로 단정하지 않는다.
+    evidence:
+      - "관광정보 API 반려동물 동반여행 detailPetTour2 — acmpyTypeCd '전구역 동반가능' (운영 확인 2026-10-13)"
+      - "문화정보원 CSV 20250324 반려동물용품 — 같은 주소(일주서로 996)의 다이소, 반려동물 동반 가능정보 N"
+
+  - placeId: 4026821
+    expectedTitle: "다이소 제주노형점"
+    petAllowanceType: UNKNOWN
+    reason: >-
+      원천끼리 어긋난다. 관광정보 API(반려동물 동반여행)는 '전구역 동반가능' 인데 문화정보원 '반려동물용품' 행은
+      '반려동물 동반 가능정보 N' 이다. 현장 확인 전까지 동반 가능으로 단정하지 않는다.
+    evidence:
+      - "관광정보 API 반려동물 동반여행 detailPetTour2 — acmpyTypeCd '전구역 동반가능' (운영 확인 2026-10-13)"
+      - "문화정보원 CSV 20250324 반려동물용품 — 같은 주소(1100로 3325)의 다이소, 반려동물 동반 가능정보 N"
+
+  - placeId: 4026823
+    expectedTitle: "다이소 제주동문시장점"
+    petAllowanceType: UNKNOWN
+    reason: >-
+      원천끼리 어긋난다. 관광정보 API(반려동물 동반여행)는 '전구역 동반가능' 인데 문화정보원 '반려동물용품' 행은
+      '반려동물 동반 가능정보 N' 이다. 현장 확인 전까지 동반 가능으로 단정하지 않는다.
+    evidence:
+      - "관광정보 API 반려동물 동반여행 detailPetTour2 — acmpyTypeCd '전구역 동반가능' (운영 확인 2026-10-13)"
+      - "문화정보원 CSV 20250324 반려동물용품 — 같은 주소(관덕로 68)의 다이소, 반려동물 동반 가능정보 N"
+
+  - placeId: 4026862
+    expectedTitle: "다이소 제주시청점"
+    petAllowanceType: UNKNOWN
+    reason: >-
+      원천끼리 어긋난다. 관광정보 API(반려동물 동반여행)는 '전구역 동반가능' 인데 문화정보원 '반려동물용품' 행은
+      '반려동물 동반 가능정보 N' 이다. 현장 확인 전까지 동반 가능으로 단정하지 않는다.
+    evidence:
+      - "관광정보 API 반려동물 동반여행 detailPetTour2 — acmpyTypeCd '전구역 동반가능' (운영 확인 2026-10-13)"
+      - "문화정보원 CSV 20250324 반려동물용품 — 같은 주소(중앙로 213)의 다이소, 반려동물 동반 가능정보 N"
+
+  - placeId: 4026870
+    expectedTitle: "다이소 제주애월점"
+    petAllowanceType: UNKNOWN
+    reason: >-
+      원천끼리 어긋난다. 관광정보 API(반려동물 동반여행)는 '전구역 동반가능' 인데 문화정보원 '반려동물용품' 행은
+      '반려동물 동반 가능정보 N' 이다. 현장 확인 전까지 동반 가능으로 단정하지 않는다.
+    evidence:
+      - "관광정보 API 반려동물 동반여행 detailPetTour2 — acmpyTypeCd '전구역 동반가능' (운영 확인 2026-10-13)"
+      - "문화정보원 CSV 20250324 반려동물용품 — 같은 주소(애원로 38)의 다이소, 반려동물 동반 가능정보 N"
+
+  # 다이소 — 문화정보원에 같은 매장은 없다. 체인 단위 근거: 제주 다이소 24곳이 전부 동반 N 인 체인이다
+  - placeId: 4026810
+    expectedTitle: "다이소 서귀포혁신도시점"
+    petAllowanceType: UNKNOWN
+    reason: >-
+      원천끼리 어긋난다. 관광정보 API(반려동물 동반여행)는 '전구역 동반가능' 인데 문화정보원에서 제주 다이소는
+      전부 '반려동물 동반 가능정보 N' 이다. 현장 확인 전까지 동반 가능으로 단정하지 않는다.
+    evidence:
+      - "관광정보 API 반려동물 동반여행 detailPetTour2 — acmpyTypeCd '전구역 동반가능' (운영 확인 2026-10-13)"
+      - "체인 단위 근거 — 문화정보원 CSV 20250324 에 이 매장은 없고, 제주 다이소 24곳이 전부 반려동물 동반 가능정보 N"
+
+  - placeId: 4026871
+    expectedTitle: "다이소 제주연동본점"
+    petAllowanceType: UNKNOWN
+    reason: >-
+      원천끼리 어긋난다. 관광정보 API(반려동물 동반여행)는 '전구역 동반가능' 인데 문화정보원에서 제주 다이소는
+      전부 '반려동물 동반 가능정보 N' 이다. 현장 확인 전까지 동반 가능으로 단정하지 않는다.
+    evidence:
+      - "관광정보 API 반려동물 동반여행 detailPetTour2 — acmpyTypeCd '전구역 동반가능' (운영 확인 2026-10-13)"
+      - "체인 단위 근거 — 문화정보원 CSV 20250324 에 이 매장은 없고, 제주 다이소 24곳이 전부 반려동물 동반 가능정보 N"
+
+  - placeId: 4026872
+    expectedTitle: "다이소 제주함덕점"
+    petAllowanceType: UNKNOWN
+    reason: >-
+      원천끼리 어긋난다. 관광정보 API(반려동물 동반여행)는 '전구역 동반가능' 인데 문화정보원에서 제주 다이소는
+      전부 '반려동물 동반 가능정보 N' 이다. 현장 확인 전까지 동반 가능으로 단정하지 않는다.
+    evidence:
+      - "관광정보 API 반려동물 동반여행 detailPetTour2 — acmpyTypeCd '전구역 동반가능' (운영 확인 2026-10-13)"
+      - "체인 단위 근거 — 문화정보원 CSV 20250324 에 이 매장은 없고, 제주 다이소 24곳이 전부 반려동물 동반 가능정보 N"

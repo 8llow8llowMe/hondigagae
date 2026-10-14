@@ -58,6 +58,28 @@ class JdbcPlaceBulkAdapterSqlTest {
     }
 
     /**
+     * 식약처 카페 분류(#1434)는 다음 적재에서 반영되어야 한다. 식약처 적재는 스냅샷 비교 없이 매주 전량을 upsert 하므로,
+     * UPDATE 절이 {@code source_category} 를 덮어야 이미 '휴게음식점' 으로 들어간 행이 '카페' 로 바뀐다.
+     */
+    @Test
+    @DisplayName("식약처 재적재는 source_category 를 갱신한다 — 카페 이름 규칙이 기존 행에도 반영된다")
+    void mfdsUpsertRefreshesSourceCategory() {
+        assertThat(insertColumnsOf("MFDS_UPSERT_SQL")).contains("source_category");
+        assertThat(updateClauseOf("MFDS_UPSERT_SQL")).contains("source_category = VALUES(source_category)");
+    }
+
+    /**
+     * 문화정보원 실내외 규칙(#1434)도 재적재로 반영되어야 한다 — 동반 불가 행의 예전 {@code false} 를 NULL 로 덮는다.
+     */
+    @Test
+    @DisplayName("문화정보원 재적재는 indoor · outdoor 를 원천 값으로 덮는다 — 모름(NULL)도 덮는다")
+    void cultureUpsertRefreshesIndoorAndOutdoor() {
+        String updateClause = updateClauseOf("CULTURE_UPSERT_SQL");
+
+        assertThat(updateClause).contains("indoor = VALUES(indoor)").contains("outdoor = VALUES(outdoor)");
+    }
+
+    /**
      * 컬럼 목록과 VALUES 항목 수가 어긋나면 런타임에야 터진다. 컬럼을 빼면서 리터럴을 안 빼는 것이
      * 정확히 이 실수라, #753 수정과 같은 변경을 할 때 여기서 걸리게 둔다.
      */

@@ -23,8 +23,10 @@ import lombok.With;
 public record ImportedPetRestaurant(
     String sourceKey,
     String name,
-    // 일반음식점 / 휴게음식점 / 제과점영업. contentTypeId 로 뭉개기 전 원본 분류를 보존한다.
+    // 일반음식점 / 휴게음식점 / 제과점영업 — 업종 원문. 이 적재 레코드에만 있고 DB 에는 sourceCategory 만 들어간다 (#1434)
     String businessType,
+    // place.source_category 로 싣는 값. 휴게음식점 중 이름이 카페인 곳은 '카페', 그 밖은 업종 그대로다 (#1434, CafeNamePolicy)
+    String sourceCategory,
     String address,
     String areaCode,
     String sigunguCode,

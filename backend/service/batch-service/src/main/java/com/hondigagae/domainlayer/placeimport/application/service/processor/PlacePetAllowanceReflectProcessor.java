@@ -1,11 +1,13 @@
 package com.hondigagae.domainlayer.placeimport.application.service.processor;
 
 import com.hondigagae.domainlayer.placeimport.application.model.PetAllowanceReflectOutcome;
+import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceOverrideCatalogPort;
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlacePetAllowanceCommandPort;
 import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlacePetAllowanceEvidenceQueryResult;
 import com.hondigagae.domainlayer.placeimport.domain.model.PetAllowancePolicy;
 import com.hondigagae.domainlayer.placeimport.domain.model.PlaceIdentityPolicy;
 import com.hondigagae.domainlayer.placeimport.domain.model.PlaceNameMatcher;
+import com.hondigagae.domainlayer.placeimport.domain.model.PlaceOverride;
 import com.hondigagae.domainlayer.placeimport.domain.model.ReflectedPetAllowance;
 import com.hondigagae.shared.travel.place.AllowedPetSize;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
@@ -14,6 +16,8 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -42,6 +46,14 @@ import org.springframework.stereotype.Component;
  * 받지 않아 실제 SQL 을 테스트로 돌려 볼 수 없고, H2 가 받는 상관 하위 질의 UPDATE 는 흡수 행을 같은 {@code place} 에서
  * 읽어야 해 MySQL 이 ER_UPDATE_TABLE_USED(1093)로 거부한다. 대상이 2,100곳 남짓이라 읽고 나서 바뀐 행만 배치 갱신하는
  * 편이 두 DB 에서 같은 SQL 로 돈다. 규칙이 Java 에 있어 단위 테스트로 고정되는 것은 덤이다.
+ *
+ * <p><b>보정이 이긴다</b> (#1434). 보정 파일({@code place-overrides.yml})에 동반 구분이 적힌 행은 읽은 근거에서 걸러 낸다 —
+ * 세 칸({@code pet_allowance_type} · {@code allowed_pet_size} · {@code pet_available})을 쓰지 않고, 본 시설 후보도 되지 않는다. 판정은 보정
+ * 스텝과 같은 {@link PlaceOverride#appliesTo}(id · 정확한 제목)다. SQL 에서 빼지 않는 이유는 MySQL 콜레이션(대소문자 · 뒤 공백 무시)과
+ * {@link String#equals} 가 갈라져, 보정 스텝은 건너뛰는데 재계산은 빼는 행(둘 다 받지 못하고 굳는 행)이 생기기 때문이다.
+ * 예전처럼 재계산이 원천 근거로 되돌리고 {@code placeOverrideStep} 이 다시 덮으면 두 스텝의 {@code changed} 가 매 실행 부풀고, 두 스텝 사이(별도
+ * 트랜잭션)에 원천 값이 보인다. 보정 파일이 깨졌으면 보정 스텝과 같은 {@code PLACE_IMPORT_024} 로 실패한다 — 깨진 파일로 재계산이 보정된
+ * 행을 원천 값으로 되돌리는 것보다 낫다.
  */
 @Slf4j
 @Component
@@ -49,9 +61,25 @@ import org.springframework.stereotype.Component;
 public class PlacePetAllowanceReflectProcessor {
 
     private final PlacePetAllowanceCommandPort placePetAllowanceCommandPort;
+    private final PlaceOverrideCatalogPort placeOverrideCatalogPort;
 
     public PetAllowanceReflectOutcome reflectPetAllowances() {
-        List<PlacePetAllowanceEvidenceQueryResult> evidences = placePetAllowanceCommandPort.findTourApiEvidences();
+        // 보정이 이긴다 (#1434). 파일을 먼저 읽는다 — 깨졌으면 근거를 읽기 전에 PLACE_IMPORT_024 로 멈춘다
+        Map<Long, PlaceOverride> petAllowanceOverrides = placeOverrideCatalogPort.readOverrides().stream()
+            .filter(PlaceOverride::overridesPetAllowance)
+            .collect(Collectors.toMap(PlaceOverride::placeId, Function.identity(), (first, second) -> first));
+
+        // 동반 구분을 보정한 행을 걸러 낸다 — 판정은 보정 스텝과 같은 PlaceOverride.appliesTo(id · 정확한 제목). 걸러 낸 행은 쓰지 않고 본 시설 후보도 아니다
+        List<PlacePetAllowanceEvidenceQueryResult> evidences = new ArrayList<>();
+        int overridden = 0;
+        for (PlacePetAllowanceEvidenceQueryResult evidence : placePetAllowanceCommandPort.findTourApiEvidences()) {
+            PlaceOverride override = petAllowanceOverrides.get(evidence.placeId());
+            if (override != null && override.appliesTo(evidence.placeId(), evidence.title())) {
+                overridden++;
+                continue;
+            }
+            evidences.add(evidence);
+        }
 
         // 1단계 — 자기 근거만으로
         List<ReflectedPetAllowance> ownResults = evidences.stream().map(PlacePetAllowanceReflectProcessor::reflect).toList();
@@ -80,9 +108,10 @@ public class PlacePetAllowanceReflectProcessor {
         int changed = changes.isEmpty() ? 0 : placePetAllowanceCommandPort.updatePetAllowances(changes);
         PetAllowanceReflectOutcome outcome = new PetAllowanceReflectOutcome(evidences.size(), changed, distribution, sizeRestricted, inherited);
         log.info("pet allowance reflected. targets={}, changed={}, ALLOWED={}, PARTIALLY_ALLOWED={}, NOT_ALLOWED={}, UNKNOWN={}, sizeRestricted={}, "
-                + "inherited={}",
+                + "inherited={}, overridden={}",
             outcome.targets(), outcome.changed(), outcome.countOf(PetAllowanceType.ALLOWED), outcome.countOf(PetAllowanceType.PARTIALLY_ALLOWED),
-            outcome.countOf(PetAllowanceType.NOT_ALLOWED), outcome.countOf(PetAllowanceType.UNKNOWN), outcome.sizeRestricted(), outcome.inherited());
+            outcome.countOf(PetAllowanceType.NOT_ALLOWED), outcome.countOf(PetAllowanceType.UNKNOWN), outcome.sizeRestricted(), outcome.inherited(),
+            overridden);
         return outcome;
     }
 

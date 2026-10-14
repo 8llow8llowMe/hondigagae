@@ -26,7 +26,8 @@ import org.springframework.transaction.PlatformTransactionManager;
  * 재실행은 멱등이다(이미 병합된 행은 후보에서 빠진다).
  *
  * <p>병합 뒤에 {@code placePetAllowanceReflectStep}(#886)이 이어 돈다 — 흡수 행의 동반 가능 여부 · 크기 제한이
- * 살아남은 TourAPI 행의 근거가 되기 때문이다. 병합 자체는 그 두 컬럼을 옮기지 않는다.
+ * 살아남은 TourAPI 행의 근거가 되기 때문이다. 병합 자체는 그 두 컬럼을 옮기지 않는다. 마지막으로 {@code placeOverrideStep}(#1434)이
+ * 근거를 적은 장소 보정을 얹는다 — 재계산은 동반 구분을 보정한 행을 대상에서 빼므로 둘이 서로 되돌리지 않는다.
  * <pre>
  * java -jar batch.jar --spring.batch.job.enabled=true --spring.batch.job.name=placeMergeJob areaCode=39 runAt=&lt;ISO 시각&gt;
  * </pre>
@@ -43,11 +44,14 @@ public class PlaceMergeJobConfig {
     private static final String STEP_NAME = "placeMergeStep";
 
     @Bean
-    public Job placeMergeJob(JobRepository jobRepository, Step placeMergeStep, Step placePetAllowanceReflectStep) {
+    public Job placeMergeJob(JobRepository jobRepository, Step placeMergeStep, Step placePetAllowanceReflectStep, Step placeOverrideStep) {
         return new JobBuilder(JOB_NAME, jobRepository)
             .start(placeMergeStep)
             // 흡수 관계가 바뀐 직후 place 의 동반 가능 여부 · 크기 제한을 다시 계산한다 (#886, PlacePetAllowanceReflectStepConfig)
             .next(placePetAllowanceReflectStep)
+            // 보정을 얹는다 (#1434, PlaceOverrideStepConfig). 재계산은 동반 구분을 보정한 행을 건드리지 않으므로, 여기서 쓰이는 것은 처음 적용 ·
+            // 다른 경로로 바뀐 칸뿐이다
+            .next(placeOverrideStep)
             .build();
     }
 

@@ -15,7 +15,8 @@ import org.springframework.transaction.PlatformTransactionManager;
  * 반려동물 동반 조건 적재 잡 (#877). place_pet_info 를 채운다.
  *
  * <p>적재 뒤에 {@code placePetAllowanceReflectStep}(#886)이 이어 돌아 TourAPI place 행의 {@code pet_allowance_type} ·
- * {@code allowed_pet_size} 를 다시 계산한다. 적재 스텝이 실패하면 재계산은 돌지 않고 지난 값이 남는다.
+ * {@code allowed_pet_size} 를 다시 계산한다. 적재 스텝이 실패하면 재계산은 돌지 않고 지난 값이 남는다. 마지막으로
+ * {@code placeOverrideStep}(#1434)이 근거를 적은 장소 보정을 얹는다 — 재계산은 동반 구분을 보정한 행을 대상에서 빼므로 둘이 서로 되돌리지 않는다.
  *
  * <p>실행 방법:
  * <pre>
@@ -41,11 +42,14 @@ public class PetTourImportJobConfig {
     private static final String STEP_NAME = "petTourImportStep";
 
     @Bean
-    public Job petTourImportJob(JobRepository jobRepository, Step petTourImportStep, Step placePetAllowanceReflectStep) {
+    public Job petTourImportJob(JobRepository jobRepository, Step petTourImportStep, Step placePetAllowanceReflectStep, Step placeOverrideStep) {
         return new JobBuilder(JOB_NAME, jobRepository)
             .start(petTourImportStep)
             // place_pet_info 가 바뀐 직후 place 의 동반 가능 여부 · 크기 제한을 다시 계산한다 (#886, PlacePetAllowanceReflectStepConfig)
             .next(placePetAllowanceReflectStep)
+            // 보정을 얹는다 (#1434, PlaceOverrideStepConfig). 재계산은 동반 구분을 보정한 행을 건드리지 않으므로, 여기서 쓰이는 것은 처음 적용 ·
+            // 다른 경로로 바뀐 칸뿐이다
+            .next(placeOverrideStep)
             .build();
     }
 

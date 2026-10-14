@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.placeimport.adapter.out.file;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedCultureFacility;
 import java.io.IOException;
@@ -97,5 +98,27 @@ class CultureFacilityCsvAdapterTest {
             new CultureFacilityCsvAdapter().readTravelFacilities(csv, "제주특별자치도");
 
         assertThat(facilities).extracting(ImportedCultureFacility::overview).containsExactly(null, "악천후 시 휴장");
+    }
+
+    @Test
+    @DisplayName("실내 · 실외 칸은 반려견이 머물 구역이다 — 동반 불가 행은 실내외를 모름(null)으로 싣는다 (#1434)")
+    void loadsStayAreaOnlyForPetAllowedRows() throws IOException {
+        Path csv = tempDir.resolve("pet_culture.csv");
+        Files.writeString(csv, String.join("\n",
+            "시설명,카테고리3,시도 명칭,위도,경도,반려동물 동반 가능정보,도로명주소,장소(실내) 여부,장소(실외)여부,반려동물 제한사항",
+            "제주도립미술관,미술관,제주특별자치도,33.45,126.48,N,제주시 1100로 2894-78,N,N,",
+            "제주항일기념관,박물관,제주특별자치도,33.54,126.66,Y,제주시 조천읍 신북로 303,N,Y,야외만 반려동물 동반 가능",
+            "한림공원,여행지,제주특별자치도,33.39,126.24,Y,제주시 한림읍 한림로 300,Y,Y,\"목줄, 배변봉투\"") + "\n");
+
+        List<ImportedCultureFacility> facilities =
+            new CultureFacilityCsvAdapter().readTravelFacilities(csv, "제주특별자치도");
+
+        assertThat(facilities).extracting(ImportedCultureFacility::title, ImportedCultureFacility::indoor, ImportedCultureFacility::outdoor)
+            .containsExactly(
+                // 실내 미술관이 '야외' 로 보이던 것 — 동반 N 이면 칸 값은 시설 형태를 말하지 않는다
+                tuple("제주도립미술관", null, null),
+                tuple("제주항일기념관", false, true),
+                tuple("한림공원", true, true));
+        assertThat(facilities.get(0).petAllowanceType()).isEqualTo("NOT_ALLOWED");
     }
 }
