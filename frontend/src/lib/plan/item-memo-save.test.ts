@@ -95,11 +95,12 @@ describe('runItemMemoSave', () => {
     const result = await runItemMemoSave(INPUT, deps)
 
     expect(calls).toEqual(['replace', 'replaced', 'visit:new-a', 'refetch'])
-    expect(result).toMatchObject({
+    expect(result).toEqual({
       kind: 'saved',
       toast: messages.plan.itemMemoSavedToast.replace('{title}', '시장'),
       restored: ['new-a'],
       restoreFailed: false,
+      refetched: expect.any(Promise),
     })
   })
 
