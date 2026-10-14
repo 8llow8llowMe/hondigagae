@@ -1,15 +1,28 @@
 package com.hondigagae.domainlayer.placeimport.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.verify;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlace;
 import java.lang.reflect.Field;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.invocation.Invocation;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 적재 SQL 의 <b>컬럼 규칙</b> 검증. 실행에는 실제 MySQL 이 필요해 여기서 못 하지만, "어느 컬럼을
@@ -69,6 +82,47 @@ class JdbcPlaceBulkAdapterSqlTest {
     }
 
     /**
+     * 관광정보 카페 분류(#1473)는 INSERT 로 싣고, 재적재는 <b>카페라고 할 때만</b> 덮는다. 그냥 {@code VALUES(source_category)} 면
+     * 카페가 아닌 행(null)에서 병합이 문화정보원에서 옮긴 분류가 다음 {@code placeImportJob} 마다 지워진다 — #763 의 {@code tel} 과 같은 모양이다.
+     * 실행에는 MySQL 이 필요해 여기서는 SQL 텍스트로 고정하고, 실제로 그 자리에 값이 묶이는지는 아래 바인딩 테스트가 본다.
+     */
+    @Test
+    @DisplayName("관광 API 적재는 source_category 를 싣되 재적재는 준 값이 있을 때만 덮는다 — 카페는 덮고, null 이면 병합이 옮긴 값을 둔다")
+    void tourApiUpsertCarriesSourceCategoryWithoutWipingMergedValue() {
+        assertThat(insertColumnsOf("UPSERT_SQL")).contains("source_category");
+        assertThat(literalAt("UPSERT_SQL", "source_category")).isEqualTo("?");
+        assertThat(updateClauseOf("UPSERT_SQL"))
+            .contains("source_category = COALESCE(VALUES(source_category), source_category)")
+            .doesNotContain("source_category = VALUES(source_category)");
+    }
+
+    /**
+     * 파라미터를 하나 끼워 넣으면 뒤의 바인딩이 전부 한 칸씩 밀린다. 개수가 모자라면 런타임에 터지지만, <b>엉뚱한 자리에 끼우면 MySQL 이 그대로
+     * 받아</b> content_id 가 분류 칸에 들어가는 식으로 조용히 틀린다. 그래서 SQL 텍스트에서 자리 번호를 세어 바인딩과 맞춘다.
+     */
+    @Test
+    @DisplayName("관광 API 적재는 source_category 자리에 원천 분류를 묶고, 모든 자리를 한 번씩 채운다")
+    void tourApiUpsertBindsSourceCategoryOnItsOwnPlaceholder() throws SQLException {
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        new JdbcPlaceBulkAdapter(jdbcTemplate, new ObjectMapper()).upsertAll(List.of(
+            ImportedPlace.builder().contentId(2900001L).contentTypeId("39").title("델문도").lclsSystm2("FD05").build(),
+            ImportedPlace.builder().contentId(2900003L).contentTypeId("39").title("어느 한식당").lclsSystm2("FD01").cat3("A05020100").build()));
+
+        ArgumentCaptor<BatchPreparedStatementSetter> setter = ArgumentCaptor.forClass(BatchPreparedStatementSetter.class);
+        verify(jdbcTemplate).batchUpdate(eq(sqlOf("UPSERT_SQL")), setter.capture());
+        int sourceCategoryIndex = parameterIndexOf("UPSERT_SQL", "source_category");
+
+        PreparedStatement cafe = mock(PreparedStatement.class);
+        setter.getValue().setValues(cafe, 0);
+        verify(cafe).setString(sourceCategoryIndex, "카페");
+        assertThat(boundIndexes(cafe)).as("모든 ? 를 한 번씩 채운다").isEqualTo(oneTo(placeholderCount("UPSERT_SQL")));
+
+        PreparedStatement korean = mock(PreparedStatement.class);
+        setter.getValue().setValues(korean, 1);
+        verify(korean).setString(sourceCategoryIndex, null);
+    }
+
+    /**
      * 문화정보원 실내외 규칙(#1434)도 재적재로 반영되어야 한다 — 동반 불가 행의 예전 {@code false} 를 NULL 로 덮는다.
      */
     @Test
@@ -118,6 +172,30 @@ class JdbcPlaceBulkAdapterSqlTest {
         int index = columns.indexOf(column);
         assertThat(index).as("%s 에 %s 컬럼이 있어야 한다", fieldName, column).isNotNegative();
         return insertValuesOf(fieldName).get(index);
+    }
+
+    /** 컬럼이 묶이는 JDBC 파라미터 번호(1부터). 리터럴 자리는 세지 않는다. */
+    private static int parameterIndexOf(String fieldName, String column) {
+        int index = insertColumnsOf(fieldName).indexOf(column);
+        assertThat(index).as("%s 에 %s 컬럼이 있어야 한다", fieldName, column).isNotNegative();
+        return (int) insertValuesOf(fieldName).subList(0, index + 1).stream().filter("?"::equals).count();
+    }
+
+    private static int placeholderCount(String fieldName) {
+        return (int) insertValuesOf(fieldName).stream().filter("?"::equals).count();
+    }
+
+    /** {@code setString} · {@code setLong} · {@code setNull} 등 어떤 setter 든 첫 인자가 파라미터 번호다. 같은 번호를 두 번 채우면 목록에 두 번 남는다. */
+    private static List<Integer> boundIndexes(PreparedStatement ps) {
+        return mockingDetails(ps).getInvocations().stream()
+            .map(Invocation::getArguments)
+            .map(arguments -> (Integer) arguments[0])
+            .sorted()
+            .toList();
+    }
+
+    private static List<Integer> oneTo(int count) {
+        return IntStream.rangeClosed(1, count).boxed().toList();
     }
 
     /**

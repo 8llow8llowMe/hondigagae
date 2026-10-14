@@ -88,12 +88,22 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
      * <p><b>같은 INSERT 안에 정반대 규칙이 하나 있다</b> — {@code area_code} 는 원천이 비워 보내도
      * 우리가 채워 넣는다. 그쪽은 사실 데이터가 아니라 <b>적재 범위 키</b>라서 NULL 이면 delist·병합·
      * 공개 조회가 동시에 눈이 먼다. "사실은 모르면 비우고, 범위 키는 모르면 채운다" 가 두 규칙의 경계다.
+     *
+     * <p><b>{@code source_category} 는 관광정보가 카페라고 할 때만 싣는다</b> (#1473). 신분류 {@code lclsSystm2 = FD05} 이거나, 신분류가 없을 때
+     * 구분류 {@code cat3 = A05020900} 이면 '카페', 그 밖은 null 이다(규칙 {@code TourApiCafeClassPolicy}). 이 칸은 범위 키가 아니라 <b>사실</b>이라
+     * 위 경계의 "모르면 비운다" 쪽이다 — 다만 관광정보가 카페라고 하지 않는 것은 "모른다" 이지 "카페가 아니다" 가 아니므로, null 로 <b>지우지도
+     * 않는다.</b> 그래서 {@code tel} 과 같은 {@code COALESCE(VALUES(source_category), source_category)} 다. 그냥 {@code VALUES(...)} 면 병합이
+     * 문화정보원 행에서 옮겨 온 분류('카페' 등, {@code MERGE_FIELDS_SQL})가 다음 적재마다 사라진다.
+     *
+     * <p>대가도 {@code tel} 과 같다 — <b>관광정보가 카페에서 다른 업종으로 바꾼 행은 '카페' 가 남는다.</b> 병합이 옮긴 '카페' 와 구분할 수
+     * 없어서다. 관광정보 업종 변경은 드물고, 병합 값을 매주 지우는 쪽이 더 큰 손실이라고 봤다 ({@code place-data-integration.md} §6-7).
      */
     private static final String UPSERT_SQL = """
         INSERT INTO place (
             id,
             source,
             source_key,
+            source_category,
             content_id,
             content_type_id,
             title,
@@ -126,9 +136,10 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             synced_at,
             created_at,
             updated_at
-        ) VALUES (?, 'TOUR_API', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ) VALUES (?, 'TOUR_API', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                   false, 'UNKNOWN', false, 'UNKNOWN', ?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE
+            source_category = COALESCE(VALUES(source_category), source_category),
             content_id = VALUES(content_id),
             content_type_id = VALUES(content_type_id),
             title = VALUES(title),
@@ -315,6 +326,8 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
                     int index = 1;
                     ps.setLong(index++, place.contentId());
                     ps.setString(index++, String.valueOf(place.contentId()));
+                    // 카페가 아니면 null — UPDATE 절의 COALESCE 가 병합이 옮긴 값을 지우지 않게 둔다 (#1473)
+                    ps.setString(index++, place.sourceCategory());
                     ps.setLong(index++, place.contentId());
                     ps.setString(index++, place.contentTypeId());
                     ps.setString(index++, place.title());
