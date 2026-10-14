@@ -569,6 +569,9 @@ Swagger 설명에 "나란히 보여 달라"를 못박아 뒀다. 문구도 "노�
   (#1434) — 특보 날 홈 방문마다 후보 전부를 다시 계산하지 않게 한다.
 - Redis 장애 · 역직렬화 실패는 캐시 미스다. 캐시 값은 `Info` 가 아니라 `CachedPlaceRecommendationQueryResult` 다
   (포트 밖으로 `Info` 를 내지 않는다, architecture-guide §4).
+- **캐시 값에 칸을 더할 때는 키를 바꾸지 않는다.** 서비스 ObjectMapper 가 없는 칸을 null 로 읽어, 옛 항목은 새 칸만 빈 채
+  최대 TTL 동안 나간다(실내 대안 `contentTypeId` · `sourceCategory`, #1461). 옛 항목의 null 이 **틀린 답**이 되는 칸(판정 ·
+  점수에 쓰는 칸)이거나 칸의 타입을 바꾸면 키 형식을 바꾼다 — 타입이 바뀌면 옛 항목은 읽기 실패(캐시 미스)다.
 
 혼잡도는 같은 장소 · 같은 날짜에 링크가 여럿이면 예측 아이디가 작은 것을 쓴다 — 단건(`findLinkedByPlaceIdAndDateRange`)과
 여러 장소 조회가 같은 정렬(`baseYmd`, `id`)이라 추천과 상세가 같은 혼잡도를 고른다.
