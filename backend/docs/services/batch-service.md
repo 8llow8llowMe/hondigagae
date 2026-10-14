@@ -130,6 +130,9 @@
   (`CafeNamePolicy.CAFE_CATEGORY`)으로 같은 값을 싣는다. 쓰는 곳은 ai-service `RequestNoteConstraints` 의 카페 판정, tour-service 장소 검색의
   `sourceCategory` 필터, FE `CAFE_SOURCE_CATEGORY` 다. 셋 다 문자열로 맞추므로 철자를 바꾸면 컴파일도 테스트도 통과한 채 **AI 카페 요청이 조용히
   0건이 된다.** 바꿔야 하면 세 곳을 함께 바꾼다.
+  관광 API 행도 분류 코드가 카페(신분류 `lcls_systm2 = FD05`, 신분류가 없을 때만 구분류 `cat3 = A05020900`)면 같은 상수를 싣는다
+  (`TourApiCafeClassPolicy`, #1473). 재적재는
+  `COALESCE` 라 카페일 때만 덮고 병합이 옮긴 값을 지우지 않는다 — `place-data-integration.md` §6-7.
 - **개별 장소는 손 UPDATE 가 아니라 보정 파일로 고친다** (#1434). 재계산 스텝과 원천 적재가 칸을 매 실행 다시 써서 손으로 고친 값은 살아남지
   못한다. 아래 "장소 보정" 절.
 
