@@ -19,7 +19,9 @@ import lombok.Builder;
  * 읽는다.
  *
  * <p>{@code saferWindowStart/End} 는 조언의 실체다. 같은 날 더 나은 시간대를 함께 주지 않으면
- * 사용자가 할 수 있는 일이 없다.
+ * 사용자가 할 수 있는 일이 없다. 기준 시각 이후 안전·주의가 이어지는 가장 이른 창을 잡고,
+ * <b>그 창 안에서 안전 칸만 이어지는 가장 긴 구간</b>(같으면 이른 것)을 낸다. 창 안에 안전 칸이
+ * 없으면 창 그대로다 — 골든타임 헤드라인(FE #1428)과 같은 규칙이다 (#1479).
  */
 @Builder
 @Schema(description = "장소 산책 위험도 응답 DTO")
@@ -61,10 +63,18 @@ public record WalkSafetyResponse(
     @Schema(description = "열지수를 어떻게 계산했는지", example = "미국 NOAA 열지수(Rothfusz 회귀식)...")
     String heatIndexBasis,
 
-    @Schema(description = "같은 날 더 안전한 시간대 시작. 없으면 null", example = "18:00:00")
+    @Schema(
+        description = "같은 날 더 안전한 시간대 시작. 기준 시각 이후 안전·주의가 이어지는 가장 이른 창 안에서 "
+            + "안전 시각만 이어지는 가장 긴 구간(길이가 같으면 이른 것)의 첫 시각이고, 창 안에 안전 시각이 없으면 창의 첫 시각이다. "
+            + "예보가 없어 판단할 수 없거나, 지금이 안전이거나, 기상특보 경보가 발효 중이거나, "
+            + "그날 남은 시각에 안전·주의 시각이 없으면 null",
+        example = "18:00:00")
     LocalTime saferWindowStart,
 
-    @Schema(description = "같은 날 더 안전한 시간대 종료. 없으면 null", example = "21:00:00")
+    @Schema(
+        description = "같은 날 더 안전한 시간대 종료. 그 구간 마지막 시각 그대로다(+1시간 하지 않는다). "
+            + "한 시각짜리 구간이면 saferWindowStart 와 같다. 없으면 null",
+        example = "21:00:00")
     LocalTime saferWindowEnd,
 
     @Schema(description = "판정에 쓴 기온(섭씨)", example = "31.0")

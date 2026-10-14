@@ -11,6 +11,7 @@ import com.hondigagae.domainlayer.insight.domain.enums.WeatherWarningType;
 import com.hondigagae.shared.travel.insight.WalkSafetyLevel;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -209,6 +210,109 @@ class WalkSafetyEvaluatorTest {
             assertThat(assessment.level()).isEqualTo(WalkSafetyLevel.SAFE);
             assertThat(assessment.hasSaferWindow()).isFalse();
         }
+
+        /** 아래 테스트들이 칸 등급을 패턴 문자로 적는다. 픽스처가 패턴대로 판정되지 않으면 그 테스트들은 아무것도 지키지 않는다. */
+        @Test
+        @DisplayName("픽스처 하루는 적은 등급 그대로 판정된다 - 한낮 칸도 일사에 흔들리지 않는다")
+        void dayFixtureJudgesEachCellAsWritten() {
+            List<HourlyWalkSafety> curve = WalkSafetyEvaluator.hourlyCurve(
+                dayOf(9, "SCD SCD SCD SCD SCD"), PetCondition.unspecified(), thresholds(), DATE.atTime(9, 0), JEJU_LATITUDE);
+
+            assertThat(curve).extracting(HourlyWalkSafety::level).containsExactly(
+                WalkSafetyLevel.SAFE, WalkSafetyLevel.CAUTION, WalkSafetyLevel.DANGER,
+                WalkSafetyLevel.SAFE, WalkSafetyLevel.CAUTION, WalkSafetyLevel.DANGER,
+                WalkSafetyLevel.SAFE, WalkSafetyLevel.CAUTION, WalkSafetyLevel.DANGER,
+                WalkSafetyLevel.SAFE, WalkSafetyLevel.CAUTION, WalkSafetyLevel.DANGER,
+                WalkSafetyLevel.SAFE, WalkSafetyLevel.CAUTION, WalkSafetyLevel.DANGER);
+        }
+
+        /**
+         * 이슈 사례 (#1479).
+         *
+         * <p>창은 안전과 주의를 이어 붙여 찾는다. 옛 계산은 그 창(12–23시)을 그대로 내서 화면이
+         * "더 안전한 시간대 12:00 – 23:00" 이라 적었는데 첫 칸 12시는 주의였다. 창 안의 안전 구간을 낸다.
+         * 창이 하루 끝(23시)까지 안전으로 끝나는 모양이기도 하다.
+         */
+        @Test
+        @DisplayName("창이 주의 시각을 품으면 창 안의 안전 구간을 낸다 - 12–23시 창에서 13–23시 (#1479)")
+        void narrowsWindowToItsSafeRun() {
+            // 11 지금(주의) | 12 주의 · 13–23 안전
+            WalkSafetyAssessment assessment = evaluateFrom(11, dayOf(11, "C C SSSSSSSSSSS"));
+
+            assertThat(assessment.level()).isEqualTo(WalkSafetyLevel.CAUTION);
+            assertThat(assessment.saferWindowStart()).isEqualTo(LocalTime.of(13, 0));
+            assertThat(assessment.saferWindowEnd()).isEqualTo(LocalTime.of(23, 0));
+        }
+
+        @Test
+        @DisplayName("창 안에 안전 구간이 여럿이면 가장 긴 것을 낸다 - 창 밖의 더 긴 안전 구간은 보지 않는다")
+        void picksLongestSafeRunInsideWindow() {
+            // 9 지금(주의) | 창 10–18: 10 안전 · 11 주의 · 12–14 안전 · 15 주의 · 16–17 안전 · 18 주의 | 19 위험 | 20–23 안전
+            WalkSafetyAssessment assessment = evaluateFrom(9, dayOf(9, "C S C SSS C SS C D SSSS"));
+
+            assertThat(assessment.saferWindowStart()).isEqualTo(LocalTime.of(12, 0));
+            assertThat(assessment.saferWindowEnd()).isEqualTo(LocalTime.of(14, 0));
+        }
+
+        @Test
+        @DisplayName("길이가 같은 안전 구간이면 이른 것을 낸다 - 같은 조건에서 답이 흔들리면 안 된다")
+        void picksEarlierSafeRunOnTie() {
+            // 9 지금(주의) | 창 10–14: 10–11 안전 · 12 주의 · 13–14 안전 | 15 위험
+            WalkSafetyAssessment assessment = evaluateFrom(9, dayOf(9, "C SS C SS D"));
+
+            assertThat(assessment.saferWindowStart()).isEqualTo(LocalTime.of(10, 0));
+            assertThat(assessment.saferWindowEnd()).isEqualTo(LocalTime.of(11, 0));
+        }
+
+        @Test
+        @DisplayName("창 끝에 붙은 안전 구간도 후보다 - 마지막 구간이 가장 길면 그것을 낸다")
+        void picksSafeRunEndingAtWindowEnd() {
+            // 9 지금(주의) | 창 10–13: 10 안전 · 11 주의 · 12–13 안전 | 14 위험 | 15–17 안전
+            WalkSafetyAssessment assessment = evaluateFrom(9, dayOf(9, "C S C SS D SSS"));
+
+            assertThat(assessment.saferWindowStart()).isEqualTo(LocalTime.of(12, 0));
+            assertThat(assessment.saferWindowEnd()).isEqualTo(LocalTime.of(13, 0));
+        }
+
+        @Test
+        @DisplayName("안전 칸이 하나뿐이면 시작과 끝이 같다 - 끝에 한 시간을 더하지 않는다")
+        void singleSafeCellStartsAndEndsAtSameTime() {
+            // 9 지금(주의) | 창 10–12: 10 주의 · 11 안전 · 12 주의 | 13 위험
+            WalkSafetyAssessment assessment = evaluateFrom(9, dayOf(9, "C C S C D"));
+
+            assertThat(assessment.saferWindowStart()).isEqualTo(LocalTime.of(11, 0));
+            assertThat(assessment.saferWindowEnd()).isEqualTo(LocalTime.of(11, 0));
+        }
+
+        /** FE #1428 의 폴백과 같다 — 그날 "좋은" 구간은 없고, 창이 "나은" 구간이다. 안내를 지우지 않는다. */
+        @Test
+        @DisplayName("창 안에 안전 칸이 없으면 창 그대로 낸다 - 창 밖의 안전 구간으로 건너뛰지 않는다")
+        void keepsWindowWhenItHasNoSafeCell() {
+            // 9 지금(위험) | 창 10–13: 내내 주의 | 14 위험 | 15–16 안전 — 지금이 위험이라 주의뿐인 창도 "나은" 구간이다
+            WalkSafetyAssessment assessment = evaluateFrom(9, dayOf(9, "D CCCC D SS"));
+
+            assertThat(assessment.saferWindowStart()).isEqualTo(LocalTime.of(10, 0));
+            assertThat(assessment.saferWindowEnd()).isEqualTo(LocalTime.of(13, 0));
+            assertThat(codesOf(assessment)).contains(WalkSafetyReasonCode.SAFE_WINDOW);
+        }
+
+        /** 근거 문장과 saferWindow 가 다른 구간을 말하면 한 화면에 시간대가 둘 생긴다 — 장소 패널은 둘을 함께 그린다. */
+        @Test
+        @DisplayName("근거 문장은 saferWindow 와 같은 구간을 말한다")
+        void reasonNamesTheSameWindow() {
+            WalkSafetyAssessment assessment = evaluateFrom(11, dayOf(11, "C C SSSSSSSSSSS"));
+
+            assertThat(saferWindowReason(assessment)).contains("13:00~23:00").doesNotContain("12:00");
+        }
+
+        /** {@code 11:00~11:00} 은 0분짜리 구간처럼 읽혀 고장으로 보인다 (FE #200 과 같은 판단). */
+        @Test
+        @DisplayName("한 시각짜리 구간은 근거 문장에서 물결로 잇지 않는다")
+        void reasonNamesSingleCellWithoutRange() {
+            WalkSafetyAssessment assessment = evaluateFrom(9, dayOf(9, "C C S C D"));
+
+            assertThat(saferWindowReason(assessment)).contains("같은 날 11:00 는").doesNotContain("~");
+        }
     }
 
     @Nested
@@ -316,6 +420,13 @@ class WalkSafetyEvaluatorTest {
     private static WeatherForecast forecast(
         LocalDate date, double temperature, Integer humidity, SkyState sky, int hour, Double windSpeed
     ) {
+        return forecast(date, temperature, humidity, sky, hour, windSpeed, PrecipitationType.NONE);
+    }
+
+    private static WeatherForecast forecast(
+        LocalDate date, double temperature, Integer humidity, SkyState sky, int hour, Double windSpeed,
+        PrecipitationType precipitationType
+    ) {
         return WeatherForecast.builder()
             .nx(53).ny(38)
             .forecastAt(date.atTime(hour, 0))
@@ -323,11 +434,49 @@ class WalkSafetyEvaluatorTest {
             .temperature(temperature)
             .humidity(humidity)
             .skyState(sky)
-            .precipitationType(PrecipitationType.NONE)
+            .precipitationType(precipitationType)
             .precipitation(PrecipitationAmount.none())
             .precipitationProbability(10)
             .windSpeed(windSpeed)
             .build();
+    }
+
+    /**
+     * 시각마다 간이 판정 등급을 정해 둔 하루. {@code S} 안전 · {@code C} 주의 · {@code D} 위험이고 공백은 무시한다.
+     *
+     * <p>안전은 흐린 18도, 주의는 같은 조건에 비(젖은 노면), 위험은 체감온도 40도(습도가 없으면 기온 그대로)다.
+     * 등급을 일사에 맡기지 않아 한낮 칸도 패턴대로 판정된다 — {@code dayFixtureJudgesEachCellAsWritten} 가 지킨다.
+     */
+    private static List<WeatherForecast> dayOf(int fromHour, String levels) {
+        String cells = levels.replace(" ", "");
+        List<WeatherForecast> hourly = new ArrayList<>();
+        for (int index = 0; index < cells.length(); index++) {
+            int hour = fromHour + index;
+            hourly.add(switch (cells.charAt(index)) {
+                case 'S' -> forecast(DATE, 18.0d, 50, SkyState.OVERCAST, hour, 2.0d, PrecipitationType.NONE);
+                case 'C' -> forecast(DATE, 18.0d, 50, SkyState.OVERCAST, hour, 2.0d, PrecipitationType.RAIN);
+                case 'D' -> forecast(DATE, 40.0d, null, SkyState.OVERCAST, hour, 2.0d, PrecipitationType.NONE);
+                default -> throw new IllegalArgumentException("unknown level cell: " + cells.charAt(index));
+            });
+        }
+        return hourly;
+    }
+
+    /** {@code dayOf} 의 첫 시각을 지금으로 두고 판정한다. 첫 칸은 안전이 아니어야 창을 찾는다. */
+    private static WalkSafetyAssessment evaluateFrom(int hour, List<WeatherForecast> hourly) {
+        WeatherForecast now = hourly.stream()
+            .filter(forecast -> forecast.forecastAt().getHour() == hour)
+            .findFirst().orElseThrow();
+        return WalkSafetyEvaluator.evaluate(
+            now, hourly, PetCondition.unspecified(), thresholds(), DATE.atTime(hour, 0),
+            ForecastCoverage.AVAILABLE, null, JEJU_LATITUDE);
+    }
+
+    private static String saferWindowReason(WalkSafetyAssessment assessment) {
+        return assessment.reasons().stream()
+            .filter(reason -> reason.code() == WalkSafetyReasonCode.SAFE_WINDOW)
+            .map(WalkSafetyReason::description)
+            .findFirst().orElseThrow();
     }
 
     /** 한낮은 뜨겁고 저녁으로 갈수록 식는 맑은 하루. */
