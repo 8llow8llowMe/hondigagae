@@ -190,6 +190,10 @@ export const MID_TERM_FORECAST_CODE = 'MID_TERM'
 /**
  * 그날 일정에 장소 항목이 없다. **항목이 하나도 없는 날이면 빈 일차 안내가 같은 말을 이미
  * 한다** — 그때만 서버 문장을 감춘다 (#497).
+ *
+ * **브리핑의 `BRIEFING_REASON_NO_PLACE_ITEM`(`lib/plan/briefing.ts`)과 별개 계약이라 합치지
+ * 않는다 (#1506).** 문자열만 같다 — 이쪽은 일자 날씨(`PlanDayWeatherUnavailableReason`), 저쪽은
+ * 브리핑 골든타임(`PlanBriefingWalkTimesUnavailableReason`) enum 이고 서버가 일부러 나눠 둔다.
  */
 export const NO_PLACE_ITEM_REASON_CODE = 'NO_PLACE_ITEM'
 
