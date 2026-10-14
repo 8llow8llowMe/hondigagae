@@ -157,4 +157,79 @@ class TourApiPlaceCatalogAdapterTest {
             assertThat(place.sigunguCode()).isNull();
         }
     }
+
+    /**
+     * 관광정보 음식점 행의 원천 분류 (#1473). 화면의 카페 칩 · 핀과 검색의 {@code sourceCategory=카페} 가 이 값 하나를 본다.
+     * 픽스처의 분류 코드는 2026-10-14 실조회 체계다.
+     */
+    @Nested
+    @DisplayName("원천 분류 — 관광정보 카페")
+    class SourceCategory {
+
+        @Test
+        @DisplayName("신분류 FD05 행은 카페다 — 이름에 단서가 없어도, 구분류 소분류가 비어 있어도")
+        void mapsLclsSystm2CafeToCafeCategory() {
+            JsonNode item = item("""
+                {"contentid":"2900001","contenttypeid":"39","title":"델문도",
+                 "cat1":"A05","cat2":"A0502","cat3":"",
+                 "lclsSystm1":"FD","lclsSystm2":"FD05","lclsSystm3":"FD050100"}
+                """);
+
+            ImportedPlace place = adapter().toImportedPlace(item, JEJU_AREA_CODE);
+
+            assertThat(place.sourceCategory()).isEqualTo("카페");
+            // 판정 근거인 원천 코드는 그대로 남는다 — 규칙이 틀렸을 때 되짚을 수 있어야 한다
+            assertThat(place.cat3()).isNull();
+            assertThat(place.lclsSystm2()).isEqualTo("FD05");
+        }
+
+        @Test
+        @DisplayName("신분류가 비어 오면 구분류 소분류 A05020900 으로 대신 판정한다 — dev 0곳이지만 방어한다")
+        void mapsCat3CafeToCafeCategoryWithoutLclsSystm2() {
+            JsonNode item = item("""
+                {"contentid":"2900002","contenttypeid":"39","title":"신분류 없는 카페",
+                 "cat1":"A05","cat2":"A0502","cat3":"A05020900","lclsSystm2":""}
+                """);
+
+            assertThat(adapter().toImportedPlace(item, JEJU_AREA_CODE).sourceCategory()).isEqualTo("카페");
+        }
+
+        @Test
+        @DisplayName("카페가 아닌 음식점은 원천 분류를 싣지 않는다 — 제과(FD03)도 카페로 묶지 않는다")
+        void leavesNonCafeRestaurantWithoutCategory() {
+            JsonNode korean = item("""
+                {"contentid":"2900003","contenttypeid":"39","title":"어느 한식당",
+                 "cat3":"A05020100","lclsSystm2":"FD01","lclsSystm3":"FD010100"}
+                """);
+            JsonNode bakery = item("""
+                {"contentid":"2900004","contenttypeid":"39","title":"어느 빵집",
+                 "lclsSystm2":"FD03","lclsSystm3":"FD030100"}
+                """);
+
+            assertThat(adapter().toImportedPlace(korean, JEJU_AREA_CODE).sourceCategory()).isNull();
+            assertThat(adapter().toImportedPlace(bakery, JEJU_AREA_CODE).sourceCategory()).isNull();
+        }
+
+        @Test
+        @DisplayName("구분류는 카페여도 신분류가 제과면 카페가 아니다 — 베이커리 카페가 신분류에서 제과로 옮겨졌다(dev 6곳)")
+        void lclsSystm2WinsOverCat3ForBakeryCafe() {
+            // dev 2026-10-14: 베카신 · 봉주르마담 · 블루메베이글 · 수와래베이커리 · 시스터필드 · 아베베베이커리가 이 모양이다
+            JsonNode item = item("""
+                {"contentid":"2900006","contenttypeid":"39","title":"아베베베이커리",
+                 "cat3":"A05020900","lclsSystm2":"FD03","lclsSystm3":"FD030100"}
+                """);
+
+            assertThat(adapter().toImportedPlace(item, JEJU_AREA_CODE).sourceCategory()).isNull();
+        }
+
+        @Test
+        @DisplayName("분류 코드가 없는 행(음식점 외 유형 포함)은 null 이다")
+        void leavesItemWithoutClassCodesNull() {
+            JsonNode item = item("""
+                {"contentid":"2900005","contenttypeid":"12","title":"어느 관광지"}
+                """);
+
+            assertThat(adapter().toImportedPlace(item, JEJU_AREA_CODE).sourceCategory()).isNull();
+        }
+    }
 }

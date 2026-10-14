@@ -38,4 +38,12 @@ public record ImportedPlace(
     LocalDateTime sourceModifiedAt
 ) {
 
+    /**
+     * {@code place.source_category} 로 싣는 원천 분류. 분류 코드가 카페면 '카페', 아니면 null 이다 (#1473, {@link TourApiCafeClassPolicy}).
+     *
+     * <p>필드로 따로 들고 다니지 않고 {@code cat3} · {@code lclsSystm2} 에서 매번 끌어낸다 — 같은 레코드 안에서 분류 코드와 원천 분류가 어긋날 수 없다.
+     */
+    public String sourceCategory() {
+        return TourApiCafeClassPolicy.sourceCategoryOf(lclsSystm2, cat3);
+    }
 }
