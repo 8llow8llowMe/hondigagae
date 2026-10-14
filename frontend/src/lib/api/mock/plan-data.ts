@@ -17,7 +17,7 @@ import {
   nextReviewItemId,
 } from '@/lib/api/mock/store'
 import { MOCK_WALK_COURSES } from '@/lib/api/mock/walk-course-data'
-import { todayDay } from '@/lib/date/day'
+import { serviceTodayDay } from '@/lib/date/day'
 import type { ApiResponse, CodeNameMetadata, SliceResponse, ValidationErrorItem } from '@/types/api'
 import type { ScoreMetricMetadata } from '@/types/insight'
 import type {
@@ -723,9 +723,9 @@ function markVisited(plan: MockPlan, rawItemId: string, body: string | null): Mo
     **여행 전 표시 가드** (#983 · `PlanCommandProcessor.markItemVisited`). 오늘이 시작일보다
     앞이면 다녀옴으로 **표시**할 수 없다 — 시작일 당일부터 허용하고, 일정 상태는 보지 않는다.
     **해제(`visited: false`)는 언제나 받는다.** 소유·항목 확인이 가드보다 먼저다(남의 항목은
-    날짜와 무관하게 `PLAN_005`). "오늘" 은 #971 완료 가드와 같은 `todayDay(new Date())` 다.
+    날짜와 무관하게 `PLAN_005`). "오늘" 은 #971 완료 가드와 같은 `serviceTodayDay(new Date())` 다.
   */
-  if (parsed.visited && todayDay(new Date()) < plan.startDate) {
+  if (parsed.visited && serviceTodayDay(new Date()) < plan.startDate) {
     return fail(400, 'PLAN_027', '여행 시작일 전에는 다녀옴으로 표시할 수 없습니다.')
   }
 
@@ -829,13 +829,14 @@ function update(plan: MockPlan, body: string | null): MockResult {
     **여행 전 상태 가드** (#971 · `PlanCommandProcessor.validateStartedBeforeCompletion`).
     오늘이 시작일보다 앞이면 완료로 **넘어갈** 수 없다 — 시작일 당일부터 허용한다(당일치기).
     이미 완료인 일정에 `COMPLETED` 를 다시 보내는 것은 전이가 아니라 막지 않는다(`completesNow`).
-    "오늘" 은 이 mock 의 관례대로 `todayDay(new Date())` 다 (브리핑 `today` 판정과 같다).
+    "오늘" 은 이 mock 의 관례대로 `serviceTodayDay(new Date())` 다 (브리핑 `today` 판정과 같다) —
+    백엔드 `Clock` 이 `Asia/Seoul` 고정이라 mock 도 실행 환경 시간대가 아니라 서울의 칸을 본다 (#1507).
     완료 일정의 시작일 이동 갈래는 mock `update` 가 기간 수정을 받지 않아 옮기지 않았다.
   */
   if (
     parsed.status === 'COMPLETED' &&
     plan.status !== 'COMPLETED' &&
-    todayDay(new Date()) < plan.startDate
+    serviceTodayDay(new Date()) < plan.startDate
   ) {
     return fail(400, 'PLAN_026', '여행 시작일 전에는 여행을 완료할 수 없습니다.')
   }
@@ -1539,7 +1540,7 @@ function toBriefing(plan: MockPlan, date: string): MockResult {
     mock 도 요청 시각의 오늘과 비교한다 — FE 가 고른 날짜를 그대로 "오늘" 로 삼으면
     자정 갈래를 로컬에서 볼 수 없다.
   */
-  const today = date === todayDay(new Date())
+  const today = date === serviceTodayDay(new Date())
 
   const weather = toWeather(plan).days[day - 1] ?? null
   const items = [...plan.items]
@@ -1744,7 +1745,7 @@ const WALK_SAFETY_LEVEL: Record<'SAFE' | 'CAUTION' | 'DANGER' | 'UNKNOWN', Score
 }
 
 function mockPlanWalkSafety(plan: MockPlan): PlanWalkSafetyResponse {
-  const today = todayDay(new Date())
+  const today = serviceTodayDay(new Date())
   const horizon = addDays(today, WALK_SAFETY_HORIZON_DAYS)
   const petIds = petIdsOf(plan)
 

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { resolveMock } from '@/lib/api/mock'
 import { mockStore, resetMockStore } from '@/lib/api/mock/store'
-import { toDayString, todayUtc } from '@/lib/date/day'
+import { parseDay, serviceTodayDay, toDayString } from '@/lib/date/day'
 import type { PlanDetail, PlanWeatherResponse } from '@/types/plan'
 
 const TOKEN = 'mock-access-900000000000000001'
@@ -15,6 +15,16 @@ const OTHERS = '223456789012000099'
 
 function call(path: string, method: string, body: unknown = null, token: string | null = TOKEN) {
   return resolveMock(path, method, '', body === null ? null : JSON.stringify(body), token)
+}
+
+/**
+ * 서울의 오늘에서 `offset` 일 뒤의 칸 — mock 의 시작일 가드가 보는 오늘과 같은 기준이다 (#1507).
+ * 실행 환경의 로컬 날짜로 세면 KST 00–09시 UTC 환경에서 하루 어긋난다.
+ */
+function serviceDayIn(offset: number): string {
+  const today = parseDay(serviceTodayDay(new Date()))
+  if (today === null) throw new Error('serviceTodayDay 는 YYYY-MM-DD 를 낸다')
+  return toDayString(today + offset * 86_400_000)
 }
 
 function detailOf(planId: string): PlanDetail {
@@ -223,7 +233,7 @@ describe('일정 상세 mock — 수정 · 삭제', () => {
   describe('시작일 전 완료는 400 PLAN_026 이다', () => {
     /** 오늘 기준 `offset` 일 뒤에 시작하는 1일 일정을 만든다 */
     function createPlanStartingIn(offset: number): string {
-      const start = toDayString(todayUtc(new Date()) + offset * 86_400_000)
+      const start = serviceDayIn(offset)
       const created = call('/plans', 'POST', {
         petIds: ['123456789012000001'],
         areaCode: '39',
@@ -769,9 +779,9 @@ describe('일정 상세 mock — 항목 방문 체크 (#124)', () => {
     /** 시드 일정의 시작일을 오늘 기준 `offset` 일 뒤로 옮긴다 */
     function moveStartTo(offset: number) {
       const plan = mockStore().plans.find((candidate) => candidate.planId === PLAN)!
-      const start = toDayString(todayUtc(new Date()) + offset * 86_400_000)
+      const start = serviceDayIn(offset)
       plan.startDate = start
-      plan.endDate = toDayString(todayUtc(new Date()) + (offset + 2) * 86_400_000)
+      plan.endDate = serviceDayIn(offset + 2)
     }
 
     it('내일 시작하는 일정의 항목은 표시할 수 없다 — 서버 문구 그대로다', () => {

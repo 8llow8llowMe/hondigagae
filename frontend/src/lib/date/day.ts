@@ -38,7 +38,13 @@ export function todayUtc(today: Date): number {
   return Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
 }
 
-/** 오늘을 달력의 칸으로 */
+/**
+ * 그 시각이 **실행 환경의 시간대**에서 떨어지는 달력의 칸.
+ *
+ * 판정 함수가 이미 세운 `today: Date`(`todayFromDay` 의 로컬 정오)를 칸으로 되돌릴 때 쓴다.
+ * **"지금" 의 오늘을 만들 때는 쓰지 않는다** — `todayDay(new Date())` 는 프로세스 · 브라우저
+ * 시간대에 달린다. 서비스의 오늘은 `serviceTodayDay(new Date())` 다 (#1499 · #1507).
+ */
 export function todayDay(today: Date): string {
   return toDayString(todayUtc(today))
 }
@@ -47,8 +53,8 @@ export function todayDay(today: Date): string {
  * 서비스의 시간대. 백엔드 "오늘" 의 기준(plan-service `Clock` 빈)과 같은 값이다.
  *
  * 백엔드는 `-Duser.timezone`(배포 환경변수 `TIME_ZONE`)에 기대지 않고 이 값을 직접 못박는다
- * (`backend/docs/services/plan-service.md`). 프런트 서버 페이지의 `todayDay(new Date())` 는 프로세스
- * 시간대(운영 컨테이너 `TZ: ${TIME_ZONE}` = 이 값)를 따른다.
+ * (`backend/docs/services/plan-service.md`). 프런트도 같다 — 서버 페이지 · 클라이언트 모두
+ * `serviceTodayDay` 로 이 시간대의 칸을 읽고, 운영 컨테이너 `TZ`(`${TIME_ZONE}`)에 기대지 않는다 (#1507).
  */
 export const SERVICE_TIME_ZONE = 'Asia/Seoul'
 
@@ -62,11 +68,11 @@ const serviceDayFormat = new Intl.DateTimeFormat('en-US', {
 /**
  * 서비스 시간대(서울)의 오늘을 달력의 칸으로 — **실행 환경의 시간대와 무관하다** (#1499).
  *
- * **브라우저가 스스로 오늘을 만들어야 할 때 쓴다** (`useToday`). `todayDay(new Date())` 는 실행
- * 환경의 로컬 날짜라, 브라우저가 UTC 이고 KST 00–09시면 KST 기준 어제다 — 담기 시트가 그 값을
- * 출발일 하한으로 써서 어제를 고를 수 있었다. 서버 페이지는 프로세스 시간대가 서울이라 같은 시각에
- * 둘의 결과가 같다. 다만 **서버가 렌더하는 트리**는 하이드레이션 때문에 서버가 정한 칸을 내려받는
- * 경로(`todayFromDay`)가 먼저다.
+ * **"지금" 의 오늘은 언제나 이것으로 만든다** — 서버 페이지(#1507)와, 브라우저가 스스로 오늘을
+ * 만들어야 할 때(`useToday`, #1499). `todayDay(new Date())` 는 실행 환경의 로컬 날짜라, 실행
+ * 환경이 UTC 이고 KST 00–09시면 KST 기준 어제다 — 담기 시트가 그 값을 출발일 하한으로 써서 어제를
+ * 고를 수 있었고, 서버 페이지는 컨테이너 `TZ` 가 서울이 아니면 같은 일이 났다. 다만 **서버가 렌더하는
+ * 트리**는 하이드레이션 때문에 서버가 정한 칸을 내려받는 경로(`todayFromDay`)가 먼저다.
  *
  * 형식 문자열(`en-CA` 의 `YYYY-MM-DD`)에 기대지 않고 부분(`formatToParts`)을 읽는다 — 로케일
  * 데이터가 바뀌면 형식이 조용히 달라진다.
@@ -99,14 +105,14 @@ export function dayToLocalNoon(date: string): Date | null {
 }
 
 /**
- * 서버 페이지가 `todayDay(new Date())` 로 정해 내려보낸 오늘 → 판정 함수가 받는 `today: Date`.
+ * 서버 페이지가 `serviceTodayDay(new Date())` 로 정해 내려보낸 오늘 → 판정 함수가 받는 `today: Date`.
  *
  * **오늘을 클라이언트로 넘길 때는 시각이 아니라 이 칸을 넘긴다** (#1490). 판정 함수는
  * `todayUtc()` 로 로컬 getter 를 읽으므로, 서버가 `new Date()` 를 시각 그대로 넘기면 **브라우저
  * 시간대가 날짜를 다시 정한다** — 브라우저가 UTC 이고 KST 00–09시면 홈은 `오늘 1일차`, 목록 ·
  * 상세는 `D-1` 로 갈렸다. 칸을 넘기고 로컬 정오로 세우면 어느 시간대에서 읽어도 서버의 칸이다.
  *
- * **형식이 깨진 값은 던진다.** 이 값은 서버가 `todayDay` 로 만든 것이라 깨질 수 없고, 깨졌다면
+ * **형식이 깨진 값은 던진다.** 이 값은 서버가 `serviceTodayDay` 로 만든 것이라 깨질 수 없고, 깨졌다면
  * 호출부 계약이 바뀐 것이다. `new Date()` 로 메우면 이 이슈가 조용히 돌아오므로 경계(`error.tsx`)
  * 에 맡긴다. 형식이 불확실한 값은 `dayToLocalNoon` 으로 `null` 을 받아 처리한다.
  */

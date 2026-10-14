@@ -6,7 +6,7 @@ import {
   BRIEFING_WARNING_LOOKUP_FAILED_MARKER,
 } from '@/lib/api/mock/plan-data'
 import { resetMockStore } from '@/lib/api/mock/store'
-import { todayDay } from '@/lib/date/day'
+import { serviceTodayDay } from '@/lib/date/day'
 import type { PlanBriefingResponse, PlanDetail } from '@/types/plan'
 
 const TOKEN = 'mock-access-900000000000000001'
@@ -34,7 +34,7 @@ function briefing(planId: string, date: string): PlanBriefingResponse {
  * `NO_PLACE_POINT` 와 구분되지 않고, 이 갈래의 요점인 좌표 폴백을 볼 수 없다.
  */
 function createTodayPlanWithMarkers(memos: { walk?: boolean; warning?: boolean }): PlanDetail {
-  const today = todayDay(new Date())
+  const today = serviceTodayDay(new Date())
   const result = resolveMock(
     '/plans',
     'POST',
@@ -71,7 +71,7 @@ function createTodayPlanWithMarkers(memos: { walk?: boolean; warning?: boolean }
 }
 
 function createTodayPlan(): PlanDetail {
-  const today = todayDay(new Date())
+  const today = serviceTodayDay(new Date())
   const result = resolveMock(
     '/plans',
     'POST',
@@ -227,7 +227,7 @@ describe('브리핑 mock — 특보·골든타임은 today 가 가른다', () =>
 
   it('오늘이면 특보와 골든타임이 차고 이유가 비어 있다', () => {
     const plan = createTodayPlan()
-    const data = briefing(plan.planId, todayDay(new Date()))
+    const data = briefing(plan.planId, serviceTodayDay(new Date()))
 
     expect(data.today).toBe(true)
     expect(data.weatherWarning).not.toBeNull()
@@ -242,7 +242,7 @@ describe('브리핑 mock — 특보·골든타임은 today 가 가른다', () =>
    */
   it('좌표를 schedule 과 walkTimes 양쪽에 싣고 두 값이 같다', () => {
     const plan = createTodayPlan()
-    const data = briefing(plan.planId, todayDay(new Date()))
+    const data = briefing(plan.planId, serviceTodayDay(new Date()))
 
     expect(typeof data.walkTimes?.lat).toBe('number')
     expect(data.schedule.representativeLat).toBe(data.walkTimes?.lat)
@@ -262,7 +262,7 @@ describe('브리핑 mock — LOOKUP_FAILED 마커', () => {
 
   it('골든타임 마커는 walkTimes 를 비우고 LOOKUP_FAILED 를 낸다', () => {
     const plan = createTodayPlanWithMarkers({ walk: true })
-    const data = briefing(plan.planId, todayDay(new Date()))
+    const data = briefing(plan.planId, serviceTodayDay(new Date()))
 
     expect(data.walkTimes).toBeNull()
     expect(data.walkTimesUnavailableReasonCode).toBe('LOOKUP_FAILED')
@@ -276,7 +276,7 @@ describe('브리핑 mock — LOOKUP_FAILED 마커', () => {
    */
   it('마커가 대표 장소 좌표를 지우지 않는다', () => {
     const plan = createTodayPlanWithMarkers({ walk: true })
-    const data = briefing(plan.planId, todayDay(new Date()))
+    const data = briefing(plan.planId, serviceTodayDay(new Date()))
 
     expect(typeof data.schedule.representativeLat).toBe('number')
     expect(typeof data.schedule.representativeLng).toBe('number')
@@ -284,7 +284,7 @@ describe('브리핑 mock — LOOKUP_FAILED 마커', () => {
 
   it('특보 마커는 weatherWarning 을 비우고 LOOKUP_FAILED 를 낸다', () => {
     const plan = createTodayPlanWithMarkers({ warning: true })
-    const data = briefing(plan.planId, todayDay(new Date()))
+    const data = briefing(plan.planId, serviceTodayDay(new Date()))
 
     expect(data.weatherWarning).toBeNull()
     expect(data.weatherWarningUnavailableReasonCode).toBe('LOOKUP_FAILED')
@@ -295,7 +295,7 @@ describe('브리핑 mock — LOOKUP_FAILED 마커', () => {
   /** 게이트웨이 장애는 둘을 함께 때린다 — 재시도 버튼이 둘 서는 갈래다 */
   it('마커 둘을 함께 실으면 두 사유가 같이 LOOKUP_FAILED 다', () => {
     const plan = createTodayPlanWithMarkers({ walk: true, warning: true })
-    const data = briefing(plan.planId, todayDay(new Date()))
+    const data = briefing(plan.planId, serviceTodayDay(new Date()))
 
     expect(data.weatherWarningUnavailableReasonCode).toBe('LOOKUP_FAILED')
     expect(data.walkTimesUnavailableReasonCode).toBe('LOOKUP_FAILED')

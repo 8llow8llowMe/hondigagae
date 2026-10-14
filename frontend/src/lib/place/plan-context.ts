@@ -82,7 +82,7 @@ export type PlanBasis = {
  * **날짜는 FE 가 센다** — 시작일 + (일차 - 1)(`addPlanDays` 가 UTC 달력 칸으로 센다). 일차가 기간을
  * 넘으면 없는 날이라 `null` 이다.
  *
- * **오늘은 받는다** — 서버 페이지가 `todayDay(new Date())` 로 만든 달력 칸이다(`lib/date/day.ts`).
+ * **오늘은 받는다** — 서버 페이지가 `serviceTodayDay(new Date())` 로 만든 서울의 칸이다(`lib/date/day.ts`).
  * 그날이 오늘보다 앞이면 `past` 다(#1476): 지난 날짜로 물으면 서버가 `UNKNOWN` · `INSUFFICIENT` 와
  * "내일 일정으로 확인해 주세요" 를 돌려줘, 쓸 수 있던 지금 판정을 지운다.
  */

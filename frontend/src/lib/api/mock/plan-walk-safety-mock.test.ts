@@ -4,7 +4,7 @@ import { resolveMock } from '@/lib/api/mock'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { WALK_SAFETY_LOOKUP_FAILED_MARKER } from '@/lib/api/mock/plan-data'
 import { resetMockStore } from '@/lib/api/mock/store'
-import { todayDay } from '@/lib/date/day'
+import { serviceTodayDay } from '@/lib/date/day'
 import type { PlanDetail, PlanItemWalkSafetyItem, PlanWalkSafetyResponse } from '@/types/plan'
 
 /**
@@ -30,7 +30,7 @@ function addDays(date: string, days: number): string {
   return new Date(time + days * 86_400_000).toISOString().slice(0, 10)
 }
 
-const TODAY = todayDay(new Date())
+const TODAY = serviceTodayDay(new Date())
 const YESTERDAY = addDays(TODAY, -1)
 const HORIZON_END = addDays(TODAY, 4)
 const BEYOND_HORIZON = addDays(TODAY, 5)

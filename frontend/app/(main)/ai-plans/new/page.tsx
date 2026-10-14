@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 import { Canvas, SurfaceStack } from '@/components/surface'
 import { AiPlanCreateView } from '@/features/ai-plan/ai-plan-create-view'
-import { todayDay } from '@/lib/date/day'
+import { serviceTodayDay } from '@/lib/date/day'
 import { messages } from '@/lib/messages'
 
 export const metadata: Metadata = {
@@ -42,10 +42,10 @@ export default async function AiPlanNewPage({
     (일정 상세와 같은 결정).
 
     **`toISOString()` 으로 자르지 않는다** (#1396). 그것은 UTC 날짜라 KST 오전 9시 전에는 어제였고,
-    달력의 `min` 으로 들어가 어제가 열렸다. 다른 화면과 같은 `todayDay`(서버 로컬 날짜 — 운영
-    컨테이너는 `TZ: ${TIME_ZONE}`)를 쓴다.
+    달력의 `min` 으로 들어가 어제가 열렸다. 다른 화면과 같은 `serviceTodayDay`(서울의 칸 —
+    프로세스 시간대와 무관하다, #1507)를 쓴다. 백엔드의 오늘(`Asia/Seoul` 고정 `Clock`)도 서울이다.
   */
-  const today = todayDay(new Date())
+  const today = serviceTodayDay(new Date())
 
   return (
     /*

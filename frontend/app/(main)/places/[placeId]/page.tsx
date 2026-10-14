@@ -13,7 +13,7 @@ import { ApiError } from '@/lib/api/error'
 import { placeDetailPath } from '@/lib/api/place'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
-import { todayDay } from '@/lib/date/day'
+import { serviceTodayDay } from '@/lib/date/day'
 import { messages } from '@/lib/messages'
 import { placeDetailFallbackTitle } from '@/lib/place/detail-title'
 import { isPlaceId } from '@/lib/place/place-id'
@@ -161,7 +161,11 @@ export default async function PlaceDetailPage({ params }: { params: Params }) {
         />
       )}
       <HydrationBoundary state={dehydrate(queryClient)}>
-        <PlaceDetailView placeId={placeId} authed={session !== null} today={todayDay(new Date())} />
+        <PlaceDetailView
+          placeId={placeId}
+          authed={session !== null}
+          today={serviceTodayDay(new Date())}
+        />
       </HydrationBoundary>
     </Canvas>
   )

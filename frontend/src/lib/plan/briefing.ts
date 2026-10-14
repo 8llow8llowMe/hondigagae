@@ -42,7 +42,7 @@ export type BriefingTarget =
  * `today` 가 갈릴 수 있다 — 화면에 쓰는 것은 언제나 **응답의 `today`·`date`·`day`** 이고
  * `kind` 는 진입 배너 문구를 고르는 데에만 쓴다.
  *
- * @param today `todayDay(서버가 만든 Date)` 가 준 `YYYY-MM-DD`
+ * @param today 서버 페이지가 `serviceTodayDay(new Date())` 로 만든 서울의 `YYYY-MM-DD`
  */
 export function pickBriefingDate(
   startDate: string,

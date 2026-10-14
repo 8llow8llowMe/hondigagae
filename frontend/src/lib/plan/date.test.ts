@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { todayDay, todayFromDay } from '@/lib/date/day'
+import { serviceTodayDay, todayFromDay } from '@/lib/date/day'
 import {
   formatPlanDateRange,
   formatPlanDateRangeCompact,
@@ -160,8 +160,9 @@ describe('tripPhaseOf — 브라우저 시간대가 서버와 달라도 출발 �
   const SERVER_NOW = new Date('2026-10-15T03:00:00+09:00')
 
   it('서버가 정한 칸을 로컬 정오로 세우면 UTC 브라우저에서도 오늘 1일차다', () => {
-    process.env.TZ = 'Asia/Seoul'
-    const todayIso = todayDay(SERVER_NOW)
+    // 서버 페이지는 서울의 칸을 만든다 (#1507) — 컨테이너가 UTC 여도 출발 당일이다
+    process.env.TZ = 'UTC'
+    const todayIso = serviceTodayDay(SERVER_NOW)
     expect(todayIso).toBe('2026-10-15')
 
     process.env.TZ = 'UTC'
