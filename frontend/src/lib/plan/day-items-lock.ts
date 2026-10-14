@@ -30,3 +30,25 @@ export function dayItemsLock(saves: DayItemsSaveInFlight[]): DayItemsLock {
     blocksEntry: (day) => inFlight.some((save) => save.day === null || save.day === day),
   }
 }
+
+/**
+ * 모달 저장 하나가 일괄 교체 잠금(`dayItemsLock`)에 내는 항목 — 시각 저장(#1501) · 메모 저장(#1505).
+ *
+ * - 저장 중(`saving`)은 모달의 일자다 — 요청과 상한 안의 재조회.
+ * - **상한에서 모달이 닫힌 뒤에도 재조회가 끝나지 않은 일자(`refetchingDays`)는 남는다.** 그동안
+ *   캐시는 재조회 전 상태(옛 `startTime` · 되살리기 전 `다녀옴`)라, 그 캐시로 나간 교체가 서버의 새
+ *   값을 덮는다. `busy` 는 일정 전체를 막는다 — 다른 일자의 교체 응답이 캐시에 들어간 뒤 먼저 출발한
+ *   재조회가 도착하면 그 변경을 캐시에서 되돌린다(D30-4 와 같은 이유).
+ */
+export function dayItemsSaveLocks(state: {
+  saving: boolean
+  /** 모달의 일자. 모달이 닫혔으면 `null` */
+  day: number | null
+  /** 상한 뒤에도 재조회가 끝나지 않은 일자. 같은 일자가 여러 번 들 수 있다 */
+  refetchingDays: readonly number[]
+}): DayItemsSaveInFlight[] {
+  return [
+    { saving: state.saving, day: state.day },
+    ...state.refetchingDays.map((day) => ({ saving: true, day })),
+  ]
+}

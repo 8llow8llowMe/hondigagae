@@ -5,11 +5,17 @@ import { fillTemplate } from '@/lib/text/template'
 import type { PlanDayItemsReplacePayload, PlanDetail, PlanItemDetail } from '@/types/plan'
 
 /**
- * 항목 메모 저장 한 번의 흐름 — 이슈 #1460 · `일정상세-세부명세.md` D30-3.
+ * 항목 메모 저장 한 번의 흐름 — 이슈 #1460 · #1505 · `일정상세-세부명세.md` D30-2 · D30-3.
  *
  * **훅(`use-plan-item-memo.ts`)에서 뺐다.** 교체 → 상세 갈아끼우기 → `다녀옴` 되살리기 → 재조회의
  * 순서와 갈래가 이 기능의 전부인데, 훅은 node 환경에서 렌더되지 않는다(`testing-guide.md` §1).
  * 전송과 캐시는 `deps` 로 받아 테스트가 가짜를 꽂는다.
+ *
+ * **끝나는 시점이 둘이다 (#1505, 시각 저장 `runItemTimeSave` #1501 과 같은 꼴).**
+ * - 결과는 **모달을 닫는 시점**이다 — 되살리기 뒤 재조회와 대기 상한(`waitCap`) 중 먼저 오는 쪽.
+ * - `refetched` 는 **재조회 자체가 끝나는 시점**이다. 상한에서 모달이 닫혀도 캐시는 아직 교체 응답
+ *   (`다녀옴` 이 풀린 상태)이라, 그 틈에 일괄 교체가 나가면 되살릴 체크가 없다고 판정해 서버에서
+ *   되살린 체크를 다시 잃는다. 훅은 이것이 끝날 때까지 그 일자를 잠금에 둔다(`dayItemsSaveLocks`).
  */
 
 export type ItemMemoSaveInput = {
@@ -26,8 +32,10 @@ export type ItemMemoSaveDeps = {
   markVisited: (planItemId: string) => Promise<void>
   /** 교체 응답을 캐시에 넣고 판정 등을 버린다. **여기서 던져도 저장 실패가 아니다** */
   onReplaced: (next: PlanDetail) => void
-  /** 되살리기 뒤 상세 재조회. 호출부가 대기 상한을 건다. 되살릴 것이 없으면 부르지 않는다 */
+  /** 되살리기 뒤 상세 재조회. 되살릴 것이 없으면 부르지 않는다. 상한은 여기 걸지 않는다(`waitCap`) */
   refetchDetail: () => Promise<void>
+  /** 모달을 닫기까지 재조회를 기다리는 상한 */
+  waitCap: () => Promise<void>
 }
 
 export type ItemMemoSaveResult =
@@ -35,8 +43,17 @@ export type ItemMemoSaveResult =
   | { kind: 'stale'; error: PlanDaySaveError }
   /** 교체가 실패했다 — 서버 상태는 그대로다 */
   | { kind: 'failed'; error: PlanDaySaveError }
-  /** 저장됐다. `toast` 가 말할 문장이다 — 되살리기가 일부 실패하면 그 안내다 */
-  | { kind: 'saved'; toast: string; restored: string[]; restoreFailed: boolean }
+  /**
+   * 저장됐다. `toast` 가 말할 문장이다 — 되살리기가 일부 실패하면 그 안내다. `refetched` 는 재조회가
+   * 끝나면(실패해도) 풀린다 — 거부되지 않고, 되살릴 것이 없었으면 곧바로 풀린다
+   */
+  | {
+      kind: 'saved'
+      toast: string
+      restored: string[]
+      restoreFailed: boolean
+      refetched: Promise<void>
+    }
 
 export async function runItemMemoSave(
   input: ItemMemoSaveInput,
@@ -82,13 +99,19 @@ export async function runItemMemoSave(
     .sort((a, b) => a.sequence - b.sequence)
   const restored = visitsToRestore(dayItems, after)
   let restoreFailed = false
+  let refetched: Promise<void> = Promise.resolve()
 
   if (restored.length > 0) {
     // 서로 다른 항목이라 겹쳐도 충돌하지 않는다 — 하나가 실패해도 나머지는 보낸다
     const results = await Promise.allSettled(restored.map((id) => deps.markVisited(id)))
     restoreFailed = results.some((result) => result.status === 'rejected')
-    // 단건 응답이 `Response<Void>` 라 갈아끼울 상세가 없다 — 다시 받는다
-    await deps.refetchDetail().catch(() => undefined)
+    /*
+      단건 응답이 `Response<Void>` 라 갈아끼울 상세가 없다 — 다시 받는다. 모달은 상한까지만 기다리고,
+      재조회 자체는 `refetched` 로 남긴다 (#1505). 재조회가 끝내 실패하면 낡은 캐시로 잠금이 풀리는
+      틈은 시각 저장 · `다녀옴` 토글과 같이 남는다.
+    */
+    refetched = deps.refetchDetail().catch(() => undefined)
+    await Promise.race([refetched, deps.waitCap()])
   }
 
   const clearing = (memo ?? '').trim() === ''
@@ -99,5 +122,5 @@ export async function runItemMemoSave(
         { title: target.title },
       )
 
-  return { kind: 'saved', toast, restored, restoreFailed }
+  return { kind: 'saved', toast, restored, restoreFailed, refetched }
 }

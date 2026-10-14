@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/components/toast'
 import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidation'
 import { planKeys } from '@/features/plan/queries'
+import { useRefetchingDays } from '@/features/plan/use-refetching-days'
 import { changeItemStartTime } from '@/lib/api/plan'
 import { messages } from '@/lib/messages'
 import { runItemTimeSave } from '@/lib/plan/item-time-save'
@@ -34,7 +35,7 @@ const DETAIL_REFETCH_WAIT_MS = 1500
  *
  * **잠금 상태가 둘이다 (#1501).** `saving` 은 모달(PUT → 상한 안의 재조회)이고, `refetchingDays` 는
  * 모달이 닫힌 뒤에도 재조회가 끝나지 않은 일자다. 호출부는 둘 다 일괄 교체 잠금에 넣는다
- * (`itemTimeLocks`) — 재조회 전 캐시는 옛 `startTime` 이라 그 틈의 교체가 새 시각을 덮는다.
+ * (`dayItemsSaveLocks`) — 재조회 전 캐시는 옛 `startTime` 이라 그 틈의 교체가 새 시각을 덮는다.
  */
 export function usePlanItemTime({
   planId,
@@ -52,8 +53,8 @@ export function usePlanItemTime({
   const [failure, setFailure] = useState<{ planItemId: string; error: PlanDaySaveError } | null>(
     null,
   )
-  /** 상한에서 모달이 닫힌 뒤에도 재조회가 끝나지 않은 일자. 같은 일자가 여러 번 들 수 있다 */
-  const [refetchingDays, setRefetchingDays] = useState<readonly number[]>([])
+  /** 상한에서 모달이 닫힌 뒤에도 재조회가 끝나지 않은 일자 */
+  const { refetchingDays, hold: holdRefetchingDay } = useRefetchingDays()
   // disabled 반영 전 빠른 연속 제출(Enter 두 번)을 막는다 (form-guide.md §6)
   const savingRef = useRef(false)
 
@@ -129,17 +130,8 @@ export function usePlanItemTime({
             setFailure({ planItemId, error: result.error })
             return
           }
-          /*
-            `saving` 이 풀리기(아래 `finally`) **전에** 넣는다 — 둘 사이에 잠금이 비는 렌더가 없게.
-            재조회가 이미 끝났어도 넣고 곧바로 뺀다. 같은 일자가 여러 번 들 수 있어 하나씩 뺀다.
-          */
-          setRefetchingDays((current) => [...current, day])
-          void result.refetched.then(() =>
-            setRefetchingDays((current) => {
-              const index = current.indexOf(day)
-              return index === -1 ? current : current.filter((_, at) => at !== index)
-            }),
-          )
+          // `saving` 이 풀리기(아래 `finally`) **전에** 넣는다 — 둘 사이에 잠금이 비는 렌더가 없게
+          holdRefetchingDay(day, result.refetched)
           showToast({
             message: fillTemplate(
               startTime === null
@@ -155,7 +147,7 @@ export function usePlanItemTime({
           setSaving(false)
         })
     },
-    [planId, queryClient, showToast, onSaved],
+    [planId, queryClient, showToast, onSaved, holdRefetchingDay],
   )
 
   /** 모달을 닫거나 다른 항목으로 열 때 지난 실패를 걷는다 */

@@ -39,7 +39,7 @@ import type { PlanCompanions } from '@/lib/plan/companion-pets'
 import { planConfirmCheck } from '@/lib/plan/confirm-check'
 import { addPlanDays, planPhaseOf } from '@/lib/plan/date'
 import { placeIdsOf } from '@/lib/plan/day-items'
-import { dayItemsLock } from '@/lib/plan/day-items-lock'
+import { dayItemsLock, dayItemsSaveLocks } from '@/lib/plan/day-items-lock'
 import {
   groupItemsByDay,
   lodgingBasisFor,
@@ -53,7 +53,6 @@ import {
   itemMemoTargetOf,
 } from '@/lib/plan/item-memo-edit'
 import { timeModalKey } from '@/lib/plan/item-modal-key'
-import { itemTimeLocks } from '@/lib/plan/item-time-save'
 import { packingPlacement } from '@/lib/plan/packing-promotion'
 import { isReviewSectionVisible } from '@/lib/plan/review'
 import { routeReorderAllowed, routeReorderSuggestion } from '@/lib/plan/route-reorder'
@@ -322,18 +321,29 @@ export function PlanDetailSection({
     (`DETAIL_REFETCH_WAIT_MS`)에서 닫히지만 그때 캐시는 옛 `startTime` 이라, 그 틈의 교체가 서버의 새
     시각을 덮는다.
   */
-  const timeLocks = itemTimeLocks({
+  /*
+    **메모 저장도 같다** (#1505 · D30-2). `다녀옴` 을 되살린 뒤의 재조회가 상한을 넘기면 모달은 닫히지만
+    캐시는 교체 응답(체크 풀림)이라, 그 틈의 교체가 되살릴 체크가 없다고 판정해 서버의 체크를 다시 잃는다.
+  */
+  const timeLocks = dayItemsSaveLocks({
     saving: itemTime.saving,
     day: timeTarget?.day ?? null,
     refetchingDays: itemTime.refetchingDays,
   })
   /** 시각 저장이 모달 · 재조회 중 하나라도 진행 중인가 — 모달인 다른 교체(메모 · 이동 추가)의 `blocked` */
   const itemTimeBusy = dayItemsLock(timeLocks).busy
+  const memoLocks = dayItemsSaveLocks({
+    saving: itemMemo.saving,
+    day: memoTarget?.day ?? null,
+    refetchingDays: itemMemo.refetchingDays,
+  })
+  /** 메모 저장이 모달 · 재조회 중 하나라도 진행 중인가 — 이동 추가 모달의 `blocked` */
+  const itemMemoBusy = dayItemsLock(memoLocks).busy
   const dayItemsLockState = dayItemsLock([
     { saving: addPlace.adding, day: addPlace.pending?.day ?? null },
     { saving: addMove.adding, day: addMove.pendingDay },
     ...timeLocks,
-    { saving: itemMemo.saving, day: memoTarget?.day ?? null },
+    ...memoLocks,
   ])
   const dayItemsBusy = dayItemsLockState.busy
 
@@ -851,7 +861,7 @@ export function PlanDetailSection({
         day={moveDay ?? 1}
         saving={addMove.adding}
         // 이 모달 자신의 저장은 `saving` 이 말한다. 여기는 **다른** 일괄 교체가 도는 중인지다
-        blocked={addPlace.adding || itemTimeBusy || itemMemo.saving}
+        blocked={addPlace.adding || itemTimeBusy || itemMemoBusy}
         resetsVisits={
           moveDay !== null && (days[moveDay - 1]?.items.some((item) => item.visited) ?? false)
         }
@@ -891,6 +901,11 @@ export function PlanDetailSection({
             : null
         }
         saving={itemTime.saving}
+        /*
+          메모는 모달(`saving`)만 막는다 — 교체 · 되살리기가 id 를 바꾸는 동안이다. 그 뒤 재조회만 남은
+          동안(`refetchingDays`)은 캐시 id 가 이미 새 것이고, 시각 저장은 단건 API 라 `다녀옴` 을 되싣지
+          않아 되살린 체크를 잃지 않는다 (#1505).
+        */
         blocked={addPlace.adding || addMove.adding || itemMemo.saving}
         onSave={(startTime) => {
           if (timeTarget === null || timeGroup === undefined || timeItem === undefined) return
@@ -921,7 +936,17 @@ export function PlanDetailSection({
             : null
         }
         saving={itemMemo.saving}
-        blocked={addPlace.adding || addMove.adding || itemTimeBusy || memoDayVisitPending}
+        /*
+          자기 저장은 `saving` 이 말한다. 앞선 메모 저장의 재조회가 남은 동안(`refetchingDays`, #1505)은
+          **다른** 일괄 교체로 친다 — 캐시가 되살리기 전이라 이 저장이 되살린 체크를 잃는다.
+        */
+        blocked={
+          addPlace.adding ||
+          addMove.adding ||
+          itemTimeBusy ||
+          itemMemo.refetchingDays.length > 0 ||
+          memoDayVisitPending
+        }
         onSave={(memo) => {
           if (memoTarget === null) return
           memoFocusKeyRef.current = memoEditFocusKey(memoTarget.day, memoTarget.index)

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { ApiError } from '@/lib/api/error'
-import { dayItemsLock } from '@/lib/plan/day-items-lock'
+import { dayItemsLock, dayItemsSaveLocks } from '@/lib/plan/day-items-lock'
 import { runItemMemoSave } from '@/lib/plan/item-memo-save'
-import { itemTimeLocks, runItemTimeSave } from '@/lib/plan/item-time-save'
+import { runItemTimeSave } from '@/lib/plan/item-time-save'
 import { planDetail, planItem } from '@/test/fixtures/plan'
 import type { PlanDayItemsReplacePayload, PlanDetail, PlanItemDetail } from '@/types/plan'
 
@@ -122,28 +122,6 @@ describe('runItemTimeSave', () => {
   })
 })
 
-describe('itemTimeLocks', () => {
-  it('저장 중이면 모달의 일자를 잠근다', () => {
-    expect(itemTimeLocks({ saving: true, day: 2, refetchingDays: [] })).toEqual([
-      { saving: true, day: 2 },
-    ])
-  })
-
-  it('저장이 끝나도 재조회 중인 일자는 잠금에 남는다', () => {
-    const lock = dayItemsLock(itemTimeLocks({ saving: false, day: null, refetchingDays: [3] }))
-
-    expect(lock.busy).toBe(true)
-    expect(lock.blocksEntry(3)).toBe(true)
-    expect(lock.blocksEntry(1)).toBe(false)
-  })
-
-  it('저장 · 재조회가 없으면 잠그지 않는다', () => {
-    expect(dayItemsLock(itemTimeLocks({ saving: false, day: null, refetchingDays: [] })).busy).toBe(
-      false,
-    )
-  })
-})
-
 /*
   재현 (#1501) — 시각 저장 뒤 상세 재조회가 상한(1500ms)보다 늦는 동안 메모를 저장한다.
 
@@ -183,13 +161,13 @@ describe('#1501 시각 저장 직후 메모 저장', () => {
 
     // 모달은 닫혔다(saving=false). 캐시는 아직 옛 시각이다 — 이때 메모 저장은 잠겨야 한다
     expect(cache[0]?.startTime).toBe('10:00:00')
-    expect(dayItemsLock(itemTimeLocks({ saving: false, day: null, refetchingDays })).busy).toBe(
+    expect(dayItemsLock(dayItemsSaveLocks({ saving: false, day: null, refetchingDays })).busy).toBe(
       true,
     )
 
     refetch.resolve()
     await unlocked
-    expect(dayItemsLock(itemTimeLocks({ saving: false, day: null, refetchingDays })).busy).toBe(
+    expect(dayItemsLock(dayItemsSaveLocks({ saving: false, day: null, refetchingDays })).busy).toBe(
       false,
     )
 
@@ -204,6 +182,7 @@ describe('#1501 시각 저장 직후 메모 저장', () => {
         markVisited: () => Promise.resolve(),
         onReplaced: () => undefined,
         refetchDetail: () => Promise.resolve(),
+        waitCap: () => new Promise<void>(() => undefined),
       },
     )
 
