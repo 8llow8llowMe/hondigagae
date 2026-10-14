@@ -53,7 +53,8 @@ public record PlaceRecommendationItem(
     @Schema(description = "실내 여부. null 이면 원천에 정보가 없다", example = "false", nullable = true)
     Boolean indoor,
 
-    @Schema(description = "적합도 점수(0~100). 추천에 오른 장소는 점수가 있다 — 점수를 못 낸 곳은 추천하지 않는다", example = "82")
+    @Schema(description = "적합도 점수(0~100). 추천에 오른 장소는 점수가 있다 — 점수를 못 낸 곳과 '주의 필요'(60점 미만)는 "
+        + "추천하지 않는다. 주의보 날은 특보 감점이 반영돼 60 아래일 수 있다", example = "82")
     Integer score,
 
     @Schema(description = "적합도 등급 metadata")
