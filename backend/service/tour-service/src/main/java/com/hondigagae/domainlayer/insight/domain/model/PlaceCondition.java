@@ -14,6 +14,10 @@ import lombok.Builder;
  * <p>{@code lat} / {@code lng} 도 같은 이유로 Wrapper 다. 좌표가 없는 장소가 실제로 있고,
  * 그런 곳은 격자를 구할 수 없어 날씨를 붙일 수 없다. 0 으로 채우면 적도 앞바다의 날씨를
  * 가져오게 된다 - 조용히 틀리는 쪽이 훨씬 나쁘다 (coding-conventions §9-3 의 nullable 기준).
+ *
+ * <p>{@code contentTypeId} / {@code sourceCategory} 는 판정에 쓰지 않는다. 실내 대안 조회
+ * ({@code PlaceProfileQueryPort.findIndoorAlternatives})가 이 모델로 후보를 돌려주는데, 프론트가 대안을 일정에 담을 때
+ * 음식점이면 식사로 저장하려면 장소 목록과 같은 두 값이 필요해서 함께 싣는다 (#1461). 원천에 없으면 null 이다.
  */
 @Builder
 public record PlaceCondition(
@@ -30,7 +34,10 @@ public record PlaceCondition(
     Boolean indoor,
     Boolean outdoor,
     String petRestriction,
-    String petExtraFee
+    String petExtraFee,
+    // 관광공사 콘텐츠 유형 코드(39 음식점 등)와 원천의 원본 분류(카페 등). 실내 대안 응답용이다 — 위 javadoc.
+    String contentTypeId,
+    String sourceCategory
 ) {
 
     /** 좌표가 있는지. 없으면 날씨 기반 판정 자체가 불가능하다. */

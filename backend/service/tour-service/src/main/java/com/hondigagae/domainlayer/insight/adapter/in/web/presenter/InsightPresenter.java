@@ -12,6 +12,7 @@ import com.hondigagae.domainlayer.insight.domain.model.CongestionSnapshot;
 import com.hondigagae.domainlayer.insight.domain.model.DailyWeather;
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityReason;
 import com.hondigagae.domainlayer.insight.domain.model.WeatherWarning;
+import com.hondigagae.domainlayer.place.domain.enums.ContentType;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -100,6 +101,9 @@ public class InsightPresenter {
                 .distanceMeters(alternative.distanceMeters())
                 .petAllowanceType(toMetadata(alternative.petAllowanceType()))
                 .allowedPetSize(toMetadata(alternative.allowedPetSize()))
+                // 모르는 유형 코드는 null 로 둔다 — 대안 한 곳 때문에 적합도 · 추천 응답 전체를 깨뜨리지 않는다 (#1461)
+                .contentType(ContentType.findByCode(alternative.contentTypeId()).map(ContentType::toMetadata).orElse(null))
+                .sourceCategory(alternative.sourceCategory())
                 .build())
             .toList();
     }

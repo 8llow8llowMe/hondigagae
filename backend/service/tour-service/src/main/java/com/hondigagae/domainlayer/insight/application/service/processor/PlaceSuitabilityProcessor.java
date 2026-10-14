@@ -171,6 +171,9 @@ public class PlaceSuitabilityProcessor {
             .distanceMeters((int) Math.round(distance))
             .petAllowanceType(candidate.petAllowanceType())
             .allowedPetSize(candidate.allowedPetSize())
+            // 프론트가 대안을 일정에 담을 때 음식점이면 식사로 저장한다 — 장소 목록과 같은 두 값으로 판정한다 (#1461)
+            .contentTypeId(candidate.contentTypeId())
+            .sourceCategory(candidate.sourceCategory())
             .build();
     }
 
