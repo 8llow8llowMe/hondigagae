@@ -1081,3 +1081,162 @@ SELECT id, title, indoor, outdoor, pet_allowance_type, allowed_pet_size, pet_ava
 재계산이 보정된 동반 칸을 쓰지 않으므로(§10 "보정이 이긴다") 다시 덮을 것이 없다. 0 이 아니면 그사이 다른 경로가 그 칸을 바꾼 것이다.
 
 > 장소 API 로 보면 캐시 때문에 잠시 옛 값이 올 수 있다 — §8 과 같이 **확인은 SQL 로 한다.**
+
+## 14. 관광정보 카페 분류 — `source_category` (#1473)
+
+#1473 으로 관광 API 적재가 `source_category` 를 싣는다. 신분류 `lcls_systm2 = 'FD05'` 면 `카페`이고, **신분류가 없을 때만** 구분류
+`cat3 = 'A05020900'` 으로 대신 판정한다. 그 밖은 싣지 않는다(`place-data-integration.md` §6-7, 규칙 `TourApiCafeClassPolicy`). 구분류가 이기게 두면
+구분류 카페 · 신분류 제과(`FD030100`)인 베이커리 6곳이 카페로 실린다(dev 실측). 재적재의 UPDATE 절은
+`COALESCE(VALUES(source_category), source_category)` 라 카페일 때만 덮고, 아닐 때는 병합이 옮긴 값을 그대로 둔다.
+
+**코드 배포만으로도 기존 행이 바뀐다.** `placeImportJob` 은 변경 여부로 건너뛰지 않는다 — `PlaceImportProcessor` 가 `areaBasedList2` 를 전량
+페이징해 매번 upsert 하고, `modifiedtime` 은 `source_modified_at` 으로 싣기만 할 뿐 비교하지 않는다(문화정보원의 `atchFileId` 같은 스냅샷 비교도
+없다, §1). 그래서 다음 파이프라인(월요일 03:00 KST)이 반영한다. 그 전에 보이게 하려면 아래 SQL 을 한 번 돌린다. 잡을 손으로 돌려도 되지만
+`contentTypeIds=39` 로 좁혀도 뒤의 상세 단계 둘이 일 1,000건 예산을 쓴다(실행당 상한 300 + 380, `place-data-integration.md` §5) — SQL 은
+공공 API 를 부르지 않는다.
+
+### 대상 판정 — 다음 적재가 쓸 값과 같게
+
+- 조건은 아래 두 줄의 AND 다. 이 절의 SQL 은 **모두 같은 조건**을 쓴다(1-1 · 1-2 · 2-0 · 2-2, 3-4 는 그 부정).
+
+  ```sql
+  source = 'TOUR_API' AND (source_category IS NULL OR source_category <> '카페')
+  AND (lcls_systm2 = 'FD05' OR ((lcls_systm2 IS NULL OR lcls_systm2 = '') AND cat3 = 'A05020900'))
+  ```
+
+  새 `UPSERT_SQL` 이 이 행들에 쓰는 값이 정확히 `카페` 이고(COALESCE 의 첫 인자가 NULL 이 아니다), 나머지 관광 API 행에는 아무것도 쓰지 않는다
+  (첫 인자가 NULL 이라 기존 값을 둔다). 그래서 이 UPDATE 와 다음 적재의 결과가 같다.
+- `cat3 = 'A05020900' OR ...` 처럼 구분류를 신분류와 나란히 두지 않는다 — 구분류 카페 · 신분류 제과 6곳(`베카신` · `봉주르마담` · `블루메베이글` ·
+  `수와래베이커리` · `시스터필드` · `아베베베이커리`)이 카페가 되고, 다음 적재도 그 값을 지우지 못한다(COALESCE). 신분류 없이 구분류만 카페인 행은
+  dev 0곳이라 뒤 괄호는 방어용이다.
+- **원래 값이 NULL 이 아닌 행도 있다** — 병합이 문화정보원 흡수 행에서 옮긴 분류다. 새 적재도 그 값을 `카페` 로 덮으므로 여기서도 덮고,
+  되돌리기를 위해 id 와 원래 값을 함께 남긴다(2-0).
+- delist 된 행도 함께 바꾼다. 노출되지 않는 행이라 영향이 없고, 다시 노출되면 그 실행의 upsert 가 같은 값을 쓴다. 관광 API 행은 병합에서
+  흡수되지 않는다(흡수 행은 문화정보원이다, `place-data-integration.md` §4).
+- 규칙은 코드 앞뒤 공백 · 대소문자를 무시한다. 위 조건의 대소문자는 콜레이션(`_ci`)이 무시하지만 공백은 콜레이션에 따라 다르게 본다(`= ''` 가
+  공백만 든 값을 잡는지도 그렇다). 1-3 이 0 이면 둘의 결과가 같다.
+
+### 절차
+
+**순서 제약은 없다 — 코드 배포 전에 돌려도 된다.** 옛 `UPSERT_SQL` 은 UPDATE 절에서 `source_category` 를 쓰지 않아 여기서 쓴 `카페` 를 지우지
+않고, 새 코드는 같은 행에 같은 값을 쓴다. 병합(`COALESCE(survivor.source_category, absorbed.source_category)`)도 이미 `카페` 인 행을 바꾸지 않는다.
+배포 전에 돌렸다면 그사이 옛 코드가 **새로 INSERT 한** 카페 행만 NULL 로 남는다 — 배포 뒤 첫 `placeImportJob` 이 채운다. 기다리지 않으려면 1) 부터
+다시 돌린다(멱등이다. 2-0 의 표 이름은 바꾼다).
+
+```sql
+-- 0) 스키마를 고른다 — 한 MySQL 에 dev 와 prod 스키마가 같이 있다. 2-0 의 영구 표(place_cafe_fix_1473)를 만들고 지우는 것도 이 스키마에서다.
+--    연결을 새로 열면(2) 의 트랜잭션 · 되돌리기 · DROP) 이 두 줄부터 다시 돌린다
+USE hondigagae_tour_dev;  -- prod 는 hondigagae_tour_prod
+SELECT DATABASE();
+
+-- 1) 영향 범위를 센다 (읽기 전용)
+-- 1-1) 바뀔 행 — 원래 값별로. NULL 이 아닌 값이 있으면 병합이 옮긴 분류다. 이미 카페인 행은 세지 않는다.
+--      dev 2026-10-14: 224행, 전부 원래 NULL (NULL 한 줄)
+SELECT source_category, COUNT(*) FROM place
+ WHERE source = 'TOUR_API'
+   AND (lcls_systm2 = 'FD05' OR ((lcls_systm2 IS NULL OR lcls_systm2 = '') AND cat3 = 'A05020900'))
+   AND (source_category IS NULL OR source_category <> '카페')
+ GROUP BY source_category;
+
+-- 1-2) 그중 지금 노출되는 행 — 카페 칩 · 핀 · sourceCategory=카페 검색에 새로 잡힐 수. dev 2026-10-14: 205
+SELECT COUNT(*) FROM place
+ WHERE source = 'TOUR_API'
+   AND (lcls_systm2 = 'FD05' OR ((lcls_systm2 IS NULL OR lcls_systm2 = '') AND cat3 = 'A05020900'))
+   AND (source_category IS NULL OR source_category <> '카페')
+   AND delisted_at IS NULL AND merged_into_id IS NULL;
+
+-- 1-3) 코드 앞뒤에 공백이 붙은 관광 API 행 — 0 이어야 한다. 0 이 아니면 이 절의 조건을 모두 TRIM(lcls_systm2) · TRIM(cat3) 로 바꾼다
+SELECT COUNT(*) FROM place
+ WHERE source = 'TOUR_API'
+   AND (CHAR_LENGTH(lcls_systm2) <> CHAR_LENGTH(TRIM(lcls_systm2)) OR CHAR_LENGTH(cat3) <> CHAR_LENGTH(TRIM(cat3)));
+
+-- 1-4) 지금 노출 중인 관광 API 카페 — 병합이 옮긴 값이다. 확인 3-2 의 기준이다. dev 2026-10-14: 6
+SELECT COUNT(*) FROM place
+ WHERE source = 'TOUR_API' AND source_category = '카페' AND delisted_at IS NULL AND merged_into_id IS NULL;
+```
+
+2) 되돌리기 표를 만들고 한 트랜잭션에서 바꾼다. **되돌리기 표는 `TEMPORARY` 가 아닌 보통 표다** — 임시 테이블은 세션이 끝나면 사라져 COMMIT 뒤
+되돌리기에 쓸 수 없다. `CREATE TABLE` 은 암묵적으로 커밋하므로 트랜잭션 밖에서 먼저 만든다. `START TRANSACTION` 부터 `COMMIT` 까지는 **한
+연결에서 이어 실행한다.** 표는 0) 에서 고른 스키마에 생긴다 — 만들기 · 되돌리기 · 지우기를 모두 같은 스키마에서 한다.
+
+```sql
+-- 2-0) 되돌리기 표 — 바뀔 행의 id 와 원래 값(NULL 포함)을 남긴다. 컬럼 길이는 place.source_category 와 같다. dev 기대 224행
+SELECT DATABASE();   -- 0) 에서 고른 스키마인지 다시 본다
+CREATE TABLE place_cafe_fix_1473 (
+    id BIGINT NOT NULL PRIMARY KEY,
+    original_source_category VARCHAR(50) NULL
+);
+INSERT INTO place_cafe_fix_1473 (id, original_source_category)
+SELECT id, source_category FROM place
+ WHERE source = 'TOUR_API'
+   AND (lcls_systm2 = 'FD05' OR ((lcls_systm2 IS NULL OR lcls_systm2 = '') AND cat3 = 'A05020900'))
+   AND (source_category IS NULL OR source_category <> '카페');
+
+START TRANSACTION;
+
+-- 2-1) 카페로 싣는다 — 다음 placeImportJob 의 UPSERT_SQL 이 이 행들에 쓸 값과 같다
+UPDATE place p
+  JOIN place_cafe_fix_1473 f ON f.id = p.id
+   SET p.source_category = '카페', p.updated_at = NOW();
+
+-- 2-2) COMMIT 전에 1-1 을 이 트랜잭션 안에서 다시 돌린다 — 0행이어야 한다
+SELECT source_category, COUNT(*) FROM place
+ WHERE source = 'TOUR_API'
+   AND (lcls_systm2 = 'FD05' OR ((lcls_systm2 IS NULL OR lcls_systm2 = '') AND cat3 = 'A05020900'))
+   AND (source_category IS NULL OR source_category <> '카페')
+ GROUP BY source_category;
+
+-- 2-3) 되돌리기 표의 행이 모두 카페가 됐다 — 두 값이 같아야 한다
+SELECT COUNT(*) FROM place_cafe_fix_1473;
+SELECT COUNT(*) FROM place p JOIN place_cafe_fix_1473 f ON f.id = p.id WHERE p.source_category = '카페';
+
+COMMIT;   -- 2-2 가 0행이고 2-3 의 두 값이 같을 때만. 아니면 ROLLBACK; 하고 원인을 본다
+```
+
+- 화면에서 달라지는 것 — 이름에 단서가 없는 관광정보 카페가 카페 칩 · 카페 핀 · 배지로 보이고, `sourceCategory=카페` 검색과 AI 카페 요청
+  (`RequestNoteConstraints`)에 잡힌다. 동반 가능 여부 · 크기 조건은 바뀌지 않는다.
+- prod 는 §8 · §13 과 같이 **런북으로 사람이 적용**한다. dev 에서 1) · 2) 와 확인 3-x 를 돌려 건수를 확인한 뒤 옮긴다.
+
+### 확인
+
+```sql
+-- 3-1) 바꿀 행이 남지 않았다 — 1-1 을 다시 돌리면 0행이다 (2-2 에서 COMMIT 전에 이미 봤다)
+
+-- 3-2) 노출 중인 관광 API 카페 수 — 1-4 + 1-2 와 같다. dev 2026-10-14: 6 + 205 = 211
+SELECT COUNT(*) FROM place
+ WHERE source = 'TOUR_API' AND source_category = '카페' AND delisted_at IS NULL AND merged_into_id IS NULL;
+
+-- 3-3) 이름에 단서가 없던 카페가 카페다 (#1472 의 예)
+SELECT id, title, source_category, lcls_systm2, cat3 FROM place
+ WHERE source = 'TOUR_API'
+   AND (title LIKE '%델문도%' OR title LIKE '%우유부단%' OR title LIKE '%나비정원%' OR title LIKE '%와랑와랑%');
+
+-- 3-4) 분류 코드는 카페가 아닌데 카페인 관광 API 행 — 이 절차가 만든 값이 아니라 원래 있던 값이다. absorbed_categories 에 '카페' 가 있으면
+--      병합이 옮긴 값이고, 없으면 관광정보가 카페에서 다른 업종으로 바꾼 행이다(COALESCE 의 한계, place-data-integration.md §6-7).
+--      조건은 대상 판정 조건의 NULL 안전한 부정이다. 구분류 카페 · 신분류 제과 6곳은 여기 나오면 안 된다(병합 값이 아니면)
+SELECT s.id, s.title, s.lcls_systm2, s.lcls_systm3, s.cat3,
+       (SELECT GROUP_CONCAT(a.source_category) FROM place a WHERE a.merged_into_id = s.id) AS absorbed_categories
+  FROM place s
+ WHERE s.source = 'TOUR_API' AND s.source_category = '카페'
+   AND NOT (COALESCE(s.lcls_systm2, '') = 'FD05' OR (COALESCE(s.lcls_systm2, '') = '' AND COALESCE(s.cat3, '') = 'A05020900'));
+```
+
+> 장소 API 로 보면 검색 캐시(`RedisPlaceSearchCacheAdapter`, TTL 기본 300초 `place.search-cache-seconds`) 때문에 최대 5분간 옛 값이 올 수 있다 —
+> §8 과 같이 **확인은 SQL 로 한다.**
+
+### 되돌리기
+
+COMMIT 뒤에 되돌려야 하면 2-0 의 표로 원래 값(NULL 포함)을 돌려놓는다. 표가 있는 스키마(0) 에서 고른 곳)에서 돌린다.
+
+```sql
+SELECT DATABASE();   -- 2-0 에서 표를 만든 스키마여야 한다
+UPDATE place p
+  JOIN place_cafe_fix_1473 f ON f.id = p.id
+   SET p.source_category = f.original_source_category, p.updated_at = NOW();
+```
+
+- **코드가 배포돼 있으면 다음 `placeImportJob` 이 같은 행을 다시 `카페` 로 덮는다.** 되돌린 값이 남으려면 코드(`UPSERT_SQL` ·
+  `TourApiCafeClassPolicy`)를 먼저 되돌리고 이 SQL 을 돌린다. 옛 코드는 UPDATE 절에서 이 칸을 쓰지 않아 되돌린 값이 남는다. 2-0 뒤에 새 코드가
+  INSERT 한 행은 표에 없어 `카페` 로 남는다.
+- 되돌리기 표는 배포 뒤 첫 `placeImportJob` 이 돌고 확인이 끝나면 **만든 스키마에서** 지운다 — `SELECT DATABASE();` 로 확인한 뒤
+  `DROP TABLE place_cafe_fix_1473;`
