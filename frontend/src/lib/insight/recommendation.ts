@@ -2,7 +2,11 @@ import { ApiError, shouldOfferRetry } from '@/lib/api/error'
 import { toMessage } from '@/lib/api/response'
 import type { PlaceCardPlace } from '@/lib/insight/place-cards'
 import { messages } from '@/lib/messages'
-import type { PlaceRecommendationResponse, PlaceSuitabilityResponse } from '@/types/insight'
+import type {
+  PlaceRecommendationResponse,
+  PlaceSuitabilityResponse,
+  WeatherWarningItem,
+} from '@/types/insight'
 
 /**
  * 홈 `오늘 갈 만한 곳` 의 추천 응답 규칙 (#1380 · 홈-세부명세 D10).
@@ -95,6 +99,31 @@ export function allCardsCautious(
   return (
     cards.length > 0 && cards.every((card) => CAUTIOUS_LEVEL_CODES.has(card.suitabilityLevel.code))
   )
+}
+
+/** 경보 — 추천을 막는 유일한 특보 단계다 (BE `WeatherWarning.suppressesRecommendation`) */
+const WARNING_LEVEL_CODE = 'WARNING'
+
+/**
+ * 추천이 **빈 목록**으로 온 날 카드 자리가 할 말 (#1513 · BE #1434).
+ *
+ * - **경보 날** — 경보가 점수를 0 으로 눌러 늘 빈 목록이다. 특보 때문에 쉰다고 말한다. 특보 내용은 홈 맨 위
+ *   띠(`WeatherWarningStrip`)가 이미 말하므로 여기서 다시 적지 않는다.
+ * - **그 밖** — '주의 필요'(60점 미만)만 남은 날, 날씨를 못 받아 점수가 없는 날이 같은 빈 목록이다. 이유를
+ *   단정하지 않는다. **주의보는 추천을 막지 않으므로** 주의보 날 빈 목록도 이쪽이다.
+ *
+ * 단계는 `level.code` 로만 가른다 — 한국어 `name` 으로 가르지 않는다 (api-integration-guide §6).
+ */
+export function emptyRecommendationNotice(warning: WeatherWarningItem | null): {
+  title: string
+  description: string
+} {
+  return warning?.level.code === WARNING_LEVEL_CODE
+    ? {
+        title: messages.home.emptyRecommendWarningTitle,
+        description: messages.home.emptyRecommendWarningDesc,
+      }
+    : { title: messages.home.emptyRecommendTitle, description: messages.home.emptyRecommendDesc }
 }
 
 /**
