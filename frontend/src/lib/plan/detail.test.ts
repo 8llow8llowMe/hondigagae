@@ -39,7 +39,15 @@ function item(overrides: Partial<PlanItemDetail> & { day: number; sequence: numb
 
 /** 좌표만 있는 장소 요약. 거리 계산에 필요한 것은 lat/lng 뿐이다 */
 function placeAt(coord: LatLng): PlanItemPlace {
-  return { addr1: null, indoor: null, firstImage: null, lat: coord.lat, lng: coord.lng }
+  return {
+    addr1: null,
+    indoor: null,
+    firstImage: null,
+    lat: coord.lat,
+    lng: coord.lng,
+    contentType: null,
+    sourceCategory: null,
+  }
 }
 
 describe('haversineMeters', () => {
@@ -277,7 +285,15 @@ describe('toItemRows — 거리는 항목이 들고 온 좌표로 잰다 (#115)'
       day: 1,
       sequence: 1,
       title: '좌표 없음',
-      place: { addr1: '제주시 어딘가', indoor: null, firstImage: null, lat: null, lng: null },
+      place: {
+        addr1: '제주시 어딘가',
+        indoor: null,
+        firstImage: null,
+        lat: null,
+        lng: null,
+        contentType: null,
+        sourceCategory: null,
+      },
     })
     const rows = toItemRows([airport, noCoord], null)
 

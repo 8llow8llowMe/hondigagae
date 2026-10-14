@@ -173,6 +173,8 @@ export const suitabilityWithIndoor: PlaceSuitabilityResponse = {
         description: '일부 구역 또는 조건부로 반려동물 동반이 가능한 장소입니다.',
       },
       allowedPetSize: { code: 'SMALL', name: '소형견', description: '소형견만 동반 가능합니다.' },
+      contentType: { code: 'CULTURE', name: '문화시설', description: '박물관, 미술관 등 문화시설' },
+      sourceCategory: '미술관',
     },
   ],
 }

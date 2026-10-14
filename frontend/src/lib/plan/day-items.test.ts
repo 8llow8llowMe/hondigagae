@@ -856,4 +856,14 @@ describe('placeItemTypeOf — 담을 장소의 일정 항목 유형 (#1447 · �
     expect(of('CULTURE', '카페')).toBe('PLACE')
     expect(of('LODGING')).toBe('PLACE')
   })
+
+  /*
+    #1516: 실내 대안 · 일정 항목 장소 요약의 `contentType` 은 nullable 이다 — 배포 직후의 옛 추천 캐시,
+    옛 tour, 원천에 유형이 없는 장소. 그대로 `.code` 를 읽으면 화면이 깨진다.
+  */
+  it('장소 유형을 모르면(contentType=null) PLACE 다 — 이름이 식당이어도 짐작하지 않는다 (#1516)', () => {
+    expect(placeItemTypeOf({ contentType: null, sourceCategory: null, title: '도라지식당' })).toBe(
+      'PLACE',
+    )
+  })
 })

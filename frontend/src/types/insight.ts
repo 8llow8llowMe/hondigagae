@@ -146,6 +146,10 @@ export type AlternativePlaceItem = {
   distanceMeters: number
   petAllowanceType: CodeNameMetadata
   allowedPetSize: CodeNameMetadata
+  /** 장소 유형 (#1461 BE). 장소 목록의 `contentType` 과 같은 값이다. **유형을 모르면 null** */
+  contentType: CodeNameMetadata | null
+  /** 원본 분류 (원천이 준 값 그대로 — `카페` 등). 없으면 null */
+  sourceCategory: string | null
 }
 
 /**

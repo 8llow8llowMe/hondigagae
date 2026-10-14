@@ -20,6 +20,7 @@ import { MOCK_WALK_COURSES } from '@/lib/api/mock/walk-course-data'
 import { serviceTodayDay } from '@/lib/date/day'
 import type { ApiResponse, CodeNameMetadata, SliceResponse, ValidationErrorItem } from '@/types/api'
 import type { ScoreMetricMetadata } from '@/types/insight'
+import type { PlaceSummary } from '@/types/place'
 import type {
   PlanAlternativePlaceItem,
   PlanBriefingItemSummary,
@@ -250,7 +251,18 @@ function toItemPlace(item: MockPlanItem): PlanItemPlace | null {
     firstImage: place.firstImage,
     lat: place.lat,
     lng: place.lng,
+    contentType: toContentTypeMetadata(place),
+    sourceCategory: place.sourceCategory,
   }
+}
+
+/**
+ * 장소 목록의 `contentType` 을 일정 응답의 3필드 metadata 로 (#1461 · #1516). 서버도 같은 값을
+ * `CodeNameDescriptionMetadata` 로 다시 씌운다 — `PlanItemPlaceItem.toContentTypeMetadata`.
+ */
+function toContentTypeMetadata(place: PlaceSummary): CodeNameMetadata {
+  const { code, name, description } = place.contentType
+  return { code, name, description: description ?? null }
 }
 
 /**
@@ -1884,7 +1896,7 @@ function mockPlanWalkSafety(plan: MockPlan): PlanWalkSafetyResponse {
 /**
  * 실내 대안.
  *
- * **좌표와 거리를 서버가 준다** (`PlanAlternativePlaceItem` 5필드). 거리는 그날 기준
+ * **좌표와 거리를 서버가 준다** (`PlanAlternativePlaceItem`). 거리는 그날 기준
  * 장소로부터의 하버사인 직선거리라 mock 도 같은 방식으로 잰다 — 주소·실내 여부는
  * 계약에 없어 화면이 `GET /places/{id}` 로 보강한다.
  */
@@ -1907,6 +1919,8 @@ function indoorAlternatives(representativePlaceId: string | null): PlanAlternati
           basisLat === null || basisLng === null
             ? 0
             : Math.round(geoMeters(basisLat, basisLng, place.lat as number, place.lng as number)),
+        contentType: toContentTypeMetadata(place),
+        sourceCategory: place.sourceCategory,
       }))
   )
 }

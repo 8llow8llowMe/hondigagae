@@ -311,10 +311,13 @@ export type AddedPlace = { placeId: string; title: string; itemType: AddedPlaceI
 /**
  * 담을 장소의 일정 항목 유형 (#1447 · 일정상세-세부명세 D26-5).
  *
- * **음식점(`contentType.code === 'RESTAURANT'`)이면 `MEAL`, 아니면 `PLACE`.** 상세 응답의
- * `PlanItemPlace` 에는 `contentType` 이 없어 일정 화면은 담긴 항목이 음식점인지 모른다 — 장소를
- * 아는 것은 담는 순간뿐이라 여기서 가른다. 그래야 확정 전 점검(`confirm-check.ts`)의 식사 판정
- * (`itemType.code === 'MEAL'`)이 음식점을 담은 날을 "식사 없음" 으로 잘못 묻지 않는다.
+ * **음식점(`contentType.code === 'RESTAURANT'`)이면 `MEAL`, 아니면 `PLACE`.** 담는 순간에 갈라
+ * 저장해 두면 확정 전 점검(`confirm-check.ts`)의 식사 판정이 음식점을 담은 날을 "식사 없음" 으로
+ * 잘못 묻지 않는다. 이미 `PLACE` 로 저장된 음식점은 점검이 상세의 장소 요약(`PlanItemPlace`)으로
+ * 이 함수를 다시 불러 센다 (#1516).
+ *
+ * **`contentType` 이 null 이면 `PLACE` 다** (#1516). 실내 대안 · 일정 항목 장소 요약의 유형은
+ * nullable 이다 — 옛 추천 캐시 · 옛 tour · 원천에 유형이 없는 장소. 이름으로 짐작하지 않는다.
  *
  * **카페는 `PLACE` 다.** 원천상 `RESTAURANT` 이지만 끼니가 아니다 — 카페만 담은 날은 식사를 물어야
  * 맞다. 판정은 `isCafeLikePlace` 다(#1472) — 원천 분류 `카페` 에 더해 장소명으로도 가린다. 원천
@@ -325,11 +328,15 @@ export type AddedPlace = { placeId: string; title: string; itemType: AddedPlaceI
  * (`PlanItemRequest.targetId` · `verifyPlaceTargets`).
  */
 export function placeItemTypeOf(place: {
-  contentType: { code: string }
+  contentType: { code: string } | null
   sourceCategory: string | null
   title: string
 }): AddedPlaceItemType {
-  return place.contentType.code === 'RESTAURANT' && !isCafeLikePlace(place) ? 'MEAL' : 'PLACE'
+  const { contentType } = place
+  if (contentType === null) return 'PLACE'
+  return contentType.code === 'RESTAURANT' && !isCafeLikePlace({ ...place, contentType })
+    ? 'MEAL'
+    : 'PLACE'
 }
 
 /**

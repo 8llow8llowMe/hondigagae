@@ -73,6 +73,16 @@ export type PlanAlternativePlaceItem = {
    * 붙인다 — 제주는 산간·해안도로가 많아 주행거리와 크게 다르다 (일정상세-세부명세 D3).
    */
   distanceMeters: number
+  /**
+   * 장소 유형 (#1461 BE · #1516). 장소 목록의 `contentType` 과 같은 값이다 — `담기` 가 음식점을
+   * `MEAL` 로 싣는 데 쓴다(`placeItemTypeOf`).
+   *
+   * **nullable 이다.** 배포 직후 최대 600초의 옛 추천 캐시, 옛 tour, 원천에 유형이 없는 장소면 null —
+   * 그때는 `PLACE` 로 담는다.
+   */
+  contentType: CodeNameMetadata | null
+  /** 원본 분류 (원천이 준 값 그대로 — `카페` 등). 없으면 null */
+  sourceCategory: string | null
 }
 
 /**
@@ -710,6 +720,16 @@ export type PlanItemPlace = {
   /** 항목 간 이동 거리 계산에 쓴다 */
   lat: number | null
   lng: number | null
+  /**
+   * 장소 유형 (#1461 BE · #1516). tour-service 장소 목록의 `contentType` 과 같은 값이다 — 확정 전 점검이
+   * `PLACE` 로 저장된 음식점을 식사로 세는 데 쓴다(`confirm-check.ts`).
+   *
+   * **nullable 이다** — 유형을 모르면 객체 통째로 null 이다(옛 tour · 원천에 유형 없음). 그때는 식사로
+   * 세지 않는다.
+   */
+  contentType: CodeNameMetadata | null
+  /** 원본 분류 (원천이 준 값 그대로 — `카페` 등). 없으면 null */
+  sourceCategory: string | null
 }
 
 /**

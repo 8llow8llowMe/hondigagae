@@ -38,7 +38,7 @@ import { initialClockTime, toClockTime } from '@/lib/plan/clock-time'
 import type { PlanCompanions } from '@/lib/plan/companion-pets'
 import { planConfirmCheck } from '@/lib/plan/confirm-check'
 import { addPlanDays, planPhaseOf } from '@/lib/plan/date'
-import { placeIdsOf } from '@/lib/plan/day-items'
+import { placeIdsOf, placeItemTypeOf } from '@/lib/plan/day-items'
 import { dayItemsLock, dayItemsSaveLocks } from '@/lib/plan/day-items-lock'
 import {
   groupItemsByDay,
@@ -725,13 +725,13 @@ export function PlanDetailSection({
                   // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
                   dayItems: group.items,
                   /*
-                    **실내 대안은 `PLACE` 로 담는다.** 대안 항목(`PlanAlternativePlaceItem`)에는
-                    `contentType` 이 없어 음식점인지 알 수 없다 (#1447 · 일정상세 D26-5).
+                    **실내 대안도 음식점은 `MEAL` 로 담는다** (#1516 · 일정상세 D26-5). 대안의
+                    `contentType` 은 nullable 이라 모르면 `PLACE` 다 — 판정은 `placeItemTypeOf` 하나.
                   */
                   place: {
                     placeId: alternative.placeId,
                     title: alternative.title,
-                    itemType: 'PLACE',
+                    itemType: placeItemTypeOf(alternative),
                   },
                 }),
               onAddMove: () => openMoveAdd(group.day),

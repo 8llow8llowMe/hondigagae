@@ -1,10 +1,10 @@
 /**
  * 일정 항목 타일의 일러스트 — 사진이 없는 항목의 자리를 채운다 (#842).
  *
- * **키가 `contentType` 이 아니라 `itemType` 이다.** `PlanItemPlace` 에는 `contentType` 이
- * 없어서(`addr1` · `indoor` · `firstImage` · `lat` · `lng` 뿐, `types/plan.ts`) `/places`
- * 목록과 홈이 쓰는 `placeIllustration(contentTypeCode)` 를 이 행에서 부를 수 없다. 대신
- * `item.itemType.code` 가 다섯 값 중 하나로 늘 온다 (`PLAN_ITEM_TYPES`).
+ * **키가 `contentType` 이 아니라 `itemType` 이다.** 처음에는 `PlanItemPlace` 에 `contentType` 이
+ * 없어서 `/places` 목록과 홈이 쓰는 `placeIllustration(contentTypeCode)` 를 이 행에서 부를 수
+ * 없었다. #1461 로 생긴 뒤에도 nullable 이고 `WALK` · `MOVE` 에는 장소가 없다 — 반면
+ * `item.itemType.code` 는 다섯 값 중 하나로 늘 온다 (`PLAN_ITEM_TYPES`).
  *
  * **`lib/place/illustration.ts` 를 고치지 않는다.** 두 표가 같은 파일 몇 개를 가리키지만
  * **키가 다른 두 매핑**이지 중복이 아니다 — 장소 도메인은 계속 `contentType` 으로 고른다.
