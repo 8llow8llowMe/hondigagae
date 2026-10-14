@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import {
   allCardsCautious,
+  emptyRecommendationNotice,
   recommendationFailure,
   toRecommendationCards,
 } from '@/lib/insight/recommendation'
@@ -198,5 +199,35 @@ describe('recommendationFailure', () => {
     expect(recommendationFailure(new ApiError(404, null, null)).title).toBe(
       messages.home.emptyPlacesTitle,
     )
+  })
+})
+
+/*
+  #1513 · #1434 BE: '주의 필요'(60점 미만)는 추천에서 빠져 목록이 비어 올 수 있다. 경보 날은 늘 빈 목록이고
+  특보는 응답 머리(`weatherWarning`)가 말한다 — 빈 상태가 그 둘을 갈라 말한다.
+*/
+describe('emptyRecommendationNotice', () => {
+  const warning = (level: 'WARNING' | 'ADVISORY') => ({
+    type: { code: 'HEAVY_RAIN', name: '호우', description: null },
+    level: { code: level, name: level === 'WARNING' ? '경보' : '주의보', description: null },
+    effectiveAt: '2026-10-15T06:00:00',
+  })
+
+  it('경보 날은 특보로 추천을 쉰다고 말한다', () => {
+    expect(emptyRecommendationNotice(warning('WARNING'))).toEqual({
+      title: '기상특보로 오늘은 추천을 쉬어요',
+      description: '특보가 풀리면 다시 골라 드릴게요. 장소는 직접 찾아볼 수 있어요.',
+    })
+  })
+
+  /* 주의보는 추천을 막지 않는다(§6-4) — 비었다면 특보 탓이라고 말하지 않는다 */
+  it.each([
+    ['주의보', warning('ADVISORY')],
+    ['특보 없음', null],
+  ] as const)('%s 날은 권할 곳이 없다고 말한다 — 이유를 단정하지 않는다', (_, item) => {
+    expect(emptyRecommendationNotice(item)).toEqual({
+      title: '오늘은 추천할 만한 곳이 없어요',
+      description: '오늘 날씨와 장소 상황을 반영하면 권할 곳이 없어요. 장소를 직접 찾아보세요.',
+    })
   })
 })

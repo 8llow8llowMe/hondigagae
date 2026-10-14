@@ -432,7 +432,20 @@ export const homeMessages = {
    * ⓘ 안은 시트라 폭이 모자라지 않아 한 벌이면 된다.
    */
   sortNoteLabel: '반영한 조건',
+  /** 추천 조회가 4xx 로 실패했는데 서버 문구가 없을 때의 제목 (`recommendationFailure`) */
   emptyPlacesTitle: '표시할 장소가 없어요',
+  /**
+   * 추천이 **빈 목록**으로 온 날 (#1513 · #1434 BE). '주의 필요'(60점 미만)는 추천에서 빠지고, 경보 날은
+   * 늘 빈 목록이다. 경보는 응답 머리 `weatherWarning` 으로 가른다(`emptyRecommendationNotice`).
+   *
+   * 경보가 아닌 빈 날은 **이유를 단정하지 않는다** — 전부 '주의 필요' 인 날도, 날씨를 못 받아 점수가 없는
+   * 날도 같은 빈 목록이다.
+   */
+  emptyRecommendWarningTitle: '기상특보로 오늘은 추천을 쉬어요',
+  emptyRecommendWarningDesc: '특보가 풀리면 다시 골라 드릴게요. 장소는 직접 찾아볼 수 있어요.',
+  emptyRecommendTitle: '오늘은 추천할 만한 곳이 없어요',
+  emptyRecommendDesc: '오늘 날씨와 장소 상황을 반영하면 권할 곳이 없어요. 장소를 직접 찾아보세요.',
+  /** 4xx 실패 빈 상태의 설명 — 서버 문구 제목 아래에 붙는다 */
   emptyPlacesDesc: '장소를 찾아보세요.',
   findPlaces: '장소 찾기',
   upcomingHeading: '다가오는 일정',

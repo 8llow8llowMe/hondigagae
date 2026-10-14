@@ -47,6 +47,7 @@ import { appliedFactorsOf, resolveBasisPlaceId, splitSharedReasons } from '@/lib
 import { clearRecentPlaceId, isBasisPlaceGone, readRecentPlaceId } from '@/lib/insight/recent-place'
 import {
   allCardsCautious,
+  emptyRecommendationNotice,
   recommendationFailure,
   toRecommendationCards,
 } from '@/lib/insight/recommendation'
@@ -301,6 +302,11 @@ export function HomeView({
     recommendations.isError && recommendations.data === undefined
       ? recommendationFailure(recommendations.error)
       : null
+  /* 빈 상태의 문구 — 4xx 실패는 서버 문구, 빈 목록은 경보 날과 그 밖을 가른다 (#1513) */
+  const emptyNotice =
+    failure === null
+      ? emptyRecommendationNotice(recommendations.data?.weatherWarning ?? null)
+      : { title: failure.title, description: messages.home.emptyPlacesDesc }
   const refetching = recommendations.isFetching && recommendations.data !== undefined
 
   /*
@@ -731,12 +737,15 @@ export function HomeView({
               /*
                 **재시도할 수 없는 실패(404 · 4xx)도 빈 상태 모양이다** (`recommendationFailure`). 다시
                 눌러도 같은 답이라 버튼을 달지 않고 서버 문구를 제목으로 낸다 — 길은 `장소 찾기` 다.
+
+                **빈 목록은 경보 날과 그 밖을 갈라 말한다** (#1513, `emptyRecommendationNotice`). '주의
+                필요' 가 추천에서 빠지면서(#1434) 빈 목록이 실패가 아니라 그날의 답이 됐다.
               */
               <EmptyState
                 headingLevel={3}
                 inset="card"
-                title={failure?.title ?? messages.home.emptyPlacesTitle}
-                description={messages.home.emptyPlacesDesc}
+                title={emptyNotice.title}
+                description={emptyNotice.description}
                 action={
                   <Link
                     href="/places"
