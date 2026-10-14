@@ -177,6 +177,7 @@ describe('#1489 다녀옴 직후 메모 저장', () => {
         },
         onReplaced: () => undefined,
         refetchDetail: () => Promise.resolve(),
+        waitCap: () => new Promise<void>(() => undefined),
       },
     )
 
