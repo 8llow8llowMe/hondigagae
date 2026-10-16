@@ -192,6 +192,15 @@ assignee 가 비어 있으면 "누가 들고 있는 작업인지" 를 PR 목록�
 (ai-service) 가 바로 뒤 #1259 · #1263 의 라벨만 읽혀 그랬다. 그래도 빠진 커밋은 해당 잡을
 `FORCE_DEPLOY` 로 한 번 돌려 올린다.
 
+**#1269 는 [#1514](https://github.com/8llow8llowMe/hondigagae/issues/1514) 전까지 한 번도 동작하지 않았다.** 공용
+파이프라인이 `checkout` 을 직접 부르면서 그 반환값(`GIT_PREVIOUS_SUCCESSFUL_COMMIT` 등)을 버려, "이전 성공 커밋" 이 늘
+비어 있었다 — 변경 파일은 "판단할 수 없어 전체 빌드" 로, 라벨은 HEAD 커밋의 PR 하나로 빠졌다. #1511(batch) 33초 뒤
+#1512(tour) 를 머지하자 batch-service 가 배포되지 않은 것이 그 결과다. 지금은 브랜치 빌드의 첫 체크아웃을 멀티브랜치가
+고정한 리비전(`checkout scm`)으로 받아 그 반환값을 env 로 옮기고(`exportCheckoutVars`), 한 빌드 안의 두 번째
+체크아웃(빌드 단계)은 첫 체크아웃이 받은 커밋을 다시 받는다 — 그사이 머지가 끼어도 판단한 커밋과 빌드하는 커밋이 같다.
+**수동 빌드도 기준점을 당긴다.** `SKIP_DEPLOY` · `PR_SHA` 로 돌린 수동 빌드도 성공하면 그 커밋이 다음 머지 빌드의
+"이전 성공 커밋" 이 되어, 그 사이 범위는 이후 자동 배포에서 다시 보지 않는다. 배포가 빠진 범위는 `FORCE_DEPLOY` 로 올린다. 빌드 로그 머리에 `이전 성공 빌드 커밋: …` 이 찍힌다.
+
 #### 라벨은 자동으로도 붙는다 — 그래도 확인은 한다
 
 `.github/workflows/label.yml` 이 **경로를 보고 라벨을 붙인다** (매핑은
@@ -302,10 +311,13 @@ gh pr merge <릴리스 PR 번호> --merge     # --delete-branch 를 붙이지 �
      conflicts" 로 막혔다. `main` 이 develop 의 조상이고 범위 안 머지 커밋도 0개라 내용 충돌은 없었다.
      GitHub 의 rebase 머지는 커밋을 하나씩 다시 적용해 새 SHA 를 만드는데, 그 재적용이 실패한 것이다.
      매 릴리스가 같은 위험을 지고, 성공해도 `main` 과 develop 의 SHA 가 갈라져 다음 릴리스가 더 어려워진다.
-  2. **배포 라벨이 정확히 읽힌다.** 파이프라인은 `main` 빌드의 HEAD 커밋에서 `merge_commit_sha` 가 같은
-     PR 을 배포 근거로 고른다(`Jenkinsfile.*-common.groovy` `resolveDeployLabelContext`). merge commit 이면
-     그 PR 이 릴리스 PR 이다. **fast-forward 로 올리면** HEAD 가 develop 의 마지막 커밋이라 그 커밋을 만든
-     **기능 PR 의 라벨만** 읽혀 일부 서비스만 배포된다.
+  2. **배포 라벨이 정확히 읽힌다.** 파이프라인은 이전 성공 빌드 이후 `main` 의 **첫 부모 이력**
+     (`git log --first-parent -m`)에서 잡의 범위에 닿은 커밋마다 `main` 으로 머지된 PR 의 라벨을 모은다
+     (`resolveMergedDeployLabelContext`, #1514). merge commit 이면 그 커밋이 릴리스 전체 변경과 함께 잡혀 릴리스
+     PR 의 라벨이 읽힌다 — 기본 `git log` 는 merge commit 의 파일을 내지 않아 develop 쪽 기능 커밋(base=develop)만
+     남고 릴리스 PR 을 못 찾는다. 범위를 잡지 못하면(첫 빌드 등) HEAD 커밋에서 `merge_commit_sha` 가 같은 PR 로
+     판단한다(`resolveDeployLabelContext`). **fast-forward 로 올리면** 그 커밋들은 develop 기능 PR 의 것이라
+     `main` 으로 머지된 PR 이 없어 배포 근거가 사라진다.
 - `main` 에만 머지 커밋이 쌓인다. develop 은 계속 선형이고, 머지 커밋은 내용을 바꾸지 않아 다음 릴리스에
   충돌을 만들지 않는다.
 - 라벨을 빠뜨렸거나 일부만 다시 내보내야 하면 해당 잡의 `main` 빌드를 **`FORCE_DEPLOY=true`** 로 수동 실행한다.
