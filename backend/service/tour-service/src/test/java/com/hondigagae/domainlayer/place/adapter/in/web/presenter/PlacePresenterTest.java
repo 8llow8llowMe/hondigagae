@@ -112,6 +112,26 @@ class PlacePresenterTest {
     }
 
     @Test
+    @DisplayName("petRestriction 은 Info 가 해석한 값을 싣는다 — place 의 원천 원문이 아니다 (#1523)")
+    void detailCarriesInterpretedPetRestriction() {
+        // 원천 원문이 자리표시여도 Processor 가 null 로 읽었으면 null 이 나가야 한다. Presenter 가 원문을 다시 집어 오면 안 된다.
+        PlaceDetailResponse placeholder = presenter.toDetailResponse(PlaceDetailInfo.builder()
+            .place(culturePortalPlace().petRestriction("해당없음").build())
+            .petRestriction(null)
+            .images(List.of())
+            .build());
+        PlaceDetailResponse stated = presenter.toDetailResponse(PlaceDetailInfo.builder()
+            .place(culturePortalPlace().indoor(false).petRestriction(" 야외만 반려동물 동반 가능 ").build())
+            .petRestriction("야외만 반려동물 동반 가능")
+            .images(List.of())
+            .build());
+
+        assertThat(placeholder.petRestriction()).isNull();
+        assertThat(stated.petRestriction()).isEqualTo("야외만 반려동물 동반 가능");
+        assertThat(stated.indoor()).isFalse();
+    }
+
+    @Test
     @DisplayName("거리순 목록이면 항목에 distanceMeters 가 실린다 (#1202)")
     void distanceListCarriesDistanceMeters() {
         SliceResponse<PlaceItem> response = presenter.toSliceResponse(

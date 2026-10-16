@@ -20,6 +20,7 @@ import com.hondigagae.domainlayer.place.application.port.out.PlaceSearchCachePor
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceCoordinateQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSliceQueryResult;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
+import com.hondigagae.domainlayer.place.domain.model.PetRestriction;
 import com.hondigagae.domainlayer.place.domain.model.Place;
 import com.hondigagae.domainlayer.place.domain.model.PlaceOpenState;
 import java.math.BigDecimal;
@@ -270,6 +271,8 @@ public class PlaceQueryProcessor {
 
         return PlaceDetailInfo.builder()
             .place(place)
+            // 원천은 "제한 없음" 을 "해당없음" · "제한사항 없음" 이라는 낱말로 보낸다 — 그대로 실으면 그 낱말이 제한사항처럼 뜬다 (#1523)
+            .petRestriction(PetRestriction.stated(place.petRestriction()))
             .intro(intro)
             .petInfo(petInfo)
             .images(images)

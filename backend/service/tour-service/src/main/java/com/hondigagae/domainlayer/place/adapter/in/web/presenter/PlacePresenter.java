@@ -80,6 +80,7 @@ public class PlacePresenter {
             .delisted(place.delistedAt() != null)
             .petAllowanceType(place.petAllowanceType().toMetadata())
             .indoor(place.indoor())
+            .petRestriction(detailInfo.petRestriction())
             .sourceCategory(place.sourceCategory())
             .sourceName(place.source() == null ? null : place.source().getDisplayName())
             .intro(toIntroItem(detailInfo.intro()))
