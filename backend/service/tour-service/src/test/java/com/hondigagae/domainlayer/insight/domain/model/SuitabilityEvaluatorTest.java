@@ -277,6 +277,35 @@ class SuitabilityEvaluatorTest {
             assertThat(fee.description()).contains("20,000원").doesNotContain("없음");
             assertThat(fee.scoreDelta()).isEqualTo(-3);
         }
+
+        @Test
+        @DisplayName("부분 동반 근거는 제한사항 원문을 괄호로 붙인다")
+        void partialAllowanceCarriesRestrictionText() {
+            SuitabilityReason partial = partialReasonOf(partiallyAllowedPlace("  야외만 반려동물 동반 가능 "));
+
+            // 앞뒤 공백은 정리하고 원문은 그대로 — 장소 상세 petRestriction 과 같은 규칙(PetRestriction)이다 (#1523)
+            assertThat(partial.description()).isEqualTo("일부 구역 또는 조건부로만 동반이 가능합니다. (야외만 반려동물 동반 가능)");
+            assertThat(partial.scoreDelta()).isNegative();
+        }
+
+        @Test
+        @DisplayName("제한사항이 '제한 없음' 자리표시이거나 비었으면 괄호를 붙이지 않는다 — (해당없음) 이 붙던 자리 (#1523)")
+        void partialAllowanceOmitsPlaceholderRestriction() {
+            String bare = "일부 구역 또는 조건부로만 동반이 가능합니다.";
+
+            assertThat(partialReasonOf(partiallyAllowedPlace("해당없음")).description()).isEqualTo(bare);
+            assertThat(partialReasonOf(partiallyAllowedPlace("제한사항 없음")).description()).isEqualTo(bare);
+            assertThat(partialReasonOf(partiallyAllowedPlace("해당 없음")).description()).isEqualTo(bare);
+            assertThat(partialReasonOf(partiallyAllowedPlace(" ")).description()).isEqualTo(bare);
+            assertThat(partialReasonOf(partiallyAllowedPlace(null)).description()).isEqualTo(bare);
+        }
+
+        private SuitabilityReason partialReasonOf(PlaceCondition place) {
+            return SuitabilityEvaluator.evaluate(input(mildWeather(), false, place, pet())).reasons().stream()
+                .filter(reason -> reason.code() == SuitabilityReasonCode.PET_PARTIALLY_ALLOWED)
+                .findFirst()
+                .orElseThrow();
+        }
     }
 
     @Nested
@@ -472,6 +501,16 @@ class SuitabilityEvaluatorTest {
             .placeId(1L).title("천지연폭포").lat(33.24).lng(126.55)
             .petAllowanceType(PetAllowanceType.ALLOWED).allowedPetSize(AllowedPetSize.ALL)
             .petExtraFee(petExtraFee)
+            .build();
+    }
+
+    /** 부분 동반 장소. 제한사항 원문만 바꿔 근거 문장을 본다. */
+    private static PlaceCondition partiallyAllowedPlace(String petRestriction) {
+        return PlaceCondition.builder()
+            .placeId(5L).title("제주항일기념관").lat(33.53).lng(126.85)
+            .petAllowanceType(PetAllowanceType.PARTIALLY_ALLOWED).allowedPetSize(AllowedPetSize.ALL)
+            .indoor(false).outdoor(true)
+            .petRestriction(petRestriction)
             .build();
     }
 

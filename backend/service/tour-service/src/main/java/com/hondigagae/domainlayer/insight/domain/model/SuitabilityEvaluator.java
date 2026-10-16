@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.insight.domain.model;
 import com.hondigagae.domainlayer.insight.domain.enums.CongestionLevel;
 import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.enums.SuitabilityReasonCode;
+import com.hondigagae.domainlayer.place.domain.model.PetRestriction;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import java.util.ArrayList;
 import java.util.List;
@@ -406,9 +407,12 @@ public final class SuitabilityEvaluator {
             .formatted(weather.maxTemperature(), rainChance == null ? "정보 없음" : rainChance + "%");
     }
 
+    /**
+     * 제한사항 원문은 장소 상세 {@code petRestriction} 과 같은 규칙({@link PetRestriction})으로 읽는다 (#1523).
+     * 원천이 "제한 없음" 을 "해당없음" 같은 낱말로 보내므로 값의 존재만 보면 "(해당없음)" 이 근거에 붙는다.
+     */
     private static String describeRestriction(PlaceCondition place, String fallback) {
-        return place.petRestriction() != null && !place.petRestriction().isBlank()
-            ? "%s (%s)".formatted(fallback, place.petRestriction())
-            : fallback;
+        String restriction = PetRestriction.stated(place.petRestriction());
+        return restriction == null ? fallback : "%s (%s)".formatted(fallback, restriction);
     }
 }

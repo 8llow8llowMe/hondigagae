@@ -75,6 +75,13 @@ public record PlaceDetailResponse(
     @Schema(description = "실내 여부. null 이면 원천에 정보가 없다", example = "true", nullable = true)
     Boolean indoor,
 
+    @Schema(
+        description = "반려동물 제한사항 원문(앞뒤 공백만 정리). 제한 없음을 뜻하는 원천 자리표시"
+            + "(해당없음 · 제한사항 없음, 공백 차이 무시)와 빈 값은 null",
+        example = "야외만 반려동물 동반 가능",
+        nullable = true)
+    String petRestriction,
+
     @Schema(description = "원본 분류 (원천이 준 값 그대로. 단 식약처 휴게음식점 중 이름이 카페인 곳과 "
         + "관광정보 신분류가 카페(FD05)인 곳 · 신분류가 없을 때 구분류 A05020900 인 곳은 카페)", example = "카페", nullable = true)
     String sourceCategory,
