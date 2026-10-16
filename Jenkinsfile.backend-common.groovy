@@ -44,28 +44,77 @@ Map<String, String> resolveGitContext() {
 }
 
 void checkoutSource() {
+    Map scmVars
     if (params.PR_SHA?.trim()) {
         echo "요청한 PR 커밋 SHA를 체크아웃합니다: ${params.PR_SHA}"
-        checkout([
+        scmVars = checkoutRevision(params.PR_SHA.trim())
+    } else if (env.CHECKED_OUT_COMMIT?.trim()) {
+        // 한 빌드에서 체크아웃이 두 번(배포 문맥 확인 · 빌드) 일어난다. 그사이 머지가 끼면 브랜치 최신이 바뀌어
+        // 판단한 커밋과 빌드하는 커밋이 갈리므로, 두 번째부터는 첫 체크아웃이 받은 커밋을 다시 받는다 (#1514).
+        echo "같은 빌드의 첫 체크아웃이 받은 커밋을 다시 체크아웃합니다: ${env.CHECKED_OUT_COMMIT}"
+        scmVars = checkoutRevision(env.CHECKED_OUT_COMMIT.trim())
+    } else if (!env.CHANGE_ID?.trim()) {
+        // 브랜치 빌드의 첫 체크아웃은 멀티브랜치가 고정한 리비전(빌드 시작 시점의 브랜치 커밋)을 그대로 받는다 (#1514).
+        // 직접 만든 GitSCM 은 그 시점의 브랜치 최신을 받고, 래퍼(`checkout scm`)와 커밋이 갈리면 BuildData 가 하나 더
+        // 붙어 브랜치 키가 'origin/<branch>' 로 바뀐다 — 그러면 이전 성공 커밋을 다른 키에서 읽는다. 래퍼와 같은 SCM 을
+        // 쓰면 BuildData 가 하나로 합쳐지고 키가 늘 '<branch>' 다. 잡 설정에 얕은 클론(CloneOption) trait 이 없어 전체 이력이 온다.
+        echo '멀티브랜치가 고정한 리비전으로 체크아웃합니다.'
+        scmVars = checkout(scm)
+    } else {
+        echo '멀티브랜치 파이프라인 기본 SCM 컨텍스트로 체크아웃합니다.'
+        scmVars = checkout([
             $class: 'GitSCM',
-            branches: [[name: params.PR_SHA.trim()]],
+            branches: scm.branches,
             userRemoteConfigs: scm.userRemoteConfigs,
             extensions: [
                 [$class: 'SubmoduleOption', recursiveSubmodules: true, parentCredentials: true]
             ]
         ])
-        return
     }
+    exportCheckoutVars(scmVars)
+}
 
-    echo '멀티브랜치 파이프라인 기본 SCM 컨텍스트로 체크아웃합니다.'
-    checkout([
+Map checkoutRevision(String revision) {
+    return checkout([
         $class: 'GitSCM',
-        branches: scm.branches,
+        branches: [[name: revision]],
         userRemoteConfigs: scm.userRemoteConfigs,
         extensions: [
             [$class: 'SubmoduleOption', recursiveSubmodules: true, parentCredentials: true]
         ]
     ])
+}
+
+// 체크아웃이 돌려준 Git 변수를 env 로 옮깁니다 (#1514).
+//
+// Declarative 기본 체크아웃은 GIT_COMMIT · GIT_PREVIOUS_SUCCESSFUL_COMMIT 를 env 에 채워 주지만, 직접 부른
+// checkout 은 그 값을 **반환 맵으로만** 줍니다. 반환값을 버리던 동안 env.GIT_PREVIOUS_SUCCESSFUL_COMMIT 이 늘 비어,
+// 변경 파일 계산은 "판단할 수 없어 전체 빌드" 로, 머지 빌드의 라벨 수집(#1269)은 HEAD 커밋의 PR 하나로 빠졌습니다.
+// 실제 사고: #1511(batch) 33초 뒤 #1512(tour) 를 머지하자 batch 잡이 #1512 의 라벨만 읽어 배포를 생략했습니다.
+//
+// 첫 체크아웃의 값만 옮깁니다 — 두 번째 체크아웃(같은 커밋)이 이전 성공 커밋을 덮지 않게.
+void exportCheckoutVars(Map scmVars) {
+    if (env.CHECKOUT_VARS_EXPORTED == 'true') {
+        return
+    }
+    env.CHECKOUT_VARS_EXPORTED = 'true'
+
+    String commit = scmVars?.get('GIT_COMMIT')?.toString()?.trim()
+    String previousSuccessful = scmVars?.get('GIT_PREVIOUS_SUCCESSFUL_COMMIT')?.toString()?.trim()
+    if (commit) {
+        env.GIT_COMMIT = commit
+        // PR 빌드는 배포하지 않고 변경 판단도 CHANGE_TARGET 과의 diff 로 하므로 고정하지 않는다.
+        // PR_SHA 수동 빌드는 두 번째 체크아웃도 그 SHA 를 다시 받는다. 그래서 브랜치 빌드에서만 고정한다.
+        if (!env.CHANGE_ID?.trim() && !params.PR_SHA?.trim()) {
+            env.CHECKED_OUT_COMMIT = commit
+        }
+    }
+    if (previousSuccessful) {
+        env.GIT_PREVIOUS_SUCCESSFUL_COMMIT = previousSuccessful
+        echo "이전 성공 빌드 커밋: ${previousSuccessful.take(8)} / 이번 커밋: ${commit ? commit.take(8) : '알 수 없음'}"
+    } else {
+        echo '이전 성공 빌드 커밋이 없습니다. (첫 빌드 등)'
+    }
 }
 
 Map<String, Object> resolveVaultSpec(Map<String, String> config, Map<String, String> ctx) {
@@ -409,7 +458,10 @@ List<String> resolveScopedCommitsSincePreviousSuccess(Map<String, String> config
     }
 
     // 커밋 줄은 '@@' 로 시작해 파일 경로 줄과 가릅니다.
-    String output = sh(returnStdout: true, script: "git log --format=@@%H --name-only ${previous}..HEAD").trim()
+    // --first-parent -m: main 에는 릴리스 merge commit 이 쌓이는데 기본 git log 는 merge commit 의 파일을 내지 않아,
+    // 범위 커밋이 develop 쪽 기능 커밋(base=develop PR)만 남고 릴리스 PR(base=main)을 못 찾는다 (#1514 검토).
+    // 첫 부모만 따라가면 merge commit 이 첫 부모와의 차이(릴리스 전체 변경)와 함께 잡힌다. develop 은 선형이라 결과가 같다.
+    String output = sh(returnStdout: true, script: "git log --first-parent -m --format=@@%H --name-only ${previous}..HEAD").trim()
     List<String> commits = []
     String current = ''
     for (String line : output.split('\n')) {
