@@ -84,7 +84,7 @@ contentUrl: https://www.data.go.kr/cmm/cmm/fileDownload.do
 | 전화번호 / 홈페이지 | `tel` / `homepage` | |
 | 반려동물 동반 가능정보 | `petAvailable` + `petAllowanceType` | Y/N |
 | 입장 가능 동물 크기 | `allowedPetSize`(신규) | 관광 API `acmpyPsblCpam` 과 같은 파서 사용. "해당없음" 58건은 UNKNOWN |
-| 반려동물 제한사항 | `petRestriction`(신규) | 원문 보존. "야외만 반려동물 동반 가능" 15건은 부분 동반 판정에 쓴다 |
+| 반려동물 제한사항 | `petRestriction`(신규) | 원문 보존. "야외만 반려동물 동반 가능" 15건은 부분 동반 판정에 쓴다. 장소 상세 응답 `petRestriction` 으로 노출한다(#1523) — 제한 없음을 뜻하는 자리표시("해당없음" · "제한사항 없음", 공백 차이 무시)와 빈 값은 null, 그 밖은 앞뒤 공백만 정리한 원문 그대로. 해석은 적재가 아니라 읽는 쪽 tour-service `PetRestriction` 이 한다(적합도 근거 문장도 같은 규칙) |
 | 장소(실내)/(실외) 여부 | `indoor` / `outdoor`(신규) | **반려견이 머물 수 있는 구역이다(시설 형태 아님).** 동반 N 이면 모름(`NULL`), 동반 Y 면 Y/N 그대로, 동반 Y 인데 두 칸이 모두 N 이면 모름 — 아래 실측 (#1434). 비 오는 날 대안 추천의 근거 |
 | 반려동물 전용 정보 | `petOnly`(신규) | "반려동물 전용" 55건 |
 | 애견 동반 추가 요금 | `petExtraFee`(신규) | 원문 보존. 요금 없음이 "없음" 이라는 낱말로 온다 — 뜻 해석은 tour-service `PetExtraFee` 가 판정 단계에서 한다 (#231) |
